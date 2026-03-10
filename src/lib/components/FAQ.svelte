@@ -2,7 +2,7 @@
 	const faqs = [
 		{
 			question: 'What types of restaurants is Superextra built for?',
-			answer: 'Superextra is built for every segment of the restaurant industry — from independent operators and fast-casual chains to fine dining groups and enterprise brands. Whether you run a single location or hundreds, our intelligence adapts to your scale and needs.'
+			answer: 'Superextra is built for every segment of the restaurant industry — from independent operators and fast-casual concepts to fine dining groups and growing multi-unit brands. Whether you run one location or twenty, our intelligence adapts to your scale and needs.'
 		},
 		{
 			question: 'How is the data collected and how accurate is it?',
@@ -19,10 +19,6 @@
 		{
 			question: 'What does pricing look like?',
 			answer: "We offer flexible plans based on the number of locations and depth of intelligence you need. Early access users get preferential pricing. Reach out to our team to learn more about the plan that fits your business."
-		},
-		{
-			question: 'How is this different from existing market research?',
-			answer: "Traditional market research is expensive, slow, and generic. Superextra delivers always-on, hyper-local intelligence that updates in real time and is specifically built for restaurant decision-making. Think of it as the Bloomberg Terminal for the restaurant industry."
 		}
 	];
 
@@ -60,23 +56,13 @@
 							</svg>
 						</div>
 						{#if openIndex === i}
-							<p class="pb-6 text-sm leading-normal text-black/50">
+							<p class="pb-6 text-sm leading-snug text-black/50">
 								{faq.answer}
 							</p>
 						{/if}
 					</button>
 				{/each}
 			</div>
-		</div>
-
-		<!-- CTA below FAQ like ElevenLabs -->
-		<div class="mt-12">
-			<a
-				href="https://superextra.ai"
-				class="inline-flex items-center gap-2 rounded-full bg-black px-8 py-3.5 text-sm font-medium text-white transition-colors hover:bg-black/80"
-			>
-				Get Access
-			</a>
 		</div>
 	</div>
 </section>

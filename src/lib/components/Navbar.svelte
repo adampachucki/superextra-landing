@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { formState } from '$lib/form-state.svelte';
+
 	let scrolled = $state(false);
 	let mobileOpen = $state(false);
 
@@ -10,7 +12,7 @@
 <svelte:window onscroll={handleScroll} />
 
 <nav
-	class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 {scrolled
+	class="fixed top-0 left-0 right-0 z-50 {scrolled
 		? 'bg-white/80 backdrop-blur-xl border-b border-gray-200'
 		: 'bg-transparent'}"
 >
@@ -29,7 +31,7 @@
 
 		<div class="hidden items-center gap-3 md:flex">
 			<a href="mailto:hello@superextra.ai" class="rounded-full border border-gray-200 px-5 py-2 text-sm text-black transition-colors hover:bg-gray-50">Contact Us</a>
-			<a href="https://superextra.ai" class="rounded-full bg-black px-5 py-2 text-sm text-white transition-colors hover:bg-black/80">Get Access</a>
+			<button onclick={() => formState.open()} class="cursor-pointer rounded-full bg-black px-5 py-2 text-sm text-white transition-colors hover:bg-black/80">Get Access</button>
 		</div>
 
 		<button
@@ -53,7 +55,7 @@
 				<a href="#faq" class="text-sm text-black/60" onclick={() => (mobileOpen = false)}>FAQ</a>
 				<hr class="border-gray-100" />
 				<a href="https://superextra.ai" class="text-sm text-black/60">Sign in</a>
-				<a href="https://superextra.ai" class="rounded-full bg-black px-5 py-2.5 text-center text-sm text-white">Get Access</a>
+				<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer rounded-full bg-black px-5 py-2.5 text-center text-sm text-white">Get Access</button>
 			</div>
 		</div>
 	{/if}

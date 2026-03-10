@@ -1,0 +1,13 @@
+{
+	"hosting": {
+		"site": "superextra-landing",
+		"public": "build",
+		"ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+		"rewrites": [
+			{
+				"source": "**",
+				"destination": "/200.html"
+			}
+		]
+	}
+}
