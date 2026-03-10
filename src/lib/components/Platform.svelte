@@ -53,7 +53,7 @@
 			Extra Clarity
 		</p>
 		<h2 class="mb-4 max-w-2xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
-			Everything restaurant owners need to make great decisions
+			The intelligence behind every restaurant decision
 		</h2>
 		<p class="mb-16 max-w-lg text-lg text-black/50">
 			Seven intelligence layers, one platform. Built for every decision a restaurant makes.

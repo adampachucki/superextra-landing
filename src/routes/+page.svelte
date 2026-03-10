@@ -4,6 +4,7 @@
 	import About from '$lib/components/About.svelte';
 	import Platform from '$lib/components/Platform.svelte';
 	import Audiences from '$lib/components/Audiences.svelte';
+	import UseCases from '$lib/components/UseCases.svelte';
 	import HowItWorks from '$lib/components/HowItWorks.svelte';
 	import FAQ from '$lib/components/FAQ.svelte';
 	import CTA from '$lib/components/CTA.svelte';
@@ -18,6 +19,7 @@
 	<About />
 	<Platform />
 	<Audiences />
+	<UseCases />
 	<HowItWorks />
 	<FAQ />
 	<CTA />
