@@ -2,12 +2,20 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { browser } from '$app/environment';
-	import { beforeNavigate, afterNavigate } from '$app/navigation';
+	import { afterNavigate } from '$app/navigation';
+	import { onMount } from 'svelte';
 
-	beforeNavigate(({ willUnload }) => {
-		if (willUnload) {
+	onMount(() => {
+		const onBeforeUnload = () => {
 			sessionStorage.setItem('se:scroll', String(scrollY));
-		}
+		};
+		addEventListener('beforeunload', onBeforeUnload);
+		// Safari fires pagehide but not always beforeunload
+		addEventListener('pagehide', onBeforeUnload);
+		return () => {
+			removeEventListener('beforeunload', onBeforeUnload);
+			removeEventListener('pagehide', onBeforeUnload);
+		};
 	});
 
 	afterNavigate(({ type }) => {
