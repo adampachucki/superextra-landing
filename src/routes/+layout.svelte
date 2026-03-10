@@ -2,6 +2,23 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { browser } from '$app/environment';
+	import { beforeNavigate, afterNavigate } from '$app/navigation';
+
+	beforeNavigate(({ willUnload }) => {
+		if (willUnload) {
+			sessionStorage.setItem('se:scroll', String(scrollY));
+		}
+	});
+
+	afterNavigate(({ type }) => {
+		if (type === 'enter') {
+			const y = sessionStorage.getItem('se:scroll');
+			if (y) {
+				sessionStorage.removeItem('se:scroll');
+				requestAnimationFrame(() => scrollTo(0, parseInt(y)));
+			}
+		}
+	});
 
 	let { children } = $props();
 	let unlocked = $state(!browser || localStorage.getItem('se_pass') === 'superpower');

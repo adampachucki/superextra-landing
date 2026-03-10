@@ -7,6 +7,16 @@
 	function handleScroll() {
 		scrolled = window.scrollY > 20;
 	}
+
+	function smoothScroll(e: MouseEvent) {
+		const href = (e.currentTarget as HTMLAnchorElement).getAttribute('href');
+		const hash = href?.split('#')[1];
+		if (!hash) return;
+		const el = document.getElementById(hash);
+		if (!el) return;
+		e.preventDefault();
+		el.scrollIntoView({ behavior: 'smooth' });
+	}
 </script>
 
 <svelte:window onscroll={handleScroll} />
@@ -24,8 +34,9 @@
 		</a>
 
 		<div class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
-			<a href="/#platform" class="text-sm text-black/60 transition-colors hover:text-black">Features</a>
-<a href="/#faq" class="text-sm text-black/60 transition-colors hover:text-black">FAQ</a>
+			<a href="/#platform" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">Features</a>
+			<a href="/#use-cases" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">Use Cases</a>
+			<a href="/#faq" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">FAQ</a>
 		</div>
 
 		<div class="hidden items-center gap-3 md:flex">
@@ -49,8 +60,9 @@
 	{#if mobileOpen}
 		<div class="border-t border-gray-100 bg-white md:hidden">
 			<div class="flex flex-col gap-4 px-6 py-6">
-				<a href="/#platform" class="text-sm text-black/60" onclick={() => (mobileOpen = false)}>Platform</a>
-				<a href="/#faq" class="text-sm text-black/60" onclick={() => (mobileOpen = false)}>FAQ</a>
+				<a href="/#platform" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Platform</a>
+				<a href="/#use-cases" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Use Cases</a>
+				<a href="/#faq" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>FAQ</a>
 				<hr class="border-gray-100" />
 				<a href="https://superextra.ai" class="text-sm text-black/60">Sign in</a>
 				<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer rounded-full bg-black px-5 py-2.5 text-center text-sm text-white">Get Access</button>

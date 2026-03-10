@@ -92,7 +92,7 @@
 	}
 </script>
 
-<section class="border-t border-gray-200 py-24 md:py-32">
+<section id="use-cases" class="border-t border-gray-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="mb-12 flex items-end justify-between">
 			<div>
@@ -100,7 +100,7 @@
 				<h2
 					class="max-w-xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black"
 				>
-					Intelligence that drives every decision
+					Intelligence to support every role and function
 				</h2>
 			</div>
 

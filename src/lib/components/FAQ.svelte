@@ -2,7 +2,7 @@
 	const faqs = [
 		{
 			question: 'What types of restaurants is Superextra built for?',
-			answer: 'Superextra is built for every segment of the restaurant industry — from independent operators and fast-casual concepts to fine dining groups and growing multi-unit brands. Whether you run one location or twenty, our intelligence adapts to your scale and needs.'
+			answer: "Superextra is built for every segment of the restaurant industry — from independent operators and fast-casual concepts to fine dining groups and growing multi-unit brands. It's also used by suppliers, tech platforms, agencies, and investors who need restaurant market intelligence."
 		},
 		{
 			question: 'How is the data collected and how accurate is it?',

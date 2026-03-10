@@ -9,7 +9,7 @@
 		{
 			title: 'Guest & Location',
 			description:
-				'Understand who your guests are and how they find you. Analyze review sentiment, measure foot traffic, and map trade areas to optimize positioning.',
+				'Understand who the guests are in your trade area. Analyze review sentiment, measure foot traffic, and map demographics to optimize positioning.',
 			features: ['Review Sentiment', 'Foot Traffic', 'Demographics', 'Trade Areas', 'Tourist vs Local Mix', 'Location Scoring']
 		},
 		{
