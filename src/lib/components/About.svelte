@@ -10,13 +10,13 @@
 			</h2>
 
 			<div class="space-y-6">
-				<p class="text-lg leading-relaxed text-black/50">
+				<p class="text-lg leading-normal text-black/50">
 					Restaurants make critical decisions every day — where to open, how to price, what to serve, who to hire — often based on gut feeling or outdated data. Superextra changes that.
 				</p>
-				<p class="text-lg leading-relaxed text-black/50">
+				<p class="text-lg leading-normal text-black/50">
 					We combine hyper-local market data, competitor benchmarking, guest sentiment, and financial modeling into a single intelligence layer purpose-built for the restaurant industry. Whether you're an independent operator, a growing group, or an enterprise brand, Superextra gives you the edge to make every decision count.
 				</p>
-				<p class="text-lg font-medium leading-relaxed text-black">
+				<p class="text-lg font-medium leading-normal text-black">
 					Super intelligence. Extra advantage.
 				</p>
 			</div>

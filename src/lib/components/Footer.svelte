@@ -5,7 +5,7 @@
 				<a href="/" class="inline-block">
 					<span class="text-[22px] font-black tracking-tight text-black">superextra</span>
 				</a>
-				<p class="mt-4 text-sm leading-relaxed text-black/40">
+				<p class="mt-4 text-sm leading-normal text-black/40">
 					Super local intelligence for restaurants. Built to give the industry an extra edge.
 				</p>
 			</div>

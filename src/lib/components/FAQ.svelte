@@ -60,7 +60,7 @@
 							</svg>
 						</div>
 						{#if openIndex === i}
-							<p class="pb-6 text-sm leading-relaxed text-black/50">
+							<p class="pb-6 text-sm leading-normal text-black/50">
 								{faq.answer}
 							</p>
 						{/if}
@@ -75,7 +75,7 @@
 				href="https://superextra.ai"
 				class="inline-flex items-center gap-2 rounded-full bg-black px-8 py-3.5 text-sm font-medium text-white transition-colors hover:bg-black/80"
 			>
-				Get Early Access
+				Get Access
 			</a>
 		</div>
 	</div>

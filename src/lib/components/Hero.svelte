@@ -1,14 +1,14 @@
-<section class="relative overflow-hidden pt-28 pb-0 md:pt-32">
+<section class="relative overflow-hidden pt-28 pb-0 md:pt-34">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<!-- Massive headline with overlapping image -->
 		<div class="relative">
-			<h1 class="relative z-10 text-center text-[clamp(3.5rem,10vw,9rem)] leading-[0.95] font-normal tracking-[-0.04em] text-black">
-				Superextra<br />Intelligence
+			<h1 class="relative z-10 text-center text-[clamp(4.5rem,9vw,9rem)] leading-[0.95] font-normal tracking-[-0.04em] text-black">
+				Market intelligence for restaurants
 			</h1>
 
 			<!-- Abstract hero image overlapping the title -->
-			<div class="relative z-0 mx-auto -mt-16 mb-8 flex justify-center md:-mt-28">
-				<div class="relative h-[280px] w-[520px] overflow-hidden rounded-2xl md:h-[400px] md:w-[680px]">
+			<div class="relative z-0 mx-auto -mt-20 mb-8 flex justify-center md:-mt-40">
+				<div class="relative h-[250px] w-[520px] overflow-hidden rounded-2xl md:h-[360px] md:w-[680px]">
 					<!-- Abstract gradient artwork reminiscent of ElevenLabs style -->
 					<div class="absolute inset-0 bg-gradient-to-br from-emerald-300 via-teal-400 to-cyan-500"></div>
 					<div class="absolute -top-10 -right-10 h-64 w-64 rounded-full bg-amber-200/60 blur-2xl"></div>
@@ -27,38 +27,38 @@
 
 		<!-- Subtitle + CTA -->
 		<div class="mx-auto max-w-2xl text-center">
-			<p class="mb-8 text-lg leading-relaxed text-black/50 md:text-xl">
+			<p class="mb-8 text-lg leading-normal text-black/50 md:text-xl">
 				Super local intelligence and competitor benchmarking platform to give every restaurant a clearer, sharper picture of the market around them. The extra advantage behind smarter decisions.
 			</p>
 			<a
 				href="https://superextra.ai"
 				class="inline-flex items-center gap-2 rounded-full bg-black px-8 py-3.5 text-sm font-medium text-white transition-colors hover:bg-black/80"
 			>
-				Get Early Access
+				Get Access
 			</a>
 		</div>
 	</div>
 
 	<!-- Stats row -->
 	<div class="mx-auto mt-20 max-w-[1200px] px-6 md:mt-28">
-		<div class="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-gray-200 bg-gray-200 md:grid-cols-3">
-			<div class="bg-gray-50 p-8">
-				<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+		<div class="grid grid-cols-1 border-t border-gray-200 md:grid-cols-3 md:divide-x md:divide-gray-200">
+			<div class="border-b border-gray-200 p-8 md:border-b-0 md:py-10 md:pr-10">
+				<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="square" stroke-linejoin="miter" d="M3 3v18h18" /><rect x="6.5" y="13.5" width="1.5" height="1.5" fill="currentColor" /><rect x="11.5" y="8.5" width="1.5" height="1.5" fill="currentColor" /><rect x="16.5" y="5.5" width="1.5" height="1.5" fill="currentColor" /><rect x="9.5" y="16.5" width="1.5" height="1.5" fill="currentColor" /><rect x="15.5" y="11.5" width="1.5" height="1.5" fill="currentColor" /></svg>
 				</div>
 				<h3 class="text-2xl font-bold text-black">50M+ data points</h3>
 				<p class="mt-1 text-sm text-black/50">Tracked across the restaurant industry daily.</p>
 			</div>
-			<div class="bg-gray-50 p-8">
-				<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+			<div class="border-b border-gray-200 p-8 md:border-b-0 md:py-10 md:px-10">
+				<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="square" stroke-linejoin="miter" d="M12 3v7l-5 5h10l-5-5ZM12 21v-6" /></svg>
 				</div>
 				<h3 class="text-2xl font-bold text-black">1-mile granularity</h3>
 				<p class="mt-1 text-sm text-black/50">True neighborhood-level competitive intelligence.</p>
 			</div>
-			<div class="bg-gray-50 p-8">
-				<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+			<div class="p-8 md:py-10 md:pl-10">
+				<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="square" stroke-linejoin="miter" d="M3 21h18M6 21v-5M12 21V8M18 21V3" /></svg>
 				</div>
 				<h3 class="text-2xl font-bold text-black">300+ markets</h3>
 				<p class="mt-1 text-sm text-black/50">Across the US with real-time intelligence and benchmarking.</p>

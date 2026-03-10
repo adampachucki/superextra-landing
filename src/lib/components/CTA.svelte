@@ -4,8 +4,8 @@
 			Super local intelligence for the restaurant industry
 		</p>
 		<div class="flex items-center gap-3">
-			<a href="mailto:hello@superextra.ai" class="rounded-full border border-gray-200 px-6 py-2.5 text-sm text-black transition-colors hover:bg-gray-50">Contact Sales</a>
-			<a href="https://superextra.ai" class="rounded-full bg-black px-6 py-2.5 text-sm text-white transition-colors hover:bg-black/80">Get Early Access</a>
+			<a href="mailto:hello@superextra.ai" class="rounded-full border border-gray-200 px-6 py-2.5 text-sm text-black transition-colors hover:bg-gray-50">Contact Us</a>
+			<a href="https://superextra.ai" class="rounded-full bg-black px-6 py-2.5 text-sm text-white transition-colors hover:bg-black/80">Get Access</a>
 		</div>
 	</div>
 </section>

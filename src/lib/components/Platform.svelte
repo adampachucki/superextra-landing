@@ -82,7 +82,7 @@
 
 						{#if activeIndex === i}
 							<div class="pb-6">
-								<p class="mb-4 text-sm leading-relaxed text-black/50">
+								<p class="mb-4 text-sm leading-normal text-black/50">
 									{category.description}
 								</p>
 								<div class="flex flex-wrap gap-2">
