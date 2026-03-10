@@ -1,7 +1,7 @@
 <section id="how-it-works" class="border-t border-gray-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">
-			How It Works
+			Get Onboard
 		</p>
 		<h2 class="mb-16 max-w-2xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
 			Request access and start making informed decisions
@@ -17,7 +17,7 @@
 			</div>
 			<div class="border-b border-gray-200 p-8 md:border-b-0 md:py-10 md:px-10">
 				<div class="mb-6 text-5xl font-black text-black/10">2.</div>
-				<h3 class="mb-3 text-lg font-bold text-black">Get Your Intelligence</h3>
+				<h3 class="mb-3 text-lg font-bold text-black">Get the Intelligence</h3>
 				<p class="text-sm leading-snug text-black/50">
 					Receive a comprehensive market profile with competitor benchmarks, guest insights, pricing data, and revenue estimates.
 				</p>

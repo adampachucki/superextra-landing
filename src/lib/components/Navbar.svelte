@@ -13,7 +13,7 @@
 
 <nav
 	class="fixed top-0 left-0 right-0 z-50 {scrolled
-		? 'bg-white/80 backdrop-blur-xl border-b border-gray-200'
+		? 'bg-white md:bg-white/80 md:backdrop-blur-xl border-b border-gray-200'
 		: 'bg-transparent'}"
 >
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
@@ -24,9 +24,8 @@
 		</a>
 
 		<div class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
-			<a href="#platform" class="text-sm text-black/60 transition-colors hover:text-black">Platform</a>
-			<a href="#how-it-works" class="text-sm text-black/60 transition-colors hover:text-black">How It Works</a>
-			<a href="#faq" class="text-sm text-black/60 transition-colors hover:text-black">FAQ</a>
+			<a href="/#platform" class="text-sm text-black/60 transition-colors hover:text-black">Features</a>
+<a href="/#faq" class="text-sm text-black/60 transition-colors hover:text-black">FAQ</a>
 		</div>
 
 		<div class="hidden items-center gap-3 md:flex">
@@ -50,9 +49,8 @@
 	{#if mobileOpen}
 		<div class="border-t border-gray-100 bg-white md:hidden">
 			<div class="flex flex-col gap-4 px-6 py-6">
-				<a href="#platform" class="text-sm text-black/60" onclick={() => (mobileOpen = false)}>Platform</a>
-				<a href="#how-it-works" class="text-sm text-black/60" onclick={() => (mobileOpen = false)}>How It Works</a>
-				<a href="#faq" class="text-sm text-black/60" onclick={() => (mobileOpen = false)}>FAQ</a>
+				<a href="/#platform" class="text-sm text-black/60" onclick={() => (mobileOpen = false)}>Platform</a>
+				<a href="/#faq" class="text-sm text-black/60" onclick={() => (mobileOpen = false)}>FAQ</a>
 				<hr class="border-gray-100" />
 				<a href="https://superextra.ai" class="text-sm text-black/60">Sign in</a>
 				<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer rounded-full bg-black px-5 py-2.5 text-center text-sm text-white">Get Access</button>

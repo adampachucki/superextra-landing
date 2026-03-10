@@ -30,7 +30,6 @@
 {:else}
 	<div class="fixed inset-0 z-[200] flex items-center justify-center bg-white">
 		<form onsubmit={(e) => { e.preventDefault(); submit(); }} class="flex flex-col items-center gap-4">
-			<h1 class="text-lg font-semibold tracking-tight text-black">Enter password</h1>
 			<input
 				bind:value={input}
 				type="password"

@@ -21,15 +21,15 @@
 				</p>
 			</div>
 			<div class="rounded-2xl border border-white/10 bg-white/5 p-6">
-				<h3 class="mb-2 text-base font-semibold text-white">Investors</h3>
+				<h3 class="mb-2 text-base font-semibold text-white">Agencies & Advisors</h3>
 				<p class="text-sm leading-snug text-white/40">
-					Evaluate opportunities, perform due diligence, and monitor portfolio performance with institutional-grade market data.
+					Real market data for pitches, strategies, and campaigns. Hyper-local restaurant intelligence on demand.
 				</p>
 			</div>
 			<div class="rounded-2xl border border-white/10 bg-white/5 p-6">
-				<h3 class="mb-2 text-base font-semibold text-white">Agencies & Advisors</h3>
+				<h3 class="mb-2 text-base font-semibold text-white">Investors</h3>
 				<p class="text-sm leading-snug text-white/40">
-					Arm your clients with real market data. Power pitches, strategies, and campaigns with hyper-local restaurant intelligence.
+					Evaluate opportunities, perform due diligence, and monitor portfolio performance with institutional-grade market data.
 				</p>
 			</div>
 		</div>

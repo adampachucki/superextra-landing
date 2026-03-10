@@ -14,7 +14,7 @@
 					Restaurants make critical decisions every day — where to open, how to price, what to serve, who to hire — often based on gut feeling or outdated data. Superextra changes that.
 				</p>
 				<p class="text-lg leading-snug text-black/50">
-					We combine hyper-local market data, competitor benchmarking, guest sentiment, and financial modeling into a single intelligence layer purpose-built for the restaurant industry. Whether you're an independent operator or a growing group, Superextra gives you the edge to make every decision count.
+					We combine hyper-local market data, competitor benchmarking, guest sentiment, and financial modeling into a single intelligence layer purpose-built for the restaurant industry. Built for independent operators and growing groups alike, Superextra gives the edge to make every decision count.
 				</p>
 				<p class="text-lg font-medium leading-snug text-black">
 					Super intelligence. Extra advantage.

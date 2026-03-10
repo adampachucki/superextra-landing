@@ -50,10 +50,10 @@
 <section id="platform" class="border-t border-gray-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">
-			Deep Insights
+			Extra Clarity
 		</p>
 		<h2 class="mb-4 max-w-2xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
-			Everything restaurant owners need to understand their market
+			Everything restaurant owners need to make great decisions
 		</h2>
 		<p class="mb-16 max-w-lg text-lg text-black/50">
 			Seven intelligence layers, one platform. Built for every decision a restaurant makes.

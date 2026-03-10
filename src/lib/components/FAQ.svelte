@@ -30,7 +30,7 @@
 		<div class="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_1.5fr] lg:gap-20">
 			<div>
 				<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">
-					FAQ
+					Learn More
 				</p>
 				<h2 class="text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
 					Frequently asked questions
