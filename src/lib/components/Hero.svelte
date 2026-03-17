@@ -22,7 +22,7 @@
 		<!-- Subtitle + CTA -->
 		<div class="mx-auto max-w-2xl text-center">
 			<p class="mb-8 text-lg leading-snug text-black/50 md:text-xl">
-				Super local intelligence and competitor benchmarking platform to give every restaurant a clear picture of the market. The extra advantage behind smarter decisions.
+				Super local intelligence and competitor benchmarking platform to give every restaurant a clear picture of the market around them. The extra advantage behind smarter decisions.
 			</p>
 			<button
 				onclick={() => formState.open()}
