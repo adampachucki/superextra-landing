@@ -19,19 +19,12 @@
 - Delivery platform price markups vs dine-in menus
 - Deals & promotional activity analysis
 
-### Supply Chain
-
-- Supplier pricing trends
-
 ### Revenue & Sales
 
 - Estimated revenue
 - Sales seasonality patterns
 - Revenue split by channel (dine-in, delivery, takeaway)
 - Seat occupancy rates
-
-### Delivery Platforms
-
 - Platform market share (Pyszne, Wolt, Glovo, Uber Eats etc.)
 
 ### Guest Intelligence
@@ -55,21 +48,16 @@
 - Tourist vs local traffic patterns
 - Visit time distribution
 
-### Workforce
+### Operations
 
 - Local labor pool availability
 - Salary benchmarks
 - Competing job offer activity
 - Staff tenure, turnover & retention rates
-
-### Real Estate
-
 - Commercial rent prices & trends
+- Supplier pricing trends
 
-### Reports & Research
-
-- Curated industry report library for market analysis & benchmarking
-- AI-powered agents for custom market data queries & analysis
+> **Platform capabilities:** Curated industry report library for market analysis & benchmarking. AI-powered agents for custom market data queries & analysis.
 
 ---
 
