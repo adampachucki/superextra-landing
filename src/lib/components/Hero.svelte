@@ -54,8 +54,8 @@
 				<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C12 2 14 9 12 12C10 9 12 2 12 2Z" /><path d="M12 12C12 12 14 15 12 22C10 15 12 12 12 12Z" /><path d="M2 12C2 12 9 10 12 12C9 14 2 12 2 12Z" /><path d="M12 12C12 12 15 10 22 12C15 14 12 12 12 12Z" /></svg>
 				</div>
-				<h3 class="text-2xl font-bold text-black">On-demand research</h3>
-				<p class="mt-1 text-sm text-black/50">Human experts and AI agents working together to support research, help understand data, and generate custom reports.</p>
+				<h3 class="text-2xl font-bold text-black">AI-native research</h3>
+				<p class="mt-1 text-sm text-black/50">Vast market data distilled into clear, actionable insights and custom reports. Backed by human experts when it matters most.</p>
 			</div>
 		</div>
 	</div>
