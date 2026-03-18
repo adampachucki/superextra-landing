@@ -41,7 +41,7 @@
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="square" stroke-linejoin="miter" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" /><path stroke-linecap="square" stroke-linejoin="miter" d="M12 9v6M9 12h6" /></svg>
 				</div>
 				<h3 class="text-2xl font-bold text-black">Unrivaled data</h3>
-				<p class="mt-1 text-sm text-black/50">Competitor activity, menus, pricing, reviews, foot traffic, and revenue estimates based on dozens of public and proprietary sources.</p>
+				<p class="mt-1 text-sm text-black/50">Competitor activity, menu pricing, reviews, foot traffic, and financials derived from dozens of public and proprietary sources.</p>
 			</div>
 			<div class="border-b border-gray-200 p-8 md:border-b-0 md:py-10 md:px-10">
 				<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">

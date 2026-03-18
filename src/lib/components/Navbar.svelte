@@ -34,7 +34,7 @@
 		</a>
 
 		<div class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
-			<a href="/#platform" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">Features</a>
+			<a href="/#platform" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">Platform</a>
 			<a href="/#use-cases" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">Use Cases</a>
 			<a href="/#faq" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">FAQ</a>
 		</div>
@@ -64,7 +64,6 @@
 				<a href="/#use-cases" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Use Cases</a>
 				<a href="/#faq" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>FAQ</a>
 				<hr class="border-gray-100" />
-				<a href="https://superextra.ai" class="text-sm text-black/60">Sign in</a>
 				<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer rounded-full bg-black px-5 py-2.5 text-center text-sm text-white">Get Access</button>
 			</div>
 		</div>
