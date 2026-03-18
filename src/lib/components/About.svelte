@@ -11,10 +11,10 @@
 
 			<div class="space-y-6">
 				<p class="text-lg leading-snug text-black/50">
-					Restaurants make critical decisions every day — where to open, how to price, what to serve, who to hire — often based on gut feeling or outdated data. Superextra changes that.
+					Restaurants make critical decisions every day — where to open, how to price, what to serve, who to hire — too often based on gut feeling or fragmented data. Superextra changes that.
 				</p>
 				<p class="text-lg leading-snug text-black/50">
-					We combine hyper-local market data, competitor benchmarking, guest sentiment, and revenue estimates into a single intelligence layer purpose-built for the restaurant industry. Built for independent operators and growing groups alike, Superextra gives the edge to make every decision count.
+					Our AI models synthesize market data, guest sentiment, and financial signals into a single purpose-built intelligence platform for all players in the ecosystem — from independent operators to suppliers and tech platforms. We give the edge to make every decision count.
 				</p>
 				<p class="text-lg font-medium leading-snug text-black">
 					Super intelligence. Extra advantage.
