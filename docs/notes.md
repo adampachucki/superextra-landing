@@ -2,8 +2,8 @@
 
 ## Context
 
-Im working on superextra.ai - an intelligence and benchmarking paltform for the restaurants industry.
-I call it palantir for the restaurant industry. Its punchy but not correct - the difference is that we bring the market data so that customers can analyze their perfromance against it and make better decisions. We dont conenct with customers own data.
+Superxtra is an intelligence and benchmarking platform for the restaurant industry.
+We may call it "Palantir for the restaurant industry". It's punchy but not factually correct - the difference is that we bring the market data so that customers can analyze their perfromance against it and make better decisions. We don't conenct with customers' own data.
 
 ---
 
