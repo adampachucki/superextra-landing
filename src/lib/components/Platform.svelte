@@ -1,6 +1,110 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 
+	const GRAD_EMERALD_VIOLET = 'linear-gradient(to right, rgb(110,231,183), rgb(167,139,250))';
+	const GRAD_INDIGO_VIOLET = 'linear-gradient(to right, rgb(99,102,241), rgb(167,139,250))';
+	const GRAD_INDIGO_VIOLET_V = 'linear-gradient(to top, rgb(99,102,241), rgb(167,139,250))';
+	const GRAD_PINK_AMBER = 'linear-gradient(to right, rgb(244,114,182), rgb(251,191,36))';
+	const GRAD_PINK_AMBER_V = 'linear-gradient(to top, rgb(244,114,182), rgb(251,191,36))';
+	const GRAD_CYAN_EMERALD = 'linear-gradient(to top, rgb(6,182,212), rgb(110,231,183))';
+	const GRAD_CYAN_EMERALD_H = 'linear-gradient(to right, rgb(6,182,212), rgb(110,231,183))';
+	const GRAD_EMERALD_CYAN = 'linear-gradient(to right, rgb(110,231,183), rgb(6,182,212))';
+	const GRAD_AMBER_PINK = 'linear-gradient(to right, rgb(251,191,36), rgb(244,114,182))';
+	const GRAD_PINK_VIOLET = 'linear-gradient(to right, rgb(244,114,182), rgb(167,139,250))';
+	const GRAD_GRAY = 'linear-gradient(to right, rgb(180,180,190), rgb(150,150,165))';
+
+	const netOpenings = [
+		{ m: 'Oct', v: 3 },
+		{ m: 'Nov', v: 5 },
+		{ m: 'Dec', v: -1 },
+		{ m: 'Jan', v: 2 },
+		{ m: 'Feb', v: 6 },
+		{ m: 'Mar', v: 8 }
+	];
+
+	const cuisineLandscape = [
+		{ name: 'Korean Fusion', change: '+34%', pct: 88, up: true },
+		{ name: 'Mediterranean', change: '+22%', pct: 68, up: true },
+		{ name: 'Fast Casual Pizza', change: '+18%', pct: 55, up: true },
+		{ name: 'Fine Dining French', change: '-8%', pct: 22, up: false }
+	];
+
+	const trendingItems = [
+		{ item: 'Smash Burger', price: '$18', trend: '+12%', up: true, hot: true },
+		{ item: 'Matcha Latte', price: '$7', trend: '+28%', up: true, hot: true },
+		{ item: 'Birria Tacos', price: '$16', trend: '+15%', up: true, hot: false },
+		{ item: 'Caesar Salad', price: '$14', trend: '+3%', up: true, hot: false },
+		{ item: 'Wagyu Steak', price: '$62', trend: '-5%', up: false, hot: false }
+	];
+
+	const activePromos = [
+		{ venue: 'Burger Joint', deal: '2-for-1 Tuesdays', type: 'Dine-in' },
+		{ venue: 'Sakura Ramen', deal: '15% off delivery', type: 'Delivery' },
+		{ venue: 'Taco Loco', deal: 'Free drink w/ combo', type: 'All channels' }
+	];
+
+	const revenueKpis = [
+		{ value: '$1.2M', label: 'Avg Revenue', change: '+8%', up: true },
+		{ value: '$47', label: 'Avg Check', change: '+3%', up: true },
+		{ value: '78%', label: 'Occupancy', change: '-2%', up: false }
+	];
+
+	const monthlyRevenue = [
+		{ m: 'Jan', v: 65 },
+		{ m: 'Feb', v: 60 },
+		{ m: 'Mar', v: 72 },
+		{ m: 'Apr', v: 78 },
+		{ m: 'May', v: 85 },
+		{ m: 'Jun', v: 92 },
+		{ m: 'Jul', v: 95 },
+		{ m: 'Aug', v: 88 },
+		{ m: 'Sep', v: 82 },
+		{ m: 'Oct', v: 78 },
+		{ m: 'Nov', v: 85 },
+		{ m: 'Dec', v: 100 }
+	];
+
+	const adSpendByChannel = [
+		{ name: 'Instagram', spend: '$2.4K/mo', pct: 85, grad: GRAD_INDIGO_VIOLET },
+		{ name: 'Google Ads', spend: '$1.8K/mo', pct: 64, grad: GRAD_CYAN_EMERALD_H },
+		{ name: 'TikTok', spend: '$800/mo', pct: 28, grad: GRAD_PINK_AMBER },
+		{ name: 'Facebook', spend: '$600/mo', pct: 21, grad: GRAD_GRAY }
+	];
+
+	const commonTools = ['Square POS', 'Toast', 'OpenTable', 'Yelp', 'Mailchimp', 'Google Ads', 'Meta Business', 'Lightspeed'];
+
+	const sentimentBreakdown = [
+		{ label: 'Positive', pct: 73, grad: GRAD_EMERALD_CYAN },
+		{ label: 'Neutral', pct: 19, grad: GRAD_GRAY },
+		{ label: 'Negative', pct: 8, grad: GRAD_PINK_AMBER }
+	];
+
+	const topMentions = [
+		{ word: 'great service', size: 'text-xs' },
+		{ word: 'cozy ambiance', size: 'text-[11px]' },
+		{ word: 'slow wait', size: 'text-[10px]' },
+		{ word: 'fresh ingredients', size: 'text-xs' },
+		{ word: 'date night', size: 'text-[11px]' },
+		{ word: 'parking', size: 'text-[10px]' }
+	];
+
+	const weeklyTraffic = [
+		{ day: 'Mon', h: 40 },
+		{ day: 'Tue', h: 55 },
+		{ day: 'Wed', h: 50 },
+		{ day: 'Thu', h: 60 },
+		{ day: 'Fri', h: 85 },
+		{ day: 'Sat', h: 95 },
+		{ day: 'Sun', h: 70 }
+	];
+
+	const operationalMetrics = [
+		{ label: 'Labor Availability', score: 'Moderate', pct: 55, grad: GRAD_AMBER_PINK },
+		{ label: 'Staff Turnover', score: '42% annual', pct: 42, grad: GRAD_PINK_VIOLET },
+		{ label: 'Open Positions', score: '124 listed', pct: 65, grad: GRAD_INDIGO_VIOLET },
+		{ label: 'Supplier Pricing', score: '+3.2% YoY', pct: 32, grad: GRAD_CYAN_EMERALD_H }
+	];
+
 	const categories = [
 		{
 			title: 'Market Landscape',
@@ -49,6 +153,12 @@
 	let activeIndex = $state(0);
 </script>
 
+{#snippet progressBar(pct: number, grad: string)}
+	<div class="h-1.5 w-full rounded-full bg-gray-100">
+		<div class="h-full rounded-full" style="width: {pct}%; background: {grad}"></div>
+	</div>
+{/snippet}
+
 <section id="platform" class="border-t border-gray-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">
@@ -62,7 +172,6 @@
 		</p>
 
 		<div class="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
-			<!-- Accordion -->
 			<div class="divide-y divide-gray-200 border-t border-gray-200">
 				{#each categories as category, i}
 					<button
@@ -98,14 +207,12 @@
 				{/each}
 			</div>
 
-			<!-- Visual panel -->
 			<div class="hidden lg:flex items-start justify-center">
 				<div class="w-full overflow-hidden rounded-2xl bg-gray-50 border border-gray-200">
 					<div class="aspect-[4/3] w-full p-8 md:p-10">
 						{#key activeIndex}
 						<div class="h-full" in:fade={{ duration: 200 }}>
 						{#if activeIndex === 0}
-							<!-- Market Landscape -->
 							<div class="flex h-full flex-col">
 								<p class="mb-4 text-[11px] font-medium uppercase tracking-widest text-black/30">Market Landscape</p>
 
@@ -124,25 +231,17 @@
 									</div>
 								</div>
 
-								<!-- Net monthly openings chart -->
 								<div class="mb-5">
 									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Net Openings — 6 Months</p>
 									<div class="flex items-end gap-1.5 h-14">
-										{#each [
-											{ m: 'Oct', v: 3 },
-											{ m: 'Nov', v: 5 },
-											{ m: 'Dec', v: -1 },
-											{ m: 'Jan', v: 2 },
-											{ m: 'Feb', v: 6 },
-											{ m: 'Mar', v: 8 }
-										] as bar}
+										{#each netOpenings as bar}
 											<div class="flex-1 flex flex-col items-center gap-0.5">
 												<span class="text-[8px] font-medium tabular-nums {bar.v > 0 ? 'text-emerald-600' : 'text-red-500'}">
 													{bar.v > 0 ? '+' : ''}{bar.v}
 												</span>
 												<div
 													class="w-full rounded-t-sm"
-													style="height: {Math.max(Math.abs(bar.v) / 8 * 100, 12)}%; background: linear-gradient(to top, {bar.v > 0 ? 'rgb(6,182,212), rgb(110,231,183)' : 'rgb(244,114,182), rgb(251,191,36)'})"
+													style="height: {Math.max(Math.abs(bar.v) / 8 * 100, 12)}%; background: {bar.v > 0 ? GRAD_CYAN_EMERALD : GRAD_PINK_AMBER_V}"
 												></div>
 												<span class="text-[8px] text-black/25">{bar.m}</span>
 											</div>
@@ -150,24 +249,16 @@
 									</div>
 								</div>
 
-								<!-- Cuisine landscape with bars -->
 								<div class="flex-1">
 									<p class="text-[10px] font-medium text-black/30 mb-2.5 uppercase tracking-wider">Cuisine Landscape</p>
 									<div class="space-y-2">
-										{#each [
-											{ name: 'Korean Fusion', change: '+34%', pct: 88, up: true },
-											{ name: 'Mediterranean', change: '+22%', pct: 68, up: true },
-											{ name: 'Fast Casual Pizza', change: '+18%', pct: 55, up: true },
-											{ name: 'Fine Dining French', change: '-8%', pct: 22, up: false }
-										] as item}
+										{#each cuisineLandscape as item}
 											<div>
 												<div class="flex items-center justify-between mb-0.5">
 													<span class="text-xs text-black/60">{item.name}</span>
 													<span class="text-[10px] font-medium {item.up ? 'text-emerald-600' : 'text-red-500'}">{item.change}</span>
 												</div>
-												<div class="h-1.5 w-full rounded-full bg-gray-100">
-													<div class="h-full rounded-full" style="width: {item.pct}%; background: linear-gradient(to right, {item.up ? 'rgb(110,231,183), rgb(167,139,250)' : 'rgb(244,114,182), rgb(251,191,36)'})"></div>
-												</div>
+												{@render progressBar(item.pct, item.up ? GRAD_EMERALD_VIOLET : GRAD_PINK_AMBER)}
 											</div>
 										{/each}
 									</div>
@@ -183,7 +274,6 @@
 							</div>
 
 						{:else if activeIndex === 1}
-							<!-- Menu & Pricing -->
 							<div class="flex h-full flex-col">
 								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/30">Menu & Pricing</p>
 
@@ -193,13 +283,7 @@
 										<span>Avg Price</span>
 										<span>Trend</span>
 									</div>
-									{#each [
-										{ item: 'Smash Burger', price: '$18', trend: '+12%', up: true, hot: true },
-										{ item: 'Matcha Latte', price: '$7', trend: '+28%', up: true, hot: true },
-										{ item: 'Birria Tacos', price: '$16', trend: '+15%', up: true, hot: false },
-										{ item: 'Caesar Salad', price: '$14', trend: '+3%', up: true, hot: false },
-										{ item: 'Wagyu Steak', price: '$62', trend: '-5%', up: false, hot: false }
-									] as row}
+									{#each trendingItems as row}
 										<div class="grid grid-cols-[1fr_auto_auto] gap-x-4 items-center px-4 py-2.5 border-b border-gray-50 last:border-0">
 											<span class="text-sm text-black/70 flex items-center gap-2">
 												{row.item}
@@ -213,15 +297,10 @@
 									{/each}
 								</div>
 
-								<!-- Deals & Promos -->
 								<div class="flex-1">
 									<p class="text-[10px] font-medium text-black/30 mb-2.5 uppercase tracking-wider">Active Promotions</p>
 									<div class="space-y-2">
-										{#each [
-											{ venue: 'Burger Joint', deal: '2-for-1 Tuesdays', type: 'Dine-in' },
-											{ venue: 'Sakura Ramen', deal: '15% off delivery', type: 'Delivery' },
-											{ venue: 'Taco Loco', deal: 'Free drink w/ combo', type: 'All channels' }
-										] as promo}
+										{#each activePromos as promo}
 											<div class="flex items-center justify-between rounded-lg bg-white border border-gray-100 px-3 py-2">
 												<div>
 													<span class="text-xs text-black/70 font-medium">{promo.venue}</span>
@@ -239,16 +318,11 @@
 							</div>
 
 						{:else if activeIndex === 2}
-							<!-- Revenue & Sales -->
 							<div class="flex h-full flex-col">
 								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/30">Revenue & Sales</p>
 
 								<div class="grid grid-cols-3 gap-3 mb-5">
-									{#each [
-										{ value: '$1.2M', label: 'Avg Revenue', sub: 'per location / yr', change: '+8%', up: true },
-										{ value: '$47', label: 'Avg Check', sub: 'dinner service', change: '+3%', up: true },
-										{ value: '78%', label: 'Occupancy', sub: 'prime hours', change: '-2%', up: false }
-									] as kpi}
+									{#each revenueKpis as kpi}
 										<div class="rounded-xl bg-white p-3 border border-gray-100">
 											<p class="text-xl font-bold text-black leading-none">{kpi.value}</p>
 											<p class="text-[10px] text-black/50 mt-1">{kpi.label}</p>
@@ -257,14 +331,13 @@
 									{/each}
 								</div>
 
-								<!-- Channel Split -->
 								<div class="mb-5">
 									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Revenue by Channel</p>
 									<div class="flex rounded-lg overflow-hidden h-7 mb-2">
 										<div class="bg-black flex items-center justify-center" style="width: 58%">
 											<span class="text-[10px] font-bold text-white">58%</span>
 										</div>
-										<div class="flex items-center justify-center" style="width: 28%; background: linear-gradient(to right, rgb(99,102,241), rgb(167,139,250))">
+										<div class="flex items-center justify-center" style="width: 28%; background: {GRAD_INDIGO_VIOLET}">
 											<span class="text-[10px] font-bold text-white">28%</span>
 										</div>
 										<div class="bg-gray-300 flex items-center justify-center" style="width: 14%">
@@ -278,26 +351,12 @@
 									</div>
 								</div>
 
-								<!-- Seasonality -->
 								<div class="flex-1">
 									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Monthly Revenue Index</p>
 									<div class="flex items-end gap-1.5 h-16">
-										{#each [
-											{ m: 'Jan', v: 65 },
-											{ m: 'Feb', v: 60 },
-											{ m: 'Mar', v: 72 },
-											{ m: 'Apr', v: 78 },
-											{ m: 'May', v: 85 },
-											{ m: 'Jun', v: 92 },
-											{ m: 'Jul', v: 95 },
-											{ m: 'Aug', v: 88 },
-											{ m: 'Sep', v: 82 },
-											{ m: 'Oct', v: 78 },
-											{ m: 'Nov', v: 85 },
-											{ m: 'Dec', v: 100 }
-										] as bar}
+										{#each monthlyRevenue as bar}
 											<div class="flex-1 flex flex-col items-center gap-1">
-												<div class="w-full rounded-t-sm" style="height: {bar.v}%; background: linear-gradient(to top, rgb(99,102,241), rgb(167,139,250))"></div>
+												<div class="w-full rounded-t-sm" style="height: {bar.v}%; background: {GRAD_INDIGO_VIOLET_V}"></div>
 												<span class="text-[7px] text-black/25">{bar.m}</span>
 											</div>
 										{/each}
@@ -310,11 +369,9 @@
 							</div>
 
 						{:else if activeIndex === 3}
-							<!-- Marketing & Digital -->
 							<div class="flex h-full flex-col">
 								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/30">Marketing & Digital</p>
 
-								<!-- Social Media Overview -->
 								<div class="grid grid-cols-3 gap-3 mb-5">
 									<div class="rounded-xl bg-white p-3 border border-gray-100">
 										<p class="text-xl font-bold text-black">8.4K</p>
@@ -330,34 +387,25 @@
 									</div>
 								</div>
 
-								<!-- Ad Spend by Channel -->
 								<div class="mb-5">
 									<p class="text-[10px] font-medium text-black/30 mb-2.5 uppercase tracking-wider">Estimated Ad Spend — Market Avg</p>
 									<div class="space-y-2">
-										{#each [
-											{ name: 'Instagram', spend: '$2.4K/mo', pct: 85, grad: 'linear-gradient(to right, rgb(99,102,241), rgb(167,139,250))' },
-											{ name: 'Google Ads', spend: '$1.8K/mo', pct: 64, grad: 'linear-gradient(to right, rgb(6,182,212), rgb(110,231,183))' },
-											{ name: 'TikTok', spend: '$800/mo', pct: 28, grad: 'linear-gradient(to right, rgb(244,114,182), rgb(251,191,36))' },
-											{ name: 'Facebook', spend: '$600/mo', pct: 21, grad: 'linear-gradient(to right, rgb(180,180,190), rgb(150,150,165))' }
-										] as channel}
+										{#each adSpendByChannel as channel}
 											<div>
 												<div class="flex items-center justify-between mb-0.5">
 													<span class="text-xs text-black/60">{channel.name}</span>
 													<span class="text-[10px] font-medium text-black/40">{channel.spend}</span>
 												</div>
-												<div class="h-1.5 w-full rounded-full bg-gray-100">
-													<div class="h-full rounded-full" style="width: {channel.pct}%; background: {channel.grad}"></div>
-												</div>
+												{@render progressBar(channel.pct, channel.grad)}
 											</div>
 										{/each}
 									</div>
 								</div>
 
-								<!-- Tools & Platforms -->
 								<div class="flex-1">
 									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Common Tools & Platforms</p>
 									<div class="flex flex-wrap gap-1.5">
-										{#each ['Square POS', 'Toast', 'OpenTable', 'Yelp', 'Mailchimp', 'Google Ads', 'Meta Business', 'Lightspeed'] as tool}
+										{#each commonTools as tool}
 											<span class="rounded-full bg-white border border-gray-100 px-2.5 py-1 text-[11px] text-black/50">{tool}</span>
 										{/each}
 									</div>
@@ -369,7 +417,6 @@
 							</div>
 
 						{:else if activeIndex === 4}
-							<!-- Guest Intelligence -->
 							<div class="flex h-full flex-col">
 								<p class="mb-4 text-[11px] font-medium uppercase tracking-widest text-black/30">Guest Intelligence</p>
 
@@ -386,25 +433,18 @@
 										<p class="text-[10px] text-black/30 mt-1">2,847 reviews</p>
 									</div>
 									<div class="flex-1 space-y-2">
-										{#each [
-											{ label: 'Positive', pct: 73, grad: 'linear-gradient(to right, rgb(110,231,183), rgb(6,182,212))' },
-											{ label: 'Neutral', pct: 19, grad: 'linear-gradient(to right, rgb(180,180,190), rgb(150,150,165))' },
-											{ label: 'Negative', pct: 8, grad: 'linear-gradient(to right, rgb(244,114,182), rgb(251,191,36))' }
-										] as s}
+										{#each sentimentBreakdown as s}
 											<div>
 												<div class="flex justify-between mb-0.5">
 													<span class="text-[10px] text-black/40">{s.label}</span>
 													<span class="text-[10px] font-medium text-black/50">{s.pct}%</span>
 												</div>
-												<div class="h-1.5 w-full rounded-full bg-gray-100">
-													<div class="h-full rounded-full" style="width: {s.pct}%; background: {s.grad}"></div>
-												</div>
+												{@render progressBar(s.pct, s.grad)}
 											</div>
 										{/each}
 									</div>
 								</div>
 
-								<!-- Tourist vs Local -->
 								<div class="grid grid-cols-2 gap-3 mb-5">
 									<div class="rounded-xl bg-white p-3 border border-gray-100">
 										<p class="text-lg font-bold text-black">68<span class="text-xs font-normal text-black/30">%</span></p>
@@ -416,11 +456,10 @@
 									</div>
 								</div>
 
-								<!-- Payment Methods -->
 								<div class="mb-4">
 									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Payment Preferences</p>
 									<div class="flex rounded-lg overflow-hidden h-6">
-										<div class="flex items-center justify-center" style="width: 62%; background: linear-gradient(to right, rgb(99,102,241), rgb(167,139,250))">
+										<div class="flex items-center justify-center" style="width: 62%; background: {GRAD_INDIGO_VIOLET}">
 											<span class="text-[9px] font-bold text-white">Card 62%</span>
 										</div>
 										<div class="bg-black flex items-center justify-center" style="width: 24%">
@@ -432,18 +471,10 @@
 									</div>
 								</div>
 
-								<!-- Top Mentions -->
 								<div class="border-t border-gray-200 pt-3 flex-1">
 									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Top Mentions</p>
 									<div class="flex flex-wrap gap-1.5">
-										{#each [
-											{ word: 'great service', size: 'text-xs' },
-											{ word: 'cozy ambiance', size: 'text-[11px]' },
-											{ word: 'slow wait', size: 'text-[10px]' },
-											{ word: 'fresh ingredients', size: 'text-xs' },
-											{ word: 'date night', size: 'text-[11px]' },
-											{ word: 'parking', size: 'text-[10px]' }
-										] as tag}
+										{#each topMentions as tag}
 											<span class="rounded-full bg-white border border-gray-100 px-2 py-0.5 {tag.size} text-black/50">{tag.word}</span>
 										{/each}
 									</div>
@@ -451,46 +482,35 @@
 							</div>
 
 						{:else if activeIndex === 5}
-							<!-- Location & Foot Traffic -->
 							<div class="flex h-full flex-col">
 								<p class="mb-4 text-[11px] font-medium uppercase tracking-widest text-black/30">Location & Foot Traffic</p>
 
-								<!-- Weekly foot traffic chart -->
 								<div class="mb-5">
 									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Weekly Foot Traffic</p>
 									<div class="flex items-end gap-1.5 h-16">
-										{#each [
-											{ day: 'Mon', h: 40 },
-											{ day: 'Tue', h: 55 },
-											{ day: 'Wed', h: 50 },
-											{ day: 'Thu', h: 60 },
-											{ day: 'Fri', h: 85 },
-											{ day: 'Sat', h: 95 },
-											{ day: 'Sun', h: 70 }
-										] as bar}
+										{#each weeklyTraffic as bar}
 											<div class="flex-1 flex flex-col items-center gap-1">
 												<span class="text-[8px] font-medium text-black/30">{bar.h}%</span>
-												<div class="w-full rounded-t-sm" style="height: {bar.h}%; background: linear-gradient(to top, rgb(99,102,241), rgb(167,139,250))"></div>
+												<div class="w-full rounded-t-sm" style="height: {bar.h}%; background: {GRAD_INDIGO_VIOLET_V}"></div>
 												<span class="text-[8px] text-black/25">{bar.day}</span>
 											</div>
 										{/each}
 									</div>
 								</div>
 
-								<!-- Visit Time Distribution -->
 								<div class="mb-5">
 									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Visit Time Distribution</p>
 									<div class="flex rounded-lg overflow-hidden h-7 mb-2">
 										<div class="flex items-center justify-center" style="width: 15%; background: rgb(180,180,190)">
 											<span class="text-[8px] font-bold text-white">15%</span>
 										</div>
-										<div class="flex items-center justify-center" style="width: 32%; background: linear-gradient(to right, rgb(99,102,241), rgb(167,139,250))">
+										<div class="flex items-center justify-center" style="width: 32%; background: {GRAD_INDIGO_VIOLET}">
 											<span class="text-[9px] font-bold text-white">32%</span>
 										</div>
 										<div class="flex items-center justify-center" style="width: 12%; background: rgb(200,200,210)">
 											<span class="text-[8px] font-bold text-white">12%</span>
 										</div>
-										<div class="flex items-center justify-center" style="width: 35%; background: linear-gradient(to right, rgb(6,182,212), rgb(110,231,183))">
+										<div class="flex items-center justify-center" style="width: 35%; background: {GRAD_CYAN_EMERALD_H}">
 											<span class="text-[9px] font-bold text-white">35%</span>
 										</div>
 										<div class="flex items-center justify-center" style="width: 6%; background: rgb(160,160,170)">
@@ -505,7 +525,6 @@
 									</div>
 								</div>
 
-								<!-- Demographics -->
 								<div class="grid grid-cols-2 gap-3 mb-4">
 									<div class="rounded-xl bg-white p-3 border border-gray-100">
 										<p class="text-lg font-bold text-black">34</p>
@@ -535,7 +554,6 @@
 							</div>
 
 						{:else if activeIndex === 6}
-							<!-- Operations -->
 							<div class="flex h-full flex-col">
 								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/30">Operations</p>
 
@@ -559,12 +577,7 @@
 								</div>
 
 								<div class="flex-1 space-y-3">
-									{#each [
-										{ label: 'Labor Availability', score: 'Moderate', pct: 55, grad: 'linear-gradient(to right, rgb(251,191,36), rgb(244,114,182))' },
-										{ label: 'Staff Turnover', score: '42% annual', pct: 42, grad: 'linear-gradient(to right, rgb(244,114,182), rgb(167,139,250))' },
-										{ label: 'Open Positions', score: '124 listed', pct: 65, grad: 'linear-gradient(to right, rgb(99,102,241), rgb(167,139,250))' },
-										{ label: 'Supplier Pricing', score: '+3.2% YoY', pct: 32, grad: 'linear-gradient(to right, rgb(6,182,212), rgb(110,231,183))' }
-									] as op}
+									{#each operationalMetrics as op}
 										<div>
 											<div class="flex justify-between mb-1">
 												<span class="text-[11px] text-black/50">{op.label}</span>

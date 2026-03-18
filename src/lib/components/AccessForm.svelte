@@ -2,6 +2,8 @@
 	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
 	import { formState } from '$lib/form-state.svelte';
 
+	const btnPrimary = 'inline-flex items-center gap-2 rounded-full bg-black px-7 py-2.5 text-sm font-medium text-white transition-colors hover:bg-black/80';
+
 	let step = $state(1);
 	let selectedType = $state('');
 	let selectedCountry = $state('us');
@@ -39,12 +41,8 @@
 	let country = $derived(countries.find((c) => c.code === selectedCountry) ?? countries[0]);
 	let isVenue = $derived(['Single venue', 'Chain operator', 'Hotel operator'].includes(selectedType));
 
-	let step1Valid = $derived(selectedType !== '');
-	let webUrlValid = $derived(/\S+\.\S+/.test(webUrl.trim()));
-	let step2Valid = $derived(businessName.trim() !== '' && (isVenue ? selectedLocations !== '' : webUrlValid));
 	let emailEl: HTMLInputElement | undefined = $state();
 	let emailValid = $derived(email.trim() !== '' && (emailEl?.validity.valid ?? false));
-	let step3Valid = $derived(fullName.trim() !== '' && emailValid);
 
 	$effect(() => {
 		if (selectedType === 'Single venue') {
@@ -184,7 +182,7 @@
 		if (invalid.length > 0) { shake(invalid); return; }
 		submitting = true;
 		try {
-			await fetch('/api/intake', {
+			const res = await fetch('/api/intake', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -198,7 +196,11 @@
 					phone: phone || undefined
 				})
 			});
-		} catch {}
+			if (!res.ok) throw new Error();
+		} catch {
+			submitting = false;
+			return;
+		}
 		submitting = false;
 		submitted = true;
 	}
@@ -241,10 +243,10 @@
 						</svg>
 					</div>
 					<h2 class="mb-2 text-xl font-semibold tracking-tight text-black">
-						You're on the list
+						Form submitted
 					</h2>
 					<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40">
-						We'll review your request and get back to you within 24 hours with next steps.
+						We'll get back to you within 24 hours
 					</p>
 					<button
 						onclick={close}
@@ -288,7 +290,7 @@
 						<div class="mt-8 flex justify-end">
 							<button
 								onclick={next}
-								class="inline-flex items-center gap-2 rounded-full bg-black px-7 py-2.5 text-sm font-medium text-white transition-colors hover:bg-black/80"
+								class="{btnPrimary}"
 							>
 								Continue
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -404,7 +406,7 @@
 							</button>
 							<button
 								onclick={next}
-								class="inline-flex items-center gap-2 rounded-full bg-black px-7 py-2.5 text-sm font-medium text-white transition-colors hover:bg-black/80"
+								class="{btnPrimary}"
 							>
 								Continue
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -477,7 +479,7 @@
 							<button
 								onclick={submit}
 								disabled={submitting}
-								class="inline-flex items-center gap-2 rounded-full bg-black px-7 py-2.5 text-sm font-medium text-white transition-colors hover:bg-black/80 disabled:opacity-60"
+								class="{btnPrimary} disabled:opacity-60"
 							>
 								{#if submitting}
 									<svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

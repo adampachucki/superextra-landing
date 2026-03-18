@@ -5,13 +5,11 @@
 
 <section class="relative overflow-hidden pt-28 pb-0 md:pt-34">
 	<div class="mx-auto max-w-[1200px] px-6">
-		<!-- Massive headline with overlapping image -->
 		<div class="relative">
 			<h1 class="relative z-10 mx-auto max-w-5xl text-center text-[clamp(3.25rem,9vw,9rem)] leading-[0.95] font-normal tracking-[-0.04em] text-black">
 				Market intelligence for restaurants
 			</h1>
 
-			<!-- Abstract hero image overlapping the title -->
 			<div class="relative z-0 mx-auto -mt-20 mb-8 flex justify-center md:-mt-40">
 				<div class="relative h-[250px] w-[520px] overflow-hidden rounded-2xl md:h-[360px] md:w-[680px]">
 					<HeroCanvas class="absolute inset-0 h-full w-full" />
@@ -19,7 +17,6 @@
 			</div>
 		</div>
 
-		<!-- Subtitle + CTA -->
 		<div class="mx-auto max-w-2xl text-center">
 			<p class="mb-8 text-lg leading-snug text-black/50 md:text-xl">
 				Super local intelligence and competitor benchmarking platform for the restaurant industry. The extra advantage behind smarter decisions.
@@ -33,7 +30,6 @@
 		</div>
 	</div>
 
-	<!-- Stats row -->
 	<div class="mx-auto mt-20 max-w-[1200px] px-6 md:mt-28">
 		<div class="grid grid-cols-1 border-t border-gray-200 md:grid-cols-3 md:divide-x md:divide-gray-200">
 			<div class="border-b border-gray-200 py-8 md:border-b-0 md:py-10 md:pr-10">

@@ -92,6 +92,29 @@
 	}
 </script>
 
+{#snippet navButtons()}
+	<button
+		onclick={prev}
+		disabled={activeIndex === 0}
+		class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-gray-200 transition-colors hover:bg-gray-50 disabled:cursor-default disabled:opacity-30"
+		aria-label="Previous"
+	>
+		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+		</svg>
+	</button>
+	<button
+		onclick={next}
+		disabled={activeIndex === useCases.length - 1}
+		class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-gray-200 transition-colors hover:bg-gray-50 disabled:cursor-default disabled:opacity-30"
+		aria-label="Next"
+	>
+		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+		</svg>
+	</button>
+{/snippet}
+
 <section id="use-cases" class="border-t border-gray-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="mb-12 flex items-end justify-between">
@@ -105,26 +128,7 @@
 			</div>
 
 			<div class="hidden items-center gap-2 md:flex">
-				<button
-					onclick={prev}
-					disabled={activeIndex === 0}
-					class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-gray-200 transition-colors hover:bg-gray-50 disabled:cursor-default disabled:opacity-30"
-					aria-label="Previous"
-				>
-					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-					</svg>
-				</button>
-				<button
-					onclick={next}
-					disabled={activeIndex === useCases.length - 1}
-					class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-gray-200 transition-colors hover:bg-gray-50 disabled:cursor-default disabled:opacity-30"
-					aria-label="Next"
-				>
-					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-					</svg>
-				</button>
+				{@render navButtons()}
 			</div>
 		</div>
 	</div>
@@ -164,28 +168,8 @@
 		{/each}
 	</div>
 
-	<!-- Mobile navigation -->
 	<div class="mt-8 flex items-center justify-center gap-2 md:hidden">
-		<button
-			onclick={prev}
-			disabled={activeIndex === 0}
-			class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-gray-200 transition-colors hover:bg-gray-50 disabled:cursor-default disabled:opacity-30"
-			aria-label="Previous"
-		>
-			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-			</svg>
-		</button>
-		<button
-			onclick={next}
-			disabled={activeIndex === useCases.length - 1}
-			class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-gray-200 transition-colors hover:bg-gray-50 disabled:cursor-default disabled:opacity-30"
-			aria-label="Next"
-		>
-			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-			</svg>
-		</button>
+		{@render navButtons()}
 	</div>
 </section>
 
