@@ -10,17 +10,14 @@
 	let modalVisible = $state(false);
 
 	const businessTypes = [
-		'Restaurant',
-		'Cafe',
-		'Bar / Pub',
-		'Hotel',
-		'Fast Food',
-		'Fast Casual',
-		'Bakery',
-		'Food Truck',
-		'Pizzeria',
-		'Catering',
-		'Delivery Service',
+		'Single venue',
+		'Chain operator',
+		'Hotel operator',
+		'Delivery service',
+		'Supply & distrib.',
+		'Advisory',
+		'Real estate',
+		'Tech platform',
 		'Other'
 	];
 
@@ -31,7 +28,28 @@
 		{ code: 'pl', name: 'Poland', dial: '+48' }
 	];
 
+	let businessName = $state('');
+	let selectedLocations = $state('');
+	let webUrl = $state('');
+	let fullName = $state('');
+	let email = $state('');
+	let phone = $state('');
+
 	let country = $derived(countries.find((c) => c.code === selectedCountry) ?? countries[0]);
+	let isVenue = $derived(['Single venue', 'Chain operator', 'Hotel operator'].includes(selectedType));
+
+	let step1Valid = $derived(selectedType !== '');
+	let webUrlValid = $derived(/\S+\.\S+/.test(webUrl.trim()));
+	let step2Valid = $derived(businessName.trim() !== '' && (isVenue ? selectedLocations !== '' : webUrlValid));
+	let emailEl: HTMLInputElement | undefined = $state();
+	let emailValid = $derived(email.trim() !== '' && (emailEl?.validity.valid ?? false));
+	let step3Valid = $derived(fullName.trim() !== '' && emailValid);
+
+	$effect(() => {
+		if (selectedType === 'Single venue') {
+			selectedLocations = '1';
+		}
+	});
 
 	// Animate in when formState.visible becomes true
 	$effect(() => {
@@ -55,13 +73,46 @@
 				step = 1;
 				selectedType = '';
 				selectedCountry = 'us';
+				businessName = '';
+				selectedLocations = '';
+				webUrl = '';
+				fullName = '';
+				email = '';
+				phone = '';
 				submitting = false;
 				submitted = false;
 			}, 200);
 		}, 150);
 	}
 
+	let shakeFields = $state<Set<string>>(new Set());
+
+	function shake(fields: string[]) {
+		shakeFields = new Set(fields);
+		setTimeout(() => (shakeFields = new Set()), 600);
+	}
+
+	function getInvalidFields(): string[] {
+		if (step === 1) return selectedType === '' ? ['type-grid'] : [];
+		if (step === 2) {
+			const fields: string[] = [];
+			if (businessName.trim() === '') fields.push('business-name');
+			if (isVenue && selectedLocations === '') fields.push('locations');
+			if (!isVenue && !(/\S+\.\S+/.test(webUrl.trim()))) fields.push('web-url');
+			return fields;
+		}
+		if (step === 3) {
+			const fields: string[] = [];
+			if (fullName.trim() === '') fields.push('full-name');
+			if (!emailValid) fields.push('email');
+			return fields;
+		}
+		return [];
+	}
+
 	function next() {
+		const invalid = getInvalidFields();
+		if (invalid.length > 0) { shake(invalid); return; }
 		if (step < 3) step++;
 	}
 
@@ -70,9 +121,25 @@
 	}
 
 	async function submit() {
+		const invalid = getInvalidFields();
+		if (invalid.length > 0) { shake(invalid); return; }
 		submitting = true;
-		// Simulate network request
-		await new Promise((r) => setTimeout(r, 1500));
+		try {
+			await fetch('/api/intake', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					type: selectedType,
+					country: country.name,
+					businessName,
+					locations: isVenue ? selectedLocations : undefined,
+					webUrl: isVenue ? undefined : webUrl,
+					fullName,
+					email,
+					phone: phone || undefined
+				})
+			});
+		} catch {}
 		submitting = false;
 		submitted = true;
 	}
@@ -142,10 +209,10 @@
 							What kind of business do you run?
 						</h2>
 						<p class="mb-8 text-center text-sm text-black/40">
-							Select the option that best describes your business
+							Select the option that best describes your category
 						</p>
 
-						<div class="grid grid-cols-3 gap-2.5">
+						<div class="grid grid-cols-3 gap-2.5 {shakeFields.has('type-grid') ? 'shake' : ''}">
 							{#each businessTypes as type}
 								<button
 									onclick={() => (selectedType = selectedType === type ? '' : type)}
@@ -196,27 +263,42 @@
 								</select>
 							</div>
 							<div>
-								<label for="business-name" class="mb-1.5 block text-xs font-medium text-black/50">Place name</label>
+								<label for="business-name" class="mb-1.5 block text-xs font-medium text-black/50">{isVenue ? 'Place name' : 'Business name'}</label>
 								<input
 									id="business-name"
 									type="text"
-									placeholder="e.g. The Corner Bistro"
-									class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none"
+									bind:value={businessName}
+									placeholder={isVenue ? 'The Corner Bistro' : 'Acme Inc.'}
+									class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('business-name') ? 'shake border-red-300' : 'border-gray-200'}"
 								/>
 							</div>
-							<div>
-								<label for="locations" class="mb-1.5 block text-xs font-medium text-black/50">Number of locations</label>
-								<select
-									id="locations"
-									class="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-black focus:border-black focus:ring-0 focus:outline-none"
-								>
-									<option value="" disabled selected class="text-black/25">Select</option>
-									<option value="1">1 location</option>
-									<option value="2-5">2 – 5 locations</option>
-									<option value="6-20">6 – 20 locations</option>
-									<option value="20+">20+ locations</option>
-								</select>
-							</div>
+							{#if isVenue}
+								<div>
+									<label for="locations" class="mb-1.5 block text-xs font-medium text-black/50">Number of locations</label>
+									<select
+										id="locations"
+										bind:value={selectedLocations}
+										class="w-full appearance-none rounded-xl border bg-white px-4 py-3 text-sm text-black focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('locations') ? 'shake border-red-300' : 'border-gray-200'}"
+									>
+										<option value="" disabled class="text-black/25">Select</option>
+										<option value="1">1 location</option>
+										<option value="2-5">2 – 5 locations</option>
+										<option value="6-20">6 – 20 locations</option>
+										<option value="20+">20+ locations</option>
+									</select>
+								</div>
+							{:else}
+								<div>
+									<label for="web-url" class="mb-1.5 block text-xs font-medium text-black/50">Web URL</label>
+									<input
+										id="web-url"
+										type="text"
+										bind:value={webUrl}
+										placeholder="example.com"
+										class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('web-url') ? 'shake border-red-300' : 'border-gray-200'}"
+									/>
+								</div>
+							{/if}
 						</div>
 
 						<div class="mt-8 flex items-center justify-between">
@@ -257,8 +339,9 @@
 								<input
 									id="full-name"
 									type="text"
+									bind:value={fullName}
 									placeholder="Jane Smith"
-									class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none"
+									class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('full-name') ? 'shake border-red-300' : 'border-gray-200'}"
 								/>
 							</div>
 							<div>
@@ -266,8 +349,10 @@
 								<input
 									id="email"
 									type="email"
-									placeholder="jane@restaurant.com"
-									class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none"
+									bind:this={emailEl}
+									bind:value={email}
+									placeholder="jane@company.com"
+									class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('email') ? 'shake border-red-300' : 'border-gray-200'}"
 								/>
 							</div>
 							<div>
@@ -279,6 +364,7 @@
 									<input
 										id="phone"
 										type="tel"
+										bind:value={phone}
 										placeholder={country.code === 'us' ? '(555) 000-0000' : country.code === 'gb' ? '7911 123456' : country.code === 'de' ? '151 12345678' : '512 345 678'}
 										class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none"
 									/>
@@ -334,5 +420,17 @@
 			opacity: 1;
 			transform: translateX(0);
 		}
+	}
+
+	.shake {
+		animation: shake 0.4s ease-out;
+	}
+
+	@keyframes shake {
+		0%, 100% { transform: translateX(0); }
+		20% { transform: translateX(-6px); }
+		40% { transform: translateX(5px); }
+		60% { transform: translateX(-3px); }
+		80% { transform: translateX(2px); }
 	}
 </style>
