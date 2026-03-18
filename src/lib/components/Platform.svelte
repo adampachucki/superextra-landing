@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { fade } from 'svelte/transition';
+
 	const categories = [
 		{
 			title: 'Market Landscape',
@@ -99,8 +101,9 @@
 			<!-- Visual panel -->
 			<div class="hidden lg:flex items-start justify-center">
 				<div class="w-full overflow-hidden rounded-2xl bg-gray-50 border border-gray-200">
-					<div class="relative aspect-[4/3] w-full p-8 md:p-10">
-
+					<div class="aspect-[4/3] w-full p-8 md:p-10">
+						{#key activeIndex}
+						<div class="h-full" in:fade={{ duration: 200 }}>
 						{#if activeIndex === 0}
 							<!-- Market Landscape -->
 							<div class="flex h-full flex-col">
@@ -584,7 +587,8 @@
 								Click a category to explore
 							</div>
 						{/if}
-
+						</div>
+						{/key}
 					</div>
 				</div>
 			</div>
