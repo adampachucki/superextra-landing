@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
 	import { formState } from '$lib/form-state.svelte';
 
 	let step = $state(1);
@@ -50,6 +51,64 @@
 			selectedLocations = '1';
 		}
 	});
+
+	// --- Google Places Autocomplete ---
+	let mapsPromise: Promise<void> | null = null;
+	let placeSuggestions = $state<Array<{ name: string; secondary: string }>>([]);
+	let showSuggestions = $state(false);
+	let debounceTimer: ReturnType<typeof setTimeout>;
+
+	function loadGoogleMaps(): Promise<void> {
+		if (mapsPromise) return mapsPromise;
+		mapsPromise = new Promise<void>((resolve, reject) => {
+			if (typeof google !== 'undefined' && google.maps?.places) {
+				resolve();
+				return;
+			}
+			const script = document.createElement('script');
+			script.src = `https://maps.googleapis.com/maps/api/js?key=${PUBLIC_GOOGLE_PLACES_KEY}&libraries=places`;
+			script.async = true;
+			script.onload = () => resolve();
+			script.onerror = reject;
+			document.head.appendChild(script);
+		});
+		return mapsPromise;
+	}
+
+	async function fetchPlaceSuggestions(input: string) {
+		if (input.length < 2) {
+			placeSuggestions = [];
+			return;
+		}
+		try {
+			await loadGoogleMaps();
+			const { suggestions } = await (google.maps.places.AutocompleteSuggestion as any).fetchAutocompleteSuggestions({
+				input,
+				includedPrimaryTypes: ['restaurant', 'cafe', 'bar', 'hotel', 'food'],
+				includedRegionCodes: [selectedCountry]
+			});
+			placeSuggestions = suggestions.map((s: any) => ({
+				name: s.placePrediction.mainText.text,
+				secondary: s.placePrediction.secondaryText?.text ?? ''
+			}));
+		} catch {
+			placeSuggestions = [];
+		}
+	}
+
+	function onPlaceInput(e: Event) {
+		const value = (e.target as HTMLInputElement).value;
+		businessName = value;
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => fetchPlaceSuggestions(value), 300);
+		showSuggestions = true;
+	}
+
+	function selectPlace(name: string) {
+		businessName = name;
+		placeSuggestions = [];
+		showSuggestions = false;
+	}
 
 	// Animate in when formState.visible becomes true
 	$effect(() => {
@@ -262,15 +321,47 @@
 									{/each}
 								</select>
 							</div>
-							<div>
+							<div class="relative">
 								<label for="business-name" class="mb-1.5 block text-xs font-medium text-black/50">{isVenue ? 'Place name' : 'Business name'}</label>
-								<input
-									id="business-name"
-									type="text"
-									bind:value={businessName}
-									placeholder={isVenue ? 'The Corner Bistro' : 'Acme Inc.'}
-									class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('business-name') ? 'shake border-red-300' : 'border-gray-200'}"
-								/>
+								{#if isVenue}
+									<input
+										id="business-name"
+										type="text"
+										value={businessName}
+										oninput={onPlaceInput}
+										onfocus={() => { if (placeSuggestions.length) showSuggestions = true; }}
+										onblur={() => setTimeout(() => (showSuggestions = false), 150)}
+										placeholder="The Corner Bistro"
+										autocomplete="off"
+										class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('business-name') ? 'shake border-red-300' : 'border-gray-200'}"
+									/>
+									{#if showSuggestions && placeSuggestions.length > 0}
+										<ul class="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+											{#each placeSuggestions as s}
+												<li>
+													<button
+														type="button"
+														class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
+														onmousedown={() => selectPlace(s.name)}
+													>
+														<span class="text-black">{s.name}</span>
+														{#if s.secondary}
+															<span class="ml-1 text-black/30">{s.secondary}</span>
+														{/if}
+													</button>
+												</li>
+											{/each}
+										</ul>
+									{/if}
+								{:else}
+									<input
+										id="business-name"
+										type="text"
+										bind:value={businessName}
+										placeholder="Acme Inc."
+										class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('business-name') ? 'shake border-red-300' : 'border-gray-200'}"
+									/>
+								{/if}
 							</div>
 							{#if isVenue}
 								<div>
