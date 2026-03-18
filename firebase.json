@@ -5,9 +5,20 @@
 		"ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
 		"rewrites": [
 			{
+				"source": "/api/intake",
+				"function": "intake"
+			},
+			{
 				"source": "**",
 				"destination": "/200.html"
 			}
 		]
-	}
+	},
+	"functions": [
+		{
+			"source": "functions",
+			"codebase": "default",
+			"runtime": "nodejs22"
+		}
+	]
 }
