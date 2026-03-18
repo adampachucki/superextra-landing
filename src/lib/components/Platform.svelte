@@ -5,7 +5,7 @@
 		{
 			title: 'Market Landscape',
 			description:
-				'Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — tracked across the market in real time.',
+				'Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market.',
 			features: ['Openings & Closings', 'Cuisine Trends', 'Competitor Ranking', 'Best-Sellers', 'Market Distribution']
 		},
 		{
@@ -17,20 +17,20 @@
 		{
 			title: 'Revenue & Sales',
 			description:
-				'Revenue estimates, seasonality patterns, channel splits, occupancy rates, and delivery platform market share.',
+				'Revenue estimates, margin and food cost analysis, seasonality patterns, channel splits, and delivery platform market share.',
 			features: ['Revenue Estimates', 'Seasonality', 'Channel Split', 'Occupancy', 'Platform Market Share']
-		},
-		{
-			title: 'Guest Intelligence',
-			description:
-				'Review sentiment, local guest preferences, tourist vs local mix, and payment method trends — all derived from real guest data.',
-			features: ['Review Sentiment', 'Guest Preferences', 'Tourist vs Local', 'Payment Methods']
 		},
 		{
 			title: 'Marketing & Digital',
 			description:
 				'Social media activity, marketing channels, estimated ad spend, and tools and platforms in use across competitors.',
 			features: ['Social Media', 'Ad Spend', 'Marketing Channels', 'Tools & Platforms']
+		},
+		{
+			title: 'Guest Intelligence',
+			description:
+				'Review sentiment, local guest preferences, tourist vs local mix, and payment method trends, all derived from real guest data.',
+			features: ['Review Sentiment', 'Guest Preferences', 'Tourist vs Local', 'Payment Methods']
 		},
 		{
 			title: 'Location & Foot Traffic',
@@ -310,6 +310,65 @@
 							</div>
 
 						{:else if activeIndex === 3}
+							<!-- Marketing & Digital -->
+							<div class="flex h-full flex-col">
+								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/30">Marketing & Digital</p>
+
+								<!-- Social Media Overview -->
+								<div class="grid grid-cols-3 gap-3 mb-5">
+									<div class="rounded-xl bg-white p-3 border border-gray-100">
+										<p class="text-xl font-bold text-black">8.4K</p>
+										<p class="text-[10px] text-black/40 mt-0.5">Avg followers</p>
+									</div>
+									<div class="rounded-xl bg-white p-3 border border-gray-100">
+										<p class="text-xl font-bold text-black">2.8<span class="text-sm font-normal text-black/40">%</span></p>
+										<p class="text-[10px] text-black/40 mt-0.5">Engagement rate</p>
+									</div>
+									<div class="rounded-xl bg-white p-3 border border-gray-100">
+										<p class="text-xl font-bold text-black">4.2</p>
+										<p class="text-[10px] text-black/40 mt-0.5">Posts / week</p>
+									</div>
+								</div>
+
+								<!-- Ad Spend by Channel -->
+								<div class="mb-5">
+									<p class="text-[10px] font-medium text-black/30 mb-2.5 uppercase tracking-wider">Estimated Ad Spend — Market Avg</p>
+									<div class="space-y-2">
+										{#each [
+											{ name: 'Instagram', spend: '$2.4K/mo', pct: 85, grad: 'linear-gradient(to right, rgb(99,102,241), rgb(167,139,250))' },
+											{ name: 'Google Ads', spend: '$1.8K/mo', pct: 64, grad: 'linear-gradient(to right, rgb(6,182,212), rgb(110,231,183))' },
+											{ name: 'TikTok', spend: '$800/mo', pct: 28, grad: 'linear-gradient(to right, rgb(244,114,182), rgb(251,191,36))' },
+											{ name: 'Facebook', spend: '$600/mo', pct: 21, grad: 'linear-gradient(to right, rgb(180,180,190), rgb(150,150,165))' }
+										] as channel}
+											<div>
+												<div class="flex items-center justify-between mb-0.5">
+													<span class="text-xs text-black/60">{channel.name}</span>
+													<span class="text-[10px] font-medium text-black/40">{channel.spend}</span>
+												</div>
+												<div class="h-1.5 w-full rounded-full bg-gray-100">
+													<div class="h-full rounded-full" style="width: {channel.pct}%; background: {channel.grad}"></div>
+												</div>
+											</div>
+										{/each}
+									</div>
+								</div>
+
+								<!-- Tools & Platforms -->
+								<div class="flex-1">
+									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Common Tools & Platforms</p>
+									<div class="flex flex-wrap gap-1.5">
+										{#each ['Square POS', 'Toast', 'OpenTable', 'Yelp', 'Mailchimp', 'Google Ads', 'Meta Business', 'Lightspeed'] as tool}
+											<span class="rounded-full bg-white border border-gray-100 px-2.5 py-1 text-[11px] text-black/50">{tool}</span>
+										{/each}
+									</div>
+								</div>
+
+								<div class="border-t border-gray-200 pt-3 mt-4">
+									<span class="text-[10px] text-black/30">Across 320 tracked competitors</span>
+								</div>
+							</div>
+
+						{:else if activeIndex === 4}
 							<!-- Guest Intelligence -->
 							<div class="flex h-full flex-col">
 								<p class="mb-4 text-[11px] font-medium uppercase tracking-widest text-black/30">Guest Intelligence</p>
@@ -388,65 +447,6 @@
 											<span class="rounded-full bg-white border border-gray-100 px-2 py-0.5 {tag.size} text-black/50">{tag.word}</span>
 										{/each}
 									</div>
-								</div>
-							</div>
-
-						{:else if activeIndex === 4}
-							<!-- Marketing & Digital -->
-							<div class="flex h-full flex-col">
-								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/30">Marketing & Digital</p>
-
-								<!-- Social Media Overview -->
-								<div class="grid grid-cols-3 gap-3 mb-5">
-									<div class="rounded-xl bg-white p-3 border border-gray-100">
-										<p class="text-xl font-bold text-black">8.4K</p>
-										<p class="text-[10px] text-black/40 mt-0.5">Avg followers</p>
-									</div>
-									<div class="rounded-xl bg-white p-3 border border-gray-100">
-										<p class="text-xl font-bold text-black">2.8<span class="text-sm font-normal text-black/40">%</span></p>
-										<p class="text-[10px] text-black/40 mt-0.5">Engagement rate</p>
-									</div>
-									<div class="rounded-xl bg-white p-3 border border-gray-100">
-										<p class="text-xl font-bold text-black">4.2</p>
-										<p class="text-[10px] text-black/40 mt-0.5">Posts / week</p>
-									</div>
-								</div>
-
-								<!-- Ad Spend by Channel -->
-								<div class="mb-5">
-									<p class="text-[10px] font-medium text-black/30 mb-2.5 uppercase tracking-wider">Estimated Ad Spend — Market Avg</p>
-									<div class="space-y-2">
-										{#each [
-											{ name: 'Instagram', spend: '$2.4K/mo', pct: 85, grad: 'linear-gradient(to right, rgb(99,102,241), rgb(167,139,250))' },
-											{ name: 'Google Ads', spend: '$1.8K/mo', pct: 64, grad: 'linear-gradient(to right, rgb(6,182,212), rgb(110,231,183))' },
-											{ name: 'TikTok', spend: '$800/mo', pct: 28, grad: 'linear-gradient(to right, rgb(244,114,182), rgb(251,191,36))' },
-											{ name: 'Facebook', spend: '$600/mo', pct: 21, grad: 'linear-gradient(to right, rgb(180,180,190), rgb(150,150,165))' }
-										] as channel}
-											<div>
-												<div class="flex items-center justify-between mb-0.5">
-													<span class="text-xs text-black/60">{channel.name}</span>
-													<span class="text-[10px] font-medium text-black/40">{channel.spend}</span>
-												</div>
-												<div class="h-1.5 w-full rounded-full bg-gray-100">
-													<div class="h-full rounded-full" style="width: {channel.pct}%; background: {channel.grad}"></div>
-												</div>
-											</div>
-										{/each}
-									</div>
-								</div>
-
-								<!-- Tools & Platforms -->
-								<div class="flex-1">
-									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Common Tools & Platforms</p>
-									<div class="flex flex-wrap gap-1.5">
-										{#each ['Square POS', 'Toast', 'OpenTable', 'Yelp', 'Mailchimp', 'Google Ads', 'Meta Business', 'Lightspeed'] as tool}
-											<span class="rounded-full bg-white border border-gray-100 px-2.5 py-1 text-[11px] text-black/50">{tool}</span>
-										{/each}
-									</div>
-								</div>
-
-								<div class="border-t border-gray-200 pt-3 mt-4">
-									<span class="text-[10px] text-black/30">Across 320 tracked competitors</span>
 								</div>
 							</div>
 

@@ -4,7 +4,7 @@
 			Built for every player in the restaurant ecosystem
 		</h2>
 		<p class="mx-auto mb-16 max-w-lg text-center text-lg text-white/50">
-			From independent restaurants to the platforms, suppliers, and investors powering the industry.
+			From independent restaurants to tech platforms, suppliers, and investors powering the industry.
 		</p>
 
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
