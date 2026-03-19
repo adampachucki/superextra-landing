@@ -12,7 +12,7 @@
 				<div class="flex items-center gap-6">
 					<div class="hidden items-center gap-2 md:flex">
 						<span class="text-xs text-black/40">Supported by</span>
-						<img src="/google-for-startups.svg" alt="Google for Startups" class="h-3.5 translate-y-px opacity-20 grayscale" />
+						<img src="/google-for-startups.svg" alt="Google for Startups" class="h-3.5 translate-y-px opacity-40 grayscale" />
 					</div>
 					<span class="mx-2 hidden h-4 w-px bg-black/10 md:block"></span>
 					<a href="/privacy-policy" class="text-sm text-black/40 transition-colors hover:text-black/60">Privacy</a>
@@ -23,7 +23,7 @@
 				</div>
 				<div class="flex items-center gap-2 md:hidden">
 					<span class="text-xs text-black/40">Supported by</span>
-					<img src="/google-for-startups.svg" alt="Google for Startups" class="h-3.5 translate-y-px opacity-20 grayscale" />
+					<img src="/google-for-startups.svg" alt="Google for Startups" class="h-3.5 translate-y-px opacity-40 grayscale" />
 				</div>
 			</div>
 		</div>
