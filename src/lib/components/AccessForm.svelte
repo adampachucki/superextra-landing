@@ -17,8 +17,8 @@
 	let contentHeight = $state<number | undefined>();
 
 	$effect(() => {
-		// Track step and submitted to re-measure
-		step; submitted;
+		// Track state changes that affect content height
+		step; submitted; submitError;
 		if (!contentEl) return;
 		// Wait a tick for DOM to update
 		requestAnimationFrame(() => {
