@@ -137,7 +137,7 @@
 				<h2
 					class="max-w-xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black"
 				>
-					Powering teams across all roles and functions
+					Supporting teams across all roles and functions
 				</h2>
 			</div>
 
