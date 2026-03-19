@@ -31,7 +31,7 @@
 	});
 
 	let { children } = $props();
-	let unlocked = $state(!browser || localStorage.getItem('se_pass') === 'superpower');
+	let unlocked = $state(true); // TEMP: password wall disabled
 	let input = $state('');
 	let shake = $state(false);
 
