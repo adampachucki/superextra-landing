@@ -55,7 +55,8 @@
 
 	// --- Google Places Autocomplete ---
 	let mapsPromise: Promise<void> | null = null;
-	let placeSuggestions = $state<Array<{ name: string; secondary: string }>>([]);
+	let placeSuggestions = $state<Array<{ name: string; secondary: string; placeId: string }>>([]);
+	let selectedPlaceId = $state('');
 	let showSuggestions = $state(false);
 	let loadingSuggestions = $state(false);
 	let debounceTimer: ReturnType<typeof setTimeout>;
@@ -93,7 +94,8 @@
 			});
 			placeSuggestions = suggestions.map((s: any) => ({
 				name: s.placePrediction.mainText.text,
-				secondary: s.placePrediction.secondaryText?.text ?? ''
+				secondary: s.placePrediction.secondaryText?.text ?? '',
+				placeId: s.placePrediction.placeId
 			}));
 		} catch {
 			placeSuggestions = [];
@@ -104,13 +106,15 @@
 	function onPlaceInput(e: Event) {
 		const value = (e.target as HTMLInputElement).value;
 		placeName = value;
+		selectedPlaceId = '';
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => fetchPlaceSuggestions(value), 300);
 		showSuggestions = true;
 	}
 
-	function selectPlace(name: string) {
-		placeName = name;
+	function selectPlace(s: { name: string; secondary: string; placeId: string }) {
+		placeName = s.name;
+		selectedPlaceId = s.placeId;
 		placeSuggestions = [];
 		showSuggestions = false;
 	}
@@ -138,6 +142,7 @@
 				selectedType = '';
 				selectedCountry = 'us';
 				placeName = '';
+				selectedPlaceId = '';
 				businessName = '';
 				selectedLocations = '';
 				webUrl = '';
@@ -200,6 +205,7 @@
 					type: selectedType,
 					country: country.name,
 					businessName: isVenue ? placeName : businessName,
+					placeId: selectedPlaceId || undefined,
 					locations: isVenue ? selectedLocations : undefined,
 					webUrl: isVenue ? undefined : webUrl,
 					fullName,
@@ -364,7 +370,7 @@
 													<button
 														type="button"
 														class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
-														onmousedown={() => selectPlace(s.name)}
+														onmousedown={() => selectPlace(s)}
 													>
 														<span class="text-black">{s.name}</span>
 														{#if s.secondary}

@@ -14,6 +14,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				${row('Category', data.type)}
 				${row('Country', data.country)}
 				${row('Name', data.businessName)}
+				${data.placeId ? row('Google Maps', `<a href="https://www.google.com/maps/place/?q=place_id:${data.placeId}">View on Maps</a>`) : ''}
 				${data.locations ? row('Locations', data.locations) : ''}
 				${data.webUrl ? row('URL', data.webUrl) : ''}
 				${row('Contact', data.fullName)}
