@@ -68,7 +68,7 @@
 							</svg>
 						</div>
 						{#if openIndex === i}
-							<p class="pb-6 text-sm leading-snug text-black/50">
+							<p class="pb-6 text-sm leading-snug text-black/60">
 								{faq.answer}
 							</p>
 						{/if}

@@ -19,7 +19,7 @@
 
 	{#if showTooltip}
 		<div
-			class="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-black/5 bg-white p-3 text-xs leading-relaxed text-black/50 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.08)]"
+			class="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-black/5 bg-white p-3 text-xs leading-relaxed text-black/60 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.08)]"
 		>
 			This page is in demo mode. Content and features shown here are for preview purposes and may change before launch.
 		</div>

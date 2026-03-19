@@ -167,7 +167,7 @@
 		<h2 class="mb-4 max-w-2xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
 			Data and insights behind every restaurant decision
 		</h2>
-		<p class="mb-16 max-w-lg text-lg text-black/50">
+		<p class="mb-16 max-w-lg text-lg text-black/60">
 			Seven intelligence layers, one platform. Built for every decision a restaurant makes.
 		</p>
 
@@ -193,7 +193,7 @@
 
 						{#if activeIndex === i}
 							<div class="pb-6">
-								<p class="mb-4 text-sm leading-snug text-black/50">
+								<p class="mb-4 text-sm leading-snug text-black/60">
 									{category.description}
 								</p>
 								<div class="flex flex-wrap gap-2">
@@ -291,7 +291,7 @@
 													<span class="rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold text-orange-600">HOT</span>
 												{/if}
 											</span>
-											<span class="text-sm text-black/50 tabular-nums">{row.price}</span>
+											<span class="text-sm text-black/60 tabular-nums">{row.price}</span>
 											<span class="text-xs font-medium tabular-nums {row.up ? 'text-emerald-600' : 'text-red-500'}">{row.trend}</span>
 										</div>
 									{/each}
@@ -325,7 +325,7 @@
 									{#each revenueKpis as kpi}
 										<div class="rounded-xl bg-white p-3 border border-gray-100">
 											<p class="text-xl font-bold text-black leading-none">{kpi.value}</p>
-											<p class="text-[10px] text-black/50 mt-1">{kpi.label}</p>
+											<p class="text-[10px] text-black/60 mt-1">{kpi.label}</p>
 											<span class="text-[9px] font-medium {kpi.up ? 'text-emerald-600' : 'text-red-500'}">{kpi.change}</span>
 										</div>
 									{/each}
@@ -406,7 +406,7 @@
 									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Common Tools & Platforms</p>
 									<div class="flex flex-wrap gap-1.5">
 										{#each commonTools as tool}
-											<span class="rounded-full bg-white border border-gray-100 px-2.5 py-1 text-[11px] text-black/50">{tool}</span>
+											<span class="rounded-full bg-white border border-gray-100 px-2.5 py-1 text-[11px] text-black/60">{tool}</span>
 										{/each}
 									</div>
 								</div>
@@ -437,7 +437,7 @@
 											<div>
 												<div class="flex justify-between mb-0.5">
 													<span class="text-[10px] text-black/40">{s.label}</span>
-													<span class="text-[10px] font-medium text-black/50">{s.pct}%</span>
+													<span class="text-[10px] font-medium text-black/60">{s.pct}%</span>
 												</div>
 												{@render progressBar(s.pct, s.grad)}
 											</div>
@@ -466,7 +466,7 @@
 											<span class="text-[9px] font-bold text-white">Cash 24%</span>
 										</div>
 										<div class="bg-gray-300 flex items-center justify-center" style="width: 14%">
-											<span class="text-[9px] font-bold text-black/50">Mobile 14%</span>
+											<span class="text-[9px] font-bold text-black/60">Mobile 14%</span>
 										</div>
 									</div>
 								</div>
@@ -475,7 +475,7 @@
 									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Top Mentions</p>
 									<div class="flex flex-wrap gap-1.5">
 										{#each topMentions as tag}
-											<span class="rounded-full bg-white border border-gray-100 px-2 py-0.5 {tag.size} text-black/50">{tag.word}</span>
+											<span class="rounded-full bg-white border border-gray-100 px-2 py-0.5 {tag.size} text-black/60">{tag.word}</span>
 										{/each}
 									</div>
 								</div>
@@ -580,7 +580,7 @@
 									{#each operationalMetrics as op}
 										<div>
 											<div class="flex justify-between mb-1">
-												<span class="text-[11px] text-black/50">{op.label}</span>
+												<span class="text-[11px] text-black/60">{op.label}</span>
 												<span class="text-[10px] font-medium text-black/40">{op.score}</span>
 											</div>
 											<div class="h-2 w-full rounded-full bg-gray-100">

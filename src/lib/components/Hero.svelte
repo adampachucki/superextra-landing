@@ -18,7 +18,7 @@
 		</div>
 
 		<div class="mx-auto max-w-2xl text-center">
-			<p class="mb-8 text-lg leading-snug text-black/50 md:text-xl">
+			<p class="mb-8 text-lg leading-snug text-black/60 md:text-xl">
 				Super local intelligence and competitor benchmarking platform for the restaurant industry. The extra advantage behind smarter decisions.
 			</p>
 			<button
@@ -37,21 +37,21 @@
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="square" stroke-linejoin="miter" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" /><path stroke-linecap="square" stroke-linejoin="miter" d="M12 9v6M9 12h6" /></svg>
 				</div>
 				<h3 class="text-2xl font-bold text-black">Unrivaled data</h3>
-				<p class="mt-1 text-sm text-black/50">Competitor activity, menu pricing, reviews, foot traffic, and financials derived from dozens of public and proprietary sources.</p>
+				<p class="mt-1 text-sm text-black/60">Competitor activity, menu pricing, reviews, foot traffic, and financials derived from dozens of public and proprietary sources.</p>
 			</div>
 			<div class="border-b border-gray-200 p-8 md:border-b-0 md:py-10 md:px-10">
 				<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>
 				</div>
 				<h3 class="text-2xl font-bold text-black">Hyper-local focus</h3>
-				<p class="mt-1 text-sm text-black/50">Labor, rent, supply chain, and occupancy data that reveals how the industry operates. Benchmarked down to the neighbourhood.</p>
+				<p class="mt-1 text-sm text-black/60">Labor, rent, supply chain, and occupancy data that reveals how the industry operates. Benchmarked down to the neighbourhood.</p>
 			</div>
 			<div class="p-8 md:py-10 md:pl-10">
 				<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C12 2 14 9 12 12C10 9 12 2 12 2Z" /><path d="M12 12C12 12 14 15 12 22C10 15 12 12 12 12Z" /><path d="M2 12C2 12 9 10 12 12C9 14 2 12 2 12Z" /><path d="M12 12C12 12 15 10 22 12C15 14 12 12 12 12Z" /></svg>
 				</div>
 				<h3 class="text-2xl font-bold text-black">AI-native research</h3>
-				<p class="mt-1 text-sm text-black/50">Vast market data distilled into clear, actionable insights and custom reports. Backed by human experts when it matters most.</p>
+				<p class="mt-1 text-sm text-black/60">Vast market data distilled into clear, actionable insights and custom reports. Backed by human experts when it matters most.</p>
 			</div>
 		</div>
 	</div>

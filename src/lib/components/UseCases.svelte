@@ -173,7 +173,7 @@
 				<h3 class="mb-2 text-lg font-semibold tracking-[-0.01em] text-black">
 					{useCase.title}
 				</h3>
-				<p class="pr-4 text-sm leading-snug text-black/50">
+				<p class="pr-4 text-sm leading-snug text-black/60">
 					{useCase.description}
 				</p>
 			</div>

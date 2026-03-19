@@ -75,7 +75,7 @@
 			<h2 class="text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
 				Powered by dozens of data sources
 			</h2>
-			<p class="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-black/50">
+			<p class="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-black/60">
 				We aggregate, cross-reference, and validate data from public platforms, proprietary databases, and official registries across every market we cover.
 			</p>
 		</div>
