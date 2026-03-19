@@ -77,9 +77,9 @@ function confirmationHtml(name: string) {
 	return `<div style="font-family:sans-serif;max-width:520px;color:#1a1a1a;font-size:14px;line-height:1.6">
 <p>Hey ${firstName},</p>
 <p>I'm Adam, co-founder of Superextra.</p>
-<p>Thanks for signing up. We're building Superextra because good restaurant decisions require reliable information — and the industry deserves better access to it.</p>
+<p>Thanks for signing up. We believe the restaurant industry deserves better access to reliable information — and we're building Superextra to make that happen.</p>
 <p>This is an automated message, but I'll follow up personally soon.</p>
-<p>In the meantime, it would really help to know:</p>
+<p>In the meantime, it would help to know:</p>
 <ol>
 <li>What challenges can we help you solve?</li>
 <li>What information would make the biggest difference?</li>

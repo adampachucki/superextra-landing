@@ -277,7 +277,7 @@
 							What kind of business do you run?
 						</h2>
 						<p class="mb-8 text-center text-sm text-black/40">
-							Select the option that best describes your category
+							Select the option that best describes you
 						</p>
 
 						<div class="grid grid-cols-3 gap-2.5 {shakeFields.has('type-grid') ? 'shake' : ''}">
