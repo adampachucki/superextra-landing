@@ -82,17 +82,17 @@
 
 		<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-px overflow-hidden border-t border-gray-200 bg-gray-200">
 			{#each allSources as source}
-				<div class="group flex items-center justify-center bg-white px-5 py-8" title="{source.name}">
+				<div class="group flex items-center justify-center bg-white px-3 py-5 sm:px-5 sm:py-8" title="{source.name}">
 					<img
 						src="/logos/{source.logo}.svg"
 						alt="{source.name}"
-						class="h-8 max-w-[130px] object-contain opacity-50 transition-opacity group-hover:opacity-90"
+						class="h-5 sm:h-6 md:h-7 max-w-[80px] sm:max-w-[100px] md:max-w-[120px] object-contain opacity-50 transition-opacity group-hover:opacity-90"
 					/>
 				</div>
 			{/each}
 
 			<!-- "And more" cell -->
-			<div class="flex items-center justify-center bg-white px-5 py-8">
+			<div class="flex items-center justify-center bg-white px-3 py-5 sm:px-5 sm:py-8">
 				<span class="text-sm text-black/25">...and more</span>
 			</div>
 		</div>
