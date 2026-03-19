@@ -18,7 +18,7 @@ export const intake = onRequest({ cors: true }, async (req, res) => {
 				${row('Category', data.type)}
 				${row('Country', data.country)}
 				${row('Name', data.businessName)}
-				${data.placeId ? row('Google Maps', `<a href="https://www.google.com/maps/place/?q=place_id:${data.placeId}">View on Maps</a>`) : ''}
+				${data.placeId ? row('Google Maps', `<a href="https://www.google.com/maps/place/?q=place_id:${esc(data.placeId)}">View on Maps</a>`, true) : ''}
 				${data.locations ? row('Locations', data.locations) : ''}
 				${data.webUrl ? row('URL', data.webUrl) : ''}
 				${row('Contact', data.fullName)}
@@ -78,10 +78,10 @@ export const intake = onRequest({ cors: true }, async (req, res) => {
 	res.json({ ok: true });
 });
 
-function row(label, value) {
+function row(label, value, raw = false) {
 	return `<tr>
 		<td style="padding:6px 12px 6px 0;color:#888;font-size:13px;white-space:nowrap">${esc(label)}</td>
-		<td style="padding:6px 0;font-size:13px">${esc(value)}</td>
+		<td style="padding:6px 0;font-size:13px">${raw ? value : esc(value)}</td>
 	</tr>`;
 }
 

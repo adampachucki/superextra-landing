@@ -127,12 +127,8 @@
 	function selectPlace(s: { name: string; secondary: string; placeId: string }) {
 		placeName = s.name;
 		selectedPlaceId = s.placeId;
-		// Delay DOM removal so touchend/click completes on the dropdown,
-		// not on elements underneath (ghost click prevention)
-		setTimeout(() => {
-			placeSuggestions = [];
-			showSuggestions = false;
-		}, 300);
+		placeSuggestions = [];
+		showSuggestions = false;
 		if (document.activeElement instanceof HTMLElement) {
 			document.activeElement.blur();
 		}
@@ -411,7 +407,8 @@
 													<button
 														type="button"
 														class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
-														onpointerdown={(e) => { e.preventDefault(); selectPlace(s); }}
+														onpointerdown={(e) => e.preventDefault()}
+													onclick={() => selectPlace(s)}
 													>
 														<span class="text-black">{s.name}</span>
 														{#if s.secondary}
