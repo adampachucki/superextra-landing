@@ -138,9 +138,9 @@
 			<div>
 				<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">Use Cases</p>
 				<h2
-					class="max-w-xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black"
+					class="max-w-2xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black"
 				>
-					Supporting teams across all roles and functions
+					Supporting decisions across all roles and functions
 				</h2>
 			</div>
 
