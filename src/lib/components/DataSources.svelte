@@ -93,7 +93,7 @@
 
 			<!-- "And more" cell -->
 			<div class="flex items-center justify-center bg-white px-3 py-5 sm:px-5 sm:py-8">
-				<span class="text-sm text-black/25">...and more</span>
+				<span class="text-sm text-black/40">...and more</span>
 			</div>
 		</div>
 	</div>
