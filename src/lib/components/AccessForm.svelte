@@ -264,7 +264,7 @@
 		<!-- Modal -->
 		<div
 			class="relative mx-4 w-full max-w-[560px] rounded-2xl bg-white p-8 shadow-2xl shadow-black/10 transition-all duration-300 md:p-10
-				{modalVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-4 scale-[0.97] opacity-0'}"
+				{modalVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}"
 		>
 			<!-- Close button -->
 			{#if !submitting}
