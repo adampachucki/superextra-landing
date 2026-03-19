@@ -10,8 +10,6 @@
 	import CTA from '$lib/components/CTA.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import AccessForm from '$lib/components/AccessForm.svelte';
-	import PreviewBadge from '$lib/components/PreviewBadge.svelte';
-	import CookieBanner from '$lib/components/CookieBanner.svelte';
 </script>
 
 <Navbar />
@@ -29,5 +27,3 @@
 
 <Footer />
 <AccessForm />
-<PreviewBadge />
-<CookieBanner />

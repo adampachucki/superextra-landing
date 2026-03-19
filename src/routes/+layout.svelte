@@ -4,6 +4,8 @@
 	import { browser } from '$app/environment';
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import PreviewBadge from '$lib/components/PreviewBadge.svelte';
+	import CookieBanner from '$lib/components/CookieBanner.svelte';
 
 	onMount(() => {
 		const onBeforeUnload = () => {
@@ -52,6 +54,8 @@
 
 {#if unlocked}
 	{@render children()}
+	<PreviewBadge />
+	<CookieBanner />
 {:else}
 	<div class="fixed inset-0 z-[200] flex items-center justify-center bg-white">
 		<form onsubmit={(e) => { e.preventDefault(); submit(); }} class="flex flex-col items-center gap-4">

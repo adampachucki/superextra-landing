@@ -8,7 +8,7 @@
 		onmouseleave={() => (showTooltip = false)}
 		onfocus={() => (showTooltip = true)}
 		onblur={() => (showTooltip = false)}
-		class="flex items-center gap-1.5 rounded-full border border-black/10 bg-white/80 py-2 pr-2 pl-4 text-xs font-medium text-black/60 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.06)] backdrop-blur-sm transition-colors hover:text-black/80"
+		class="flex items-center gap-1.5 rounded-full border border-black/10 bg-white/80 py-3 pr-3 pl-4 text-xs font-medium text-black/60 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.06)] backdrop-blur-sm transition-colors hover:text-black/80"
 	>
 		<span class="relative flex h-1.5 w-1.5">
 			<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
