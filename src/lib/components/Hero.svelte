@@ -6,11 +6,11 @@
 <section class="relative overflow-hidden pt-30 pb-0 md:pt-36">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="relative">
-			<h1 class="relative z-10 mx-auto max-w-5xl text-center text-[clamp(3.25rem,9vw,9rem)] leading-[0.95] font-normal tracking-[-0.04em] text-black">
+			<h1 class="hero-fade relative z-10 mx-auto max-w-5xl text-center text-[clamp(3.25rem,9vw,9rem)] leading-[0.95] font-normal tracking-[-0.04em] text-black" style="animation-delay: 0ms">
 				Market intelligence for restaurants
 			</h1>
 
-			<div class="relative z-0 mx-auto -mt-20 mb-8 flex justify-center md:-mt-40">
+			<div class="hero-fade relative z-0 mx-auto -mt-20 mb-8 flex justify-center md:-mt-40" style="animation-delay: 100ms">
 				<div class="relative h-[250px] w-[520px] overflow-hidden rounded-2xl md:h-[360px] md:w-[680px]">
 					<HeroCanvas class="absolute inset-0 h-full w-full" />
 				</div>
@@ -18,19 +18,20 @@
 		</div>
 
 		<div class="mx-auto max-w-2xl text-center">
-			<p class="mb-8 text-lg leading-snug text-black/60 md:text-xl">
+			<p class="hero-fade mb-8 text-lg leading-snug text-black/60 md:text-xl" style="animation-delay: 200ms">
 				Super local intelligence and competitor benchmarking platform for the restaurant industry. The extra advantage behind smarter decisions.
 			</p>
 			<button
 				onclick={() => formState.open()}
-				class="inline-flex cursor-pointer items-center gap-2 rounded-full bg-black px-8 py-3.5 text-sm font-medium text-white transition-colors hover:bg-black/80"
+				class="hero-fade inline-flex cursor-pointer items-center gap-2 rounded-full bg-black px-8 py-3.5 text-sm font-medium text-white transition-colors hover:bg-black/80"
+				style="animation-delay: 300ms"
 			>
 				Get Access
 			</button>
 		</div>
 	</div>
 
-	<div class="mx-auto mt-20 max-w-[1200px] px-6 md:mt-28">
+	<div class="hero-fade mx-auto mt-20 max-w-[1200px] px-6 md:mt-28" style="animation-delay: 450ms">
 		<div class="grid grid-cols-1 border-t border-gray-200 md:grid-cols-3 md:divide-x md:divide-gray-200">
 			<div class="border-b border-gray-200 p-8 md:border-b-0 md:py-10 md:pr-10">
 				<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#f5f4f2]">
@@ -56,3 +57,20 @@
 		</div>
 	</div>
 </section>
+
+<style>
+	.hero-fade {
+		animation: heroFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+
+	@keyframes heroFadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(16px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+</style>
