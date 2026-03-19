@@ -1,7 +1,6 @@
 import { onRequest } from 'firebase-functions/v2/https';
-import { defineString } from 'firebase-functions/params';
 
-const RELAY_KEY = defineString('RELAY_KEY');
+const RELAY_KEY = process.env.RELAY_KEY;
 const DEST = 'hello@superextra.ai';
 
 export const intake = onRequest({ cors: true }, async (req, res) => {
@@ -34,7 +33,7 @@ export const intake = onRequest({ cors: true }, async (req, res) => {
 		result = await fetch('https://api.resend.com/emails', {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${RELAY_KEY.value()}`,
+				Authorization: `Bearer ${RELAY_KEY}`,
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
@@ -62,7 +61,7 @@ export const intake = onRequest({ cors: true }, async (req, res) => {
 		await fetch('https://api.resend.com/emails', {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${RELAY_KEY.value()}`,
+				Authorization: `Bearer ${RELAY_KEY}`,
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
