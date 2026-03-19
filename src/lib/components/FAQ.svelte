@@ -6,19 +6,31 @@
 		},
 		{
 			question: 'How is the data collected and how accurate is it?',
-			answer: 'We aggregate data from dozens of public and proprietary sources including review platforms, delivery apps, foot traffic sensors, real estate databases, public filings, and more. Our AI models cross-reference and validate data in real time to deliver the most accurate picture of your market.'
+			answer: 'Superextra aggregates data from dozens of public and proprietary sources including review platforms, delivery apps, foot traffic providers, real estate databases, public filings, and more. AI models cross-reference and validate data continuously to deliver the most accurate picture of the market.'
+		},
+		{
+			question: 'Does Superextra connect to my POS or internal systems?',
+			answer: "No — and that's by design. Superextra brings the market data to you, so there's no integration required. Think of it as an external intelligence layer: all the competitive, location, and industry data you need without sharing any of your own."
 		},
 		{
 			question: 'How hyper-local is the intelligence?',
-			answer: 'Extremely. We map intelligence down to 1-mile trade areas, allowing you to understand the competitive dynamics of your exact neighborhood — not just your city or zip code. This is the granularity that makes Superextra different.'
+			answer: 'Extremely. Intelligence is mapped down to precise trade areas, so you can understand the competitive dynamics of your exact neighborhood — not just a city or zip code. That granularity is what makes Superextra different.'
 		},
 		{
 			question: 'Can I benchmark against specific competitors?',
-			answer: 'Yes. You can select specific competitors to build custom benchmarking sets, or let our AI automatically identify your most relevant competitive set based on concept, cuisine, price point, and proximity.'
+			answer: 'Superextra uses cohort-based benchmarking rather than direct competitor comparisons. Performance is measured against relevant peer groups based on cuisine, price point, format, and location — giving a more reliable and statistically meaningful picture than one-to-one comparisons.'
+		},
+{
+			question: 'What markets and geographies are covered?',
+			answer: 'Superextra is launching with deep coverage in select European markets and expanding rapidly. If you want to check availability for a specific region, reach out to the team.'
+		},
+		{
+			question: 'How reliable are the AI agents? Do they hallucinate?',
+			answer: "Superextra agents are built to report facts, not generate them. Every insight is grounded in real data. When information isn't available, the agent flags it as missing rather than inventing an answer."
 		},
 		{
 			question: 'What does pricing look like?',
-			answer: "We offer flexible plans based on the number of locations and depth of intelligence you need. Early access users get preferential pricing. Reach out to our team to learn more about the plan that fits your business."
+			answer: "Flexible plans based on the number of locations and depth of intelligence needed. Early access users get preferential pricing. Reach out to learn more about the plan that fits best."
 		}
 	];
 
