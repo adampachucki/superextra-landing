@@ -188,7 +188,9 @@
 			const dpr = window.devicePixelRatio || 1;
 			canvasEl.width = rect.width * dpr;
 			canvasEl.height = rect.height * dpr;
-			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			const sx = rect.width / W;
+			const sy = rect.height / H;
+			ctx.setTransform(dpr * sx, 0, 0, dpr * sy, 0, 0);
 			if (!animate) {
 				draw(5000);
 			}

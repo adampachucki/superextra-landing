@@ -3,31 +3,26 @@
 	import HeroCanvas from './HeroCanvas.svelte';
 </script>
 
-<section class="relative overflow-hidden pt-30 pb-0 md:pt-36">
-	<div class="mx-auto max-w-[1200px] px-6">
-		<div class="relative">
-			<h1 class="hero-fade relative z-10 mx-auto max-w-5xl text-center text-[clamp(4rem,9vw,9rem)] leading-[0.95] font-normal tracking-[-0.04em] text-black" style="animation-delay: 0ms">
+<section class="relative overflow-hidden px-8 pt-20 pb-8 md:pt-22">
+	<div class="hero-fade relative overflow-hidden rounded-3xl" style="animation-delay: 100ms; min-height: calc(100svh - 8rem)">
+		<HeroCanvas class="absolute inset-0 h-full w-full" />
+		<div class="relative z-10 flex min-h-[inherit] flex-col items-center justify-center px-6 py-20">
+			<h1 class="hero-fade mx-auto max-w-5xl text-center text-[clamp(4rem,9vw,9rem)] leading-[0.95] font-normal tracking-[-0.04em] text-black" style="animation-delay: 0ms">
 				Market intelligence for restaurants
 			</h1>
 
-			<div class="hero-fade relative z-0 mx-auto -mt-14 mb-8 flex justify-center md:-mt-40" style="animation-delay: 100ms">
-				<div class="relative h-[250px] w-[520px] overflow-hidden rounded-2xl md:h-[360px] md:w-[680px]">
-					<HeroCanvas class="absolute inset-0 h-full w-full" />
-				</div>
+			<div class="mx-auto mt-8 max-w-2xl text-center md:mt-12">
+				<p class="hero-fade mb-12 text-lg leading-snug text-black md:text-xl" style="animation-delay: 200ms">
+					Super local intelligence and competitor benchmarking platform for the restaurant industry. The extra advantage behind smarter decisions.
+				</p>
+				<button
+					onclick={() => formState.open()}
+					class="hero-fade inline-flex cursor-pointer items-center gap-2 rounded-full bg-black px-8 py-3.5 text-sm font-medium text-white transition-colors hover:bg-black/80"
+					style="animation-delay: 300ms"
+				>
+					Get Access
+				</button>
 			</div>
-		</div>
-
-		<div class="mx-auto max-w-2xl text-center">
-			<p class="hero-fade mb-8 text-lg leading-snug text-black/60 md:text-xl" style="animation-delay: 200ms">
-				Super local intelligence and competitor benchmarking platform for the restaurant industry. The extra advantage behind smarter decisions.
-			</p>
-			<button
-				onclick={() => formState.open()}
-				class="hero-fade inline-flex cursor-pointer items-center gap-2 rounded-full bg-black px-8 py-3.5 text-sm font-medium text-white transition-colors hover:bg-black/80"
-				style="animation-delay: 300ms"
-			>
-				Get Access
-			</button>
 		</div>
 	</div>
 
