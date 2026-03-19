@@ -273,7 +273,7 @@
 			{#if !submitting}
 				<button
 					onclick={close}
-					class="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full text-black/30 transition-colors hover:bg-gray-100 hover:text-black/60"
+					class="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full text-black/25 transition-colors hover:bg-gray-100 hover:text-black/60"
 					aria-label="Close"
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -335,7 +335,7 @@
 									class="cursor-pointer rounded-xl border px-3 py-3 text-sm transition-all duration-200
 										{selectedType === type
 											? 'border-black bg-black text-white'
-											: 'border-gray-200 bg-white text-black/70 hover:border-gray-300 hover:text-black'}"
+											: 'border-gray-200 bg-white text-black/60 hover:border-gray-300 hover:text-black'}"
 								>
 									{type}
 								</button>
@@ -395,7 +395,7 @@
 										class="{inputBase} pr-10 {shakeFields.has('place-name') ? 'shake border-red-300' : 'border-gray-200'}"
 									/>
 									{#if loadingSuggestions}
-										<svg class="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-black/20" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<svg class="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-black/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 											<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
 											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
 										</svg>
@@ -412,7 +412,7 @@
 													>
 														<span class="text-black">{s.name}</span>
 														{#if s.secondary}
-															<span class="ml-1 text-black/30">{s.secondary}</span>
+															<span class="ml-1 text-black/25">{s.secondary}</span>
 														{/if}
 													</button>
 												</li>

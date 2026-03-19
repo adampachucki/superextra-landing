@@ -61,7 +61,7 @@
 							</h3>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
-								class="h-5 w-5 shrink-0 text-black/30 transition-transform duration-300 {openIndex === i ? 'rotate-45' : ''}"
+								class="h-5 w-5 shrink-0 text-black/25 transition-transform duration-300 {openIndex === i ? 'rotate-45' : ''}"
 								fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />

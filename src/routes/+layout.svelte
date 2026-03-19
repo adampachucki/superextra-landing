@@ -54,7 +54,9 @@
 
 {#if unlocked}
 	{@render children()}
-	<PreviewBadge />
+	<div class="fixed bottom-5 left-5 z-50 hidden md:block">
+		<PreviewBadge />
+	</div>
 	<CookieBanner />
 {:else}
 	<div class="fixed inset-0 z-[200] flex items-center justify-center bg-white">

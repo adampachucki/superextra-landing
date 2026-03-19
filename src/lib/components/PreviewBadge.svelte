@@ -1,14 +1,16 @@
 <script lang="ts">
+	let { shadow = true, tooltipBelow = false }: { shadow?: boolean; tooltipBelow?: boolean } = $props();
 	let showTooltip = $state(false);
 </script>
 
-<div class="fixed bottom-5 left-5 z-50">
+<div class="relative">
 	<button
 		onmouseenter={() => (showTooltip = true)}
 		onmouseleave={() => (showTooltip = false)}
 		onfocus={() => (showTooltip = true)}
 		onblur={() => (showTooltip = false)}
-		class="flex items-center gap-1.5 rounded-full border border-black/10 bg-white/80 py-3 pr-3 pl-4 text-xs font-medium text-black/60 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.06)] backdrop-blur-sm transition-colors hover:text-black/80"
+		class="flex items-center gap-1.5 rounded-full border border-black/10 bg-white/80 py-1.5 pr-2.5 pl-3 text-xs font-medium text-black/60 backdrop-blur-sm transition-colors hover:text-black"
+		class:shadow-[0_2px_20px_-4px_rgba(0,0,0,0.06)]={shadow}
 	>
 		<span class="relative flex h-1.5 w-1.5">
 			<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
@@ -19,7 +21,7 @@
 
 	{#if showTooltip}
 		<div
-			class="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-black/5 bg-white p-3 text-xs leading-relaxed text-black/60 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.08)]"
+			class="absolute w-56 rounded-xl border border-black/5 bg-white p-3 text-xs leading-relaxed text-black/60 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.08)] {tooltipBelow ? 'top-full right-0 mt-2' : 'bottom-full left-0 mb-2'}"
 		>
 			This page is in demo mode. Content and features shown here are for preview purposes and may change before launch.
 		</div>

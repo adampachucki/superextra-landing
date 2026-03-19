@@ -14,7 +14,7 @@
 	<h1 class="text-3xl font-semibold tracking-tight text-black">Terms & Conditions</h1>
 	<p class="mt-2 text-sm text-black/40">Last updated: March 10, 2026</p>
 
-	<div class="prose prose-sm prose-neutral mt-10 max-w-none text-black/70 prose-headings:text-black prose-headings:font-semibold prose-h2:text-lg prose-h2:mt-10 prose-h2:mb-4 prose-p:leading-relaxed prose-li:leading-relaxed prose-a:text-black prose-a:underline">
+	<div class="prose prose-sm prose-neutral mt-10 max-w-none text-black/60 prose-headings:text-black prose-headings:font-semibold prose-h2:text-lg prose-h2:mt-10 prose-h2:mb-4 prose-p:leading-relaxed prose-li:leading-relaxed prose-a:text-black prose-a:underline">
 		<h2>1. Agreement to Terms</h2>
 		<p>These Terms & Conditions ("Terms") govern your access to and use of the Superextra website at superextra.ai and the Superextra platform (collectively, the "Service"), operated by Superextra ("we", "our", or "us").</p>
 		<p>By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, you may not use the Service.</p>

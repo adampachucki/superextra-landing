@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formState } from '$lib/form-state.svelte';
+	import PreviewBadge from '$lib/components/PreviewBadge.svelte';
 
 	let scrolled = $state(false);
 	let mobileOpen = $state(false);
@@ -44,17 +45,20 @@
 			<button onclick={() => formState.open()} class="cursor-pointer rounded-full bg-black px-5 py-2 text-sm text-white transition-colors hover:bg-black/80">Get Access</button>
 		</div>
 
-		<button
-			class="text-black md:hidden"
-			onclick={() => (mobileOpen = !mobileOpen)}
-			aria-label="Toggle menu"
-		>
+		<div class="flex items-center gap-3 md:hidden">
+			<PreviewBadge shadow={false} tooltipBelow />
+			<button
+				class="text-black"
+				onclick={() => (mobileOpen = !mobileOpen)}
+				aria-label="Toggle menu"
+			>
 			{#if mobileOpen}
 				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" /></svg>
 			{:else}
 				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
 			{/if}
 		</button>
+		</div>
 	</div>
 
 	{#if mobileOpen}

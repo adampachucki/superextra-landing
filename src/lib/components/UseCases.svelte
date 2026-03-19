@@ -169,7 +169,7 @@
 					<UseCaseGraphics index={i} hovered={hoveredIndex === i} />
 				</div>
 
-				<p class="mb-1 text-xs font-medium text-black/30">{useCase.audience}</p>
+				<p class="mb-1 text-xs font-medium text-black/25">{useCase.audience}</p>
 				<h3 class="mb-2 text-lg font-semibold tracking-[-0.01em] text-black">
 					{useCase.title}
 				</h3>

@@ -184,7 +184,7 @@
 							</h3>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
-								class="h-5 w-5 shrink-0 text-black/30 transition-transform duration-300 {activeIndex === i ? 'rotate-180' : ''}"
+								class="h-5 w-5 shrink-0 text-black/25 transition-transform duration-300 {activeIndex === i ? 'rotate-180' : ''}"
 								fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
@@ -214,7 +214,7 @@
 						<div class="h-full" in:fade={{ duration: 200 }}>
 						{#if activeIndex === 0}
 							<div class="flex h-full flex-col">
-								<p class="mb-4 text-[11px] font-medium uppercase tracking-widest text-black/30">Market Landscape</p>
+								<p class="mb-4 text-[11px] font-medium uppercase tracking-widest text-black/25">Market Landscape</p>
 
 								<div class="grid grid-cols-3 gap-3 mb-5">
 									<div class="rounded-xl bg-white p-3 border border-gray-100">
@@ -232,7 +232,7 @@
 								</div>
 
 								<div class="mb-5">
-									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Net Openings — 6 Months</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2 uppercase tracking-wider">Net Openings — 6 Months</p>
 									<div class="flex items-end gap-1.5 h-14">
 										{#each netOpenings as bar}
 											<div class="flex-1 flex flex-col items-center gap-0.5">
@@ -250,7 +250,7 @@
 								</div>
 
 								<div class="flex-1">
-									<p class="text-[10px] font-medium text-black/30 mb-2.5 uppercase tracking-wider">Cuisine Landscape</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2.5 uppercase tracking-wider">Cuisine Landscape</p>
 									<div class="space-y-2">
 										{#each cuisineLandscape as item}
 											<div>
@@ -267,7 +267,7 @@
 								<div class="border-t border-gray-200 pt-3 flex items-center justify-between">
 									<div class="flex items-center gap-2">
 										<span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-										<span class="text-[10px] text-black/30">Live — updated 2h ago</span>
+										<span class="text-[10px] text-black/25">Live — updated 2h ago</span>
 									</div>
 									<span class="text-[10px] font-medium text-black/40">3 white space opportunities</span>
 								</div>
@@ -275,17 +275,17 @@
 
 						{:else if activeIndex === 1}
 							<div class="flex h-full flex-col">
-								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/30">Menu & Pricing</p>
+								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/25">Menu & Pricing</p>
 
 								<div class="rounded-xl bg-white border border-gray-100 overflow-hidden mb-4">
-									<div class="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 border-b border-gray-100 text-[10px] font-medium uppercase tracking-wider text-black/30">
+									<div class="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 border-b border-gray-100 text-[10px] font-medium uppercase tracking-wider text-black/25">
 										<span>Item</span>
 										<span>Avg Price</span>
 										<span>Trend</span>
 									</div>
 									{#each trendingItems as row}
 										<div class="grid grid-cols-[1fr_auto_auto] gap-x-4 items-center px-4 py-2.5 border-b border-gray-50 last:border-0">
-											<span class="text-sm text-black/70 flex items-center gap-2">
+											<span class="text-sm text-black/60 flex items-center gap-2">
 												{row.item}
 												{#if row.hot}
 													<span class="rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold text-orange-600">HOT</span>
@@ -298,12 +298,12 @@
 								</div>
 
 								<div class="flex-1">
-									<p class="text-[10px] font-medium text-black/30 mb-2.5 uppercase tracking-wider">Active Promotions</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2.5 uppercase tracking-wider">Active Promotions</p>
 									<div class="space-y-2">
 										{#each activePromos as promo}
 											<div class="flex items-center justify-between rounded-lg bg-white border border-gray-100 px-3 py-2">
 												<div>
-													<span class="text-xs text-black/70 font-medium">{promo.venue}</span>
+													<span class="text-xs text-black/60 font-medium">{promo.venue}</span>
 													<p class="text-[10px] text-black/40">{promo.deal}</p>
 												</div>
 												<span class="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] text-black/40">{promo.type}</span>
@@ -313,13 +313,13 @@
 								</div>
 
 								<div class="border-t border-gray-200 pt-3 mt-4">
-									<span class="text-[10px] text-black/30">Based on 1,240 menus across the market</span>
+									<span class="text-[10px] text-black/25">Based on 1,240 menus across the market</span>
 								</div>
 							</div>
 
 						{:else if activeIndex === 2}
 							<div class="flex h-full flex-col">
-								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/30">Revenue & Sales</p>
+								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/25">Revenue & Sales</p>
 
 								<div class="grid grid-cols-3 gap-3 mb-5">
 									{#each revenueKpis as kpi}
@@ -332,7 +332,7 @@
 								</div>
 
 								<div class="mb-5">
-									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Revenue by Channel</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2 uppercase tracking-wider">Revenue by Channel</p>
 									<div class="flex rounded-lg overflow-hidden h-7 mb-2">
 										<div class="bg-black flex items-center justify-center" style="width: 58%">
 											<span class="text-[10px] font-bold text-white">58%</span>
@@ -352,7 +352,7 @@
 								</div>
 
 								<div class="flex-1">
-									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Monthly Revenue Index</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2 uppercase tracking-wider">Monthly Revenue Index</p>
 									<div class="flex items-end gap-1.5 h-16">
 										{#each monthlyRevenue as bar}
 											<div class="flex-1 flex flex-col items-center gap-1">
@@ -364,13 +364,13 @@
 								</div>
 
 								<div class="border-t border-gray-200 pt-3 mt-4">
-									<span class="text-[10px] text-black/30">Based on 186 comparable venues</span>
+									<span class="text-[10px] text-black/25">Based on 186 comparable venues</span>
 								</div>
 							</div>
 
 						{:else if activeIndex === 3}
 							<div class="flex h-full flex-col">
-								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/30">Marketing & Digital</p>
+								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/25">Marketing & Digital</p>
 
 								<div class="grid grid-cols-3 gap-3 mb-5">
 									<div class="rounded-xl bg-white p-3 border border-gray-100">
@@ -388,7 +388,7 @@
 								</div>
 
 								<div class="mb-5">
-									<p class="text-[10px] font-medium text-black/30 mb-2.5 uppercase tracking-wider">Estimated Ad Spend — Market Avg</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2.5 uppercase tracking-wider">Estimated Ad Spend — Market Avg</p>
 									<div class="space-y-2">
 										{#each adSpendByChannel as channel}
 											<div>
@@ -403,7 +403,7 @@
 								</div>
 
 								<div class="flex-1">
-									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Common Tools & Platforms</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2 uppercase tracking-wider">Common Tools & Platforms</p>
 									<div class="flex flex-wrap gap-1.5">
 										{#each commonTools as tool}
 											<span class="rounded-full bg-white border border-gray-100 px-2.5 py-1 text-[11px] text-black/60">{tool}</span>
@@ -412,13 +412,13 @@
 								</div>
 
 								<div class="border-t border-gray-200 pt-3 mt-4">
-									<span class="text-[10px] text-black/30">Across 320 tracked competitors</span>
+									<span class="text-[10px] text-black/25">Across 320 tracked competitors</span>
 								</div>
 							</div>
 
 						{:else if activeIndex === 4}
 							<div class="flex h-full flex-col">
-								<p class="mb-4 text-[11px] font-medium uppercase tracking-widest text-black/30">Guest Intelligence</p>
+								<p class="mb-4 text-[11px] font-medium uppercase tracking-widest text-black/25">Guest Intelligence</p>
 
 								<div class="flex gap-5 mb-5">
 									<div class="text-center">
@@ -430,7 +430,7 @@
 												</svg>
 											{/each}
 										</div>
-										<p class="text-[10px] text-black/30 mt-1">2,847 reviews</p>
+										<p class="text-[10px] text-black/25 mt-1">2,847 reviews</p>
 									</div>
 									<div class="flex-1 space-y-2">
 										{#each sentimentBreakdown as s}
@@ -447,17 +447,17 @@
 
 								<div class="grid grid-cols-2 gap-3 mb-5">
 									<div class="rounded-xl bg-white p-3 border border-gray-100">
-										<p class="text-lg font-bold text-black">68<span class="text-xs font-normal text-black/30">%</span></p>
+										<p class="text-lg font-bold text-black">68<span class="text-xs font-normal text-black/25">%</span></p>
 										<p class="text-[10px] text-black/40 mt-0.5">Local residents</p>
 									</div>
 									<div class="rounded-xl bg-white p-3 border border-gray-100">
-										<p class="text-lg font-bold text-black">32<span class="text-xs font-normal text-black/30">%</span></p>
+										<p class="text-lg font-bold text-black">32<span class="text-xs font-normal text-black/25">%</span></p>
 										<p class="text-[10px] text-black/40 mt-0.5">Tourists & visitors</p>
 									</div>
 								</div>
 
 								<div class="mb-4">
-									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Payment Preferences</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2 uppercase tracking-wider">Payment Preferences</p>
 									<div class="flex rounded-lg overflow-hidden h-6">
 										<div class="flex items-center justify-center" style="width: 62%; background: {GRAD_INDIGO_VIOLET}">
 											<span class="text-[9px] font-bold text-white">Card 62%</span>
@@ -472,7 +472,7 @@
 								</div>
 
 								<div class="border-t border-gray-200 pt-3 flex-1">
-									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Top Mentions</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2 uppercase tracking-wider">Top Mentions</p>
 									<div class="flex flex-wrap gap-1.5">
 										{#each topMentions as tag}
 											<span class="rounded-full bg-white border border-gray-100 px-2 py-0.5 {tag.size} text-black/60">{tag.word}</span>
@@ -483,14 +483,14 @@
 
 						{:else if activeIndex === 5}
 							<div class="flex h-full flex-col">
-								<p class="mb-4 text-[11px] font-medium uppercase tracking-widest text-black/30">Location & Foot Traffic</p>
+								<p class="mb-4 text-[11px] font-medium uppercase tracking-widest text-black/25">Location & Foot Traffic</p>
 
 								<div class="mb-5">
-									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Weekly Foot Traffic</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2 uppercase tracking-wider">Weekly Foot Traffic</p>
 									<div class="flex items-end gap-1.5 h-16">
 										{#each weeklyTraffic as bar}
 											<div class="flex-1 flex flex-col items-center gap-1">
-												<span class="text-[8px] font-medium text-black/30">{bar.h}%</span>
+												<span class="text-[8px] font-medium text-black/25">{bar.h}%</span>
 												<div class="w-full rounded-t-sm" style="height: {bar.h}%; background: {GRAD_INDIGO_VIOLET_V}"></div>
 												<span class="text-[8px] text-black/25">{bar.day}</span>
 											</div>
@@ -499,7 +499,7 @@
 								</div>
 
 								<div class="mb-5">
-									<p class="text-[10px] font-medium text-black/30 mb-2 uppercase tracking-wider">Visit Time Distribution</p>
+									<p class="text-[10px] font-medium text-black/25 mb-2 uppercase tracking-wider">Visit Time Distribution</p>
 									<div class="flex rounded-lg overflow-hidden h-7 mb-2">
 										<div class="flex items-center justify-center" style="width: 15%; background: rgb(180,180,190)">
 											<span class="text-[8px] font-bold text-white">15%</span>
@@ -548,29 +548,29 @@
 								</div>
 
 								<div class="border-t border-gray-200 pt-3 mt-4 flex items-center justify-between">
-									<span class="text-[10px] text-black/30">Downtown district — 1mi radius</span>
+									<span class="text-[10px] text-black/25">Downtown district — 1mi radius</span>
 									<span class="text-[10px] font-medium text-black/40">68% local / 32% tourist</span>
 								</div>
 							</div>
 
 						{:else if activeIndex === 6}
 							<div class="flex h-full flex-col">
-								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/30">Operations</p>
+								<p class="mb-5 text-[11px] font-medium uppercase tracking-widest text-black/25">Operations</p>
 
 								<div class="grid grid-cols-2 gap-3 mb-5">
 									<div class="rounded-xl bg-white p-4 border border-gray-100">
 										<div class="flex items-end gap-1 mb-1">
-											<span class="text-sm text-black/30 mb-0.5">$</span>
+											<span class="text-sm text-black/25 mb-0.5">$</span>
 											<span class="text-3xl font-bold text-black leading-none">18.50</span>
-											<span class="text-sm text-black/30 mb-0.5">/hr</span>
+											<span class="text-sm text-black/25 mb-0.5">/hr</span>
 										</div>
 										<p class="text-[10px] text-black/40">Avg salary</p>
 									</div>
 									<div class="rounded-xl bg-white p-4 border border-gray-100">
 										<div class="flex items-end gap-1 mb-1">
-											<span class="text-sm text-black/30 mb-0.5">$</span>
+											<span class="text-sm text-black/25 mb-0.5">$</span>
 											<span class="text-3xl font-bold text-black leading-none">85</span>
-											<span class="text-sm text-black/30 mb-0.5">/sqft</span>
+											<span class="text-sm text-black/25 mb-0.5">/sqft</span>
 										</div>
 										<p class="text-[10px] text-black/40">Avg rent</p>
 									</div>
@@ -591,12 +591,12 @@
 								</div>
 
 								<div class="border-t border-gray-200 pt-3 mt-4">
-									<span class="text-[10px] text-black/30">Market avg — Downtown district</span>
+									<span class="text-[10px] text-black/25">Market avg — Downtown district</span>
 								</div>
 							</div>
 
 						{:else}
-							<div class="flex h-full items-center justify-center text-sm text-black/30">
+							<div class="flex h-full items-center justify-center text-sm text-black/25">
 								Click a category to explore
 							</div>
 						{/if}
