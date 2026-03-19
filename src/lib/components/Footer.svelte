@@ -27,5 +27,8 @@
 				</div>
 			</div>
 		</div>
+		<p class="mt-4 text-center text-xs text-black/30 md:hidden">
+			We use <a href="/privacy-policy" class="underline transition-colors hover:text-black/60">cookies</a>
+		</p>
 	</div>
 </footer>
