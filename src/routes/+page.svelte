@@ -7,6 +7,7 @@
 	import UseCases from '$lib/components/UseCases.svelte';
 	import GetOnboard from '$lib/components/GetOnboard.svelte';
 	import FAQ from '$lib/components/FAQ.svelte';
+	import DataSources from '$lib/components/DataSources.svelte';
 	import CTA from '$lib/components/CTA.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import AccessForm from '$lib/components/AccessForm.svelte';
@@ -22,6 +23,7 @@
 	<UseCases />
 	<GetOnboard />
 	<FAQ />
+	<DataSources />
 	<CTA />
 </main>
 

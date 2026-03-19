@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" fill="#000000">
+  <!-- OpenTable: distinctive red dot circle + wordmark -->
+  <circle cx="14" cy="20" r="10" stroke="#000000" stroke-width="2.5" fill="none"/>
+  <circle cx="14" cy="20" r="4" fill="#000000"/>
+  <text x="30" y="26" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#000000">OpenTable</text>
+</svg>
