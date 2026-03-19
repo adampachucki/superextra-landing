@@ -31,6 +31,7 @@
 		{ code: 'pl', name: 'Poland', dial: '+48' }
 	];
 
+	let placeName = $state('');
 	let businessName = $state('');
 	let selectedLocations = $state('');
 	let webUrl = $state('');
@@ -96,14 +97,14 @@
 
 	function onPlaceInput(e: Event) {
 		const value = (e.target as HTMLInputElement).value;
-		businessName = value;
+		placeName = value;
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => fetchPlaceSuggestions(value), 300);
 		showSuggestions = true;
 	}
 
 	function selectPlace(name: string) {
-		businessName = name;
+		placeName = name;
 		placeSuggestions = [];
 		showSuggestions = false;
 	}
@@ -130,6 +131,7 @@
 				step = 1;
 				selectedType = '';
 				selectedCountry = 'us';
+				placeName = '';
 				businessName = '';
 				selectedLocations = '';
 				webUrl = '';
@@ -153,7 +155,8 @@
 		if (step === 1) return selectedType === '' ? ['type-grid'] : [];
 		if (step === 2) {
 			const fields: string[] = [];
-			if (businessName.trim() === '') fields.push('business-name');
+			if (isVenue && placeName.trim() === '') fields.push('place-name');
+			if (!isVenue && businessName.trim() === '') fields.push('business-name');
 			if (isVenue && selectedLocations === '') fields.push('locations');
 			if (!isVenue && !(/\S+\.\S+/.test(webUrl.trim()))) fields.push('web-url');
 			return fields;
@@ -188,7 +191,7 @@
 				body: JSON.stringify({
 					type: selectedType,
 					country: country.name,
-					businessName,
+					businessName: isVenue ? placeName : businessName,
 					locations: isVenue ? selectedLocations : undefined,
 					webUrl: isVenue ? undefined : webUrl,
 					fullName,
@@ -323,19 +326,19 @@
 									{/each}
 								</select>
 							</div>
-							<div class="relative">
-								<label for="business-name" class="mb-1.5 block text-xs font-medium text-black/50">{isVenue ? 'Place name' : 'Business name'}</label>
-								{#if isVenue}
+							{#if isVenue}
+								<div class="relative">
+									<label for="place-name" class="mb-1.5 block text-xs font-medium text-black/50">Place name</label>
 									<input
-										id="business-name"
+										id="place-name"
 										type="text"
-										value={businessName}
+										value={placeName}
 										oninput={onPlaceInput}
 										onfocus={() => { if (placeSuggestions.length) showSuggestions = true; }}
 										onblur={() => setTimeout(() => (showSuggestions = false), 150)}
 										placeholder="The Corner Bistro"
 										autocomplete="off"
-										class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('business-name') ? 'shake border-red-300' : 'border-gray-200'}"
+										class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('place-name') ? 'shake border-red-300' : 'border-gray-200'}"
 									/>
 									{#if showSuggestions && placeSuggestions.length > 0}
 										<ul class="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
@@ -355,7 +358,10 @@
 											{/each}
 										</ul>
 									{/if}
-								{:else}
+								</div>
+							{:else}
+								<div>
+									<label for="business-name" class="mb-1.5 block text-xs font-medium text-black/50">Business name</label>
 									<input
 										id="business-name"
 										type="text"
@@ -363,8 +369,8 @@
 										placeholder="Acme Inc."
 										class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('business-name') ? 'shake border-red-300' : 'border-gray-200'}"
 									/>
-								{/if}
-							</div>
+								</div>
+							{/if}
 							{#if isVenue}
 								<div>
 									<label for="locations" class="mb-1.5 block text-xs font-medium text-black/50">Number of locations</label>
