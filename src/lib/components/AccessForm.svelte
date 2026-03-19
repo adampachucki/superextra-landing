@@ -489,7 +489,7 @@
 						</div>
 
 						{#if submitError}
-							<p class="mt-4 text-center text-sm text-red-500">Something went wrong. Please try again.</p>
+							<p class="mt-4 text-sm text-red-500">Something went wrong, please try again</p>
 						{/if}
 
 						<div class="mt-8 flex items-center justify-between">
