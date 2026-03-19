@@ -3,12 +3,14 @@
 	import { formState } from '$lib/form-state.svelte';
 
 	const btnPrimary = 'inline-flex items-center gap-2 rounded-full bg-black px-7 py-2.5 text-sm font-medium text-white transition-colors hover:bg-black/80';
+	const inputBase = 'w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none';
 
 	let step = $state(1);
 	let selectedType = $state('');
 	let selectedCountry = $state('us');
 	let submitting = $state(false);
 	let submitted = $state(false);
+	let submitError = $state(false);
 	let backdropVisible = $state(false);
 	let modalVisible = $state(false);
 
@@ -144,6 +146,7 @@
 				phone = '';
 				submitting = false;
 				submitted = false;
+				submitError = false;
 			}, 200);
 		}, 150);
 	}
@@ -188,6 +191,7 @@
 		const invalid = getInvalidFields();
 		if (invalid.length > 0) { shake(invalid); return; }
 		submitting = true;
+		submitError = false;
 		try {
 			const res = await fetch('/api/intake', {
 				method: 'POST',
@@ -206,6 +210,7 @@
 			if (!res.ok) throw new Error();
 		} catch {
 			submitting = false;
+			submitError = true;
 			return;
 		}
 		submitting = false;
@@ -333,27 +338,25 @@
 							{#if isVenue}
 								<div class="relative">
 									<label for="place-name" class="mb-1.5 block text-xs font-medium text-black/50">Place name</label>
-									<div class="relative">
-										<input
-											id="place-name"
-											type="text"
-											value={placeName}
-											oninput={onPlaceInput}
-											onfocus={() => { if (placeSuggestions.length) showSuggestions = true; }}
-											onblur={() => setTimeout(() => (showSuggestions = false), 150)}
-											placeholder="The Corner Bistro"
-											autocomplete="off"
+									<input
+										id="place-name"
+										type="text"
+										value={placeName}
+										oninput={onPlaceInput}
+										onfocus={() => { if (placeSuggestions.length) showSuggestions = true; }}
+										onblur={() => setTimeout(() => (showSuggestions = false), 150)}
+										placeholder="The Corner Bistro"
+										autocomplete="off"
 										autocorrect="off"
 										spellcheck="false"
-											class="w-full rounded-xl border px-4 py-3 pr-10 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('place-name') ? 'shake border-red-300' : 'border-gray-200'}"
-										/>
-										{#if loadingSuggestions}
-											<svg class="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-black/20" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-												<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
-												<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-											</svg>
-										{/if}
-									</div>
+										class="{inputBase} pr-10 {shakeFields.has('place-name') ? 'shake border-red-300' : 'border-gray-200'}"
+									/>
+									{#if loadingSuggestions}
+										<svg class="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-black/20" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+											<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+										</svg>
+									{/if}
 									{#if showSuggestions && placeSuggestions.length > 0}
 										<ul class="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
 											{#each placeSuggestions as s}
@@ -381,7 +384,7 @@
 										type="text"
 										bind:value={businessName}
 										placeholder="Acme Inc."
-										class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('business-name') ? 'shake border-red-300' : 'border-gray-200'}"
+										class="{inputBase} {shakeFields.has('business-name') ? 'shake border-red-300' : 'border-gray-200'}"
 									/>
 								</div>
 							{/if}
@@ -408,7 +411,7 @@
 										type="text"
 										bind:value={webUrl}
 										placeholder="example.com"
-										class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('web-url') ? 'shake border-red-300' : 'border-gray-200'}"
+										class="{inputBase} {shakeFields.has('web-url') ? 'shake border-red-300' : 'border-gray-200'}"
 									/>
 								</div>
 							{/if}
@@ -454,7 +457,7 @@
 									type="text"
 									bind:value={fullName}
 									placeholder="Jane Smith"
-									class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('full-name') ? 'shake border-red-300' : 'border-gray-200'}"
+									class="{inputBase} {shakeFields.has('full-name') ? 'shake border-red-300' : 'border-gray-200'}"
 								/>
 							</div>
 							<div>
@@ -465,7 +468,7 @@
 									bind:this={emailEl}
 									bind:value={email}
 									placeholder="jane@company.com"
-									class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('email') ? 'shake border-red-300' : 'border-gray-200'}"
+									class="{inputBase} {shakeFields.has('email') ? 'shake border-red-300' : 'border-gray-200'}"
 								/>
 							</div>
 							<div>
@@ -484,6 +487,10 @@
 								</div>
 							</div>
 						</div>
+
+						{#if submitError}
+							<p class="mt-4 text-center text-sm text-red-500">Something went wrong. Please try again.</p>
+						{/if}
 
 						<div class="mt-8 flex items-center justify-between">
 							<button
