@@ -15,7 +15,7 @@
 				</p>
 			</div>
 			<div class="rounded-2xl border border-white/10 bg-white/5 p-6">
-				<h3 class="mb-2 text-base font-semibold text-white">Growing Groups</h3>
+				<h3 class="mb-2 text-base font-semibold text-white">Growing Chains</h3>
 				<p class="text-sm leading-snug text-white/40">
 					Find your next location, optimize your portfolio, and benchmark each unit against its local market.
 				</p>
