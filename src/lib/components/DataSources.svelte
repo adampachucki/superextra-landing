@@ -85,7 +85,7 @@
 
 		<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-px overflow-hidden border-t border-gray-200 bg-gray-200">
 			{#each allSources as source}
-				<div class="group flex items-center justify-center bg-[#f5f4f2] px-5 py-8">
+				<div class="group flex items-center justify-center bg-[#f5f4f2] px-5 py-8" title="{source.name}">
 					<img
 						src="/logos/{source.logo}.svg"
 						alt="{source.name}"
