@@ -17,6 +17,8 @@ jobs:
 
       - run: npm ci
       - run: npm run build
+        env:
+          PUBLIC_GOOGLE_PLACES_KEY: ${{ secrets.PUBLIC_GOOGLE_PLACES_KEY }}
       - run: cd functions && npm ci
 
       - name: Authenticate to Google Cloud
