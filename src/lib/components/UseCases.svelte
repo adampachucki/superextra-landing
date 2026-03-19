@@ -5,45 +5,59 @@
 	const useCases = [
 		{
 			title: 'Market Research',
+			audience: 'Operators & Chains',
 			description:
-				'Map your competitive landscape. Track openings, closings, and emerging concepts to understand where your market is heading.',
+				'Understand market dynamics, competitive positioning, and emerging white spaces. Continuously monitor shifts so you spot opportunities before anyone else.',
 			image: '/ppl/image1.webp'
 		},
 		{
 			title: 'Marketing Strategy',
+			audience: 'Operators & Agencies',
 			description:
-				'Benchmark competitor campaigns and social presence. Allocate spend with confidence using real local market data.',
+				'Benchmark your brand against local competitors. Know which campaigns, channels, and price points are driving results in your market.',
 			image: '/ppl/image2.webp'
 		},
 		{
-			title: 'Site Selection',
+			title: 'Expansion Planning',
+			audience: 'Chains & Investors',
 			description:
-				'Evaluate foot traffic, demographics, rent trends, and competition density to pinpoint your next winning location.',
+				'Evaluate locations with foot traffic, demographics, competition density, and rent data side by side. De-risk every new site decision.',
 			image: '/ppl/image3.webp'
 		},
 		{
-			title: 'Pricing Strategy',
+			title: 'Financial Modelling',
+			audience: 'Operators & Investors',
 			description:
-				'Monitor competitor menus and track price positioning across channels. Find the sweet spot between margin and volume.',
+				'Build projections grounded in real revenue benchmarks, occupancy rates, labor costs, and seasonality patterns — not assumptions.',
 			image: '/ppl/image4.webp'
 		},
 		{
-			title: 'Financial Modeling',
+			title: 'Ops & Workforce',
+			audience: 'Operators & Chains',
 			description:
-				'Build projections grounded in real revenue estimates, occupancy benchmarks, and market-derived cost assumptions.',
+				'Track how your costs, staffing, and channel performance compare to the local market. Spot inefficiencies before they hit margins.',
 			image: '/ppl/image5.webp'
 		},
 		{
-			title: 'Operations',
+			title: 'Sales & Leads',
+			audience: 'Suppliers & Distributors',
 			description:
-				'Benchmark labor costs, supplier pricing, and channel performance to run leaner and more profitably.',
+				'Find restaurants that match your ideal customer profile, track new openings in your territory, and time your outreach with real demand signals.',
 			image: '/ppl/image6.webp'
 		},
 		{
-			title: 'Workforce Planning',
+			title: 'Due Diligence',
+			audience: 'Investors & Advisors',
 			description:
-				'Access local salary benchmarks, labor availability, and turnover rates to build and retain the right team.',
+				'Verify partners and vet investment opportunities with independent market data — revenue benchmarks, competitive positioning, and local demand signals.',
 			image: '/ppl/image7.webp'
+		},
+		{
+			title: 'Enrichment',
+			audience: 'Tech Platforms',
+			description:
+				'Integrate hyper-local restaurant intelligence into your platform via API. Add market context, venue data, and competitive insights to your product.',
+			image: '/ppl/image3.webp'
 		}
 	];
 
@@ -123,7 +137,7 @@
 				<h2
 					class="max-w-xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black"
 				>
-					Built to support every role and function
+					Powering teams across all roles and functions
 				</h2>
 			</div>
 
@@ -154,11 +168,14 @@
 					/>
 					<div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
 
-					<h3
-						class="relative z-10 p-5 text-[clamp(1.5rem,3vw,2rem)] leading-[1.05] font-semibold tracking-[-0.02em] text-white md:p-6"
-					>
-						{useCase.title}
-					</h3>
+					<div class="relative z-10 p-5 md:p-6">
+						<p class="mb-1 text-xs font-medium text-white/60">{useCase.audience}</p>
+						<h3
+							class="text-[clamp(1.5rem,3vw,2rem)] leading-[1.05] font-semibold tracking-[-0.02em] text-white"
+						>
+							{useCase.title}
+						</h3>
+					</div>
 				</div>
 
 				<p class="pr-4 text-sm leading-snug text-black/50">
