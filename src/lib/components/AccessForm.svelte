@@ -55,6 +55,7 @@
 	let mapsPromise: Promise<void> | null = null;
 	let placeSuggestions = $state<Array<{ name: string; secondary: string }>>([]);
 	let showSuggestions = $state(false);
+	let loadingSuggestions = $state(false);
 	let debounceTimer: ReturnType<typeof setTimeout>;
 
 	function loadGoogleMaps(): Promise<void> {
@@ -77,8 +78,10 @@
 	async function fetchPlaceSuggestions(input: string) {
 		if (input.length < 2) {
 			placeSuggestions = [];
+			loadingSuggestions = false;
 			return;
 		}
+		loadingSuggestions = true;
 		try {
 			await loadGoogleMaps();
 			const { suggestions } = await (google.maps.places.AutocompleteSuggestion as any).fetchAutocompleteSuggestions({
@@ -93,6 +96,7 @@
 		} catch {
 			placeSuggestions = [];
 		}
+		loadingSuggestions = false;
 	}
 
 	function onPlaceInput(e: Event) {
@@ -329,17 +333,27 @@
 							{#if isVenue}
 								<div class="relative">
 									<label for="place-name" class="mb-1.5 block text-xs font-medium text-black/50">Place name</label>
-									<input
-										id="place-name"
-										type="text"
-										value={placeName}
-										oninput={onPlaceInput}
-										onfocus={() => { if (placeSuggestions.length) showSuggestions = true; }}
-										onblur={() => setTimeout(() => (showSuggestions = false), 150)}
-										placeholder="The Corner Bistro"
-										autocomplete="off"
-										class="w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('place-name') ? 'shake border-red-300' : 'border-gray-200'}"
-									/>
+									<div class="relative">
+										<input
+											id="place-name"
+											type="text"
+											value={placeName}
+											oninput={onPlaceInput}
+											onfocus={() => { if (placeSuggestions.length) showSuggestions = true; }}
+											onblur={() => setTimeout(() => (showSuggestions = false), 150)}
+											placeholder="The Corner Bistro"
+											autocomplete="off"
+										autocorrect="off"
+										spellcheck="false"
+											class="w-full rounded-xl border px-4 py-3 pr-10 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('place-name') ? 'shake border-red-300' : 'border-gray-200'}"
+										/>
+										{#if loadingSuggestions}
+											<svg class="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-black/20" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+												<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+												<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+											</svg>
+										{/if}
+									</div>
 									{#if showSuggestions && placeSuggestions.length > 0}
 										<ul class="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
 											{#each placeSuggestions as s}
