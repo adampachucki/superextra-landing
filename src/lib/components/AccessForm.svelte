@@ -13,6 +13,18 @@
 	let submitError = $state(false);
 	let backdropVisible = $state(false);
 	let modalVisible = $state(false);
+	let contentEl: HTMLDivElement | undefined = $state();
+	let contentHeight = $state<number | undefined>();
+
+	$effect(() => {
+		// Track step and submitted to re-measure
+		step; submitted;
+		if (!contentEl) return;
+		// Wait a tick for DOM to update
+		requestAnimationFrame(() => {
+			if (contentEl) contentHeight = contentEl.scrollHeight;
+		});
+	});
 
 	const businessTypes = [
 		'Single venue',
@@ -278,6 +290,13 @@
 					</svg>
 				</button>
 			{/if}
+
+			<!-- Content wrapper with animated height -->
+			<div
+				class="overflow-hidden transition-[height] duration-300 ease-out"
+				style={contentHeight ? `height:${contentHeight}px` : ''}
+			>
+				<div bind:this={contentEl}>
 
 			<!-- Success state -->
 			{#if submitted}
@@ -555,6 +574,9 @@
 					</div>
 				{/if}
 			{/if}
+
+				</div>
+			</div>
 		</div>
 	</div>
 {/if}
