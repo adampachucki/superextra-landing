@@ -69,7 +69,7 @@
 	const allSources = categories.flatMap(c => c.sources);
 </script>
 
-<section class="bg-[#f5f4f2] py-24 md:py-32">
+<section class="py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="mb-16 text-center">
 			<h2 class="text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
@@ -82,7 +82,7 @@
 
 		<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-px overflow-hidden border-t border-gray-200 bg-gray-200">
 			{#each allSources as source}
-				<div class="group flex items-center justify-center bg-[#f5f4f2] px-5 py-8" title="{source.name}">
+				<div class="group flex items-center justify-center bg-white px-5 py-8" title="{source.name}">
 					<img
 						src="/logos/{source.logo}.svg"
 						alt="{source.name}"
@@ -92,7 +92,7 @@
 			{/each}
 
 			<!-- "And more" cell -->
-			<div class="flex items-center justify-center bg-[#f5f4f2] px-5 py-8">
+			<div class="flex items-center justify-center bg-white px-5 py-8">
 				<span class="text-sm text-black/25">...and more</span>
 			</div>
 		</div>
