@@ -9,8 +9,16 @@
 			answer: 'Superextra aggregates data from dozens of public and proprietary sources including review platforms, delivery apps, foot traffic providers, real estate databases, public filings, and more. AI models cross-reference and validate data continuously to deliver the most accurate picture of the market.'
 		},
 		{
+			question: 'How reliable are the AI agents? Do they hallucinate?',
+			answer: "Superextra agents are built to report facts, not generate them. Every insight is grounded in real data. When information isn't available, the agent flags it as missing rather than inventing an answer."
+		},
+		{
 			question: 'Does Superextra connect to my POS or internal systems?',
 			answer: "No — and that's by design. Superextra brings the market data to you, so there's no integration required. Think of it as an external intelligence layer: all the competitive, location, and industry data you need without sharing any of your own."
+		},
+		{
+			question: 'What markets and geographies are covered?',
+			answer: 'Superextra is launching with deep coverage in select European markets and expanding rapidly. If you want to check availability for a specific region, reach out to the team.'
 		},
 		{
 			question: 'How hyper-local is the intelligence?',
@@ -19,14 +27,6 @@
 		{
 			question: 'Can I benchmark against specific competitors?',
 			answer: 'Superextra uses cohort-based benchmarking rather than direct competitor comparisons. Performance is measured against relevant peer groups based on cuisine, price point, format, and location — giving a more reliable and statistically meaningful picture than one-to-one comparisons.'
-		},
-{
-			question: 'What markets and geographies are covered?',
-			answer: 'Superextra is launching with deep coverage in select European markets and expanding rapidly. If you want to check availability for a specific region, reach out to the team.'
-		},
-		{
-			question: 'How reliable are the AI agents? Do they hallucinate?',
-			answer: "Superextra agents are built to report facts, not generate them. Every insight is grounded in real data. When information isn't available, the agent flags it as missing rather than inventing an answer."
 		},
 		{
 			question: 'What does pricing look like?',
