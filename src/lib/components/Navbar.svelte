@@ -24,9 +24,10 @@
 
 <nav
 	class="fixed top-0 left-0 right-0 z-50 {scrolled
-		? 'bg-white md:bg-white/80 md:backdrop-blur-xl border-b border-gray-200'
+		? 'bg-white md:bg-white/80 md:backdrop-blur-xl'
 		: 'bg-transparent'}"
 >
+	<div class="absolute inset-x-0 bottom-0 h-px bg-gray-200 transition-opacity duration-300 {scrolled ? 'opacity-100' : 'opacity-0'}"></div>
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
 		<a href="/" class="flex items-center">
 			<span class="text-[22px] font-light tracking-tight text-black"
