@@ -127,9 +127,12 @@
 	function selectPlace(s: { name: string; secondary: string; placeId: string }) {
 		placeName = s.name;
 		selectedPlaceId = s.placeId;
-		placeSuggestions = [];
-		showSuggestions = false;
-		// Dismiss keyboard on mobile to prevent viewport offset
+		// Delay DOM removal so touchend/click completes on the dropdown,
+		// not on elements underneath (ghost click prevention)
+		setTimeout(() => {
+			placeSuggestions = [];
+			showSuggestions = false;
+		}, 300);
 		if (document.activeElement instanceof HTMLElement) {
 			document.activeElement.blur();
 		}
@@ -368,7 +371,7 @@
 
 						<div class="space-y-4">
 							<div>
-								<label for="country" class="mb-1.5 block text-xs font-medium text-black/50">Country</label>
+								<label for="country" class="mb-1.5 block text-xs font-medium text-black/60">Country</label>
 								<select
 									id="country"
 									bind:value={selectedCountry}
@@ -381,7 +384,7 @@
 							</div>
 							{#if isVenue}
 								<div class="relative">
-									<label for="place-name" class="mb-1.5 block text-xs font-medium text-black/50">Place name</label>
+									<label for="place-name" class="mb-1.5 block text-xs font-medium text-black/60">Place name</label>
 									<input
 										id="place-name"
 										type="text"
@@ -422,7 +425,7 @@
 								</div>
 							{:else}
 								<div>
-									<label for="business-name" class="mb-1.5 block text-xs font-medium text-black/50">Business name</label>
+									<label for="business-name" class="mb-1.5 block text-xs font-medium text-black/60">Business name</label>
 									<input
 										id="business-name"
 										type="text"
@@ -434,7 +437,7 @@
 							{/if}
 							{#if isVenue}
 								<div>
-									<label for="locations" class="mb-1.5 block text-xs font-medium text-black/50">Number of locations</label>
+									<label for="locations" class="mb-1.5 block text-xs font-medium text-black/60">Number of locations</label>
 									<select
 										id="locations"
 										bind:value={selectedLocations}
@@ -449,7 +452,7 @@
 								</div>
 							{:else}
 								<div>
-									<label for="web-url" class="mb-1.5 block text-xs font-medium text-black/50">Web URL</label>
+									<label for="web-url" class="mb-1.5 block text-xs font-medium text-black/60">Web URL</label>
 									<input
 										id="web-url"
 										type="text"
@@ -495,7 +498,7 @@
 
 						<div class="space-y-4">
 							<div>
-								<label for="full-name" class="mb-1.5 block text-xs font-medium text-black/50">Full name</label>
+								<label for="full-name" class="mb-1.5 block text-xs font-medium text-black/60">Full name</label>
 								<input
 									id="full-name"
 									type="text"
@@ -505,7 +508,7 @@
 								/>
 							</div>
 							<div>
-								<label for="email" class="mb-1.5 block text-xs font-medium text-black/50">Work email</label>
+								<label for="email" class="mb-1.5 block text-xs font-medium text-black/60">Work email</label>
 								<input
 									id="email"
 									type="email"
@@ -516,9 +519,9 @@
 								/>
 							</div>
 							<div>
-								<label for="phone" class="mb-1.5 block text-xs font-medium text-black/50">Phone <span class="text-black/25">(optional)</span></label>
+								<label for="phone" class="mb-1.5 block text-xs font-medium text-black/60">Phone <span class="text-black/25">(optional)</span></label>
 								<div class="flex gap-2">
-									<span class="flex items-center rounded-xl border border-gray-200 bg-gray-50 px-3.5 text-sm text-black/50">
+									<span class="flex items-center rounded-xl border border-gray-200 bg-gray-50 px-3.5 text-sm text-black/60">
 										{country.dial}
 									</span>
 									<input
