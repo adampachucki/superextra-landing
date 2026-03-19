@@ -3,7 +3,7 @@
 	import HeroCanvas from './HeroCanvas.svelte';
 </script>
 
-<section class="relative overflow-hidden pt-28 pb-0 md:pt-34">
+<section class="relative overflow-hidden pt-30 pb-0 md:pt-36">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="relative">
 			<h1 class="relative z-10 mx-auto max-w-5xl text-center text-[clamp(3.25rem,9vw,9rem)] leading-[0.95] font-normal tracking-[-0.04em] text-black">
