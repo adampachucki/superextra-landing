@@ -2,7 +2,7 @@
 	import { formState } from '$lib/form-state.svelte';
 </script>
 
-<section class="border-t border-gray-200 py-16">
+<section class="py-16">
 	<div class="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-6 px-6 md:flex-row">
 		<p class="text-center text-lg font-medium text-black md:text-left">
 			Early access is now open. Limited spots available.

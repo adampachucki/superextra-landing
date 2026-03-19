@@ -17,7 +17,7 @@
 				{ name: 'Google Maps', logo: 'googlemaps' },
 				{ name: 'OpenStreetMap', logo: 'openstreetmap' },
 				{ name: 'Foursquare', logo: 'foursquare' },
-				{ name: 'SafeGraph', logo: 'safegraph' },
+				{ name: 'Finebite', logo: 'finebite' },
 			]
 		},
 		{
@@ -69,12 +69,9 @@
 	const allSources = categories.flatMap(c => c.sources);
 </script>
 
-<section class="border-t border-gray-200 bg-[#f5f4f2] py-24 md:py-32">
+<section class="bg-[#f5f4f2] py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="mb-16 text-center">
-			<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">
-				Data Sources
-			</p>
 			<h2 class="text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
 				Powered by dozens of data sources
 			</h2>
