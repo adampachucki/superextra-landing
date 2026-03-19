@@ -416,7 +416,7 @@
 													<button
 														type="button"
 														class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
-														onmousedown={() => selectPlace(s)}
+														onpointerdown={(e) => { e.preventDefault(); selectPlace(s); }}
 													>
 														<span class="text-black">{s.name}</span>
 														{#if s.secondary}
