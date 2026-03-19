@@ -145,19 +145,23 @@
 			<circle cx="66" cy="164" r="1.5" fill="black"/>
 		</svg>
 	{:else if index === 1}
-		<!-- Marketing Strategy: Signal arcs -->
+		<!-- Marketing Strategy: Radio tower broadcast -->
 		<svg viewBox="0 0 200 200" fill="none" class="w-3/5">
-			<path d="M 60,170 A 30,30 0 0,1 30,140" stroke="black" stroke-width="1"/>
-			<path d="M 90,170 A 60,60 0 0,1 30,110" stroke="black" stroke-width="1"/>
-			<path d="M 120,170 A 90,90 0 0,1 30,80" stroke="black" stroke-width="0.8"/>
-			<path d="M 150,170 A 120,120 0 0,1 30,50" stroke="black" stroke-width="0.6" stroke-dasharray="4,3"/>
-			<path d="M 180,170 A 150,150 0 0,1 30,20" stroke="black" stroke-width="0.5" stroke-dasharray="2,3"/>
-			<circle cx="30" cy="170" r="3" fill="black"/>
-			<line x1="30" y1="170" x2="175" y2="35" stroke="black" stroke-width="0.4" stroke-dasharray="2,4"/>
-			<line x1="30" y1="170" x2="185" y2="95" stroke="black" stroke-width="0.4" stroke-dasharray="2,4"/>
-			<circle cx="78" cy="118" r="1.5" fill="black"/>
-			<circle cx="118" cy="78" r="1.5" fill="black"/>
-			<circle cx="152" cy="52" r="1.5" fill="black"/>
+			<!-- Antenna -->
+			<line x1="40" y1="30" x2="40" y2="175" stroke="black" stroke-width="1.2"/>
+			<circle cx="40" cy="30" r="2.5" fill="black"/>
+			<!-- Base -->
+			<line x1="25" y1="175" x2="55" y2="175" stroke="black" stroke-width="1"/>
+			<!-- Broadcast arcs emanating right -->
+			<path d="M 50,70 A 35,35 0 0,1 50,130" stroke="black" stroke-width="1"/>
+			<path d="M 65,50 A 55,55 0 0,1 65,150" stroke="black" stroke-width="0.9"/>
+			<path d="M 85,35 A 72,72 0 0,1 85,165" stroke="black" stroke-width="0.7"/>
+			<path d="M 110,22 A 88,88 0 0,1 110,178" stroke="black" stroke-width="0.5" stroke-dasharray="4,3"/>
+			<path d="M 140,15 A 98,98 0 0,1 140,185" stroke="black" stroke-width="0.4" stroke-dasharray="2,3"/>
+			<!-- Signal markers -->
+			<circle cx="50" cy="100" r="1.5" fill="black"/>
+			<circle cx="85" cy="100" r="1.5" fill="black"/>
+			<circle cx="140" cy="100" r="1.5" fill="black"/>
 		</svg>
 	{:else if index === 2}
 		<!-- Expansion Planning: Growth rings -->
@@ -191,38 +195,59 @@
 			<circle cx="155" cy="140" r="1.5" fill="black"/>
 		</svg>
 	{:else if index === 4}
-		<!-- Ops & Workforce: Wireframe cube -->
+		<!-- Ops & Workforce: Gantt / shift schedule -->
 		<svg viewBox="0 0 200 200" fill="none" class="w-3/5">
-			<path d="M 50,75 L 150,75 L 150,175 L 50,175 Z" stroke="black" stroke-width="1"/>
-			<path d="M 75,25 L 175,25 L 175,125 L 75,125 Z" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
-			<line x1="50" y1="75" x2="75" y2="25" stroke="black" stroke-width="0.8"/>
-			<line x1="150" y1="75" x2="175" y2="25" stroke="black" stroke-width="0.8"/>
-			<line x1="150" y1="175" x2="175" y2="125" stroke="black" stroke-width="0.8"/>
-			<line x1="50" y1="175" x2="75" y2="125" stroke="black" stroke-width="0.5" stroke-dasharray="3,3"/>
-			<line x1="100" y1="75" x2="100" y2="175" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-			<line x1="50" y1="125" x2="150" y2="125" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-			<line x1="50" y1="75" x2="150" y2="175" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-			<circle cx="50" cy="75" r="1.5" fill="black"/>
-			<circle cx="150" cy="75" r="1.5" fill="black"/>
-			<circle cx="150" cy="175" r="1.5" fill="black"/>
-			<circle cx="175" cy="25" r="1.5" fill="black"/>
+			<!-- Vertical time markers -->
+			<line x1="40" y1="25" x2="40" y2="180" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
+			<line x1="80" y1="25" x2="80" y2="180" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
+			<line x1="120" y1="25" x2="120" y2="180" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
+			<line x1="160" y1="25" x2="160" y2="180" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
+			<!-- Schedule bars -->
+			<rect x="25" y="32" width="95" height="10" rx="2" stroke="black" stroke-width="1"/>
+			<rect x="55" y="55" width="70" height="10" rx="2" stroke="black" stroke-width="1"/>
+			<rect x="80" y="78" width="90" height="10" rx="2" stroke="black" stroke-width="0.8" stroke-dasharray="4,3"/>
+			<rect x="25" y="101" width="55" height="10" rx="2" stroke="black" stroke-width="1"/>
+			<rect x="100" y="101" width="75" height="10" rx="2" stroke="black" stroke-width="0.8"/>
+			<rect x="40" y="124" width="120" height="10" rx="2" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
+			<rect x="25" y="147" width="80" height="10" rx="2" stroke="black" stroke-width="1"/>
+			<rect x="120" y="147" width="50" height="10" rx="2" stroke="black" stroke-width="0.8"/>
+			<!-- Row markers -->
+			<circle cx="18" cy="37" r="1.5" fill="black"/>
+			<circle cx="18" cy="60" r="1.5" fill="black"/>
+			<circle cx="18" cy="83" r="1.5" fill="black"/>
+			<circle cx="18" cy="106" r="1.5" fill="black"/>
+			<circle cx="18" cy="129" r="1.5" fill="black"/>
+			<circle cx="18" cy="152" r="1.5" fill="black"/>
 		</svg>
 	{:else if index === 5}
-		<!-- Sales & Leads: Convergence funnel -->
+		<!-- Sales & Leads: CRM network graph -->
 		<svg viewBox="0 0 200 200" fill="none" class="w-3/5">
-			<path d="M 25,30 C 45,85 75,135 100,175" stroke="black" stroke-width="1"/>
-			<path d="M 65,22 C 75,70 88,120 100,175" stroke="black" stroke-width="0.8"/>
-			<path d="M 108,18 C 106,65 103,115 100,175" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
-			<path d="M 150,24 C 138,75 118,128 100,175" stroke="black" stroke-width="0.8"/>
-			<path d="M 180,35 C 158,85 128,135 100,175" stroke="black" stroke-width="1"/>
-			<circle cx="100" cy="175" r="3" fill="black"/>
-			<circle cx="25" cy="30" r="1.5" fill="black"/>
-			<circle cx="65" cy="22" r="1.5" fill="black"/>
-			<circle cx="108" cy="18" r="1.5" fill="black"/>
-			<circle cx="150" cy="24" r="1.5" fill="black"/>
-			<circle cx="180" cy="35" r="1.5" fill="black"/>
-			<line x1="35" y1="80" x2="165" y2="80" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-			<line x1="55" y1="130" x2="145" y2="130" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
+			<!-- Central hub -->
+			<circle cx="100" cy="100" r="6" stroke="black" stroke-width="1.2"/>
+			<circle cx="100" cy="100" r="2" fill="black"/>
+			<!-- Connection lines -->
+			<line x1="100" y1="100" x2="42" y2="48" stroke="black" stroke-width="0.8"/>
+			<line x1="100" y1="100" x2="155" y2="38" stroke="black" stroke-width="0.8"/>
+			<line x1="100" y1="100" x2="170" y2="105" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
+			<line x1="100" y1="100" x2="148" y2="162" stroke="black" stroke-width="0.8"/>
+			<line x1="100" y1="100" x2="55" y2="155" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
+			<line x1="100" y1="100" x2="28" y2="110" stroke="black" stroke-width="0.8"/>
+			<line x1="100" y1="100" x2="72" y2="30" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
+			<line x1="100" y1="100" x2="172" y2="148" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
+			<!-- Outer nodes — varying sizes -->
+			<circle cx="42" cy="48" r="4" stroke="black" stroke-width="0.8"/>
+			<circle cx="155" cy="38" r="5" stroke="black" stroke-width="0.8"/>
+			<circle cx="170" cy="105" r="3" stroke="black" stroke-width="0.7"/>
+			<circle cx="148" cy="162" r="4.5" stroke="black" stroke-width="0.8"/>
+			<circle cx="55" cy="155" r="3.5" stroke="black" stroke-width="0.7"/>
+			<circle cx="28" cy="110" r="3" stroke="black" stroke-width="0.8"/>
+			<circle cx="72" cy="30" r="2.5" stroke="black" stroke-width="0.7"/>
+			<circle cx="172" cy="148" r="3" stroke="black" stroke-width="0.7"/>
+			<!-- Secondary connections between outer nodes -->
+			<line x1="42" y1="48" x2="72" y2="30" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
+			<line x1="155" y1="38" x2="170" y2="105" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
+			<line x1="148" y1="162" x2="172" y2="148" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
+			<line x1="28" y1="110" x2="55" y2="155" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
 		</svg>
 	{:else if index === 6}
 		<!-- Due Diligence: Concentric circles with sweep -->
@@ -239,21 +264,24 @@
 			<circle cx="140" cy="100" r="1.5" fill="black"/>
 		</svg>
 	{:else if index === 7}
-		<!-- Enrichment: Merging data layers -->
+		<!-- Enrichment: Vertically stacked isometric layers -->
 		<svg viewBox="0 0 200 200" fill="none" class="w-3/5">
-			<path d="M 20,45 C 65,45 125,50 175,92" stroke="black" stroke-width="1"/>
-			<path d="M 20,75 C 65,75 125,78 175,96" stroke="black" stroke-width="0.8"/>
-			<path d="M 20,105 C 65,105 125,104 175,100" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
-			<path d="M 20,135 C 65,135 125,122 175,104" stroke="black" stroke-width="0.8"/>
-			<path d="M 20,165 C 65,160 125,135 175,108" stroke="black" stroke-width="1"/>
-			<circle cx="175" cy="100" r="3" fill="black"/>
-			<circle cx="20" cy="45" r="1.5" fill="black"/>
-			<circle cx="20" cy="75" r="1.5" fill="black"/>
-			<circle cx="20" cy="105" r="1.5" fill="black"/>
-			<circle cx="20" cy="135" r="1.5" fill="black"/>
-			<circle cx="20" cy="165" r="1.5" fill="black"/>
-			<line x1="65" y1="35" x2="65" y2="175" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-			<line x1="125" y1="35" x2="125" y2="175" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
+			<!-- Layer 1 (top) -->
+			<path d="M 100,28 L 170,58 L 100,88 L 30,58 Z" stroke="black" stroke-width="0.5" stroke-dasharray="3,3"/>
+			<!-- Layer 2 -->
+			<path d="M 100,58 L 170,88 L 100,118 L 30,88 Z" stroke="black" stroke-width="0.7"/>
+			<!-- Layer 3 -->
+			<path d="M 100,88 L 170,118 L 100,148 L 30,118 Z" stroke="black" stroke-width="0.8"/>
+			<!-- Layer 4 (bottom) -->
+			<path d="M 100,118 L 170,148 L 100,178 L 30,148 Z" stroke="black" stroke-width="1"/>
+			<!-- Vertical axis -->
+			<line x1="100" y1="20" x2="100" y2="185" stroke="black" stroke-width="0.4" stroke-dasharray="2,3"/>
+			<!-- Data points per layer -->
+			<circle cx="100" cy="58" r="1.5" fill="black"/>
+			<circle cx="130" cy="73" r="1.5" fill="black"/>
+			<circle cx="70" cy="103" r="1.5" fill="black"/>
+			<circle cx="120" cy="133" r="1.5" fill="black"/>
+			<circle cx="100" cy="148" r="2" fill="black"/>
 		</svg>
 	{/if}
 {/snippet}
