@@ -39,23 +39,24 @@
 			[99, 102, 241] // indigo
 		];
 
-		const blobs = Array.from({ length: 8 }, (_, i) => ({
-			seed: i * 13.7 + 5.3,
-			baseX: ((i * 97 + 80) % (W - 100)) + 50,
-			baseY: ((i * 73 + 40) % (H - 80)) + 40,
-			baseR: 70 + ((i * 41) % 80),
-			aspectRatio: 0.6 + ((i * 29) % 50) / 50
+		const blobs = Array.from({ length: 8 }, () => ({
+			seed: Math.random() * 100,
+			baseX: Math.random() * (W - 100) + 50,
+			baseY: Math.random() * (H - 80) + 40,
+			baseR: 70 + Math.random() * 80,
+			aspectRatio: 0.6 + Math.random() * 0.5
 		}));
 
+		const rng = () => Math.random() * 100;
 		const lines = [
-			{ seed: 3.7, baseY: 130, width: 1.5, points: 5, amp: 80 },
-			{ seed: 17.3, baseY: 220, width: 1.5, points: 6, amp: 90 },
-			{ seed: 31.1, baseY: 300, width: 1, points: 4, amp: 70 }
+			{ seed: rng(), baseY: 130, width: 1.5, amp: 55, freq: 0.006 + Math.random() * 0.006, phaseSpeed: 0.12 + Math.random() * 0.08, baseOpacity: 0.18 },
+			{ seed: rng(), baseY: 220, width: 1.5, amp: 60, freq: 0.005 + Math.random() * 0.006, phaseSpeed: 0.1 + Math.random() * 0.08, baseOpacity: 0.1 },
+			{ seed: rng(), baseY: 300, width: 1, amp: 50, freq: 0.007 + Math.random() * 0.006, phaseSpeed: 0.1 + Math.random() * 0.08, baseOpacity: 0.07 }
 		];
 
 		const circles = [
-			{ seed: 41.3, baseX: W * 0.15, baseY: H * 0.3, baseR: 300 },
-			{ seed: 67.9, baseX: W * 0.85, baseY: H * 0.7, baseR: 250 }
+			{ seed: rng(), baseX: W * (0.1 + Math.random() * 0.3), baseY: H * (0.15 + Math.random() * 0.4), baseR: 220 + Math.random() * 120 },
+			{ seed: rng(), baseX: W * (0.6 + Math.random() * 0.3), baseY: H * (0.45 + Math.random() * 0.4), baseR: 200 + Math.random() * 100 }
 		];
 
 		let frame: number;
@@ -142,16 +143,12 @@
 
 			for (const line of lines) {
 				const s = line.seed;
-				const opacity = 0.15 + noise(t * 0.08, s + 600) * 0.1 + 0.05;
-				const step = (W + 40) / (line.points - 1);
+				const opacity = line.baseOpacity + noise(t * 0.08, s + 600) * 0.06;
 
-				const pts: { x: number; y: number }[] = [];
-				for (let j = 0; j < line.points; j++) {
-					pts.push({
-						x: -20 + j * step,
-						y: line.baseY + noise(t * 0.15 + j * 0.5, s + j * 11) * line.amp
-					});
-				}
+				// Slowly evolving amplitude and frequency modulation for organic feel
+				const ampMod = 1 + noise(t * 0.03, s + 700) * 0.3;
+				const freqMod = 1 + noise(t * 0.025, s + 800) * 0.2;
+				const yDrift = noise(t * 0.04, s + 900) * 25;
 
 				ctx.save();
 				ctx.globalAlpha = Math.max(0.05, opacity);
@@ -160,21 +157,21 @@
 				ctx.lineCap = 'round';
 				ctx.lineJoin = 'round';
 				ctx.beginPath();
-				ctx.moveTo(pts[0].x, pts[0].y);
 
-				const tension = 0.3;
-				for (let j = 0; j < pts.length - 1; j++) {
-					const p0 = pts[Math.max(0, j - 1)];
-					const p1 = pts[j];
-					const p2 = pts[j + 1];
-					const p3 = pts[Math.min(pts.length - 1, j + 2)];
-
-					const cp1x = p1.x + (p2.x - p0.x) * tension;
-					const cp1y = p1.y + (p2.y - p0.y) * tension;
-					const cp2x = p2.x - (p3.x - p1.x) * tension;
-					const cp2y = p2.y - (p3.y - p1.y) * tension;
-
-					ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+				const step = 4; // sample every 4px for smooth curve
+				const phase = t * line.phaseSpeed + s; // seed offsets initial phase
+				let first = true;
+				for (let x = -20; x <= W + 20; x += step) {
+					const wave1 = Math.sin(x * line.freq * freqMod + phase) * line.amp * ampMod;
+					const wave2 = Math.sin(x * line.freq * 2.1 * freqMod + phase * 0.7 + s * 3.1) * line.amp * 0.3;
+					const wave3 = Math.sin(x * line.freq * 0.5 * freqMod + phase * 0.4 + s * 1.7) * line.amp * 0.4;
+					const y = line.baseY + wave1 + wave2 + wave3 + yDrift;
+					if (first) {
+						ctx.moveTo(x, y);
+						first = false;
+					} else {
+						ctx.lineTo(x, y);
+					}
 				}
 
 				ctx.stroke();
