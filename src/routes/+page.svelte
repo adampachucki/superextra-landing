@@ -5,7 +5,7 @@
 	import Platform from '$lib/components/Platform.svelte';
 	import Audiences from '$lib/components/Audiences.svelte';
 	import UseCases from '$lib/components/UseCases.svelte';
-	import HowItWorks from '$lib/components/HowItWorks.svelte';
+	import GetOnboard from '$lib/components/GetOnboard.svelte';
 	import FAQ from '$lib/components/FAQ.svelte';
 	import CTA from '$lib/components/CTA.svelte';
 	import Footer from '$lib/components/Footer.svelte';
@@ -22,7 +22,7 @@
 	<Platform />
 	<Audiences />
 	<UseCases />
-	<HowItWorks />
+	<GetOnboard />
 	<FAQ />
 	<CTA />
 </main>

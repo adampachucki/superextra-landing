@@ -1,4 +1,4 @@
-<section id="how-it-works" class="border-t border-gray-200 py-24 md:py-32">
+<section id="get-onboard" class="border-t border-gray-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">
 			Get Onboard
@@ -24,9 +24,9 @@
 			</div>
 			<div class="p-8 md:py-10 md:pl-10">
 				<div class="mb-6 text-5xl font-black text-black/10">3.</div>
-				<h3 class="mb-3 text-lg font-bold text-black">Grow further</h3>
+				<h3 class="mb-3 text-lg font-bold text-black">Uncover insights</h3>
 				<p class="text-sm leading-snug text-black/50">
-					Access real-time dashboards with AI-driven analysis and curated reports to stay ahead of your market every day.
+					Receive dedicated deep research report and access an AI-powered dashboard for further analysis and monitoring.
 				</p>
 			</div>
 		</div>
