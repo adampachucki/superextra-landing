@@ -208,7 +208,7 @@
 			</div>
 
 			<div class="hidden lg:flex items-start justify-center">
-				<div class="w-full overflow-hidden rounded-2xl bg-gray-50 border border-gray-200">
+				<div class="w-full overflow-hidden rounded-2xl bg-[#f5f4f2]">
 					<div class="aspect-[4/3] w-full p-8 md:p-10">
 						{#key activeIndex}
 						<div class="h-full" in:fade={{ duration: 200 }}>
@@ -218,11 +218,11 @@
 
 								<div class="grid grid-cols-3 gap-3 mb-5">
 									<div class="rounded-xl bg-white p-3 border border-gray-100">
-										<p class="text-xl font-bold text-emerald-600">+12</p>
+										<p class="text-xl font-bold text-black">+12</p>
 										<p class="text-[10px] text-black/40 mt-0.5">Openings</p>
 									</div>
 									<div class="rounded-xl bg-white p-3 border border-gray-100">
-										<p class="text-xl font-bold text-red-500">-4</p>
+										<p class="text-xl font-bold text-black">-4</p>
 										<p class="text-[10px] text-black/40 mt-0.5">Closures</p>
 									</div>
 									<div class="rounded-xl bg-white p-3 border border-gray-100">
