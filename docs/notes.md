@@ -8,7 +8,8 @@ We may call it "Palantir for the restaurant industry". It's punchy but not factu
 ## Branding
 
 We call it Superextra, not SuperExtra, Super Extra, SUPEREXTRA, Superextra.ai
-We rarely use 'you' and 'your' in copy; rathe use modern Apple branding style that focuses on the product
+We rarely use 'you' and 'your' in copy but sometimes it makes sense, e.g. in FAQ
+We rather use modern Apple branding style that focuses on the product than more direct and sales'ish style
 Our brand is minimalistic, modern, strong, visionary
 
 ---
