@@ -123,7 +123,7 @@
 				<h2
 					class="max-w-xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black"
 				>
-					Intelligence to support every role and function
+					Built to support every role and function
 				</h2>
 			</div>
 
