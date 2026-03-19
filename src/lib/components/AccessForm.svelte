@@ -20,7 +20,6 @@
 		// Track state changes that affect content height
 		step; submitted; submitError;
 		if (!contentEl) return;
-		// Wait a tick for DOM to update
 		requestAnimationFrame(() => {
 			if (contentEl) contentHeight = contentEl.scrollHeight;
 		});
@@ -284,7 +283,7 @@
 
 			<!-- Content wrapper with animated height -->
 			<div
-				class="overflow-hidden transition-[height] duration-300 ease-out"
+				class="transition-[height] duration-300 ease-out"
 				style={contentHeight ? `height:${contentHeight}px` : ''}
 			>
 				<div bind:this={contentEl}>
@@ -342,17 +341,6 @@
 							{/each}
 						</div>
 
-						<div class="mt-8 flex justify-end">
-							<button
-								onclick={next}
-								class="{btnPrimary}"
-							>
-								Continue
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-								</svg>
-							</button>
-						</div>
 					</div>
 
 				<!-- Step 2: Business Details -->
@@ -401,7 +389,7 @@
 										</svg>
 									{/if}
 									{#if showSuggestions && placeSuggestions.length > 0}
-										<ul class="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+										<ul class="absolute left-0 right-0 top-full z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
 											{#each placeSuggestions as s}
 												<li>
 													<button
@@ -461,26 +449,6 @@
 							{/if}
 						</div>
 
-						<div class="mt-8 flex items-center justify-between">
-							<button
-								onclick={back}
-								class="inline-flex items-center gap-1.5 text-sm text-black/40 transition-colors hover:text-black"
-							>
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-								</svg>
-								Back
-							</button>
-							<button
-								onclick={next}
-								class="{btnPrimary}"
-							>
-								Continue
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-								</svg>
-							</button>
-						</div>
 					</div>
 
 				<!-- Step 3: Contact Info -->
@@ -535,40 +503,57 @@
 						{#if submitError}
 							<p class="mt-4 text-sm text-red-500">Something went wrong, please try again</p>
 						{/if}
-
-						<div class="mt-8 flex items-center justify-between">
-							<button
-								onclick={back}
-								disabled={submitting}
-								class="inline-flex items-center gap-1.5 text-sm text-black/40 transition-colors hover:text-black disabled:opacity-30"
-							>
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-								</svg>
-								Back
-							</button>
-							<button
-								onclick={submit}
-								disabled={submitting}
-								class="{btnPrimary} disabled:opacity-60"
-							>
-								{#if submitting}
-									<svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-									</svg>
-									Submitting...
-								{:else}
-									Request Access
-								{/if}
-							</button>
-						</div>
 					</div>
 				{/if}
 			{/if}
 
 				</div>
 			</div>
+
+			<!-- Navigation buttons (outside height transition to avoid clipping) -->
+			{#if !submitted}
+				<div class="mt-8 flex items-center {step === 1 ? 'justify-end' : 'justify-between'}">
+					{#if step > 1}
+						<button
+							onclick={back}
+							disabled={submitting}
+							class="inline-flex items-center gap-1.5 text-sm text-black/40 transition-colors hover:text-black disabled:opacity-30"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+							</svg>
+							Back
+						</button>
+					{/if}
+					{#if step < 3}
+						<button
+							onclick={next}
+							class="{btnPrimary}"
+						>
+							Continue
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+							</svg>
+						</button>
+					{:else}
+						<button
+							onclick={submit}
+							disabled={submitting}
+							class="{btnPrimary} disabled:opacity-60"
+						>
+							{#if submitting}
+								<svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+								</svg>
+								Submitting...
+							{:else}
+								Request Access
+							{/if}
+						</button>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}
