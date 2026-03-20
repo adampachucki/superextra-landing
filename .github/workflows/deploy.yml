@@ -33,8 +33,5 @@ jobs:
           channelId: live
           projectId: superextra-site
 
-      - name: Write functions .env
-        run: echo "RELAY_KEY=${{ secrets.RELAY_KEY }}" > functions/.env
-
       - name: Deploy Cloud Functions
-        run: npx firebase-tools deploy --only functions --project superextra-site --force
+        run: npx firebase-tools deploy --only functions --project superextra-site
