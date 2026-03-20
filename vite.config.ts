@@ -5,6 +5,9 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
-		port: 5199
+		port: 5199,
+		proxy: {
+			'/api/intake': 'https://superextra-landing.web.app'
+		}
 	}
 });
