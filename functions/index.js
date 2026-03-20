@@ -1,9 +1,11 @@
 import { onRequest } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 
-const RELAY_KEY = process.env.RELAY_KEY;
+const relayKey = defineSecret('RELAY_KEY');
 const DEST = 'hello@superextra.ai';
 
-export const intake = onRequest({ cors: true }, async (req, res) => {
+export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req, res) => {
+	const RELAY_KEY = relayKey.value();
 	if (req.method !== 'POST') {
 		res.status(405).json({ ok: false, error: 'Method not allowed' });
 		return;
@@ -28,6 +30,12 @@ export const intake = onRequest({ cors: true }, async (req, res) => {
 		</div>
 	`;
 
+	if (!RELAY_KEY) {
+		console.error('RELAY_KEY env var is not set');
+		res.status(500).json({ ok: false, error: 'Email service not configured' });
+		return;
+	}
+
 	let result;
 	try {
 		result = await fetch('https://api.resend.com/emails', {
@@ -45,14 +53,15 @@ export const intake = onRequest({ cors: true }, async (req, res) => {
 		});
 	} catch (err) {
 		console.error('Resend fetch failed:', err);
-		res.status(500).json({ ok: false });
+		res.status(500).json({ ok: false, error: 'Email service unreachable' });
 		return;
 	}
 
 	if (!result.ok) {
 		const body = await result.text().catch(() => '');
-		console.error('Resend returned non-ok status:', result.status, body);
-		res.status(500).json({ ok: false });
+		console.error('Resend error:', result.status, body);
+		const error = result.status === 401 ? 'Email API key invalid' : `Email service error (${result.status})`;
+		res.status(502).json({ ok: false, error });
 		return;
 	}
 

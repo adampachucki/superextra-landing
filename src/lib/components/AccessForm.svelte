@@ -221,11 +221,14 @@
 		if (step > 1) step--;
 	}
 
+	let submitErrorDetail = $state('');
+
 	async function submit() {
 		const invalid = getInvalidFields();
 		if (invalid.length > 0) { shake(invalid); return; }
 		submitting = true;
 		submitError = false;
+		submitErrorDetail = '';
 		try {
 			const res = await fetch('/api/intake', {
 				method: 'POST',
@@ -242,10 +245,15 @@
 					phone: phone || undefined
 				})
 			});
-			if (!res.ok) throw new Error();
-		} catch {
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				submitErrorDetail = body.error || `Server error (${res.status})`;
+				throw new Error(submitErrorDetail);
+			}
+		} catch (err) {
 			submitting = false;
 			submitError = true;
+			console.error('Form submission failed:', err);
 			return;
 		}
 		submitting = false;
@@ -501,7 +509,7 @@
 						</div>
 
 						{#if submitError}
-							<p class="mt-4 text-sm text-red-500">Something went wrong, please try again</p>
+							<p class="mt-4 text-sm text-red-500">Something went wrong, please try again{#if submitErrorDetail} ({submitErrorDetail}){/if}</p>
 						{/if}
 					</div>
 				{/if}
