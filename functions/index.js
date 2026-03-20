@@ -76,7 +76,7 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 			body: JSON.stringify({
 				from: 'Adam Pachucki <ap@superextra.ai>',
 				to: data.email,
-				subject: 'Thanks for signing up — Superextra',
+				subject: "You've signed up for Superextra",
 				html: confirmationHtml(data.fullName)
 			})
 		});
@@ -103,7 +103,7 @@ function confirmationHtml(name) {
 	return `<div style="font-family:sans-serif;max-width:520px;color:#1a1a1a;font-size:14px;line-height:1.6">
 <p>Hey ${firstName},</p>
 <p>I'm Adam, co-founder of Superextra.</p>
-<p>Thanks for signing up. We believe the restaurant industry deserves better access to reliable information — and we're building Superextra to make that happen.</p>
+<p>We believe the restaurant industry deserves better access to reliable information, and we're building Superextra to make that happen.</p>
 <p>This is an automated message, but I'll follow up personally soon.</p>
 <p>In the meantime, it would help to know:</p>
 <ol>
