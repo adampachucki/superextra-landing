@@ -54,10 +54,12 @@
 
 {#if unlocked}
 	{@render children()}
+	<!-- TEMP: preview badge and cookie banner hidden
 	<div class="fixed bottom-5 left-5 z-50 hidden md:block">
 		<PreviewBadge />
 	</div>
 	<CookieBanner />
+	-->
 {:else}
 	<div class="fixed inset-0 z-[200] flex items-center justify-center bg-white">
 		<form onsubmit={(e) => { e.preventDefault(); submit(); }} class="flex flex-col items-center gap-4">
