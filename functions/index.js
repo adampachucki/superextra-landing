@@ -1,9 +1,10 @@
 import { onRequest } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 
-const RELAY_KEY = process.env.RELAY_KEY;
+const relayKey = defineSecret('RELAY_KEY');
 const DEST = 'hello@superextra.ai';
 
-export const intake = onRequest({ cors: true }, async (req, res) => {
+export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req, res) => {
 	if (req.method !== 'POST') {
 		res.status(405).json({ ok: false, error: 'Method not allowed' });
 		return;
@@ -33,7 +34,7 @@ export const intake = onRequest({ cors: true }, async (req, res) => {
 		result = await fetch('https://api.resend.com/emails', {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${RELAY_KEY}`,
+				Authorization: `Bearer ${relayKey.value()}`,
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
@@ -61,7 +62,7 @@ export const intake = onRequest({ cors: true }, async (req, res) => {
 		await fetch('https://api.resend.com/emails', {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${RELAY_KEY}`,
+				Authorization: `Bearer ${relayKey.value()}`,
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
