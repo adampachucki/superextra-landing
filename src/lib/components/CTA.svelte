@@ -9,7 +9,7 @@
 		</p>
 		<div class="flex items-center gap-3">
 			<a href="mailto:hello@superextra.ai" class="rounded-full border border-gray-200 px-6 py-2.5 text-sm text-black transition-colors hover:bg-gray-50">Contact Us</a>
-			<button onclick={() => formState.open()} class="cursor-pointer rounded-full bg-black px-6 py-2.5 text-sm text-white transition-colors hover:bg-black/80">Get Access</button>
+			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-6 py-2.5 text-sm">Get Access</button>
 		</div>
 	</div>
 </section>

@@ -50,6 +50,13 @@
 	<link rel="icon" href={favicon} />
 	<title>Superextra - Super Local Intelligence for Restaurants</title>
 	<meta name="description" content="Super local intelligence and competitor benchmarking platform for the restaurant industry. The extra advantage behind smarter decisions." />
+	<meta property="og:title" content="Superextra - Super Local Intelligence for Restaurants" />
+	<meta property="og:description" content="Super local intelligence and competitor benchmarking platform for the restaurant industry. The extra advantage behind smarter decisions." />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://superextra.ai" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Superextra - Super Local Intelligence for Restaurants" />
+	<meta name="twitter:description" content="Super local intelligence and competitor benchmarking platform for the restaurant industry." />
 </svelte:head>
 
 {#if unlocked}
@@ -77,14 +84,3 @@
 		</form>
 	</div>
 {/if}
-
-<style>
-	@keyframes shake {
-		0%, 100% { transform: translateX(0); }
-		20%, 60% { transform: translateX(-6px); }
-		40%, 80% { transform: translateX(6px); }
-	}
-	:global(.animate-shake) {
-		animation: shake 0.4s ease-in-out;
-	}
-</style>

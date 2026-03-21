@@ -2,7 +2,7 @@
 	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
 	import { formState } from '$lib/form-state.svelte';
 
-	const btnPrimary = 'inline-flex items-center gap-2 rounded-full bg-black px-7 py-2.5 text-sm font-medium text-white transition-colors hover:bg-black/80';
+	const btnPrimary = 'inline-flex items-center gap-2 btn-primary px-7 py-2.5 text-sm';
 	const inputBase = 'w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none';
 
 	let step = $state(1);
@@ -14,6 +14,7 @@
 	let backdropVisible = $state(false);
 	let modalVisible = $state(false);
 	let contentEl: HTMLDivElement | undefined = $state();
+	let modalEl: HTMLDivElement | undefined = $state();
 	let contentHeight = $state<number | undefined>();
 
 	$effect(() => {
@@ -161,6 +162,13 @@
 		}
 	});
 
+	// Focus modal when it becomes visible
+	$effect(() => {
+		if (modalVisible && modalEl) {
+			modalEl.focus();
+		}
+	});
+
 	function close() {
 		modalVisible = false;
 		setTimeout(() => {
@@ -261,10 +269,12 @@
 	}
 </script>
 
+<svelte:window onkeydown={(e) => { if (formState.visible && e.key === 'Escape' && !submitting) close(); }} />
+
 {#if formState.visible}
 	<!-- Backdrop -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
+		role="presentation"
 		class="fixed inset-0 z-[100] flex items-center justify-center transition-all duration-300
 			{backdropVisible ? 'bg-black/20 backdrop-blur-sm' : 'bg-black/0 backdrop-blur-0'}"
 		onmousedown={(e) => {
@@ -273,7 +283,12 @@
 	>
 		<!-- Modal -->
 		<div
-			class="relative mx-4 w-full max-w-[560px] rounded-2xl bg-white p-8 shadow-2xl shadow-black/10 transition-all duration-300 md:p-10
+			bind:this={modalEl}
+			role="dialog"
+			aria-modal="true"
+			aria-label="Request access"
+			tabindex="-1"
+			class="relative mx-4 w-full max-w-[560px] rounded-2xl bg-white p-8 shadow-2xl shadow-black/10 transition-all duration-300 md:p-10 focus:outline-none
 				{modalVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}"
 		>
 			<!-- Close button -->

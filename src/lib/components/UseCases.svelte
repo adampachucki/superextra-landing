@@ -1,5 +1,6 @@
 <script lang="ts">
 	import UseCaseGraphics from './UseCaseGraphics.svelte';
+	import SectionHeader from './SectionHeader.svelte';
 
 	let scrollContainer: HTMLDivElement;
 	let activeIndex = $state(0);
@@ -10,57 +11,49 @@
 			title: 'Market Research',
 			audience: 'Operators & Chains',
 			description:
-				'Understand market dynamics, competitive positioning, and emerging white spaces. Continuously monitor shifts so you spot opportunities before anyone else.',
-			image: '/ppl/image1.webp'
+				'Understand market dynamics, competitive positioning, and emerging white spaces. Continuously monitor shifts so you spot opportunities before anyone else.'
 		},
 		{
 			title: 'Marketing Strategy',
 			audience: 'Operators & Agencies',
 			description:
-				'Benchmark your brand against local competitors. Know which campaigns, channels, and price points are driving results in your market.',
-			image: '/ppl/image2.webp'
+				'Benchmark your brand against local competitors. Know which campaigns, channels, and price points are driving results in your market.'
 		},
 		{
 			title: 'Expansion Planning',
 			audience: 'Chains & Investors',
 			description:
-				'Evaluate locations with foot traffic, demographics, competition density, and rent data side by side. De-risk every new site decision.',
-			image: '/ppl/image3.webp'
+				'Evaluate locations with foot traffic, demographics, competition density, and rent data side by side. De-risk every new site decision.'
 		},
 		{
 			title: 'Financial Modelling',
 			audience: 'Operators & Investors',
 			description:
-				'Build projections grounded in real revenue benchmarks, occupancy rates, labor costs, and seasonality patterns — not assumptions.',
-			image: '/ppl/image4.webp'
+				'Build projections grounded in real revenue benchmarks, occupancy rates, labor costs, and seasonality patterns — not assumptions.'
 		},
 		{
 			title: 'Ops & Workforce',
 			audience: 'Operators & Chains',
 			description:
-				'Track how your costs, staffing, and channel performance compare to the local market. Spot inefficiencies before they hit margins.',
-			image: '/ppl/image5.webp'
+				'Track how your costs, staffing, and channel performance compare to the local market. Spot inefficiencies before they hit margins.'
 		},
 		{
 			title: 'Sales & Leads',
 			audience: 'Suppliers & Distributors',
 			description:
-				'Find restaurants that match your ideal customer profile, track new openings in your territory, and time your outreach with real demand signals.',
-			image: '/ppl/image6.webp'
+				'Find restaurants that match your ideal customer profile, track new openings in your territory, and time your outreach with real demand signals.'
 		},
 		{
 			title: 'Due Diligence',
 			audience: 'Investors & Advisors',
 			description:
-				'Verify partners and vet investment opportunities with independent market data — revenue benchmarks, competitive positioning, and local demand signals.',
-			image: '/ppl/image7.webp'
+				'Verify partners and vet investment opportunities with independent market data — revenue benchmarks, competitive positioning, and local demand signals.'
 		},
 		{
 			title: 'Enrichment',
 			audience: 'Tech Platforms',
 			description:
-				'Integrate hyper-local restaurant intelligence into your platform via API. Add market context, venue data, and competitive insights to your product.',
-			image: '/ppl/image3.webp'
+				'Integrate hyper-local restaurant intelligence into your platform via API. Add market context, venue data, and competitive insights to your product.'
 		}
 	];
 
@@ -136,12 +129,7 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="mb-12 flex items-end justify-between">
 			<div>
-				<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">Use Cases</p>
-				<h2
-					class="max-w-2xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black"
-				>
-					Supporting decisions across all roles and functions
-				</h2>
+				<SectionHeader subtitle="Use Cases" title="Supporting decisions across all roles and functions" titleClass="max-w-2xl" />
 			</div>
 
 			<div class="hidden items-center gap-2 md:flex">

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import HeroCanvas from './HeroCanvas.svelte';
+	import SectionHeader from './SectionHeader.svelte';
 
 	const categories = [
 		{
@@ -69,12 +70,7 @@
 
 <section id="platform" class="border-t border-gray-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
-		<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">
-			Extra Clarity
-		</p>
-		<h2 class="mb-4 max-w-2xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
-			Data and insights behind every restaurant decision
-		</h2>
+		<SectionHeader subtitle="Extra Clarity" title="Data and insights behind every restaurant decision" titleClass="mb-4 max-w-2xl" />
 		<p class="mb-16 max-w-lg text-lg text-black/60">
 			Seven intelligence layers, one platform. Built for every decision a restaurant makes.
 		</p>
@@ -82,19 +78,21 @@
 		<div class="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-start lg:gap-16">
 			<div class="divide-y divide-gray-200 border-t border-gray-200">
 				{#each categories as category, i}
-					<button
-						class="group w-full cursor-pointer text-left"
-						onclick={() => {
-						activeIndex = i;
-						if (mobileOpen.has(i)) {
-							mobileOpen.delete(i);
-						} else {
-							mobileOpen.add(i);
-						}
-						mobileOpen = new Set(mobileOpen);
-					}}
-					>
-						<div class="flex items-center justify-between py-5">
+					<div>
+						<button
+							class="group flex w-full cursor-pointer items-center justify-between py-5 text-left"
+							aria-expanded={mobileOpen.has(i) || activeIndex === i}
+							aria-controls="platform-panel-{i}"
+							onclick={() => {
+							activeIndex = i;
+							if (mobileOpen.has(i)) {
+								mobileOpen.delete(i);
+							} else {
+								mobileOpen.add(i);
+							}
+							mobileOpen = new Set(mobileOpen);
+						}}
+						>
 							<h3 class="text-base font-semibold transition-colors
 								{mobileOpen.has(i) ? 'max-lg:text-black' : 'text-black/40 group-hover:text-black'}
 								{activeIndex === i ? 'lg:text-black' : 'lg:text-black/40 lg:group-hover:text-black'}">
@@ -109,11 +107,15 @@
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 							</svg>
-						</div>
+						</button>
 
-						<div class="pb-6
+						<div
+							id="platform-panel-{i}"
+							role="region"
+							class="pb-6
 							{mobileOpen.has(i) ? '' : 'max-lg:hidden'}
-							{activeIndex === i ? '' : 'lg:hidden'}">
+							{activeIndex === i ? '' : 'lg:hidden'}"
+						>
 							<p class="mb-4 text-sm leading-snug text-black/60">
 								{category.description}
 							</p>
@@ -126,13 +128,13 @@
 								<img src={panelImages[i]} alt={category.title} class="w-full" />
 							</div>
 						</div>
-					</button>
+					</div>
 				{/each}
 			</div>
 
 			<div class="hidden lg:block relative aspect-[1940/1799] rounded-2xl overflow-hidden">
 				<HeroCanvas class="absolute inset-0 w-full h-full" width={580} height={540} />
-				<img src="/container-empty.png" alt="" class="absolute bottom-0 right-0 w-[93%]" />
+				<img src="/container-empty.webp" alt="" class="absolute bottom-0 right-0 w-[93%]" />
 				{#key activeIndex}
 				<div class="absolute bottom-0 right-0 w-[93%]" in:fade={{ duration: 400, delay: 100 }} out:fade={{ duration: 300 }}>
 					<img src={panelImages[activeIndex]} alt={categories[activeIndex].title} class="w-full" />

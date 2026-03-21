@@ -1,72 +1,35 @@
 <script lang="ts">
-	const categories = [
-		{
-			name: 'Reviews & Bookings',
-			sources: [
-				{ name: 'TripAdvisor', logo: 'tripadvisor' },
-				{ name: 'OpenTable', logo: 'opentable' },
-				{ name: 'Yelp', logo: 'yelp' },
-				{ name: 'TheFork', logo: 'thefork' },
-				{ name: 'Michelin Guide', logo: 'michelin' },
-				{ name: 'Zomato', logo: 'zomato' },
-			]
-		},
-		{
-			name: 'Maps & Location',
-			sources: [
-				{ name: 'Google Maps', logo: 'googlemaps' },
-				{ name: 'OpenStreetMap', logo: 'openstreetmap' },
-				{ name: 'Foursquare', logo: 'foursquare' },
-				{ name: 'Finebite', logo: 'finebite' },
-			]
-		},
-		{
-			name: 'Social & Digital',
-			sources: [
-				{ name: 'Instagram', logo: 'instagram' },
-				{ name: 'Facebook', logo: 'facebook' },
-				{ name: 'TikTok', logo: 'tiktok' },
-			]
-		},
-		{
-			name: 'Delivery Platforms',
-			sources: [
-				{ name: 'Uber Eats', logo: 'ubereats' },
-				{ name: 'Wolt', logo: 'wolt' },
-				{ name: 'Just Eat', logo: 'justeat' },
-				{ name: 'Glovo', logo: 'glovo' },
-			]
-		},
-		{
-			name: 'Business Registries',
-			sources: [
-				{ name: 'CEIDG / KRS', logo: 'ceidg' },
-				{ name: 'Handelsregister', logo: 'handelsregister' },
-				{ name: 'Companies House', logo: 'companieshouse' },
-				{ name: 'SEC / EDGAR', logo: 'sec' },
-			]
-		},
-		{
-			name: 'Market Research & Census',
-			sources: [
-				{ name: 'Statista', logo: 'statista' },
-				{ name: 'Deloitte', logo: 'deloitte' },
-				{ name: 'NielsenIQ', logo: 'nielseniq' },
-				{ name: 'Eurostat', logo: 'eurostat' },
-				{ name: 'IBISWorld', logo: 'ibisworld' },
-			]
-		},
-		{
-			name: 'Financial & Credit',
-			sources: [
-				{ name: 'Krajowy Rejestr Długów', logo: 'krd' },
-				{ name: 'Dun & Bradstreet', logo: 'dnb' },
-				{ name: 'Creditreform', logo: 'creditreform' },
-			]
-		},
+	const sources = [
+		{ name: 'TripAdvisor', logo: 'tripadvisor' },
+		{ name: 'OpenTable', logo: 'opentable' },
+		{ name: 'Yelp', logo: 'yelp' },
+		{ name: 'TheFork', logo: 'thefork' },
+		{ name: 'Michelin Guide', logo: 'michelin' },
+		{ name: 'Zomato', logo: 'zomato' },
+		{ name: 'Google Maps', logo: 'googlemaps' },
+		{ name: 'OpenStreetMap', logo: 'openstreetmap' },
+		{ name: 'Foursquare', logo: 'foursquare' },
+		{ name: 'Finebite', logo: 'finebite' },
+		{ name: 'Instagram', logo: 'instagram' },
+		{ name: 'Facebook', logo: 'facebook' },
+		{ name: 'TikTok', logo: 'tiktok' },
+		{ name: 'Uber Eats', logo: 'ubereats' },
+		{ name: 'Wolt', logo: 'wolt' },
+		{ name: 'Just Eat', logo: 'justeat' },
+		{ name: 'Glovo', logo: 'glovo' },
+		{ name: 'CEIDG / KRS', logo: 'ceidg' },
+		{ name: 'Handelsregister', logo: 'handelsregister' },
+		{ name: 'Companies House', logo: 'companieshouse' },
+		{ name: 'SEC / EDGAR', logo: 'sec' },
+		{ name: 'Statista', logo: 'statista' },
+		{ name: 'Deloitte', logo: 'deloitte' },
+		{ name: 'NielsenIQ', logo: 'nielseniq' },
+		{ name: 'Eurostat', logo: 'eurostat' },
+		{ name: 'IBISWorld', logo: 'ibisworld' },
+		{ name: 'Krajowy Rejestr Długów', logo: 'krd' },
+		{ name: 'Dun & Bradstreet', logo: 'dnb' },
+		{ name: 'Creditreform', logo: 'creditreform' },
 	];
-
-	const allSources = categories.flatMap(c => c.sources);
 </script>
 
 <section class="py-24 md:py-32">
@@ -81,7 +44,7 @@
 		</div>
 
 		<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-px overflow-hidden border-t border-gray-200 bg-gray-200">
-			{#each allSources as source}
+			{#each sources as source}
 				<div class="group flex items-center justify-center bg-white px-3 py-5 sm:px-5 sm:py-8" title="{source.name}">
 					<img
 						src="/logos/{source.logo}.svg"

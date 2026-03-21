@@ -1,11 +1,10 @@
+<script lang="ts">
+	import SectionHeader from './SectionHeader.svelte';
+</script>
+
 <section id="get-onboard" class="border-t border-gray-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
-		<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">
-			Get Onboard
-		</p>
-		<h2 class="mb-16 max-w-2xl text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
-			Request access and start making informed decisions
-		</h2>
+		<SectionHeader subtitle="Get Onboard" title="Request access and start making informed decisions" titleClass="mb-16 max-w-2xl" />
 
 		<div class="grid grid-cols-1 gap-0 border-t border-gray-200 md:grid-cols-3 md:divide-x md:divide-gray-200">
 			<div class="border-b border-gray-200 p-8 md:border-b-0 md:py-10 md:pr-10">

@@ -46,7 +46,7 @@
 
 		<div class="hidden items-center gap-3 md:flex">
 			<a href="mailto:hello@superextra.ai" class="rounded-full border border-gray-200 px-5 py-2 text-sm text-black transition-colors hover:bg-gray-50">Contact Us</a>
-			<button onclick={() => formState.open()} class="cursor-pointer rounded-full bg-black px-5 py-2 text-sm text-white transition-colors hover:bg-black/80">Get Access</button>
+			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-5 py-2 text-sm">Get Access</button>
 		</div>
 
 		<div class="flex items-center gap-3 md:hidden">
@@ -72,7 +72,7 @@
 				<a href="/#use-cases" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Use Cases</a>
 				<a href="/#faq" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>FAQ</a>
 				<hr class="border-gray-100" />
-				<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer rounded-full bg-black px-5 py-2.5 text-center text-sm text-white">Get Access</button>
+				<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm">Get Access</button>
 			</div>
 		</div>
 	{/if}

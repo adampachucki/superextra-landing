@@ -14,7 +14,7 @@
 		<span>We use <a href="/privacy-policy" class="underline transition-colors hover:text-black">cookies</a></span>
 		<button
 			onclick={accept}
-			class="rounded-full bg-black px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-black/80"
+			class="btn-primary px-3 py-1 text-xs"
 		>
 			OK
 		</button>

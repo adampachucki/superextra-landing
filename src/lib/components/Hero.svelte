@@ -23,7 +23,7 @@
 			</p>
 			<button
 				onclick={() => formState.open()}
-				class="hero-fade inline-flex cursor-pointer items-center gap-2 rounded-full bg-black px-8 py-3.5 text-sm font-medium text-white transition-colors hover:bg-black/80"
+				class="hero-fade inline-flex cursor-pointer items-center gap-2 btn-primary px-8 py-3.5 text-sm"
 				style="animation-delay: 300ms"
 			>
 				Get Access

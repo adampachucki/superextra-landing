@@ -1,4 +1,6 @@
 <script lang="ts">
+	import SectionHeader from './SectionHeader.svelte';
+
 	const faqs = [
 		{
 			question: 'What types of restaurants is Superextra built for?',
@@ -41,21 +43,18 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_1.5fr] lg:gap-20">
 			<div>
-				<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40">
-					Learn More
-				</p>
-				<h2 class="text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black">
-					Frequently asked questions
-				</h2>
+				<SectionHeader subtitle="Learn More" title="Frequently asked questions" />
 			</div>
 
 			<div class="divide-y divide-gray-200 border-t border-gray-200">
 				{#each faqs as faq, i}
-					<button
-						class="group w-full cursor-pointer text-left"
-						onclick={() => (openIndex = openIndex === i ? -1 : i)}
-					>
-						<div class="flex items-center justify-between py-5">
+					<div>
+						<button
+							class="group flex w-full cursor-pointer items-center justify-between py-5 text-left"
+							aria-expanded={openIndex === i}
+							aria-controls="faq-answer-{i}"
+							onclick={() => (openIndex = openIndex === i ? -1 : i)}
+						>
 							<h3 class="pr-8 text-base font-semibold transition-colors {openIndex === i ? 'text-black' : 'text-black/60 group-hover:text-black'}">
 								{faq.question}
 							</h3>
@@ -66,13 +65,19 @@
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
 							</svg>
+						</button>
+						<div
+							id="faq-answer-{i}"
+							role="region"
+							class="grid transition-[grid-template-rows] duration-300 {openIndex === i ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}"
+						>
+							<div class="overflow-hidden">
+								<p class="pb-6 text-sm leading-snug text-black/60">
+									{faq.answer}
+								</p>
+							</div>
 						</div>
-						{#if openIndex === i}
-							<p class="pb-6 text-sm leading-snug text-black/60">
-								{faq.answer}
-							</p>
-						{/if}
-					</button>
+					</div>
 				{/each}
 			</div>
 		</div>
