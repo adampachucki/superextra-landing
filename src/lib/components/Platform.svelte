@@ -7,43 +7,43 @@
 		{
 			title: 'Market Landscape',
 			description:
-				'Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market.',
+				'See how the competitive landscape shifts in real time — who\'s opening, who\'s closing, and which concepts are gaining ground. Benchmarked against relevant cohorts.',
 			features: ['Openings & Closings', 'Cuisine Trends', 'Competitor Ranking', 'Best-Sellers', 'Market Distribution']
 		},
 		{
 			title: 'Menu & Pricing',
 			description:
-				'Trending items, price tracking, competitor menus, delivery markups, and promotional activity across the market.',
+				'Know exactly how the market positions menus — what gets promoted, at what price point, and how delivery and supplier trends shape the landscape.',
 			features: ['Trending Items', 'Price Tracking', 'Competitor Menus', 'Delivery Markups', 'Deals & Promos']
 		},
 		{
 			title: 'Revenue & Sales',
 			description:
-				'Revenue estimates, margin and food cost analysis, seasonality patterns, channel splits, and delivery platform market share.',
+				'A financial picture of how the market performs. From profitability and margins to how revenue shifts across seasons and years.',
 			features: ['Revenue Estimates', 'Seasonality', 'Channel Split', 'Occupancy', 'Platform Market Share']
 		},
 		{
 			title: 'Marketing & Digital',
 			description:
-				'Social media activity, marketing channels, estimated ad spend, and tools and platforms in use across competitors.',
+				'Benchmark marketing strategies across the market: where budgets go, which channels drive results, and what tools the industry relies on.',
 			features: ['Social Media', 'Ad Spend', 'Marketing Channels', 'Tools & Platforms']
 		},
 		{
 			title: 'Guest Intelligence',
 			description:
-				'Review sentiment, local guest preferences, tourist vs local mix, and payment method trends, all derived from real guest data.',
+				'Learn what guests actually think, want, and expect. Derived from real review and behavioural data across the market.',
 			features: ['Review Sentiment', 'Guest Preferences', 'Tourist vs Local', 'Payment Methods']
 		},
 		{
 			title: 'Location & Foot Traffic',
 			description:
-				'Measured and projected foot traffic, demographic profiles, purchasing power, and visit time distribution.',
+				'Understand the people around each location: how many, when they come, what they earn, and how patterns shift over time.',
 			features: ['Foot Traffic', 'Projections', 'Demographics', 'Purchasing Power', 'Visit Patterns']
 		},
 		{
 			title: 'Operations',
 			description:
-				'Labor pool availability, salary benchmarks, job market activity, staff turnover, commercial rent, and supplier pricing.',
+				'Discover the real cost of running a restaurant. From hiring and retention to rent and supplier pricing in each area.',
 			features: ['Labor Availability', 'Salaries', 'Turnover', 'Rent Trends', 'Supplier Pricing']
 		}
 	];
