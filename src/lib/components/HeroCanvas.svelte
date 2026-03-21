@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	let { animate = true, class: className = '' }: { animate?: boolean; class?: string } = $props();
+	let { animate = true, class: className = '', width = 680, height = 400 }: { animate?: boolean; class?: string; width?: number; height?: number } = $props();
 
 	let canvasEl: HTMLCanvasElement;
 
 	onMount(() => {
 		const ctx = canvasEl.getContext('2d')!;
-		const W = 680;
-		const H = 400;
+		const W = width;
+		const H = height;
 
 		function noise(t: number, seed: number): number {
 			return (
