@@ -151,6 +151,16 @@
 		}
 	];
 
+	const panelImages = [
+		'/landscape.webp',
+		'/menu.webp',
+		'/revenue.webp',
+		'/marketing.webp',
+		'/guest.webp',
+		'/location.webp',
+		'/ops.webp'
+	];
+
 	let activeIndex = $state(0);
 </script>
 
@@ -201,6 +211,12 @@
 									{#each category.features as feature}
 										<span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-black/60">{feature}</span>
 									{/each}
+								</div>
+								<div class="mt-4 max-w-sm overflow-hidden rounded-xl lg:hidden">
+									<div class="relative aspect-[1940/1799]">
+										<HeroCanvas class="absolute inset-0 w-full h-full" width={580} height={540} animate={false} />
+										<img src={panelImages[i]} alt={category.title} class="absolute bottom-0 right-0 w-[85%]" />
+									</div>
 								</div>
 							</div>
 						{/if}
