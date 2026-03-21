@@ -205,12 +205,12 @@
 					}}
 					>
 						<div class="flex items-center justify-between py-5">
-							<h3 class="text-base font-semibold transition-colors {activeIndex === i || mobileOpen.has(i) ? 'text-black' : 'text-black/40 group-hover:text-black'}">
+							<h3 class="text-base font-semibold transition-colors {mobileOpen.has(i) ? 'max-lg:text-black' : 'text-black/40 group-hover:text-black'} {activeIndex === i ? 'lg:text-black' : 'lg:text-black/40 lg:group-hover:text-black'}">
 								{category.title}
 							</h3>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
-								class="h-5 w-5 shrink-0 text-black/25 transition-transform duration-300 {activeIndex === i || mobileOpen.has(i) ? 'rotate-180' : ''}"
+								class="h-5 w-5 shrink-0 text-black/25 transition-transform duration-300 {mobileOpen.has(i) ? 'rotate-180 lg:rotate-0' : ''} {activeIndex === i ? 'lg:rotate-180' : ''}"
 								fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
