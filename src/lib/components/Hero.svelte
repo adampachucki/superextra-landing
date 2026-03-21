@@ -38,7 +38,7 @@
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" stroke="black" stroke-width="0.8"/><path d="M12 9v6M9 12h6" stroke="black" stroke-width="0.8"/></svg>
 				</div>
 				<h3 class="text-xl font-semibold text-black">Unrivaled data</h3>
-				<p class="mt-1 text-sm text-black/60">Dozens of public and proprietary sources combined into a single intelligence layer. Deeper than any competitor can assemble alone.</p>
+				<p class="mt-1 text-sm text-black/60">Dozens of public and proprietary sources combined into a single platform. Deeper than any competitor can assemble alone.</p>
 			</div>
 			<div class="border-b border-gray-200 p-8 md:border-b-0 md:py-10 md:px-10">
 				<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#f5f4f2]">
