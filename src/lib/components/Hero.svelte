@@ -38,14 +38,14 @@
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" stroke="black" stroke-width="0.8"/><path d="M12 9v6M9 12h6" stroke="black" stroke-width="0.8"/></svg>
 				</div>
 				<h3 class="text-xl font-semibold text-black">Unrivaled data</h3>
-				<p class="mt-1 text-sm text-black/60">Competitor activity, menu pricing, reviews, foot traffic, and financials derived from dozens of public and proprietary sources.</p>
+				<p class="mt-1 text-sm text-black/60">Dozens of public and proprietary sources combined into a single intelligence layer. Deeper than any competitor can assemble alone.</p>
 			</div>
 			<div class="border-b border-gray-200 p-8 md:border-b-0 md:py-10 md:px-10">
 				<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#f5f4f2]">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="black" stroke-width="0.8"/><circle cx="12" cy="12" r="5" stroke="black" stroke-width="0.8"/><circle cx="12" cy="12" r="1.2" fill="black"/></svg>
 				</div>
 				<h3 class="text-xl font-semibold text-black">Hyper-local focus</h3>
-				<p class="mt-1 text-sm text-black/60">Labor, rent, supply chain, and occupancy data that reveals how the industry operates. Benchmarked down to the neighbourhood.</p>
+				<p class="mt-1 text-sm text-black/60">Country, city, area, neighbourhood. Every layer of the market mapped so decisions are grounded at the right level of detail.</p>
 			</div>
 			<div class="p-8 md:py-10 md:pl-10">
 				<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#f5f4f2]">

@@ -57,3 +57,25 @@
 > Super local insights. Extraordinary edge.
 > Super local intelligence for the restaurant industry. The extra advantage behind smarter decisions.
 > A intelligence and competitor benchmarking platform to give every restaurant a clearer, sharper picture of the market around them.
+
+## Hero section proposals
+
+Problem: The hero value props overlap heavily with platform section content. "Unrivaled data" lists sources (competitor activity, menu pricing, reviews, foot traffic, financials) that the platform section then details across its seven layers. "Hyper-local focus" lists dimensions (labor, rent, supply chain, occupancy) that map directly to the Operations and Location layers. The comma-heavy lists read like feature dumps rather than compelling hooks.
+
+Variants for "Unrivaled data" (replacing the comma list with a sharper angle):
+
+1. Unrivaled data
+   Dozens of public and proprietary sources combined into a single intelligence layer — deeper than any competitor can assemble alone.
+2. Unrivaled data
+   Public records, proprietary feeds, and real-time signals fused into one intelligence layer no spreadsheet or manual research can match.
+3. Unrivaled data
+   A living picture of the market assembled from dozens of sources — updated continuously, not quarterly.
+
+Variants for "Hyper-local focus" (replacing the comma list with a distinct angle from Platform):
+
+1. Hyper-local focus
+   Every metric benchmarked down to the neighbourhood. Not city averages — the blocks and streets that actually shape a restaurant's trade.
+2. Hyper-local focus
+   Intelligence scoped to the streets around each location. National trends are noise — neighbourhood-level data is signal.
+3. Hyper-local focus
+   Neighbourhood-level benchmarks that reveal how conditions shift block by block — not broad metro summaries that obscure what matters.
