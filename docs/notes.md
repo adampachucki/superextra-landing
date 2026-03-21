@@ -33,3 +33,4 @@ Our brand is minimalistic, modern, strong, visionary
 - [Square](https://squareup.com/us/en)
 - [Legora](https://legora.com)
 - [Palantir Foundry](https://www.palantir.com/platforms/foundry/)
+- https://delve.co

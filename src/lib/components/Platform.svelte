@@ -215,7 +215,7 @@
 								<div class="mt-4 max-w-sm overflow-hidden rounded-xl lg:hidden">
 									<div class="relative aspect-[1940/1799]">
 										<HeroCanvas class="absolute inset-0 w-full h-full" width={580} height={540} animate={false} />
-										<img src={panelImages[i]} alt={category.title} class="absolute bottom-0 right-0 w-[85%]" />
+										<img src={panelImages[i]} alt={category.title} class="absolute bottom-0 right-0 w-[93%]" />
 									</div>
 								</div>
 							</div>
@@ -226,8 +226,9 @@
 
 			<div class="hidden lg:block relative aspect-[1940/1799] rounded-2xl overflow-hidden">
 				<HeroCanvas class="absolute inset-0 w-full h-full" width={580} height={540} />
+				<img src="/container-empty.png" alt="" class="absolute bottom-0 right-0 w-[93%]" />
 				{#key activeIndex}
-				<div class="absolute bottom-0 right-0 w-[85%]" in:fade={{ duration: 400, delay: 100 }} out:fade={{ duration: 300 }}>
+				<div class="absolute bottom-0 right-0 w-[93%]" in:fade={{ duration: 400, delay: 100 }} out:fade={{ duration: 300 }}>
 				{#if activeIndex === 0}
 					<img src="/landscape.webp" alt="Market Landscape" class="w-full" />
 				{:else if activeIndex === 1}
