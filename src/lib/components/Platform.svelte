@@ -210,21 +210,21 @@
 			<div class="hidden lg:block relative aspect-[1940/1799] rounded-2xl overflow-hidden">
 				<img src="/bcg.webp" alt="" class="absolute inset-0 w-full h-full rounded-2xl" />
 				{#key activeIndex}
-				<div class="absolute inset-0" in:fade={{ duration: 400, delay: 100 }} out:fade={{ duration: 300 }}>
+				<div class="absolute bottom-0 right-0 w-[85%]" in:fade={{ duration: 400, delay: 100 }} out:fade={{ duration: 300 }}>
 				{#if activeIndex === 0}
-					<img src="/landscape.webp" alt="Market Landscape" class="w-full h-full" />
+					<img src="/landscape.webp" alt="Market Landscape" class="w-full" />
 				{:else if activeIndex === 1}
-					<img src="/menu.webp" alt="Menu & Pricing" class="w-full h-full" />
+					<img src="/menu.webp" alt="Menu & Pricing" class="w-full" />
 				{:else if activeIndex === 2}
-					<img src="/revenue.webp" alt="Revenue & Sales" class="w-full h-full" />
+					<img src="/revenue.webp" alt="Revenue & Sales" class="w-full" />
 				{:else if activeIndex === 3}
-					<img src="/marketing.webp" alt="Marketing & Digital" class="w-full h-full" />
+					<img src="/marketing.webp" alt="Marketing & Digital" class="w-full" />
 				{:else if activeIndex === 4}
-					<img src="/guest.webp" alt="Guest Intelligence" class="w-full h-full" />
+					<img src="/guest.webp" alt="Guest Intelligence" class="w-full" />
 				{:else if activeIndex === 5}
-					<img src="/location.webp" alt="Location & Foot Traffic" class="w-full h-full" />
+					<img src="/location.webp" alt="Location & Foot Traffic" class="w-full" />
 				{:else if activeIndex === 6}
-					<img src="/ops.webp" alt="Operations" class="w-full h-full" />
+					<img src="/ops.webp" alt="Operations" class="w-full" />
 				{/if}
 				</div>
 				{/key}
