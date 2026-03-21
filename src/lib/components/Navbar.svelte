@@ -50,7 +50,7 @@
 		</div>
 
 		<div class="flex items-center gap-3 md:hidden">
-			<PreviewBadge shadow={false} tooltipBelow />
+			<PreviewBadge tooltipBelow />
 			<button
 				class="text-black"
 				onclick={() => (mobileOpen = !mobileOpen)}

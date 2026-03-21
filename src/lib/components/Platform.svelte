@@ -163,16 +163,6 @@
 
 	let activeIndex = $state(0);
 	let mobileOpen = $state(new Set<number>([0]));
-	let isMobile = $state(false);
-
-	$effect(() => {
-		const mql = window.matchMedia('(max-width: 1023px)');
-		isMobile = mql.matches;
-		const handler = (e: MediaQueryListEvent) => (isMobile = e.matches);
-		mql.addEventListener('change', handler);
-		return () => mql.removeEventListener('change', handler);
-	});
-
 	$effect(() => {
 		panelImages.forEach((src) => {
 			const img = new Image();
@@ -205,33 +195,43 @@
 					<button
 						class="group w-full cursor-pointer text-left"
 						onclick={() => {
-						if (isMobile) {
-							if (mobileOpen.has(i)) {
-								mobileOpen.delete(i);
-							} else {
-								mobileOpen.add(i);
-							}
-							mobileOpen = new Set(mobileOpen);
+						activeIndex = i;
+						if (mobileOpen.has(i)) {
+							mobileOpen.delete(i);
 						} else {
-							activeIndex = i;
+							mobileOpen.add(i);
 						}
+						mobileOpen = new Set(mobileOpen);
 					}}
 					>
 						<div class="flex items-center justify-between py-5">
-							<h3 class="text-base font-semibold transition-colors {(isMobile ? mobileOpen.has(i) : activeIndex === i) ? 'text-black' : 'text-black/40 group-hover:text-black'}">
+							<h3 class="text-base font-semibold transition-colors {activeIndex === i || mobileOpen.has(i) ? 'text-black' : 'text-black/40 group-hover:text-black'}">
 								{category.title}
 							</h3>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
-								class="h-5 w-5 shrink-0 text-black/25 transition-transform duration-300 {(isMobile ? mobileOpen.has(i) : activeIndex === i) ? 'rotate-180' : ''}"
+								class="h-5 w-5 shrink-0 text-black/25 transition-transform duration-300 {activeIndex === i || mobileOpen.has(i) ? 'rotate-180' : ''}"
 								fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 							</svg>
 						</div>
 
-						{#if isMobile ? mobileOpen.has(i) : activeIndex === i}
-							<div class="pb-6">
+						<div class="pb-6 lg:hidden {mobileOpen.has(i) ? '' : 'hidden'}">
+							<p class="mb-4 text-sm leading-snug text-black/60">
+								{category.description}
+							</p>
+							<div class="flex flex-wrap gap-2">
+								{#each category.features as feature}
+									<span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-black/60">{feature}</span>
+								{/each}
+							</div>
+							<div class="mt-4 max-w-sm overflow-hidden rounded-xl">
+								<img src={panelImages[i]} alt={category.title} class="w-full" />
+							</div>
+						</div>
+						{#if activeIndex === i}
+							<div class="hidden lg:block pb-6">
 								<p class="mb-4 text-sm leading-snug text-black/60">
 									{category.description}
 								</p>
@@ -239,9 +239,6 @@
 									{#each category.features as feature}
 										<span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-black/60">{feature}</span>
 									{/each}
-								</div>
-								<div class="mt-4 max-w-sm overflow-hidden rounded-xl lg:hidden">
-									<img src={panelImages[i]} alt={category.title} class="w-full" />
 								</div>
 							</div>
 						{/if}
