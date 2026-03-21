@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { formState } from '$lib/form-state.svelte';
 	import PreviewBadge from '$lib/components/PreviewBadge.svelte';
+	import { onMount } from 'svelte';
 
 	let scrolled = $state(false);
 	let mobileOpen = $state(false);
@@ -8,6 +9,8 @@
 	function handleScroll() {
 		scrolled = window.scrollY > 20;
 	}
+
+	onMount(() => handleScroll());
 
 	function smoothScroll(e: MouseEvent) {
 		const href = (e.currentTarget as HTMLAnchorElement).getAttribute('href');

@@ -162,6 +162,23 @@
 	];
 
 	let activeIndex = $state(0);
+	let mobileOpen = $state(new Set<number>([0]));
+	let isMobile = $state(false);
+
+	$effect(() => {
+		const mql = window.matchMedia('(max-width: 1023px)');
+		isMobile = mql.matches;
+		const handler = (e: MediaQueryListEvent) => (isMobile = e.matches);
+		mql.addEventListener('change', handler);
+		return () => mql.removeEventListener('change', handler);
+	});
+
+	$effect(() => {
+		panelImages.forEach((src) => {
+			const img = new Image();
+			img.src = src;
+		});
+	});
 </script>
 
 {#snippet progressBar(pct: number, grad: string)}
@@ -187,22 +204,33 @@
 				{#each categories as category, i}
 					<button
 						class="group w-full cursor-pointer text-left"
-						onclick={() => (activeIndex = i)}
+						onclick={() => {
+						if (isMobile) {
+							if (mobileOpen.has(i)) {
+								mobileOpen.delete(i);
+							} else {
+								mobileOpen.add(i);
+							}
+							mobileOpen = new Set(mobileOpen);
+						} else {
+							activeIndex = i;
+						}
+					}}
 					>
 						<div class="flex items-center justify-between py-5">
-							<h3 class="text-base font-semibold transition-colors {activeIndex === i ? 'text-black' : 'text-black/40 group-hover:text-black'}">
+							<h3 class="text-base font-semibold transition-colors {(isMobile ? mobileOpen.has(i) : activeIndex === i) ? 'text-black' : 'text-black/40 group-hover:text-black'}">
 								{category.title}
 							</h3>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
-								class="h-5 w-5 shrink-0 text-black/25 transition-transform duration-300 {activeIndex === i ? 'rotate-180' : ''}"
+								class="h-5 w-5 shrink-0 text-black/25 transition-transform duration-300 {(isMobile ? mobileOpen.has(i) : activeIndex === i) ? 'rotate-180' : ''}"
 								fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 							</svg>
 						</div>
 
-						{#if activeIndex === i}
+						{#if isMobile ? mobileOpen.has(i) : activeIndex === i}
 							<div class="pb-6">
 								<p class="mb-4 text-sm leading-snug text-black/60">
 									{category.description}
@@ -213,10 +241,7 @@
 									{/each}
 								</div>
 								<div class="mt-4 max-w-sm overflow-hidden rounded-xl lg:hidden">
-									<div class="relative aspect-[1940/1799]">
-										<HeroCanvas class="absolute inset-0 w-full h-full" width={580} height={540} animate={false} />
-										<img src={panelImages[i]} alt={category.title} class="absolute bottom-0 right-0 w-[93%]" />
-									</div>
+									<img src={panelImages[i]} alt={category.title} class="w-full" />
 								</div>
 							</div>
 						{/if}
