@@ -7,7 +7,7 @@
 		{
 			title: 'Market Landscape',
 			description:
-				'See how the competitive landscape shifts in real time — who\'s opening, who\'s closing, and which concepts are gaining ground. Benchmarked against relevant cohorts.',
+				'See how the competitive landscape shifts. Who\'s opening, who\'s closing, and which concepts are gaining ground. Benchmarked against relevant cohorts.',
 			features: ['Openings & Closings', 'Cuisine Trends', 'Competitor Ranking', 'Best-Sellers', 'Market Distribution']
 		},
 		{
@@ -26,7 +26,7 @@
 			title: 'Marketing & Digital',
 			description:
 				'Benchmark marketing strategies across the market: where budgets go, which channels drive results, and what tools the industry relies on.',
-			features: ['Social Media', 'Ad Spend', 'Marketing Channels', 'Tools & Platforms']
+			features: ['Social Media', 'Ad Spend', 'Marketing Channels', 'Tools & Platforms', 'Web Presence']
 		},
 		{
 			title: 'Guest Intelligence',
@@ -37,14 +37,14 @@
 		{
 			title: 'Location & Foot Traffic',
 			description:
-				'Understand the people around each location: how many, when they come, what they earn, and how patterns shift over time.',
-			features: ['Foot Traffic', 'Projections', 'Demographics', 'Purchasing Power', 'Visit Patterns']
+				'Understand the foot traffic around each location, the mix of offices and residences shaping demand, how rents move, and the purchasing power nearby.',
+			features: ['Foot Traffic', 'Projections', 'Demographics', 'Purchasing Power', 'Rent Trends']
 		},
 		{
 			title: 'Operations',
 			description:
-				'Discover the real cost of running a restaurant. From hiring and retention to rent and supplier pricing in each area.',
-			features: ['Labor Availability', 'Salaries', 'Turnover', 'Rent Trends', 'Supplier Pricing']
+				'Discover the real cost of running a restaurant. From staffing and lease costs to supplier pricing across each area.',
+			features: ['Labor Availability', 'Salaries', 'Turnover', 'Lease Costs', 'Supplier Pricing']
 		}
 	];
 
