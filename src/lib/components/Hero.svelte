@@ -10,9 +10,9 @@
 				Market intelligence for restaurants
 			</h1>
 
-			<div class="hero-fade relative z-0 mx-auto -mt-48 mb-8 flex justify-center md:-mt-72" style="animation-delay: 100ms">
-				<div class="relative h-[320px] w-[320px] shrink-0 overflow-hidden rounded-full md:h-[480px] md:w-[480px]">
-					<HeroCanvas width={600} height={600} class="absolute inset-0 h-full w-full" />
+			<div class="hero-fade relative z-0 mx-auto -mt-20 mb-8 flex justify-center md:-mt-40" style="animation-delay: 100ms">
+				<div class="relative h-[250px] w-[520px] overflow-hidden rounded-2xl md:h-[360px] md:w-[680px]">
+					<HeroCanvas class="absolute inset-0 h-full w-full" />
 				</div>
 			</div>
 		</div>
