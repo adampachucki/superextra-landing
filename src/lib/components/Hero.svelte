@@ -52,7 +52,7 @@
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="black" viewBox="0 0 24 24"><path d="M12 2C12 2 14 9 12 12C10 9 12 2 12 2Z"/><path d="M12 12C12 12 14 15 12 22C10 15 12 12 12 12Z"/><path d="M2 12C2 12 9 10 12 12C9 14 2 12 2 12Z"/><path d="M12 12C12 12 15 10 22 12C15 14 12 12 12 12Z"/></svg>
 				</div>
 				<h3 class="text-xl font-medium text-black">AI-native research</h3>
-				<p class="mt-1 text-sm text-black/60">Vast market data distilled into clear, actionable insights and custom reports. Backed by human experts when it matters most.</p>
+				<p class="mt-1 text-sm text-black/60">Vast market data distilled into clear, actionable insights and custom reports. Delivered hand-in-hand with our research team.</p>
 			</div>
 		</div>
 	</div>

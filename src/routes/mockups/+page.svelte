@@ -2,6 +2,9 @@
 	import MarketLandscapeV1 from '$lib/components/mockups/MarketLandscapeV1.svelte';
 	import MarketLandscapeV2 from '$lib/components/mockups/MarketLandscapeV2.svelte';
 	import MarketLandscapeV3 from '$lib/components/mockups/MarketLandscapeV3.svelte';
+	import MenuPricingV1 from '$lib/components/mockups/MenuPricingV1.svelte';
+	import MenuPricingV2 from '$lib/components/mockups/MenuPricingV2.svelte';
+	import MenuPricingV4 from '$lib/components/mockups/MenuPricingV4.svelte';
 
 	const cards = [
 		{
@@ -9,9 +12,19 @@
 			title: 'Market Landscape',
 			desc: "Who's opening, closing, and gaining ground — benchmarked against relevant cohorts.",
 			variants: [
-				{ label: 'V1 — Ranked Bar Chart', component: MarketLandscapeV1 },
-				{ label: 'V2 — Bubble Position Map', component: MarketLandscapeV2 },
-				{ label: 'V3 — Movement Tracker', component: MarketLandscapeV3 }
+				{ label: 'V1 — Line Chart + Activity', component: MarketLandscapeV1 },
+				{ label: 'V2 — Category Trends', component: MarketLandscapeV2 },
+				{ label: 'V3 — Category List + Sparklines', component: MarketLandscapeV3 }
+			]
+		},
+		{
+			id: 'menu-pricing',
+			title: 'Menu & Pricing',
+			desc: 'How the market positions menus, at what price point, and how delivery shapes the landscape.',
+			variants: [
+				{ label: 'V1 — Price Positioning Map', component: MenuPricingV1 },
+				{ label: 'V2 — Item Price Comparison', component: MenuPricingV2 },
+				{ label: 'V3 — Burger Price Index', component: MenuPricingV4 }
 			]
 		}
 	];
@@ -21,8 +34,8 @@
 	<title>Mockups — Superextra</title>
 </svelte:head>
 
-<div class="min-h-screen bg-[#f0efed] py-12">
-	<div class="mx-auto max-w-[1400px] px-6">
+<div class="min-h-screen bg-[#fefdfb] py-12">
+	<div class="mx-auto max-w-[1200px] px-6">
 		<header class="mb-12">
 			<a href="/" class="text-sm text-black/40 hover:text-black/60 transition-colors">&larr; Back to site</a>
 			<h1 class="mt-4 text-3xl font-medium text-black">Card Mockup Variants</h1>
@@ -34,9 +47,9 @@
 				<h2 class="text-xl font-medium text-black mb-2">{card.title}</h2>
 				<p class="text-sm text-black/50 mb-8">{card.desc}</p>
 
-				<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+				<div class="grid grid-cols-1 gap-5 md:grid-cols-3">
 					{#each card.variants as variant}
-						<div>
+						<div class="card-wrapper">
 							<p class="text-xs font-medium text-black/40 mb-3 uppercase tracking-wide">{variant.label}</p>
 							<div class="card">
 								<div class="card-text">
@@ -56,6 +69,11 @@
 </div>
 
 <style>
+	.card-wrapper {
+		display: flex;
+		flex-direction: column;
+	}
+
 	.card {
 		border-radius: 1rem;
 		background: var(--color-cream-100);
@@ -65,6 +83,7 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+		height: clamp(25rem, 30vw, 28rem);
 	}
 
 	.card-text {

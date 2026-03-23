@@ -286,6 +286,7 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+		height: clamp(25rem, 30vw, 28rem);
 	}
 
 	.card-text {
