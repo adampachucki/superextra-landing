@@ -320,7 +320,7 @@
 						</svg>
 					</div>
 					<h2 class="mb-2 text-xl font-medium tracking-tight text-black">
-						Form submitted
+						Request sent
 					</h2>
 					<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40">
 						We'll get back to you within 24 hours
