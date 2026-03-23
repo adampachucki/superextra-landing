@@ -1,5 +1,8 @@
 <script lang="ts">
 	import SectionHeader from './SectionHeader.svelte';
+	import MarketLandscapeV2 from './mockups/MarketLandscapeV2.svelte';
+	import MenuPricingV4 from './mockups/MenuPricingV4.svelte';
+	import RevenueSalesV1 from './mockups/RevenueSalesV1.svelte';
 </script>
 
 <section class="border-t border-cream-200 py-24 md:py-32">
@@ -19,30 +22,7 @@
 				</div>
 
 				<div class="mockup">
-					<div class="mockup-bar">
-						<div class="bar-icon">
-							<span></span><span></span>
-						</div>
-						<span class="bar-label">Competitor Ranking</span>
-					</div>
-
-					<div class="mockup-body">
-						{#each [
-							{ name: 'Pizzeria Roma', type: 'Italian · 4.8 ★', grad: 'from-[#06b6d4] to-[#6366f1]' },
-							{ name: 'Sushi Express', type: 'Japanese · 4.6 ★', grad: 'from-[#fbbf24] to-[#f472b6]' },
-							{ name: 'Green Garden', type: 'Vegan · 4.5 ★', grad: 'from-[#6ee7b7] to-[#06b6d4]' },
-							{ name: 'Taco Loco', type: 'Mexican · 4.3 ★', grad: 'from-[#f472b6] to-[#a78bfa]' },
-							{ name: 'Burger Joint', type: 'American · 4.2 ★', grad: 'from-[#a78bfa] to-[#6366f1]' }
-						] as comp}
-							<div class="list-row">
-								<div class="circle bg-gradient-to-br {comp.grad}"></div>
-								<div>
-									<div class="list-name">{comp.name}</div>
-									<div class="list-meta">{comp.type}</div>
-								</div>
-							</div>
-						{/each}
-					</div>
+					<MarketLandscapeV2 />
 				</div>
 			</div>
 
@@ -54,23 +34,7 @@
 				</div>
 
 				<div class="mockup">
-					<div class="mockup-body pt-5">
-						<p class="select-header">Select a category</p>
-
-						{#each [
-							{ name: 'Appetizers', grad: 'from-[#6366f1] to-[#a78bfa]' },
-							{ name: 'Main Courses', grad: 'from-[#f472b6] to-[#fbbf24]' },
-							{ name: 'Desserts', grad: 'from-[#a78bfa] to-[#f472b6]' },
-							{ name: 'Beverages', grad: 'from-[#6ee7b7] to-[#06b6d4]' },
-							{ name: 'Delivery Menus', grad: 'from-[#fbbf24] to-[#6ee7b7]' },
-							{ name: 'Specials', grad: 'from-[#06b6d4] to-[#6366f1]' }
-						] as cat}
-							<div class="list-row">
-								<div class="circle-lg bg-gradient-to-br {cat.grad}"></div>
-								<span class="list-name">{cat.name}</span>
-							</div>
-						{/each}
-					</div>
+					<MenuPricingV4 />
 				</div>
 			</div>
 
@@ -81,56 +45,8 @@
 					<p class="desc">Revenue estimates, seasonality patterns, and channel splits across the competitive set.</p>
 				</div>
 
-				<div class="mockup">
-					<div class="mockup-bar">
-						<div class="bar-icon">
-							<span></span><span></span>
-						</div>
-					</div>
-
-					<div class="mockup-body">
-						<div class="insight-row">
-							<div class="insight-dot bg-[#6366f1]"></div>
-							<p class="insight-text">
-								Monthly revenue averaging <strong>$142K</strong>, with consistent 12% year-over-year growth.
-							</p>
-						</div>
-
-						<div class="insight-row mt-4">
-							<div class="insight-dot bg-[#f472b6]"></div>
-							<p class="insight-text">
-								Delivery channel growing at <strong>18%</strong>, now accounting for 28% of total revenue.
-							</p>
-						</div>
-					</div>
-
-					<div class="revenue-timeline">
-						<div class="timeline-track">
-							<span class="timeline-dot"></span>
-							<span class="timeline-label">Q1</span>
-							<span class="timeline-spacer"></span>
-							<span class="timeline-dot"></span>
-							<span class="timeline-label">Q2</span>
-							<span class="timeline-spacer"></span>
-							<span class="timeline-dot active"></span>
-							<span class="timeline-label">Q3</span>
-							<span class="timeline-spacer"></span>
-							<span class="timeline-dot"></span>
-							<span class="timeline-label">Q4</span>
-						</div>
-						<div class="channel-tabs">
-							<div class="channel-tab active">Dine-in</div>
-							<div class="channel-tab">Delivery</div>
-						</div>
-					</div>
-					<div class="mockup-body border-t border-black/[0.04]">
-						<div class="insight-row">
-							<div class="insight-dot bg-[#6ee7b7]"></div>
-							<p class="insight-text">
-								Weekend revenue <strong>34%</strong> higher than weekday average across cohort.
-							</p>
-						</div>
-					</div>
+				<div class="mockup mockup-edge">
+					<RevenueSalesV1 />
 				</div>
 			</div>
 
@@ -325,6 +241,12 @@
 		display: flex;
 		flex-direction: column;
 		flex: 1;
+	}
+
+	.mockup-edge {
+		border-radius: 0.75rem 0 0 0;
+		margin-right: -1.75rem;
+		border-right: none;
 	}
 
 	/* Top bar inside mockup (the ‖ icon + label row) */
