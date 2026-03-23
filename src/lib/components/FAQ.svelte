@@ -55,7 +55,7 @@
 							aria-controls="faq-answer-{i}"
 							onclick={() => (openIndex = openIndex === i ? -1 : i)}
 						>
-							<h3 class="pr-8 text-base font-semibold transition-colors {openIndex === i ? 'text-black' : 'text-black/60 group-hover:text-black'}">
+							<h3 class="pr-8 text-base font-medium transition-colors {openIndex === i ? 'text-black' : 'text-black/60 group-hover:text-black'}">
 								{faq.question}
 							</h3>
 							<svg

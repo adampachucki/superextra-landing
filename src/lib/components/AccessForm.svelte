@@ -319,7 +319,7 @@
 							<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 						</svg>
 					</div>
-					<h2 class="mb-2 text-xl font-semibold tracking-tight text-black">
+					<h2 class="mb-2 text-xl font-medium tracking-tight text-black">
 						Form submitted
 					</h2>
 					<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40">
@@ -343,7 +343,7 @@
 				<!-- Step 1: Business Type -->
 				{#if step === 1}
 					<div class="step-content">
-						<h2 class="mb-2 text-center text-xl font-semibold tracking-tight text-black">
+						<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black">
 							What kind of business do you run?
 						</h2>
 						<p class="mb-8 text-center text-sm text-black/40">
@@ -369,7 +369,7 @@
 				<!-- Step 2: Business Details -->
 				{:else if step === 2}
 					<div class="step-content">
-						<h2 class="mb-2 text-center text-xl font-semibold tracking-tight text-black">
+						<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black">
 							Tell us about your business
 						</h2>
 						<p class="mb-8 text-center text-sm text-black/40">
@@ -477,7 +477,7 @@
 				<!-- Step 3: Contact Info -->
 				{:else}
 					<div class="step-content">
-						<h2 class="mb-2 text-center text-xl font-semibold tracking-tight text-black">
+						<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black">
 							How can we reach you?
 						</h2>
 						<p class="mb-8 text-center text-sm text-black/40">

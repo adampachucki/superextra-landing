@@ -164,7 +164,7 @@
 				</div>
 
 				<p class="mb-1 text-xs font-medium text-black/25">{useCase.audience}</p>
-				<h3 class="mb-2 text-lg font-semibold tracking-[-0.01em] text-black">
+				<h3 class="mb-2 text-lg font-medium tracking-[-0.01em] text-black">
 					{useCase.title}
 				</h3>
 				<p class="pr-4 text-sm leading-snug text-black/60">
