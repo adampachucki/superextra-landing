@@ -1,8 +1,9 @@
 <script lang="ts">
 	import SectionHeader from './SectionHeader.svelte';
-	import MarketLandscapeV2 from './mockups/MarketLandscapeV2.svelte';
-	import MenuPricingV4 from './mockups/MenuPricingV4.svelte';
-	import RevenueSalesV1 from './mockups/RevenueSalesV1.svelte';
+	import MarketLandscapeV3 from './mockups/MarketLandscapeV3.svelte';
+	import MenuPricingV1 from './mockups/MenuPricingV1.svelte';
+	import RevenueSalesV2 from './mockups/RevenueSalesV2.svelte';
+	import MarketingV2 from './mockups/MarketingV2.svelte';
 </script>
 
 <section class="border-t border-cream-200 py-24 md:py-32">
@@ -22,7 +23,7 @@
 				</div>
 
 				<div class="mockup">
-					<MarketLandscapeV2 />
+					<MarketLandscapeV3 />
 				</div>
 			</div>
 
@@ -33,8 +34,8 @@
 					<p class="desc">How the market positions menus, at what price point, and how delivery shapes the landscape.</p>
 				</div>
 
-				<div class="mockup">
-					<MenuPricingV4 />
+				<div class="mockup mockup-edge">
+					<MenuPricingV1 />
 				</div>
 			</div>
 
@@ -46,7 +47,7 @@
 				</div>
 
 				<div class="mockup mockup-edge">
-					<RevenueSalesV1 />
+					<RevenueSalesV2 />
 				</div>
 			</div>
 
@@ -57,24 +58,8 @@
 					<p class="desc">Where budgets go, which channels drive results, and what tools the market relies on.</p>
 				</div>
 
-				<div class="mockup">
-					<div class="mockup-body pt-4">
-						<p class="select-header">Channel mix</p>
-
-						{#each [
-							{ name: 'Instagram', pct: '42%', grad: 'from-[#f472b6] to-[#a78bfa]' },
-							{ name: 'Google Ads', pct: '31%', grad: 'from-[#06b6d4] to-[#6366f1]' },
-							{ name: 'TikTok', pct: '18%', grad: 'from-[#6ee7b7] to-[#fbbf24]' },
-							{ name: 'Email', pct: '9%', grad: 'from-[#fbbf24] to-[#f472b6]' },
-							{ name: 'Referral', pct: '5%', grad: 'from-[#a78bfa] to-[#06b6d4]' }
-						] as ch}
-							<div class="list-row compact">
-								<div class="circle-sm bg-gradient-to-br {ch.grad}"></div>
-								<span class="list-name flex-1">{ch.name}</span>
-								<span class="list-meta">{ch.pct}</span>
-							</div>
-						{/each}
-					</div>
+				<div class="mockup-free">
+					<MarketingV2 />
 				</div>
 			</div>
 
@@ -247,6 +232,14 @@
 		border-radius: 0.75rem 0 0 0;
 		margin-right: -1.75rem;
 		border-right: none;
+	}
+
+	.mockup-free {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		margin: 0 -1.75rem;
 	}
 
 	/* Top bar inside mockup (the ‖ icon + label row) */

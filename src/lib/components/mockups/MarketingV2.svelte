@@ -237,7 +237,7 @@
 		left: 0;
 		right: 0;
 		padding: 0.375rem 0.5rem;
-		background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, transparent 100%);
+		background: linear-gradient(to top, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.12) 40%, transparent 100%);
 		display: flex;
 		flex-direction: column;
 		gap: 0.1rem;

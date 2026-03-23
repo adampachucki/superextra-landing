@@ -2,7 +2,7 @@
 	const items = [
 		{ name: 'Negroni', you: 12, avg: 14, min: 9, max: 18 },
 		{ name: 'Espresso Martini', you: 15, avg: 16, min: 11, max: 21 },
-		{ name: 'Aperol Spritz', you: 11, avg: 11, min: 8, max: 15 }
+		{ name: 'Aperol Spritz', you: 13, avg: 11, min: 8, max: 15 }
 	];
 
 	function pct(value: number, min: number, max: number): number {
@@ -10,12 +10,10 @@
 	}
 
 	function dotColor(you: number, avg: number): string {
-		if (you < avg - 0.5) return '#10b981';
-		if (you > avg + 0.5) return '#ef4444';
-		return '#f59e0b';
+		if (you < avg - 0.5) return '#06b6d4';
+		if (you > avg + 0.5) return '#f472b6';
+		return '#06b6d4';
 	}
-
-	let belowCount = $derived(items.filter((i) => i.you < i.avg - 0.5).length);
 </script>
 
 <div class="top-bar">
@@ -47,14 +45,11 @@
 	{/each}
 
 	<div class="narrative">
-		<p>Negroni consistently underpriced relative to the local competitive set — the current gap suggests room for a 10–15% increase without impacting volume.</p>
-		<p>Espresso Martini tracks just below the market median, while Aperol Spritz sits right at parity.</p>
-		<p>Seasonal demand shifts in Q2 could widen the gap further as rooftop venues adjust upward.</p>
+		<div class="narrative-border"></div>
+		<div class="narrative-text">
+			<p>Negroni consistently underpriced relative to the local competitive set — the current gap suggests room for a 10–15% increase without impacting volume. Espresso Martini tracks just below the market median.</p>
+		</div>
 	</div>
-</div>
-
-<div class="footer">
-	<span class="footer-text">{belowCount} of {items.length} items below market avg</span>
 </div>
 
 <style>
@@ -93,7 +88,7 @@
 		padding: 1.25rem 1.25rem;
 	}
 
-	/* ── Item row — stacked: header above spectrum ── */
+	/* ── Item row ── */
 	.row {
 		display: flex;
 		flex-direction: column;
@@ -159,33 +154,33 @@
 		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
 	}
 
-	/* ── Narrative ── */
+	/* ── Narrative with fade ── */
 	.narrative {
-		border-left: 2px solid rgba(0, 0, 0, 0.08);
-		padding-left: 0.75rem;
+		display: flex;
+		gap: 0.75rem;
 		margin-top: 0.25rem;
 	}
 
-	.narrative p {
+	.narrative-border {
+		width: 2px;
+		flex-shrink: 0;
+		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.08), transparent);
+	}
+
+	.narrative-text {
+		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.55) 40%, rgba(0, 0, 0, 0.25) 75%);
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+	}
+
+	.narrative-text p {
 		font-size: 0.6875rem;
 		line-height: 1.5;
-		color: rgba(0, 0, 0, 0.85);
 		margin: 0;
 	}
 
-	.narrative p + p {
+	.narrative-text p + p {
 		margin-top: 0.5rem;
-	}
-
-	/* ── Footer ── */
-	.footer {
-		padding: 0.5rem 1.25rem 0.75rem;
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
-	}
-
-	.footer-text {
-		font-size: 0.6875rem;
-		color: rgba(0, 0, 0, 0.35);
-		font-weight: 500;
 	}
 </style>

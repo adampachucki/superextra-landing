@@ -28,7 +28,7 @@
 			title: 'Menu & Pricing',
 			desc: 'How the market positions menus, at what price point, and how delivery shapes the landscape.',
 			variants: [
-				{ label: 'V1 — Price Positioning Map', component: MenuPricingV1 },
+				{ label: 'V1 — Insight Cards', component: MenuPricingV1, mockupEdge: true },
 				{ label: 'V2 — Item Price Comparison', component: MenuPricingV2 },
 				{ label: 'V3 — Burger Price Index', component: MenuPricingV4 }
 			]
@@ -88,7 +88,7 @@
 										<variant.component />
 									</div>
 								{:else}
-									<div class="mockup" class:mockup-edge={card.mockupEdge}>
+									<div class="mockup" class:mockup-edge={'mockupEdge' in variant ? variant.mockupEdge : card.mockupEdge}>
 										<variant.component />
 									</div>
 								{/if}
