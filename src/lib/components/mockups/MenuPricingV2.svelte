@@ -133,7 +133,7 @@
 		top: 50%;
 		left: 0;
 		right: 0;
-		height: 2px;
+		height: 1px;
 		background: rgba(0, 0, 0, 0.06);
 		border-radius: 2px;
 		transform: translateY(-50%);

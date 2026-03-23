@@ -1,7 +1,7 @@
 <script lang="ts">
 	const viewW = 220;
 	const viewH = 136;
-	const padLeft = 34;
+	const padLeft = 26;
 	const padRight = 10;
 	const padTop = 10;
 	const padBottom = 22;
@@ -58,7 +58,17 @@
 			</linearGradient>
 		</defs>
 
-		<!-- Horizontal dotted grid lines + Y-axis labels -->
+		<!-- Y-axis labels -->
+		{#each yTicks as tick}
+			<text
+				x={padLeft - 5}
+				y={yTickY(tick) + 2}
+				text-anchor="end"
+				class="y-label"
+			>${tick}</text>
+		{/each}
+
+		<!-- Horizontal dotted grid lines -->
 		{#each yTicks as tick}
 			<line
 				x1={padLeft}
@@ -69,15 +79,9 @@
 				stroke-width="0.5"
 				stroke-dasharray="2,2.5"
 			/>
-			<text
-				x={padLeft - 5}
-				y={yTickY(tick) + 2}
-				text-anchor="end"
-				class="y-label"
-			>${tick}</text>
 		{/each}
 
-		<!-- Bars -->
+		<!-- Bars (rendered on top of grid lines) -->
 		{#each bars as bar, i}
 			<rect
 				x={barX(i)}
@@ -86,7 +90,7 @@
 				height={barHeight(bar.value)}
 				rx="1.5"
 				ry="1.5"
-				fill={bar.featured ? 'url(#burgerFeaturedGrad)' : 'rgba(0,0,0,0.09)'}
+				fill={bar.featured ? 'url(#burgerFeaturedGrad)' : '#e5e5e5'}
 			/>
 
 			<!-- Price label above the featured bar -->
@@ -132,7 +136,7 @@
 					<line x1="4" y1="1.5" x2="4" y2="3.5" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" />
 					<line x1="8" y1="1.5" x2="8" y2="3.5" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" />
 				</svg>
-				Q1'25 – Q1'26
+				Q1'25 – Now
 			</button>
 		</div>
 	</div>
