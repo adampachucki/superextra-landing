@@ -73,7 +73,7 @@
 				type="password"
 				placeholder="Password"
 				autofocus
-				class="w-64 rounded-xl border border-gray-200 px-4 py-3 text-center text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shake ? 'animate-shake' : ''}"
+				class="w-64 rounded-xl border border-cream-200 px-4 py-3 text-center text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none {shake ? 'animate-shake' : ''}"
 			/>
 			<button
 				type="submit"

@@ -43,7 +43,7 @@
 			</p>
 		</div>
 
-		<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-px overflow-hidden border-t border-gray-200 bg-gray-200">
+		<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-px overflow-hidden border-t border-cream-200 bg-cream-200">
 			{#each sources as source}
 				<div class="group flex items-center justify-center bg-white px-3 py-5 sm:px-5 sm:py-8" title="{source.name}">
 					<img

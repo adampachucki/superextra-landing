@@ -30,7 +30,7 @@
 		? 'bg-white md:bg-white/80 md:backdrop-blur-xl'
 		: 'bg-transparent'}"
 >
-	<div class="absolute inset-x-0 bottom-0 h-px bg-gray-200 transition-opacity duration-300 {scrolled ? 'opacity-100' : 'opacity-0'}"></div>
+	<div class="absolute inset-x-0 bottom-0 h-px bg-cream-200 transition-opacity duration-300 {scrolled ? 'opacity-100' : 'opacity-0'}"></div>
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
 		<a href="/" class="flex items-center">
 			<span class="text-[22px] font-light tracking-tight text-black"
@@ -45,7 +45,7 @@
 		</div>
 
 		<div class="hidden items-center gap-3 md:flex">
-			<a href="mailto:hello@superextra.ai" class="rounded-full border border-gray-200 px-5 py-2 text-sm text-black transition-colors hover:bg-gray-50">Contact Us</a>
+			<a href="mailto:hello@superextra.ai" class="rounded-full border border-cream-200 px-5 py-2 text-sm text-black transition-colors hover:bg-cream-50">Contact Us</a>
 			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-5 py-2 text-sm">Get Access</button>
 		</div>
 
@@ -66,12 +66,12 @@
 	</div>
 
 	{#if mobileOpen}
-		<div class="border-t border-gray-100 bg-white md:hidden">
+		<div class="border-t border-cream-100 bg-white md:hidden">
 			<div class="flex flex-col gap-4 px-6 py-6">
 				<a href="/#platform" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Platform</a>
 				<a href="/#use-cases" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Use Cases</a>
 				<a href="/#faq" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>FAQ</a>
-				<hr class="border-gray-100" />
+				<hr class="border-cream-100" />
 				<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm">Get Access</button>
 			</div>
 		</div>

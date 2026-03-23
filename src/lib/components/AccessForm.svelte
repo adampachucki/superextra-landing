@@ -295,7 +295,7 @@
 			{#if !submitting}
 				<button
 					onclick={close}
-					class="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full text-black/25 transition-colors hover:bg-gray-100 hover:text-black/60"
+					class="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full text-black/25 transition-colors hover:bg-cream-100 hover:text-black/60"
 					aria-label="Close"
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -327,7 +327,7 @@
 					</p>
 					<button
 						onclick={close}
-						class="rounded-full border border-gray-200 px-7 py-2.5 text-sm text-black transition-colors hover:bg-gray-50"
+						class="rounded-full border border-cream-200 px-7 py-2.5 text-sm text-black transition-colors hover:bg-cream-50"
 					>
 						Done
 					</button>
@@ -336,7 +336,7 @@
 				<!-- Step indicator -->
 				<div class="mb-8 flex items-center justify-center gap-2">
 					{#each [1, 2, 3] as s}
-						<div class="h-1 rounded-full transition-all duration-300 {s === step ? 'w-8 bg-black' : s < step ? 'w-8 bg-black/30' : 'w-8 bg-gray-200'}"></div>
+						<div class="h-1 rounded-full transition-all duration-300 {s === step ? 'w-8 bg-black' : s < step ? 'w-8 bg-black/30' : 'w-8 bg-cream-200'}"></div>
 					{/each}
 				</div>
 
@@ -357,7 +357,7 @@
 									class="cursor-pointer rounded-xl border px-3 py-3 text-sm transition-all duration-200
 										{selectedType === type
 											? 'border-black bg-black text-white'
-											: 'border-gray-200 bg-white text-black/60 hover:border-gray-300 hover:text-black'}"
+											: 'border-cream-200 bg-white text-black/60 hover:border-cream-300 hover:text-black'}"
 								>
 									{type}
 								</button>
@@ -382,7 +382,7 @@
 								<select
 									id="country"
 									bind:value={selectedCountry}
-									class="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-black focus:border-black focus:ring-0 focus:outline-none"
+									class="w-full appearance-none rounded-xl border border-cream-200 bg-white px-4 py-3 text-sm text-black focus:border-black focus:ring-0 focus:outline-none"
 								>
 									{#each countries as c}
 										<option value={c.code}>{c.name}</option>
@@ -403,7 +403,7 @@
 										autocomplete="off"
 										autocorrect="off"
 										spellcheck="false"
-										class="{inputBase} pr-10 {shakeFields.has('place-name') ? 'shake border-red-300' : 'border-gray-200'}"
+										class="{inputBase} pr-10 {shakeFields.has('place-name') ? 'shake border-red-300' : 'border-cream-200'}"
 									/>
 									{#if loadingSuggestions}
 										<svg class="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-black/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -412,12 +412,12 @@
 										</svg>
 									{/if}
 									{#if showSuggestions && placeSuggestions.length > 0}
-										<ul class="absolute left-0 right-0 top-full z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+										<ul class="absolute left-0 right-0 top-full z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-cream-200 bg-white py-1 shadow-lg">
 											{#each placeSuggestions as s}
 												<li>
 													<button
 														type="button"
-														class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
+														class="w-full px-4 py-2 text-left text-sm hover:bg-cream-50"
 														onpointerdown={(e) => e.preventDefault()}
 													onclick={() => selectPlace(s)}
 													>
@@ -439,7 +439,7 @@
 										type="text"
 										bind:value={businessName}
 										placeholder="Acme Inc."
-										class="{inputBase} {shakeFields.has('business-name') ? 'shake border-red-300' : 'border-gray-200'}"
+										class="{inputBase} {shakeFields.has('business-name') ? 'shake border-red-300' : 'border-cream-200'}"
 									/>
 								</div>
 							{/if}
@@ -449,7 +449,7 @@
 									<select
 										id="locations"
 										bind:value={selectedLocations}
-										class="w-full appearance-none rounded-xl border bg-white px-4 py-3 text-sm text-black focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('locations') ? 'shake border-red-300' : 'border-gray-200'}"
+										class="w-full appearance-none rounded-xl border bg-white px-4 py-3 text-sm text-black focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('locations') ? 'shake border-red-300' : 'border-cream-200'}"
 									>
 										<option value="" disabled class="text-black/25">Select</option>
 										<option value="1">1 location</option>
@@ -466,7 +466,7 @@
 										type="text"
 										bind:value={webUrl}
 										placeholder="example.com"
-										class="{inputBase} {shakeFields.has('web-url') ? 'shake border-red-300' : 'border-gray-200'}"
+										class="{inputBase} {shakeFields.has('web-url') ? 'shake border-red-300' : 'border-cream-200'}"
 									/>
 								</div>
 							{/if}
@@ -492,7 +492,7 @@
 									type="text"
 									bind:value={fullName}
 									placeholder="Jane Smith"
-									class="{inputBase} {shakeFields.has('full-name') ? 'shake border-red-300' : 'border-gray-200'}"
+									class="{inputBase} {shakeFields.has('full-name') ? 'shake border-red-300' : 'border-cream-200'}"
 								/>
 							</div>
 							<div>
@@ -503,13 +503,13 @@
 									bind:this={emailEl}
 									bind:value={email}
 									placeholder="jane@company.com"
-									class="{inputBase} {shakeFields.has('email') ? 'shake border-red-300' : 'border-gray-200'}"
+									class="{inputBase} {shakeFields.has('email') ? 'shake border-red-300' : 'border-cream-200'}"
 								/>
 							</div>
 							<div>
 								<label for="phone" class="mb-1.5 block text-xs font-medium text-black/60">Phone <span class="text-black/25">(optional)</span></label>
 								<div class="flex gap-2">
-									<span class="flex items-center rounded-xl border border-gray-200 bg-gray-50 px-3.5 text-sm text-black/60">
+									<span class="flex items-center rounded-xl border border-cream-200 bg-cream-50 px-3.5 text-sm text-black/60">
 										{country.dial}
 									</span>
 									<input
@@ -517,7 +517,7 @@
 										type="tel"
 										bind:value={phone}
 										placeholder={country.code === 'us' ? '(555) 000-0000' : country.code === 'gb' ? '7911 123456' : country.code === 'de' ? '151 12345678' : '512 345 678'}
-										class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none"
+										class="w-full rounded-xl border border-cream-200 px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none"
 									/>
 								</div>
 							</div>

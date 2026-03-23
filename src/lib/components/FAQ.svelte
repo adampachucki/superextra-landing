@@ -39,14 +39,14 @@
 	let openIndex = $state(-1);
 </script>
 
-<section id="faq" class="bg-[#f5f4f2] py-24 md:py-32">
+<section id="faq" class="bg-cream-100 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_1.5fr] lg:gap-20">
 			<div>
 				<SectionHeader subtitle="Learn More" title="Frequently asked questions" />
 			</div>
 
-			<div class="divide-y divide-gray-200 border-t border-gray-200">
+			<div class="divide-y divide-cream-200 border-t border-cream-200">
 				{#each faqs as faq, i}
 					<div>
 						<button

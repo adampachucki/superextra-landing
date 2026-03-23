@@ -2,7 +2,7 @@
 	import SectionHeader from './SectionHeader.svelte';
 </script>
 
-<section class="border-t border-gray-200 py-24 md:py-32">
+<section class="border-t border-cream-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<SectionHeader subtitle="Extra Clarity" title="Data and insights behind every restaurant decision" titleClass="mb-4 max-w-2xl" />
 		<p class="mb-16 max-w-lg text-lg text-black/60">
@@ -279,7 +279,7 @@
 	/* ── Card shell ── */
 	.card {
 		border-radius: 1rem;
-		background: #f5f4f2;
+		background: var(--color-cream-100);
 		border: 1px solid rgba(0, 0, 0, 0.03);
 		padding: 1.75rem 1.75rem;
 		padding-bottom: 0;
