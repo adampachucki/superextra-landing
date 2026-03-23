@@ -2,7 +2,7 @@
 	let { index, hovered = false }: { index: number; hovered: boolean } = $props();
 </script>
 
-<svg viewBox="0 0 200 200" fill="none" class="w-3/5" class:hovered>
+<svg viewBox="0 0 200 200" fill="none" class="relative z-10 w-3/5" class:hovered>
 {#if index === 0}
 	<!-- Market Research: Orbital ellipses -->
 	<line x1="10" y1="100" x2="190" y2="100" stroke="black" stroke-width="0.5" stroke-dasharray="2,3"/>
@@ -162,10 +162,27 @@
 </svg>
 
 <style>
+	/* === Shared: color transition on hover === */
+	svg line, svg path, svg ellipse, svg circle, svg rect {
+		transition: stroke 0.4s ease, fill 0.4s ease;
+	}
+
+	.hovered line,
+	.hovered path,
+	.hovered ellipse,
+	.hovered circle,
+	.hovered rect {
+		stroke: white;
+	}
+
+	.hovered [fill="black"] {
+		fill: white;
+	}
+
 	/* === Shared: marching ants === */
 	.ants, .ants-rev {
 		stroke-dashoffset: 0;
-		transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+		transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease, fill 0.4s ease;
 	}
 	.hovered .ants { stroke-dashoffset: -21; }
 	.hovered .ants-rev { stroke-dashoffset: 18; }

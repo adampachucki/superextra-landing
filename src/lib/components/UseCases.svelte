@@ -1,5 +1,6 @@
 <script lang="ts">
 	import UseCaseGraphics from './UseCaseGraphics.svelte';
+	import CardCanvas from './CardCanvas.svelte';
 	import SectionHeader from './SectionHeader.svelte';
 
 	let scrollContainer: HTMLDivElement;
@@ -152,8 +153,13 @@
 				onmouseleave={() => hoveredIndex = -1}
 			>
 				<div
-					class="mb-5 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl bg-[#f5f4f2]"
+					class="relative mb-5 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl bg-[#f5f4f2]"
 				>
+					<CardCanvas
+						active={hoveredIndex === i}
+						seed={i}
+						class="absolute inset-0 h-full w-full transition-opacity duration-500 {hoveredIndex === i ? 'opacity-100' : 'opacity-0'}"
+					/>
 					<UseCaseGraphics index={i} hovered={hoveredIndex === i} />
 				</div>
 
