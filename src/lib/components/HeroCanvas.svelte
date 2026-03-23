@@ -143,29 +143,25 @@
 
 			for (const line of lines) {
 				const s = line.seed;
-				const opacity = line.baseOpacity + noise(t * 0.08, s + 600) * 0.06;
-
-				// Slowly evolving amplitude and frequency modulation for organic feel
-				const ampMod = 1 + noise(t * 0.03, s + 700) * 0.3;
-				const freqMod = 1 + noise(t * 0.025, s + 800) * 0.2;
-				const yDrift = noise(t * 0.04, s + 900) * 25;
 
 				ctx.save();
-				ctx.globalAlpha = Math.max(0.05, opacity);
+				ctx.globalAlpha = line.baseOpacity;
 				ctx.strokeStyle = 'white';
 				ctx.lineWidth = line.width;
 				ctx.lineCap = 'round';
 				ctx.lineJoin = 'round';
 				ctx.beginPath();
 
-				const step = 4; // sample every 4px for smooth curve
-				const phase = t * line.phaseSpeed + s; // seed offsets initial phase
+				const step = 2;
+				const phase = t * line.phaseSpeed;
+				const k = line.freq;
 				let first = true;
 				for (let x = -20; x <= W + 20; x += step) {
-					const wave1 = Math.sin(x * line.freq * freqMod + phase) * line.amp * ampMod;
-					const wave2 = Math.sin(x * line.freq * 2.1 * freqMod + phase * 0.7 + s * 3.1) * line.amp * 0.3;
-					const wave3 = Math.sin(x * line.freq * 0.5 * freqMod + phase * 0.4 + s * 1.7) * line.amp * 0.4;
-					const y = line.baseY + wave1 + wave2 + wave3 + yDrift;
+					const fundamental = Math.sin(x * k + phase + s);
+					const harmonic2 = Math.sin(x * k * 2 + phase * 1.5) * 0.35;
+					const harmonic3 = Math.sin(x * k * 3 + phase * 0.75) * 0.15;
+					const envelope = Math.sin(Math.PI * ((x + 20) / (W + 40)));
+					const y = line.baseY + (fundamental + harmonic2 + harmonic3) * line.amp * envelope;
 					if (first) {
 						ctx.moveTo(x, y);
 						first = false;
