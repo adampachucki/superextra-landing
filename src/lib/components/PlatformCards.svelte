@@ -28,11 +28,11 @@
 
 					<div class="mockup-body">
 						{#each [
-							{ name: 'Pizzeria Roma', type: 'Italian · 4.8 ★', grad: 'from-[#a8c4d4] to-[#7ea3b8]' },
-							{ name: 'Sushi Express', type: 'Japanese · 4.6 ★', grad: 'from-[#c4b09a] to-[#a8926e]' },
-							{ name: 'Green Garden', type: 'Vegan · 4.5 ★', grad: 'from-[#a8c4a0] to-[#7ea878]' },
-							{ name: 'Taco Loco', type: 'Mexican · 4.3 ★', grad: 'from-[#c4a8a0] to-[#b08878]' },
-							{ name: 'Burger Joint', type: 'American · 4.2 ★', grad: 'from-[#b8b0c4] to-[#9888a8]' }
+							{ name: 'Pizzeria Roma', type: 'Italian · 4.8 ★', grad: 'from-[#06b6d4] to-[#6366f1]' },
+							{ name: 'Sushi Express', type: 'Japanese · 4.6 ★', grad: 'from-[#fbbf24] to-[#f472b6]' },
+							{ name: 'Green Garden', type: 'Vegan · 4.5 ★', grad: 'from-[#6ee7b7] to-[#06b6d4]' },
+							{ name: 'Taco Loco', type: 'Mexican · 4.3 ★', grad: 'from-[#f472b6] to-[#a78bfa]' },
+							{ name: 'Burger Joint', type: 'American · 4.2 ★', grad: 'from-[#a78bfa] to-[#6366f1]' }
 						] as comp}
 							<div class="list-row">
 								<div class="circle bg-gradient-to-br {comp.grad}"></div>
@@ -58,12 +58,12 @@
 						<p class="select-header">Select a category</p>
 
 						{#each [
-							{ name: 'Appetizers', grad: 'from-[#b0c4d8] to-[#8aa4c0]' },
-							{ name: 'Main Courses', grad: 'from-[#d4a88c] to-[#c08a6a]' },
-							{ name: 'Desserts', grad: 'from-[#c8a0b8] to-[#b888a4]' },
-							{ name: 'Beverages', grad: 'from-[#a0c4b8] to-[#80b0a0]' },
-							{ name: 'Delivery Menus', grad: 'from-[#c4b898] to-[#b0a078]' },
-							{ name: 'Specials', grad: 'from-[#c4b0b0] to-[#a89898]' }
+							{ name: 'Appetizers', grad: 'from-[#6366f1] to-[#a78bfa]' },
+							{ name: 'Main Courses', grad: 'from-[#f472b6] to-[#fbbf24]' },
+							{ name: 'Desserts', grad: 'from-[#a78bfa] to-[#f472b6]' },
+							{ name: 'Beverages', grad: 'from-[#6ee7b7] to-[#06b6d4]' },
+							{ name: 'Delivery Menus', grad: 'from-[#fbbf24] to-[#6ee7b7]' },
+							{ name: 'Specials', grad: 'from-[#06b6d4] to-[#6366f1]' }
 						] as cat}
 							<div class="list-row">
 								<div class="circle-lg bg-gradient-to-br {cat.grad}"></div>
@@ -90,14 +90,14 @@
 
 					<div class="mockup-body">
 						<div class="insight-row">
-							<div class="insight-dot bg-[#6b8eae]"></div>
+							<div class="insight-dot bg-[#6366f1]"></div>
 							<p class="insight-text">
 								Monthly revenue averaging <strong>$142K</strong>, with consistent 12% year-over-year growth.
 							</p>
 						</div>
 
 						<div class="insight-row mt-4">
-							<div class="insight-dot bg-[#b87878]"></div>
+							<div class="insight-dot bg-[#f472b6]"></div>
 							<p class="insight-text">
 								Delivery channel growing at <strong>18%</strong>, now accounting for 28% of total revenue.
 							</p>
@@ -125,7 +125,7 @@
 					</div>
 					<div class="mockup-body border-t border-black/[0.04]">
 						<div class="insight-row">
-							<div class="insight-dot bg-[#8aae6b]"></div>
+							<div class="insight-dot bg-[#6ee7b7]"></div>
 							<p class="insight-text">
 								Weekend revenue <strong>34%</strong> higher than weekday average across cohort.
 							</p>
@@ -146,11 +146,11 @@
 						<p class="select-header">Channel mix</p>
 
 						{#each [
-							{ name: 'Instagram', pct: '42%', grad: 'from-[#c48aac] to-[#a86888]' },
-							{ name: 'Google Ads', pct: '31%', grad: 'from-[#88b4c8] to-[#6898b0]' },
-							{ name: 'TikTok', pct: '18%', grad: 'from-[#a0a0b8] to-[#8888a0]' },
-							{ name: 'Email', pct: '9%', grad: 'from-[#b8c4a0] to-[#98a880]' },
-							{ name: 'Referral', pct: '5%', grad: 'from-[#c4b8a0] to-[#a89878]' }
+							{ name: 'Instagram', pct: '42%', grad: 'from-[#f472b6] to-[#a78bfa]' },
+							{ name: 'Google Ads', pct: '31%', grad: 'from-[#06b6d4] to-[#6366f1]' },
+							{ name: 'TikTok', pct: '18%', grad: 'from-[#6ee7b7] to-[#fbbf24]' },
+							{ name: 'Email', pct: '9%', grad: 'from-[#fbbf24] to-[#f472b6]' },
+							{ name: 'Referral', pct: '5%', grad: 'from-[#a78bfa] to-[#06b6d4]' }
 						] as ch}
 							<div class="list-row compact">
 								<div class="circle-sm bg-gradient-to-br {ch.grad}"></div>
@@ -450,7 +450,7 @@
 		flex-shrink: 0;
 	}
 	.timeline-dot.active {
-		background: rgba(0, 0, 0, 0.5);
+		background: #6366f1;
 	}
 	.timeline-label {
 		font-size: 0.625rem;
@@ -504,7 +504,7 @@
 	}
 	.rating-bar {
 		height: 100%;
-		background: rgba(0, 0, 0, 0.3);
+		background: linear-gradient(to right, #6366f1, #a78bfa);
 		border-radius: 2px;
 	}
 	.rating-pct {
