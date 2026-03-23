@@ -4,6 +4,7 @@
 			name: 'Vegan',
 			locations: 14,
 			trend: [4, 7, 11],
+			net: 7,
 			grad: 'from-[#6ee7b7] to-[#06b6d4]',
 			stroke: '#06b6d4'
 		},
@@ -11,6 +12,7 @@
 			name: 'Italian',
 			locations: 48,
 			trend: [8, 5, 6],
+			net: -2,
 			grad: 'from-[#fbbf24] to-[#f472b6]',
 			stroke: '#f472b6'
 		},
@@ -18,22 +20,25 @@
 			name: 'Asian Fusion',
 			locations: 31,
 			trend: [6, 7, 6],
+			net: 0,
 			grad: 'from-[#06b6d4] to-[#6366f1]',
-			stroke: '#6366f1'
+			stroke: '#06b6d4'
 		},
 		{
 			name: 'American',
 			locations: 52,
 			trend: [9, 7, 5],
+			net: -4,
 			grad: 'from-[#f472b6] to-[#a78bfa]',
-			stroke: '#a78bfa'
+			stroke: '#f472b6'
 		},
 		{
 			name: 'Mexican',
 			locations: 35,
 			trend: [7, 8, 10],
+			net: 3,
 			grad: 'from-[#a78bfa] to-[#6366f1]',
-			stroke: '#6366f1'
+			stroke: '#06b6d4'
 		}
 	];
 
@@ -81,6 +86,9 @@
 					stroke-linejoin="round"
 				/>
 			</svg>
+			<span class="net-badge" style="color: {cat.stroke}; background: {cat.stroke}14;">
+				{cat.net > 0 ? '+' : ''}{cat.net}
+			</span>
 		</div>
 	{/each}
 </div>
@@ -177,5 +185,14 @@
 		width: 2.5rem;
 		height: 1rem;
 		flex-shrink: 0;
+	}
+
+	.net-badge {
+		font-size: 0.625rem;
+		font-weight: 600;
+		padding: 0.2rem 0.45rem;
+		border-radius: 0.3rem;
+		flex-shrink: 0;
+		line-height: 1.2;
 	}
 </style>
