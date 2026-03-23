@@ -2,7 +2,6 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Hero from '$lib/components/Hero.svelte';
 	import About from '$lib/components/About.svelte';
-	import Platform from '$lib/components/Platform.svelte';
 	import PlatformCards from '$lib/components/PlatformCards.svelte';
 	import Audiences from '$lib/components/Audiences.svelte';
 	import UseCases from '$lib/components/UseCases.svelte';
@@ -19,7 +18,6 @@
 <main>
 	<Hero />
 	<About />
-	<!-- <Platform /> -->
 	<PlatformCards />
 	<Audiences />
 	<UseCases />
