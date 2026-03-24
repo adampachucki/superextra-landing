@@ -32,7 +32,7 @@
 		},
 		{
 			question: 'What does pricing look like?',
-			answer: "Flexible plans based on the number of locations and depth of intelligence needed. Early access users get preferential pricing. Reach out to learn more about the plan that fits best."
+			answer: "Engagement-based pricing tied to the number of locations and depth of intelligence needed. Early access customers get preferential pricing. Reach out to learn more."
 		}
 	];
 

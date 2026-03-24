@@ -25,7 +25,7 @@
 				<div class="mb-6 text-5xl font-black text-black/10">3.</div>
 				<h3 class="mb-3 text-lg font-medium text-black">Uncover insights</h3>
 				<p class="text-sm leading-snug text-black/60">
-					Receive dedicated deep research report and access an AI-powered dashboard for further analysis and monitoring.
+					Receive dedicated deep research reports and AI agents to work with for further analysis and monitoring.
 				</p>
 			</div>
 		</div>

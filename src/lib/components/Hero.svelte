@@ -19,13 +19,13 @@
 
 		<div class="mx-auto max-w-2xl text-center">
 			<p class="mb-8 text-lg leading-snug text-black/60 md:text-xl">
-				Super local intelligence and competitor benchmarking platform for the restaurant industry. The extra advantage behind smarter decisions.
+				Super local intelligence and competitor benchmarking for the restaurant industry. The extra advantage behind smarter decisions.
 			</p>
 			<button
 				onclick={() => formState.open()}
 				class="inline-flex cursor-pointer items-center gap-2 btn-primary px-8 py-3.5 text-sm"
 			>
-				Get Access
+				Get Started
 			</button>
 		</div>
 	</div>

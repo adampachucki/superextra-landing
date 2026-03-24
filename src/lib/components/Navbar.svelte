@@ -42,14 +42,14 @@
 		</a>
 
 		<div class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
-			<a href="/#platform" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">Platform</a>
+			<a href="/#intelligence" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">Intelligence</a>
 			<a href="/#use-cases" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">Use Cases</a>
 			<a href="/#faq" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black">FAQ</a>
 		</div>
 
 		<div class="hidden items-center gap-3 md:flex">
 			<a href="mailto:hello@superextra.ai" class="rounded-full border border-black/10 px-6 py-2.5 text-sm font-medium text-black/70 transition-all hover:border-black/15 hover:text-black/90">Contact Us</a>
-			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-5 py-2 text-sm">Get Access</button>
+			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-5 py-2 text-sm">Get Started</button>
 		</div>
 
 		<div class="flex items-center gap-3 md:hidden">
@@ -71,11 +71,11 @@
 	{#if mobileOpen}
 		<div class="border-t border-cream-100 bg-white md:hidden">
 			<div class="flex flex-col gap-4 px-6 py-6">
-				<a href="/#platform" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Platform</a>
+				<a href="/#intelligence" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Intelligence</a>
 				<a href="/#use-cases" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Use Cases</a>
 				<a href="/#faq" class="text-sm text-black/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>FAQ</a>
 				<hr class="border-cream-100" />
-				<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm">Get Access</button>
+				<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm">Get Started</button>
 			</div>
 		</div>
 	{/if}
