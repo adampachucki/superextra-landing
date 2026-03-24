@@ -6,7 +6,14 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="flex flex-col items-center justify-between gap-6 md:flex-row">
 			<div class="flex flex-col items-center gap-2 md:items-start">
-				<span class="text-[22px] font-light tracking-tight text-black">Superextra</span>
+				<div class="flex items-center gap-1.5">
+					<svg class="h-[18px] w-[18px] -mt-1" viewBox="0 0 12 12" fill="none">
+						<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5"/>
+						<line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="currentColor" stroke-width="1.5"/>
+						<line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="currentColor" stroke-width="1.5"/>
+					</svg>
+					<span class="text-[22px] font-light tracking-tight text-black">Superextra</span>
+				</div>
 				<p class="text-sm text-black/40">
 					&copy; {year} Superextra. All rights reserved.
 				</p>
