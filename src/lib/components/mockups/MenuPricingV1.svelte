@@ -1,13 +1,12 @@
 <div class="wrapper">
 	<div class="chat">
 		<div class="msg msg-user">
-			<p class="bubble bubble-user">How does our menu pricing compare to the market?</p>
+			<p class="bubble bubble-user">How are our entrée prices positioned vs competitors?</p>
 		</div>
 
 		<div class="msg msg-ai">
-			<div class="avatar"></div>
 			<p class="bubble bubble-ai">
-				Average entrée price sits at <strong>€27</strong>, about 12% below the local competitive set. Delivery menus carry a <strong>€3,40</strong> markup on average, with appetizers showing the widest gap.
+				Average entrée sits at <strong>€27</strong>, about 12% below the local competitive set. Top performers price <strong>15–20%</strong> higher.
 			</p>
 		</div>
 
@@ -22,8 +21,8 @@
 	</div>
 
 	<div class="prompt-float">
-		<div class="prompt-box">
-			<span class="prompt-text">Show cocktail prices vs neighborhood avg<span class="cursor"></span></span>
+		<div class="prompt-box prompt-inline">
+			<span class="prompt-text">Show cocktail prices vs local avg<span class="cursor"></span></span>
 			<div class="prompt-controls">
 				<div class="prompt-meta">
 					<svg class="meta-icon" viewBox="0 0 16 16" fill="none">
@@ -51,15 +50,16 @@
 		display: flex;
 		flex-direction: column;
 		flex: 1;
-		min-width: 115%;
+		min-width: 100%;
 	}
 
 	/* ── Chat ── */
 	.chat {
-		padding: 1.125rem 1rem 0.625rem;
+		padding: 0 1rem 0.625rem;
+		margin-top: 1rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.875rem;
+		gap: 0.5rem;
 	}
 
 	.msg {
@@ -69,13 +69,13 @@
 	.msg-user {
 		justify-content: flex-end;
 		padding-left: 1.5rem;
-		margin-right: -0.5rem;
+		margin-right: 0;
 	}
 
 	.msg-ai {
 		align-items: flex-start;
 		gap: 0.5rem;
-		margin-right: -3rem;
+		margin-right: 0;
 	}
 
 	.avatar {
@@ -89,7 +89,7 @@
 
 	.bubble {
 		font-size: 0.75rem;
-		line-height: 1.35;
+		line-height: 1.5;
 		padding: 0.75rem 1rem;
 		border-radius: 1rem;
 	}
@@ -116,8 +116,8 @@
 		display: flex;
 		align-items: center;
 		gap: 0.375rem;
-		padding-left: 2.75rem;
-		margin-top: -0.5rem;
+		padding-left: 1rem;
+		margin-top: 0rem;
 	}
 
 	.status-sparkle {
@@ -151,13 +151,13 @@
 
 	/* ── Floating prompt ── */
 	.prompt-float {
-		padding: 1.75rem 0.375rem 0.5rem 1.25rem;
+		padding: 0.5rem 1rem 0.5rem 1rem;
 	}
 
 	.prompt-box {
 		background: #fff;
 		border-radius: 1rem;
-		padding: 0.75rem 0.875rem 0.5rem;
+		padding: 0.75rem 0.875rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.625rem;
@@ -165,6 +165,10 @@
 			0 1px 4px rgba(0, 0, 0, 0.06),
 			0 4px 16px rgba(0, 0, 0, 0.04);
 		border: none;
+	}
+
+	.prompt-inline {
+		gap: 0.375rem;
 	}
 
 	.prompt-text {
@@ -225,13 +229,13 @@
 
 	@media (max-width: 767px) {
 		.wrapper {
-			min-width: 130%;
+			min-width: 100%;
 		}
 		.msg-user {
 			padding-left: 3rem;
 		}
 		.msg-ai {
-			margin-right: -1rem;
+			margin-right: 0;
 		}
 		.prompt-float {
 			padding-top: 1rem;

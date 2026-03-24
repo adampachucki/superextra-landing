@@ -30,7 +30,7 @@
 				<MarketLandscapeV3 />
 			</PlatformCard> -->
 
-			<PlatformCard title="Menu & Pricing" desc="Trending items, price tracking, competitor menus, delivery markups, and promotional activity across the market." mode="edge">
+			<PlatformCard title="Menu & Pricing" desc="Trending items, price tracking, competitor menus, delivery markups, and promotional activity across the market.">
 				<MenuPricingV1 />
 			</PlatformCard>
 
