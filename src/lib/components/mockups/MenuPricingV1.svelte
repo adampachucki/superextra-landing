@@ -89,8 +89,8 @@
 
 	.bubble {
 		font-size: 0.75rem;
-		line-height: 1.5;
-		padding: 0.5rem 0.75rem;
+		line-height: 1.35;
+		padding: 0.75rem 1rem;
 		border-radius: 1rem;
 	}
 
