@@ -1,4 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#000"/>
-  <text x="16" y="23" text-anchor="middle" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-size="22" font-weight="300" fill="#fff">S</text>
+  <rect width="32" height="32" rx="6" fill="#1a1a1a"/>
+  <g transform="translate(6 6) scale(1.6667)">
+    <line x1="6" y1="0.5" x2="6" y2="11.5" stroke="#fff" stroke-width="1.5"/>
+    <line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="#fff" stroke-width="1.5"/>
+    <line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="#fff" stroke-width="1.5"/>
+  </g>
 </svg>
