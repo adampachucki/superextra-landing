@@ -163,6 +163,13 @@
 		transform-origin: top left;
 	}
 
+	@media (max-width: 767px) {
+		.report {
+			transform: scale(1.18);
+			min-width: 140%;
+		}
+	}
+
 	.sidebar {
 		width: 2.75rem;
 		flex-shrink: 0;
