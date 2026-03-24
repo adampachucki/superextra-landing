@@ -12,7 +12,11 @@
 		</div>
 
 		<div class="status">
-			<span class="status-dot"></span>
+			<svg class="status-sparkle" viewBox="0 0 16 16" fill="none">
+				<path d="M8 1.5L9.1 5.9L13.5 7L9.1 8.1L8 12.5L6.9 8.1L2.5 7L6.9 5.9L8 1.5Z" fill="currentColor" />
+				<path d="M12.5 1L13 2.5L14.5 3L13 3.5L12.5 5L12 3.5L10.5 3L12 2.5L12.5 1Z" fill="currentColor" />
+				<path d="M3.5 10L4 11.5L5.5 12L4 12.5L3.5 14L3 12.5L1.5 12L3 11.5L3.5 10Z" fill="currentColor" />
+			</svg>
 			<span class="status-text shimmer">Generating charts...</span>
 		</div>
 	</div>
@@ -71,7 +75,7 @@
 	.msg-ai {
 		align-items: flex-start;
 		gap: 0.5rem;
-		padding-right: 0.5rem;
+		margin-right: -3rem;
 	}
 
 	.avatar {
@@ -116,12 +120,12 @@
 		margin-top: -0.5rem;
 	}
 
-	.status-dot {
-		width: 5px;
-		height: 5px;
-		border-radius: 50%;
-		background: #38bdf8;
+	.status-sparkle {
+		width: 0.75rem;
+		height: 0.75rem;
+		color: #38bdf8;
 		opacity: 0.5;
+		flex-shrink: 0;
 	}
 
 	.status-text {
@@ -147,7 +151,7 @@
 
 	/* ── Floating prompt ── */
 	.prompt-float {
-		padding: 0.75rem 0.375rem 0.5rem 1.25rem;
+		padding: 1.75rem 0.375rem 0.5rem 1.25rem;
 	}
 
 	.prompt-box {
