@@ -23,7 +23,7 @@
 					<path d="M14 10l-4-5v3H3v4h7v3l4-5z" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="1.5"/>
 				</svg>
 			</div>
-			<span class="likes-count">2,847 likes</span>
+			<span class="likes-count">2.847 likes</span>
 		</div>
 	</div>
 
@@ -38,7 +38,7 @@
 					<svg viewBox="0 0 24 24" fill="white" stroke="none">
 						<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
 					</svg>
-					<span>4.2K</span>
+					<span>4,2K</span>
 				</div>
 				<div class="tt-action">
 					<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
@@ -56,7 +56,7 @@
 			</div>
 			<div class="tt-overlay">
 				<span class="tt-handle">@theburgerbar</span>
-				<span class="tt-views">14.2K views</span>
+				<span class="tt-views">14,2K views</span>
 			</div>
 		</div>
 	</div>

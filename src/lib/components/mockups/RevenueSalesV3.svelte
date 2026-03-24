@@ -103,7 +103,7 @@
 
 <div class="footer">
 	<span class="footer-total">Total: ${total}K</span>
-	<span class="footer-change">+4.8% vs Oct</span>
+	<span class="footer-change">+4,8% vs Oct</span>
 </div>
 
 <style>

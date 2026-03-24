@@ -52,7 +52,7 @@
 			<span class="stat-dot" style="background: {seg.color}"></span>
 			<div class="stat-text">
 				<span class="stat-label">{seg.name}</span>
-				<span class="stat-value">{seg.value.toLocaleString()}</span>
+				<span class="stat-value">{seg.value.toLocaleString('de-DE')}</span>
 			</div>
 		</div>
 	{/each}
@@ -71,7 +71,7 @@
 			/>
 		{/each}
 
-		<text x={cx} y={cy - 4} text-anchor="middle" class="center-value">{total.toLocaleString()}</text>
+		<text x={cx} y={cy - 4} text-anchor="middle" class="center-value">{total.toLocaleString('de-DE')}</text>
 		<text x={cx} y={cy + 6} text-anchor="middle" class="center-label">reviewers</text>
 
 		<defs>
@@ -83,10 +83,10 @@
 		</defs>
 
 		<text x="128" y="18" class="overflow-text" fill="url(#guestTextFadeGrad)">
-			<tspan x="128" dy="0">Local critics average 4.1</tspan>
-			<tspan x="128" dy="9">stars and review 3.8 spots</tspan>
+			<tspan x="128" dy="0">Local critics average 4,1</tspan>
+			<tspan x="128" dy="9">stars and review 3,8 spots</tspan>
 			<tspan x="128" dy="9">per quarter. Local visitors</tspan>
-			<tspan x="128" dy="9">skew higher at 4.4 stars</tspan>
+			<tspan x="128" dy="9">skew higher at 4,4 stars</tspan>
 			<tspan x="128" dy="9">but focus almost exclusively</tspan>
 			<tspan x="128" dy="9">on weekend dining. Intl</tspan>
 			<tspan x="128" dy="9">tourists leave the most</tspan>
@@ -97,7 +97,7 @@
 </div>
 
 <div class="footer">
-	<span class="footer-total">Reviewers: {total.toLocaleString()}</span>
+	<span class="footer-total">Reviewers: {total.toLocaleString('de-DE')}</span>
 	<span class="footer-change">+8% vs 2024</span>
 </div>
 

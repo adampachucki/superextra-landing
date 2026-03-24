@@ -55,7 +55,7 @@
 		</div>
 		<div class="summary-sep"></div>
 		<div class="summary-item">
-			<span class="summary-num">12.4</span>
+			<span class="summary-num">12,4</span>
 			<span class="summary-label">per km²</span>
 		</div>
 	</div>

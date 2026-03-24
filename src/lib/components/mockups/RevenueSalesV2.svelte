@@ -60,8 +60,8 @@
 
 <div class="body">
 	<div class="hero">
-		<span class="hero-value">€2.1M</span>
-		<span class="hero-growth">+12.4%</span>
+		<span class="hero-value">€2,1M</span>
+		<span class="hero-growth">+12,4%</span>
 	</div>
 	<div class="hero-subtitle">Annual Revenue · Benchmarked Cohort</div>
 

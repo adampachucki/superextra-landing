@@ -52,7 +52,7 @@
 					<div class="row-label">{zone}</div>
 					{#each traffic[rowIdx] as score}
 						<div class="cell" style="background: {cellColor(score)}">
-							{score.toFixed(1)}
+							{score.toFixed(1).replace('.', ',')}
 						</div>
 					{/each}
 				</div>
@@ -61,11 +61,11 @@
 
 		<div class="summary">
 			<div class="summary-left">
-				<span class="summary-value">7.4</span>
+				<span class="summary-value">7,4</span>
 				<span class="summary-denominator">/ 10</span>
 			</div>
 			<div class="summary-right">
-				<span class="summary-change">+0.6</span>
+				<span class="summary-change">+0,6</span>
 				<span class="summary-context">vs prior year</span>
 			</div>
 		</div>

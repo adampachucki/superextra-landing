@@ -96,7 +96,7 @@
 					y={barY(bar.value) - 4}
 					text-anchor="middle"
 					class="bar-value featured-value"
-				>€{bar.value.toFixed(2)}</text>
+				>€{bar.value.toFixed(2).replace('.', ',')}</text>
 			{/if}
 
 			<!-- Quarter label below -->

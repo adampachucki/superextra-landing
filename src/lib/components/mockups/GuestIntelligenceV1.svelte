@@ -56,7 +56,7 @@
 					<div class="row-label">{cat}</div>
 					{#each scores[rowIdx] as score}
 						<div class="cell" style="background: {cellColor(score)}; color: {textColor(score)}">
-							{score.toFixed(1)}
+							{score.toFixed(1).replace('.', ',')}
 						</div>
 					{/each}
 				</div>
@@ -65,11 +65,11 @@
 
 		<div class="summary">
 			<div class="summary-left">
-				<span class="summary-value">4.2</span>
-				<span class="summary-denominator">/ 5.0</span>
+				<span class="summary-value">4,2</span>
+				<span class="summary-denominator">/ 5,0</span>
 			</div>
 			<div class="summary-right">
-				<span class="summary-change">+0.3</span>
+				<span class="summary-change">+0,3</span>
 				<span class="summary-context">vs prior quarter</span>
 			</div>
 		</div>
