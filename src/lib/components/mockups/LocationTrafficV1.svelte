@@ -1,5 +1,4 @@
 <script lang="ts">
-	import MockupBar from './MockupBar.svelte';
 	const grid: number[][] = [
 		[0, 1, 1, 2, 1, 0, 0],
 		[1, 2, 3, 3, 2, 1, 0],
@@ -18,11 +17,11 @@
 	const markerSet = new Set(markers.map(([r, c]) => `${r}-${c}`));
 
 	function cellBg(level: number): string {
-		if (level === 0) return 'rgba(110, 231, 183, 0.08)';
-		if (level === 1) return 'rgba(6, 182, 212, 0.20)';
-		if (level === 2) return 'rgba(6, 182, 212, 0.40)';
-		if (level === 3) return 'rgba(99, 102, 241, 0.50)';
-		return 'rgba(99, 102, 241, 0.65)';
+		if (level === 0) return 'rgba(110, 231, 183, 0.15)';
+		if (level === 1) return 'rgba(6, 182, 212, 0.35)';
+		if (level === 2) return 'rgba(6, 182, 212, 0.55)';
+		if (level === 3) return 'rgba(99, 102, 241, 0.65)';
+		return 'rgba(99, 102, 241, 0.80)';
 	}
 
 	function dotColor(level: number): string {
@@ -33,7 +32,6 @@
 </script>
 
 <div class="outer">
-<MockupBar label="Location Density" icon="barchart" />
 
 <div class="body">
 	<div class="grid-map">

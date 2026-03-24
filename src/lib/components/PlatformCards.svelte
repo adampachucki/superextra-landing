@@ -56,7 +56,7 @@
 			class:opacity-100={expanded}
 			class:mt-0={!expanded}
 		>
-			<PlatformCard title="Location & Foot Traffic" desc="Measured and projected foot traffic, demographic profiles, purchasing power, and visit time distribution.">
+			<PlatformCard title="Location & Foot Traffic" desc="Measured and projected foot traffic, demographic profiles, purchasing power, and visit time distribution." mode="free">
 				<LocationTrafficV1 />
 			</PlatformCard>
 
