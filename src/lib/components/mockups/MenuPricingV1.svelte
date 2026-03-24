@@ -222,4 +222,19 @@
 		width: 0.8125rem;
 		height: 0.8125rem;
 	}
+
+	@media (max-width: 767px) {
+		.wrapper {
+			min-width: 130%;
+		}
+		.msg-user {
+			padding-left: 3rem;
+		}
+		.msg-ai {
+			margin-right: -1rem;
+		}
+		.prompt-float {
+			padding-top: 1rem;
+		}
+	}
 </style>
