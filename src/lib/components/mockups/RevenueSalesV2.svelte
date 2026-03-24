@@ -130,7 +130,6 @@
 		border-radius: 0.25rem;
 		overflow: hidden;
 		margin-left: auto;
-		margin-right: -1.5rem;
 	}
 
 	.year-pill {
