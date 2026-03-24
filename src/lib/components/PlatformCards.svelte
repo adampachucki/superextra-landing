@@ -8,7 +8,7 @@
 	import OperationsV1 from './mockups/OperationsV1.svelte';
 </script>
 
-<section class="border-t border-cream-200 py-24 md:py-32">
+<section id="platform" class="border-t border-cream-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<SectionHeader subtitle="Extra Clarity" title="Data and insights behind every restaurant decision" titleClass="mb-4 max-w-2xl" />
 		<p class="mb-16 max-w-lg text-lg text-black/60">
@@ -21,7 +21,7 @@
 			<div class="card">
 				<div class="card-text">
 					<h3 class="title">Market Landscape</h3>
-					<p class="desc">Who's opening, closing, and gaining ground — benchmarked against relevant cohorts.</p>
+					<p class="desc">Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market.</p>
 				</div>
 
 				<div class="mockup">
