@@ -6,6 +6,17 @@
 	let scrollContainer: HTMLDivElement;
 	let activeIndex = $state(0);
 	let hoveredIndex = $state(-1);
+	let isMobile = $state(false);
+
+	$effect(() => {
+		const mq = window.matchMedia('(max-width: 767px)');
+		isMobile = mq.matches;
+		const handler = (e: MediaQueryListEvent) => (isMobile = e.matches);
+		mq.addEventListener('change', handler);
+		return () => mq.removeEventListener('change', handler);
+	});
+
+	let effectiveHovered = $derived(isMobile && hoveredIndex === -1 ? activeIndex : hoveredIndex);
 
 	const useCases = [
 		{
@@ -156,11 +167,11 @@
 					class="relative mb-5 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl bg-cream-100"
 				>
 					<CardCanvas
-						active={hoveredIndex === i}
+						active={effectiveHovered === i}
 						seed={i}
-						class="absolute inset-0 h-full w-full transition-opacity duration-500 {hoveredIndex === i ? 'opacity-100' : 'opacity-0'}"
+						class="absolute inset-0 h-full w-full transition-opacity duration-500 {effectiveHovered === i ? 'opacity-100' : 'opacity-0'}"
 					/>
-					<UseCaseGraphics index={i} hovered={hoveredIndex === i} />
+					<UseCaseGraphics index={i} hovered={effectiveHovered === i} />
 				</div>
 
 				<p class="mb-1 text-xs font-medium text-black/25">{useCase.audience}</p>
