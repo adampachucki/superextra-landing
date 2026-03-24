@@ -206,6 +206,7 @@
 		font-weight: 600;
 		color: rgba(0, 0, 0, 0.7);
 		margin-bottom: 0.5rem;
+		font-family: 'Georgia', 'Times New Roman', serif;
 	}
 
 	.narrative {
@@ -213,6 +214,7 @@
 		line-height: 1.7;
 		color: rgba(0, 0, 0, 0.6);
 		margin-bottom: 1.5rem;
+		font-family: 'Georgia', 'Times New Roman', serif;
 	}
 
 	.stat {
@@ -221,12 +223,10 @@
 		background: rgba(99, 102, 241, 0.06);
 		padding: 0.1rem 0.35rem;
 		border-radius: 0.2rem;
-		border-bottom: 1.5px solid rgba(99, 102, 241, 0.3);
 	}
 
 	.stat.decline {
 		background: rgba(244, 114, 182, 0.06);
-		border-bottom-color: rgba(244, 114, 182, 0.35);
 	}
 
 	/* ── Chart + Activity layout ── */

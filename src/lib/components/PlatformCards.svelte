@@ -24,15 +24,15 @@
 				<MarketLandscapeWideV1 />
 			</PlatformCard>
 
-			<PlatformCard title="Market Landscape" desc="Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market.">
+			<!-- <PlatformCard title="Market Landscape" desc="Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market.">
 				<MarketLandscapeV3 />
-			</PlatformCard>
+			</PlatformCard> -->
 
 			<PlatformCard title="Menu & Pricing" desc="Trending items, price tracking, competitor menus, delivery markups, and promotional activity across the market." mode="edge">
 				<MenuPricingV1 />
 			</PlatformCard>
 
-			<PlatformCard title="Revenue & Sales" desc="Revenue estimates, margin and food cost analysis, seasonality patterns, channel splits, and delivery platform market share." mode="edge">
+			<PlatformCard title="Revenue & Sales" desc="Revenue estimates, margin and food cost analysis, seasonality patterns, channel splits, and delivery platform markups." mode="edge">
 				<RevenueSalesV2 />
 			</PlatformCard>
 
