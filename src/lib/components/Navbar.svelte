@@ -26,9 +26,7 @@
 <svelte:window onscroll={handleScroll} />
 
 <nav
-	class="fixed top-0 left-0 right-0 z-50 {scrolled
-		? 'bg-white md:bg-white/80 md:backdrop-blur-xl'
-		: 'bg-transparent'}"
+	class="fixed top-0 left-0 right-0 z-50 bg-cream"
 >
 	<div class="absolute inset-x-0 bottom-0 h-px bg-cream-200 transition-opacity duration-300 {scrolled ? 'opacity-100' : 'opacity-0'}"></div>
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
