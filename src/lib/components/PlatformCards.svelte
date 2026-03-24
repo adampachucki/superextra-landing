@@ -4,6 +4,7 @@
 	import MenuPricingV1 from './mockups/MenuPricingV1.svelte';
 	import RevenueSalesV2 from './mockups/RevenueSalesV2.svelte';
 	import MarketingV2 from './mockups/MarketingV2.svelte';
+	import GuestIntelligenceV2 from './mockups/GuestIntelligenceV2.svelte';
 </script>
 
 <section class="border-t border-cream-200 py-24 md:py-32">
@@ -70,32 +71,8 @@
 					<p class="desc">What guests think, want, and expect — from real reviews and behavioural data.</p>
 				</div>
 
-				<div class="mockup">
-					<div class="mockup-body pt-4">
-						<p class="select-header">Review sentiment</p>
-
-						{#each [
-							{ stars: '★★★★★', pct: 62 },
-							{ stars: '★★★★☆', pct: 24 },
-							{ stars: '★★★☆☆', pct: 9 },
-							{ stars: '★★☆☆☆', pct: 3 },
-							{ stars: '★☆☆☆☆', pct: 2 }
-						] as r}
-							<div class="rating-row">
-								<span class="rating-stars">{r.stars}</span>
-								<div class="rating-bar-track">
-									<div class="rating-bar" style="width:{r.pct}%"></div>
-								</div>
-								<span class="rating-pct">{r.pct}%</span>
-							</div>
-						{/each}
-
-						<div class="mt-4 pt-3 border-t border-black/[0.04]">
-							<p class="text-[11px] text-black/35 mb-2">Average: 4.4 · ↑ 0.2 vs last quarter</p>
-							<p class="text-[12px] font-medium text-black/55 mb-1">Top keywords</p>
-							<p class="text-[11px] text-black/35">Great atmosphere · Slow service · Fresh ingredients</p>
-						</div>
-					</div>
+				<div class="mockup mockup-edge">
+					<GuestIntelligenceV2 />
 				</div>
 			</div>
 
@@ -106,31 +83,49 @@
 					<p class="desc">Traffic patterns, demographics, purchasing power, and rent trends.</p>
 				</div>
 
-				<div class="mockup">
-					<div class="mockup-body pt-4 pb-4">
-						<p class="select-header">Traffic heatmap</p>
+				<div class="mockup mockup-edge">
+					<div class="mockup-bar">
+						<div class="bar-icon">
+							<span></span><span></span>
+						</div>
+						<span class="bar-label">Foot Traffic Index</span>
+					</div>
 
-						<div class="grid grid-cols-7 gap-[5px] mb-3 px-1">
-							{#each [
-								[0.08, 0.15, 0.40, 0.22, 0.50, 0.12, 0.08],
-								[0.10, 0.28, 0.60, 0.72, 0.58, 0.30, 0.10],
-								[0.14, 0.38, 0.82, 0.95, 0.78, 0.42, 0.15],
-								[0.10, 0.22, 0.52, 0.62, 0.48, 0.25, 0.10],
-								[0.06, 0.12, 0.28, 0.35, 0.22, 0.10, 0.06],
-								[0.04, 0.08, 0.15, 0.20, 0.12, 0.06, 0.04]
-							] as row}
-								{#each row as cell}
-									<div class="aspect-square rounded-full" style="background:rgba(0,0,0,{cell * 0.55})"></div>
+					<div class="mockup-body">
+						<div class="ht-grid">
+							<div class="ht-header">
+								<div class="ht-row-spacer"></div>
+								{#each ['Q1', 'Q2', 'Q3', 'Q4'] as period}
+									<div class="ht-col-head">{period}</div>
 								{/each}
+							</div>
+
+							{#each [
+								{ zone: 'Kollwitzplatz', scores: [8.4, 9.1, 9.5, 9.2] },
+								{ zone: 'Helmholtzpl.', scores: [6.8, 7.2, 7.5, 7.8] },
+								{ zone: 'Kastanienallee', scores: [5.2, 5.0, 5.8, 6.1] },
+								{ zone: 'Schönhauser', scores: [4.1, 4.5, 4.3, 4.8] }
+							] as row}
+								<div class="ht-row">
+									<div class="ht-row-label">{row.zone}</div>
+									{#each row.scores as s}
+										<div class="ht-cell" style="background:{s >= 9 ? 'rgba(99,102,241,0.55)' : s >= 8 ? 'rgba(99,102,241,0.35)' : s >= 7 ? 'rgba(6,182,212,0.35)' : s >= 6 ? 'rgba(6,182,212,0.2)' : s >= 5 ? 'rgba(244,114,182,0.25)' : 'rgba(244,114,182,0.4)'}">
+											{s.toFixed(1)}
+										</div>
+									{/each}
+								</div>
 							{/each}
 						</div>
 
-						<div class="flex justify-between text-[9px] text-black/20 px-1">
-							<span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
-						</div>
-
-						<div class="mt-3 pt-3 border-t border-black/[0.04] text-[11px] text-black/35">
-							Peak: 12–2 PM weekdays
+						<div class="ht-summary">
+							<div class="ht-summary-left">
+								<span class="ht-big">7.4</span>
+								<span class="ht-denom">/ 10</span>
+							</div>
+							<div class="ht-summary-right">
+								<span class="ht-change">+0.6</span>
+								<span class="ht-ctx">vs prior year</span>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -442,5 +437,97 @@
 		font-size: 0.8125rem;
 		font-weight: 600;
 		color: rgba(0, 0, 0, 0.6);
+	}
+
+	/* ── Foot Traffic heatmap table ── */
+	.ht-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+	.ht-header {
+		display: flex;
+		align-items: flex-end;
+		gap: 0.3rem;
+		padding-bottom: 0.25rem;
+	}
+	.ht-row-spacer {
+		width: 4.75rem;
+		flex-shrink: 0;
+	}
+	.ht-col-head {
+		flex: 1;
+		text-align: center;
+		font-size: 0.5625rem;
+		font-weight: 500;
+		color: rgba(0, 0, 0, 0.35);
+	}
+	.ht-row {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+	}
+	.ht-row-label {
+		width: 4.75rem;
+		flex-shrink: 0;
+		font-size: 0.6875rem;
+		font-weight: 500;
+		color: rgba(0, 0, 0, 0.55);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		text-align: right;
+		padding-right: 0.5rem;
+	}
+	.ht-cell {
+		flex: 1;
+		aspect-ratio: 1.3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 0.25rem;
+		font-size: 0.625rem;
+		font-weight: 600;
+		color: rgba(0, 0, 0, 0.65);
+		line-height: 1;
+	}
+	.ht-summary {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		margin-top: 0.75rem;
+		padding-top: 0.75rem;
+	}
+	.ht-summary-left {
+		display: flex;
+		align-items: baseline;
+		gap: 0.25rem;
+	}
+	.ht-big {
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: rgba(0, 0, 0, 0.88);
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+	}
+	.ht-denom {
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: rgba(0, 0, 0, 0.3);
+	}
+	.ht-summary-right {
+		display: flex;
+		align-items: baseline;
+		gap: 0.25rem;
+	}
+	.ht-change {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: #0d9488;
+	}
+	.ht-ctx {
+		font-size: 0.625rem;
+		color: rgba(0, 0, 0, 0.3);
 	}
 </style>
