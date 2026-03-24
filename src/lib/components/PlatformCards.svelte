@@ -9,6 +9,8 @@
 	import GuestIntelligenceV2 from './mockups/GuestIntelligenceV2.svelte';
 	import LocationTrafficV1 from './mockups/LocationTrafficV1.svelte';
 	import OperationsV1 from './mockups/OperationsV1.svelte';
+
+	let expanded = $state(false);
 </script>
 
 <section id="platform" class="border-t border-cream-200 py-24 md:py-32">
@@ -44,6 +46,16 @@
 				<GuestIntelligenceV2 />
 			</PlatformCard>
 
+		</div>
+
+		<div class="mt-5 grid grid-cols-1 gap-5 overflow-hidden transition-all duration-500 ease-out md:grid-cols-3"
+			class:max-h-0={!expanded}
+			class:max-h-[55rem]={expanded}
+			class:md:max-h-[40rem]={expanded}
+			class:opacity-0={!expanded}
+			class:opacity-100={expanded}
+			class:mt-0={!expanded}
+		>
 			<PlatformCard title="Location & Foot Traffic" desc="Measured and projected foot traffic, demographic profiles, purchasing power, and visit time distribution.">
 				<LocationTrafficV1 />
 			</PlatformCard>
@@ -51,7 +63,15 @@
 			<PlatformCard title="Operations" desc="Labor pool availability, salary benchmarks, job market activity, staff turnover, commercial rent, and supplier pricing.">
 				<OperationsV1 />
 			</PlatformCard>
+		</div>
 
+		<div class="mt-10 flex justify-center">
+			<button
+				onclick={() => expanded = !expanded}
+				class="cursor-pointer rounded-full border border-black/10 bg-cream-100 px-6 py-2.5 text-sm font-medium text-black/70 transition-all hover:border-black/20 hover:bg-cream-200 hover:text-black"
+			>
+				{expanded ? 'Show less' : 'Show more'}
+			</button>
 		</div>
 	</div>
 </section>
