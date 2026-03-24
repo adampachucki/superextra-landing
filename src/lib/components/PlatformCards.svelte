@@ -17,7 +17,7 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<SectionHeader subtitle="Extra Clarity" title="Data and insights behind every restaurant decision" titleClass="mb-4 max-w-2xl" />
 		<p class="mb-16 max-w-lg text-lg text-black/60">
-			Seven intelligence layers, one platform. Built for every decision a restaurant makes.
+			Seven intelligence layers, one platform.
 		</p>
 
 		<div class="grid grid-cols-1 gap-5 md:grid-cols-[repeat(auto-fill,minmax(18rem,1fr))]">
