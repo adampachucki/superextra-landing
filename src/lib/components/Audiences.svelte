@@ -1,10 +1,10 @@
 <section class="bg-black py-24 text-white md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
-		<h2 class="mx-auto mb-4 max-w-2xl text-center text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em]">
-			Built for every player in the restaurant ecosystem
+		<h2 class="mx-auto mb-4 text-center text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em]">
+			Built for every player in the ecosystem
 		</h2>
 		<p class="mx-auto mb-16 max-w-lg text-center text-lg text-white/50">
-			From independent restaurants to suppliers, tech platforms, and investors powering the industry.
+			The restaurant industry has many sides. We serve them all.
 		</p>
 
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

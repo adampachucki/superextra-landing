@@ -141,7 +141,7 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="mb-12 flex items-end justify-between">
 			<div>
-				<SectionHeader subtitle="Use Cases" title="Supporting decisions across all roles and functions" titleClass="max-w-2xl" />
+				<SectionHeader subtitle="Use Cases" title="Supporting decisions across different functions" titleClass="max-w-2xl" />
 			</div>
 
 			<div class="hidden items-center gap-2 md:flex">
