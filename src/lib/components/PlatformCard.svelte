@@ -1,15 +1,16 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	let { title, desc, mode = 'standard', children }: {
+	let { title, desc, mode = 'standard', wide = false, children }: {
 		title: string;
 		desc: string;
 		mode?: 'standard' | 'edge' | 'free';
+		wide?: boolean;
 		children: Snippet;
 	} = $props();
 </script>
 
-<div class="card">
+<div class="card" class:card-wide={wide}>
 	<div class="card-text">
 		<h3 class="title">{title}</h3>
 		<p class="desc">{desc}</p>
@@ -37,6 +38,12 @@
 		flex-direction: column;
 		overflow: hidden;
 		height: clamp(25rem, 30vw, 28rem);
+	}
+
+	@media (min-width: 768px) {
+		.card-wide {
+			grid-column: span 2;
+		}
 	}
 
 	.card-text {

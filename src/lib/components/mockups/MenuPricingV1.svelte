@@ -13,7 +13,7 @@
 
 		<div class="status">
 			<span class="status-dot"></span>
-			<span class="status-text">Generating charts...</span>
+			<span class="status-text shimmer">Generating charts...</span>
 		</div>
 	</div>
 
@@ -65,6 +65,7 @@
 	.msg-user {
 		justify-content: flex-end;
 		padding-left: 1.5rem;
+		margin-right: -0.5rem;
 	}
 
 	.msg-ai {
@@ -77,7 +78,7 @@
 		width: 1.75rem;
 		height: 1.75rem;
 		border-radius: 50%;
-		background: linear-gradient(135deg, #6366f1, #06b6d4);
+		background: linear-gradient(135deg, #60a5fa, #38bdf8, #06b6d4);
 		flex-shrink: 0;
 		margin-top: 0.1rem;
 	}
@@ -96,7 +97,7 @@
 	}
 
 	.bubble-ai {
-		background: linear-gradient(135deg, rgba(99, 102, 241, 0.07), rgba(6, 182, 212, 0.06));
+		background: linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(6, 182, 212, 0.06));
 		color: rgba(0, 0, 0, 0.7);
 		border-top-left-radius: 0.25rem;
 	}
@@ -111,14 +112,15 @@
 		display: flex;
 		align-items: center;
 		gap: 0.375rem;
-		padding-left: 2.25rem;
+		padding-left: 2.75rem;
+		margin-top: -0.5rem;
 	}
 
 	.status-dot {
 		width: 5px;
 		height: 5px;
 		border-radius: 50%;
-		background: #6366f1;
+		background: #38bdf8;
 		opacity: 0.5;
 	}
 
@@ -128,9 +130,24 @@
 		font-style: italic;
 	}
 
+	.status-text.shimmer {
+		color: transparent;
+		-webkit-text-fill-color: transparent;
+		background: linear-gradient(
+			90deg,
+			rgba(0, 0, 0, 0.28) 0%,
+			rgba(0, 0, 0, 0.28) 25%,
+			rgba(0, 0, 0, 0.12) 50%,
+			rgba(0, 0, 0, 0.28) 75%,
+			rgba(0, 0, 0, 0.28) 100%
+		);
+		-webkit-background-clip: text;
+		background-clip: text;
+	}
+
 	/* ── Floating prompt ── */
 	.prompt-float {
-		padding: 0.25rem 0.375rem 0.5rem 1.25rem;
+		padding: 0.75rem 0.375rem 0.5rem 1.25rem;
 	}
 
 	.prompt-box {
@@ -141,9 +158,9 @@
 		flex-direction: column;
 		gap: 0.625rem;
 		box-shadow:
-			0 1px 3px rgba(0, 0, 0, 0.06),
-			0 4px 12px rgba(0, 0, 0, 0.04);
-		border: 1px solid rgba(0, 0, 0, 0.04);
+			0 1px 4px rgba(0, 0, 0, 0.06),
+			0 4px 16px rgba(0, 0, 0, 0.04);
+		border: none;
 	}
 
 	.prompt-text {

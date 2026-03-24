@@ -2,6 +2,7 @@
 	import SectionHeader from './SectionHeader.svelte';
 	import PlatformCard from './PlatformCard.svelte';
 	import MarketLandscapeV3 from './mockups/MarketLandscapeV3.svelte';
+	import MarketLandscapeWideV1 from './mockups/MarketLandscapeWideV1.svelte';
 	import MenuPricingV1 from './mockups/MenuPricingV1.svelte';
 	import RevenueSalesV2 from './mockups/RevenueSalesV2.svelte';
 	import MarketingV2 from './mockups/MarketingV2.svelte';
@@ -18,6 +19,10 @@
 		</p>
 
 		<div class="grid grid-cols-1 gap-5 md:grid-cols-3">
+
+			<PlatformCard title="Market Landscape" desc="Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market. Deep narrative reports that turn raw signals into actionable insights." wide mode="edge">
+				<MarketLandscapeWideV1 />
+			</PlatformCard>
 
 			<PlatformCard title="Market Landscape" desc="Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market.">
 				<MarketLandscapeV3 />
