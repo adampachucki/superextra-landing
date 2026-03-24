@@ -164,7 +164,7 @@
 				onmouseleave={() => hoveredIndex = -1}
 			>
 				<div
-					class="relative mb-5 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl bg-cream-100"
+					class="relative mb-5 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl border-[0.5px] border-black/[0.03] bg-cream-100"
 				>
 					<CardCanvas
 						active={effectiveHovered === i}
