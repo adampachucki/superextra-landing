@@ -30,7 +30,7 @@
 </script>
 
 <div class="wrapper">
-	<MockupBar label="Foot Traffic Index" icon="pin" compact>
+	<MockupBar label="Foot Traffic Index" icon="barchart" compact>
 		<div class="range-pills">
 			<span class="range-pill">6m</span>
 			<span class="range-pill active">1y</span>

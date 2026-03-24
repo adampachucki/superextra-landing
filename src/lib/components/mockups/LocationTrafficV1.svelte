@@ -33,7 +33,7 @@
 </script>
 
 <div class="outer">
-<MockupBar label="Location Density" icon="pin" />
+<MockupBar label="Location Density" icon="barchart" />
 
 <div class="body">
 	<div class="grid-map">

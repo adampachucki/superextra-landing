@@ -34,7 +34,7 @@
 </script>
 
 <div class="wrapper">
-	<MockupBar label="Guest Sentiment" icon="chat" compact>
+	<MockupBar label="Guest Sentiment" icon="barchart" compact>
 		<div class="range-pills">
 			<span class="range-pill">3m</span>
 			<span class="range-pill active">6m</span>

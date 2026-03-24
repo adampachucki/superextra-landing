@@ -1,7 +1,9 @@
 <div class="wrapper">
 	<div class="top-bar">
 		<svg class="bar-svg" viewBox="0 0 12 12" fill="none">
-			<path d="M2,1 H10 Q11,1 11,2 V7 Q11,8 10,8 H5 L2.5,11 V8 H2 Q1,8 1,7 V2 Q1,1 2,1 Z" stroke="rgba(0,0,0,0.3)" stroke-width="1.1"/>
+			<rect x="1" y="7" width="2" height="4" fill="rgba(0,0,0,0.2)"/>
+			<rect x="5" y="4" width="2" height="7" fill="rgba(0,0,0,0.25)"/>
+			<rect x="9" y="1" width="2" height="10" fill="rgba(0,0,0,0.3)"/>
 		</svg>
 		<span class="bar-label">Review Insights</span>
 	</div>

@@ -42,7 +42,7 @@
 	];
 </script>
 
-<MockupBar label="Market Activity" icon="trend">
+<MockupBar label="Market Activity" icon="barchart">
 	<div class="header-legend">
 		<span class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>Open</span>
 		<span class="legend-item"><span class="legend-dot" style="background:rgba(0,0,0,0.15)"></span>Close</span>

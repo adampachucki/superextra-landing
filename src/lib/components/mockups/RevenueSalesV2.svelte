@@ -50,7 +50,7 @@
 	const dotPointY = toY(values[dotIndex]);
 </script>
 
-<MockupBar label="Financial Overview" icon="chart">
+<MockupBar label="Financial Overview" icon="barchart">
 	<div class="year-pills">
 		<span class="year-pill">2023</span>
 		<span class="year-pill">2024</span>

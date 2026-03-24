@@ -39,7 +39,7 @@
 	});
 </script>
 
-<MockupBar label="Channel Breakdown" icon="chart" compact>
+<MockupBar label="Channel Breakdown" icon="barchart" compact>
 	<div class="month-selector">
 		<span class="month-arrow">&#8249;</span>
 		<span class="month-name">Nov</span>
