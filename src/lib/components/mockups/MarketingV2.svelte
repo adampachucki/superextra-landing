@@ -19,12 +19,12 @@
 				</svg>
 				<!-- Comment (speech bubble) -->
 				<svg class="action-icon" viewBox="0 0 24 24" fill="none">
-					<path d="M20.656 17.008a9.993 9.993 0 10-3.59 3.615L22 22z" stroke="rgba(0,0,0,0.7)" stroke-width="1.8" stroke-linejoin="round"/>
+					<path d="M20.656 17.008a9.993 9.993 0 10-3.59 3.615L22 22z" style="stroke: rgba(var(--mockup-text), 0.7)" stroke-width="1.8" stroke-linejoin="round"/>
 				</svg>
 				<!-- Share (paper plane) -->
 				<svg class="action-icon" viewBox="0 0 24 24" fill="none">
-					<line x1="22" y1="3" x2="9.218" y2="10.083" stroke="rgba(0,0,0,0.7)" stroke-width="1.8"/>
-					<polygon points="22,3 15,22 9.218,10.083 2,9" fill="none" stroke="rgba(0,0,0,0.7)" stroke-width="1.8" stroke-linejoin="round"/>
+					<line x1="22" y1="3" x2="9.218" y2="10.083" style="stroke: rgba(var(--mockup-text), 0.7)" stroke-width="1.8"/>
+					<polygon points="22,3 15,22 9.218,10.083 2,9" fill="none" style="stroke: rgba(var(--mockup-text), 0.7)" stroke-width="1.8" stroke-linejoin="round"/>
 				</svg>
 			</div>
 			<span class="likes-count">2.847 likes</span>
@@ -101,7 +101,7 @@
 		position: absolute;
 		width: 52%;
 		border-radius: 0.75rem;
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+		box-shadow: 0 4px 16px rgba(var(--mockup-text), 0.08);
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
@@ -112,7 +112,7 @@
 		left: -8%;
 		top: 2rem;
 		z-index: 2;
-		background: #ffffff;
+		background: rgb(var(--mockup-bg));
 	}
 
 	.card-center {
@@ -127,7 +127,7 @@
 		right: -16%;
 		top: 3.5rem;
 		z-index: 1;
-		background: #ffffff;
+		background: rgb(var(--mockup-bg));
 	}
 
 	/* ── Post header ── */
@@ -167,15 +167,15 @@
 	.post-name {
 		font-size: 0.5625rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.7);
+		color: rgba(var(--mockup-text), 0.7);
 		white-space: nowrap;
 	}
 
 	.sponsored-pill {
 		font-size: 0.45rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.4);
-		background: rgba(0, 0, 0, 0.06);
+		color: rgba(var(--mockup-text), 0.4);
+		background: rgba(var(--mockup-text), 0.06);
 		border-radius: 0.125rem;
 		padding: 0.1em 0.35em;
 		white-space: nowrap;
@@ -224,14 +224,14 @@
 	.tt-action svg {
 		width: 0.875rem;
 		height: 0.875rem;
-		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+		filter: drop-shadow(0 1px 2px rgba(var(--mockup-text), 0.4));
 	}
 
 	.tt-action span {
 		font-size: 0.4375rem;
 		font-weight: 600;
 		color: rgba(255, 255, 255, 0.9);
-		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+		text-shadow: 0 1px 2px rgba(var(--mockup-text), 0.5);
 	}
 
 	.tt-overlay {
@@ -240,7 +240,7 @@
 		left: 0;
 		right: 0;
 		padding: 0.375rem 0.5rem;
-		background: linear-gradient(to top, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.12) 40%, transparent 100%);
+		background: linear-gradient(to top, rgba(var(--mockup-text), 0.35) 0%, rgba(var(--mockup-text), 0.12) 40%, transparent 100%);
 		display: flex;
 		flex-direction: column;
 		gap: 0.1rem;
@@ -281,7 +281,7 @@
 	.likes-count {
 		font-size: 0.5rem;
 		font-weight: 700;
-		color: rgba(0, 0, 0, 0.75);
+		color: rgba(var(--mockup-text), 0.75);
 	}
 
 	/* Facebook footer */
@@ -298,7 +298,7 @@
 
 	.reaction-count {
 		font-size: 0.4375rem;
-		color: rgba(0, 0, 0, 0.4);
+		color: rgba(var(--mockup-text), 0.4);
 		white-space: nowrap;
 	}
 </style>

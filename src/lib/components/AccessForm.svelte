@@ -3,7 +3,7 @@
 	import { formState } from '$lib/form-state.svelte';
 
 	const btnPrimary = 'inline-flex items-center gap-2 btn-primary px-7 py-2.5 text-sm';
-	const inputBase = 'w-full rounded-xl border px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none';
+	const inputBase = 'w-full rounded-xl border px-4 py-3 text-sm text-black dark:text-white placeholder:text-black/25 dark:placeholder:text-white/25 focus:border-black dark:focus:border-white focus:ring-0 focus:outline-none';
 
 	let step = $state(1);
 	let selectedType = $state('');
@@ -288,14 +288,14 @@
 			aria-modal="true"
 			aria-label="Request access"
 			tabindex="-1"
-			class="relative mx-4 w-full max-w-[560px] rounded-2xl bg-white p-8 shadow-2xl shadow-black/10 transition-all duration-300 md:p-10 focus:outline-none
+			class="relative mx-4 w-full max-w-[560px] rounded-2xl bg-white dark:bg-cream-50 p-8 shadow-2xl shadow-black/10 transition-all duration-300 md:p-10 focus:outline-none
 				{modalVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}"
 		>
 			<!-- Close button -->
 			{#if !submitting}
 				<button
 					onclick={close}
-					class="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full text-black/25 transition-colors hover:bg-cream-100 hover:text-black/60"
+					class="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full text-black/25 dark:text-white/25 transition-colors hover:bg-cream-100 hover:text-black/60 dark:hover:text-white/60"
 					aria-label="Close"
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -314,20 +314,20 @@
 			<!-- Success state -->
 			{#if submitted}
 				<div class="step-content flex flex-col items-center py-8 text-center">
-					<div class="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+					<div class="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 						</svg>
 					</div>
-					<h2 class="mb-2 text-xl font-medium tracking-tight text-black">
+					<h2 class="mb-2 text-xl font-medium tracking-tight text-black dark:text-white">
 						Request sent
 					</h2>
-					<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40">
+					<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40 dark:text-white/40">
 						We'll get back to you within 24 hours
 					</p>
 					<button
 						onclick={close}
-						class="rounded-full border border-cream-200 px-7 py-2.5 text-sm text-black transition-colors hover:bg-cream-50"
+						class="rounded-full border border-cream-200 px-7 py-2.5 text-sm text-black dark:text-white transition-colors hover:bg-cream-50"
 					>
 						Done
 					</button>
@@ -336,17 +336,17 @@
 				<!-- Step indicator -->
 				<div class="mb-8 flex items-center justify-center gap-2">
 					{#each [1, 2, 3] as s}
-						<div class="h-1 rounded-full transition-all duration-300 {s === step ? 'w-8 bg-black' : s < step ? 'w-8 bg-black/30' : 'w-8 bg-cream-200'}"></div>
+						<div class="h-1 rounded-full transition-all duration-300 {s === step ? 'w-8 bg-black dark:bg-white' : s < step ? 'w-8 bg-black/30 dark:bg-white/30' : 'w-8 bg-cream-200'}"></div>
 					{/each}
 				</div>
 
 				<!-- Step 1: Business Type -->
 				{#if step === 1}
 					<div class="step-content">
-						<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black">
+						<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
 							What kind of business do you run?
 						</h2>
-						<p class="mb-8 text-center text-sm text-black/40">
+						<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
 							Select the option that best describes you
 						</p>
 
@@ -356,8 +356,8 @@
 									onclick={() => (selectedType = selectedType === type ? '' : type)}
 									class="cursor-pointer rounded-xl border px-3 py-3 text-sm transition-all duration-200
 										{selectedType === type
-											? 'border-black bg-black text-white'
-											: 'border-cream-200 bg-white text-black/60 hover:border-cream-300 hover:text-black'}"
+											? 'border-black bg-black text-white dark:border-white dark:bg-white dark:text-black'
+											: 'border-cream-200 bg-white dark:bg-cream-50 text-black/60 dark:text-white/60 hover:border-cream-300 hover:text-black dark:hover:text-white'}"
 								>
 									{type}
 								</button>
@@ -369,20 +369,20 @@
 				<!-- Step 2: Business Details -->
 				{:else if step === 2}
 					<div class="step-content">
-						<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black">
+						<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
 							Tell us about your business
 						</h2>
-						<p class="mb-8 text-center text-sm text-black/40">
+						<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
 							Help us tailor the experience to your needs
 						</p>
 
 						<div class="space-y-4">
 							<div>
-								<label for="country" class="mb-1.5 block text-xs font-medium text-black/60">Country</label>
+								<label for="country" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Country</label>
 								<select
 									id="country"
 									bind:value={selectedCountry}
-									class="w-full appearance-none rounded-xl border border-cream-200 bg-white px-4 py-3 text-sm text-black focus:border-black focus:ring-0 focus:outline-none"
+									class="w-full appearance-none rounded-xl border border-cream-200 bg-white dark:bg-cream-50 px-4 py-3 text-sm text-black dark:text-white focus:border-black dark:focus:border-white focus:ring-0 focus:outline-none"
 								>
 									{#each countries as c}
 										<option value={c.code}>{c.name}</option>
@@ -391,7 +391,7 @@
 							</div>
 							{#if isVenue}
 								<div class="relative">
-									<label for="place-name" class="mb-1.5 block text-xs font-medium text-black/60">Place name</label>
+									<label for="place-name" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Place name</label>
 									<input
 										id="place-name"
 										type="text"
@@ -406,13 +406,13 @@
 										class="{inputBase} pr-10 {shakeFields.has('place-name') ? 'shake border-red-300' : 'border-cream-200'}"
 									/>
 									{#if loadingSuggestions}
-										<svg class="absolute right-3 bottom-3 h-4 w-4 animate-spin text-black/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<svg class="absolute right-3 bottom-3 h-4 w-4 animate-spin text-black/25 dark:text-white/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 											<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
 											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
 										</svg>
 									{/if}
 									{#if showSuggestions && placeSuggestions.length > 0}
-										<ul class="absolute left-0 right-0 top-full z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-cream-200 bg-white py-1 shadow-lg">
+										<ul class="absolute left-0 right-0 top-full z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-cream-200 bg-white dark:bg-cream-50 py-1 shadow-lg">
 											{#each placeSuggestions as s}
 												<li>
 													<button
@@ -421,9 +421,9 @@
 														onpointerdown={(e) => e.preventDefault()}
 													onclick={() => selectPlace(s)}
 													>
-														<span class="text-black">{s.name}</span>
+														<span class="text-black dark:text-white">{s.name}</span>
 														{#if s.secondary}
-															<span class="ml-1 text-black/25">{s.secondary}</span>
+															<span class="ml-1 text-black/25 dark:text-white/25">{s.secondary}</span>
 														{/if}
 													</button>
 												</li>
@@ -433,7 +433,7 @@
 								</div>
 							{:else}
 								<div>
-									<label for="business-name" class="mb-1.5 block text-xs font-medium text-black/60">Business name</label>
+									<label for="business-name" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Business name</label>
 									<input
 										id="business-name"
 										type="text"
@@ -445,11 +445,11 @@
 							{/if}
 							{#if isVenue}
 								<div>
-									<label for="locations" class="mb-1.5 block text-xs font-medium text-black/60">Number of locations</label>
+									<label for="locations" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Number of locations</label>
 									<select
 										id="locations"
 										bind:value={selectedLocations}
-										class="w-full appearance-none rounded-xl border bg-white px-4 py-3 text-sm text-black focus:border-black focus:ring-0 focus:outline-none {shakeFields.has('locations') ? 'shake border-red-300' : 'border-cream-200'}"
+										class="w-full appearance-none rounded-xl border bg-white dark:bg-cream-50 px-4 py-3 text-sm text-black dark:text-white focus:border-black dark:focus:border-white focus:ring-0 focus:outline-none {shakeFields.has('locations') ? 'shake border-red-300' : 'border-cream-200'}"
 									>
 										<option value="" disabled class="text-black/25">Select</option>
 										<option value="1">1 location</option>
@@ -460,7 +460,7 @@
 								</div>
 							{:else}
 								<div>
-									<label for="web-url" class="mb-1.5 block text-xs font-medium text-black/60">Web URL</label>
+									<label for="web-url" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Web URL</label>
 									<input
 										id="web-url"
 										type="text"
@@ -477,16 +477,16 @@
 				<!-- Step 3: Contact Info -->
 				{:else}
 					<div class="step-content">
-						<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black">
+						<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
 							How can we reach you?
 						</h2>
-						<p class="mb-8 text-center text-sm text-black/40">
+						<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
 							We'll get back to you within 24 hours
 						</p>
 
 						<div class="space-y-4">
 							<div>
-								<label for="full-name" class="mb-1.5 block text-xs font-medium text-black/60">Full name</label>
+								<label for="full-name" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Full name</label>
 								<input
 									id="full-name"
 									type="text"
@@ -496,7 +496,7 @@
 								/>
 							</div>
 							<div>
-								<label for="email" class="mb-1.5 block text-xs font-medium text-black/60">Work email</label>
+								<label for="email" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Work email</label>
 								<input
 									id="email"
 									type="email"
@@ -507,9 +507,9 @@
 								/>
 							</div>
 							<div>
-								<label for="phone" class="mb-1.5 block text-xs font-medium text-black/60">Phone <span class="text-black/25">(optional)</span></label>
+								<label for="phone" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Phone <span class="text-black/25 dark:text-white/25">(optional)</span></label>
 								<div class="flex gap-2">
-									<span class="flex items-center rounded-xl border border-cream-200 bg-cream-50 px-3.5 text-sm text-black/60">
+									<span class="flex items-center rounded-xl border border-cream-200 bg-cream-50 px-3.5 text-sm text-black/60 dark:text-white/60">
 										{country.dial}
 									</span>
 									<input
@@ -517,7 +517,7 @@
 										type="tel"
 										bind:value={phone}
 										placeholder={country.code === 'us' ? '(555) 000-0000' : country.code === 'gb' ? '7911 123456' : country.code === 'de' ? '151 12345678' : '512 345 678'}
-										class="w-full rounded-xl border border-cream-200 px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none"
+										class="w-full rounded-xl border border-cream-200 px-4 py-3 text-sm text-black dark:text-white placeholder:text-black/25 dark:placeholder:text-white/25 focus:border-black dark:focus:border-white focus:ring-0 focus:outline-none"
 									/>
 								</div>
 							</div>
@@ -540,7 +540,7 @@
 						<button
 							onclick={back}
 							disabled={submitting}
-							class="inline-flex items-center gap-1.5 text-sm text-black/40 transition-colors hover:text-black disabled:opacity-30"
+							class="inline-flex items-center gap-1.5 text-sm text-black/40 dark:text-white/40 transition-colors hover:text-black dark:hover:text-white disabled:opacity-30"
 						>
 							<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />

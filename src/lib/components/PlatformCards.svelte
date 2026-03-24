@@ -16,7 +16,7 @@
 <section id="intelligence" class="border-t border-cream-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<SectionHeader subtitle="Extra Clarity" title="Data and insights behind every restaurant decision" titleClass="mb-4 max-w-2xl" />
-		<p class="mb-16 max-w-lg text-lg text-black/60">
+		<p class="mb-16 max-w-lg text-lg text-black/60 dark:text-white/60">
 			Seven intelligence layers, combined.
 		</p>
 
@@ -68,7 +68,7 @@
 		<div class="mt-10 flex justify-center">
 			<button
 				onclick={() => expanded = !expanded}
-				class="cursor-pointer rounded-full border border-black/10 px-6 py-2.5 text-sm font-medium text-black/70 transition-all hover:border-black/15 hover:text-black/90"
+				class="cursor-pointer rounded-full border border-black/10 px-6 py-2.5 text-sm font-medium text-black/70 transition-all hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90"
 			>
 				{expanded ? 'Show less' : 'Show more'}
 			</button>

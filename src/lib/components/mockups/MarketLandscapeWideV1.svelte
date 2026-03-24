@@ -109,25 +109,25 @@
 					<span class="section-label">MONTHLY OPENINGS VS CLOSINGS</span>
 					<div class="legend">
 						<span class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>Open</span>
-						<span class="legend-item"><span class="legend-dot" style="background:rgba(0,0,0,0.15)"></span>Close</span>
+						<span class="legend-item"><span class="legend-dot" style="background:rgba(var(--mockup-text),0.15)"></span>Close</span>
 					</div>
 				</div>
 				<svg class="line-chart" viewBox="0 0 {viewW} {viewH}">
 					<!-- horizontal grid + y-axis labels -->
 					{#each yTicks as tick}
 						{@const y = padT + (1 - (tick - minVal) / range) * plotH}
-						<line x1={padL} y1={y} x2={viewW - padR} y2={y} stroke="rgba(0,0,0,0.05)" stroke-width="0.4" stroke-dasharray="2,2" />
-						<text x={padL - 4} y={y + 1.2} text-anchor="end" fill="rgba(0,0,0,0.25)" font-size="3.5">{tick}</text>
+						<line x1={padL} y1={y} x2={viewW - padR} y2={y} style="stroke: rgba(var(--mockup-text), 0.05)" stroke-width="0.4" stroke-dasharray="2,2" />
+						<text x={padL - 4} y={y + 1.2} text-anchor="end" style="fill: rgba(var(--mockup-text), 0.25)" font-size="3.5">{tick}</text>
 					{/each}
 
 					<!-- axes -->
-					<line x1={padL} y1={padT} x2={padL} y2={viewH - padB} stroke="rgba(0,0,0,0.08)" stroke-width="0.5" />
-					<line x1={padL} y1={viewH - padB} x2={viewW - padR} y2={viewH - padB} stroke="rgba(0,0,0,0.08)" stroke-width="0.5" />
+					<line x1={padL} y1={padT} x2={padL} y2={viewH - padB} style="stroke: rgba(var(--mockup-text), 0.08)" stroke-width="0.5" />
+					<line x1={padL} y1={viewH - padB} x2={viewW - padR} y2={viewH - padB} style="stroke: rgba(var(--mockup-text), 0.08)" stroke-width="0.5" />
 
 					<!-- x-axis labels -->
 					{#each xTickIndices as idx}
 						{@const x = padL + (idx / (months.length - 1)) * plotW}
-						<text x={x} y={viewH - padB + 7} text-anchor="middle" fill="rgba(0,0,0,0.25)" font-size="3.5">{months[idx]}</text>
+						<text x={x} y={viewH - padB + 7} text-anchor="middle" style="fill: rgba(var(--mockup-text), 0.25)" font-size="3.5">{months[idx]}</text>
 					{/each}
 
 					<!-- lines -->
@@ -142,7 +142,7 @@
 					<polyline
 						points={closingsPoints}
 						fill="none"
-						stroke="rgba(0,0,0,0.15)"
+						style="stroke: rgba(var(--mockup-text), 0.15)"
 						stroke-width="1"
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -173,7 +173,7 @@
 	.sidebar {
 		width: 2.75rem;
 		flex-shrink: 0;
-		border-right: 1px solid rgba(0, 0, 0, 0.06);
+		border-right: 1px solid rgba(var(--mockup-text), 0.06);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -188,13 +188,13 @@
 		align-items: center;
 		justify-content: center;
 		border-radius: 0.375rem;
-		color: rgba(0, 0, 0, 0.25);
+		color: rgba(var(--mockup-text), 0.25);
 		cursor: default;
 	}
 
 	.nav-icon.active {
-		background: rgba(0, 0, 0, 0.06);
-		color: rgba(0, 0, 0, 0.55);
+		background: rgba(var(--mockup-text), 0.06);
+		color: rgba(var(--mockup-text), 0.55);
 	}
 
 	.nav-spacer {
@@ -211,7 +211,7 @@
 	.heading {
 		font-size: 0.8125rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.7);
+		color: rgba(var(--mockup-text), 0.7);
 		margin-bottom: 0.5rem;
 		font-family: 'Georgia', 'Times New Roman', serif;
 	}
@@ -219,14 +219,14 @@
 	.narrative {
 		font-size: 0.75rem;
 		line-height: 1.7;
-		color: rgba(0, 0, 0, 0.6);
+		color: rgba(var(--mockup-text), 0.6);
 		margin-bottom: 1.5rem;
 		font-family: 'Georgia', 'Times New Roman', serif;
 	}
 
 	.stat {
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.85);
+		color: rgba(var(--mockup-text), 0.85);
 		background: rgba(99, 102, 241, 0.06);
 		padding: 0.1rem 0.35rem;
 		border-radius: 0.2rem;
@@ -257,7 +257,7 @@
 		font-size: 0.5625rem;
 		font-weight: 600;
 		letter-spacing: 0.06em;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 		display: block;
 		margin-bottom: 0.5rem;
 	}
@@ -279,7 +279,7 @@
 		align-items: center;
 		gap: 0.2rem;
 		font-size: 0.5625rem;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 	}
 
 	.legend-dot {
@@ -314,7 +314,7 @@
 		flex: 1;
 		font-size: 0.6875rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.7);
+		color: rgba(var(--mockup-text), 0.7);
 	}
 
 	.category-pair {
@@ -330,10 +330,10 @@
 	}
 
 	.pair-slash {
-		color: rgba(0, 0, 0, 0.12);
+		color: rgba(var(--mockup-text), 0.12);
 	}
 
 	.pair-close {
-		color: rgba(0, 0, 0, 0.2);
+		color: rgba(var(--mockup-text), 0.2);
 	}
 </style>

@@ -94,7 +94,7 @@
 	.period-selector {
 		display: flex;
 		gap: 0;
-		background: rgba(0, 0, 0, 0.04);
+		background: rgba(var(--mockup-text), 0.04);
 		border-radius: 0.25rem;
 		overflow: hidden;
 		margin-left: auto;
@@ -103,13 +103,13 @@
 	.period {
 		font-size: 0.5625rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 		padding: 0.2rem 0.4rem;
 	}
 
 	.period.active {
-		background: rgba(0, 0, 0, 0.06);
-		color: rgba(0, 0, 0, 0.5);
+		background: rgba(var(--mockup-text), 0.06);
+		color: rgba(var(--mockup-text), 0.5);
 		border-radius: 0.25rem;
 	}
 
@@ -125,7 +125,7 @@
 	}
 
 	.row-border {
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		border-top: 1px solid rgba(var(--mockup-text), 0.04);
 	}
 
 	.circle {
@@ -142,13 +142,13 @@
 	.name {
 		font-size: 0.8125rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.75);
+		color: rgba(var(--mockup-text), 0.75);
 		display: block;
 	}
 
 	.subtitle {
 		font-size: 0.6875rem;
-		color: rgba(0, 0, 0, 0.35);
+		color: rgba(var(--mockup-text), 0.35);
 		display: block;
 	}
 

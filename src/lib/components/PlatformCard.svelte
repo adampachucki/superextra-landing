@@ -31,7 +31,7 @@
 	.card {
 		border-radius: 1rem;
 		background: var(--color-cream-100);
-		border: 0.5px solid rgba(0, 0, 0, 0.03);
+		border: 0.5px solid rgba(var(--mockup-text), 0.03);
 		padding: 1.75rem 1.75rem;
 		padding-bottom: 0;
 		display: flex;
@@ -62,20 +62,20 @@
 	.title {
 		font-size: 1.25rem;
 		font-weight: 500;
-		color: #000;
+		color: var(--color-text);
 	}
 
 	.desc {
 		font-size: 0.875rem;
 		line-height: 1.5;
 		margin-top: 0.25rem;
-		color: rgba(0, 0, 0, 0.6);
+		color: rgba(var(--mockup-text), 0.6);
 	}
 
 	.mockup {
 		border-radius: 0.75rem 0.75rem 0 0;
-		background: #fff;
-		border: 0.5px solid rgba(0, 0, 0, 0.08);
+		background: rgb(var(--mockup-bg));
+		border: 0.5px solid rgba(var(--mockup-text), 0.08);
 		border-bottom: none;
 		margin-bottom: -3.5rem;
 		display: flex;

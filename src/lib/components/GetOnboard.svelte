@@ -8,23 +8,23 @@
 
 		<div class="grid grid-cols-1 gap-0 border-t border-cream-200 md:grid-cols-3 md:divide-x md:divide-cream-200">
 			<div class="border-b border-cream-200 p-8 md:border-b-0 md:py-10 md:pr-10">
-				<div class="mb-6 text-5xl font-black text-black/10">1.</div>
-				<h3 class="mb-3 text-lg font-medium text-black">Get in touch</h3>
-				<p class="text-sm leading-snug text-black/60">
+				<div class="mb-6 text-5xl font-black text-black/10 dark:text-white/10">1.</div>
+				<h3 class="mb-3 text-lg font-medium text-black dark:text-white">Get in touch</h3>
+				<p class="text-sm leading-snug text-black/60 dark:text-white/60">
 					We're onboarding a limited number of customers. Apply for early access and tell us about your business.
 				</p>
 			</div>
 			<div class="border-b border-cream-200 p-8 md:border-b-0 md:py-10 md:px-10">
-				<div class="mb-6 text-5xl font-black text-black/10">2.</div>
-				<h3 class="mb-3 text-lg font-medium text-black">Talk to experts</h3>
-				<p class="text-sm leading-snug text-black/60">
+				<div class="mb-6 text-5xl font-black text-black/10 dark:text-white/10">2.</div>
+				<h3 class="mb-3 text-lg font-medium text-black dark:text-white">Talk to experts</h3>
+				<p class="text-sm leading-snug text-black/60 dark:text-white/60">
 					We'll map out the intelligence that matters most for your market and competitive landscape.
 				</p>
 			</div>
 			<div class="p-8 md:py-10 md:pl-10">
-				<div class="mb-6 text-5xl font-black text-black/10">3.</div>
-				<h3 class="mb-3 text-lg font-medium text-black">Uncover insights</h3>
-				<p class="text-sm leading-snug text-black/60">
+				<div class="mb-6 text-5xl font-black text-black/10 dark:text-white/10">3.</div>
+				<h3 class="mb-3 text-lg font-medium text-black dark:text-white">Uncover insights</h3>
+				<p class="text-sm leading-snug text-black/60 dark:text-white/60">
 					Receive dedicated deep research reports and AI agents to work with for further analysis and monitoring.
 				</p>
 			</div>

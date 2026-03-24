@@ -25,8 +25,8 @@
 	}
 
 	function dotColor(level: number): string {
-		if (level <= 1) return 'rgba(0, 0, 0, 0.25)';
-		if (level === 2) return 'rgba(0, 0, 0, 0.35)';
+		if (level <= 1) return 'rgba(var(--mockup-text), 0.25)';
+		if (level === 2) return 'rgba(var(--mockup-text), 0.35)';
 		return 'rgba(255, 255, 255, 0.8)';
 	}
 </script>
@@ -110,13 +110,13 @@
 		gap: 0.75rem;
 		margin-top: 0.75rem;
 		padding-top: 0.625rem;
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		border-top: 1px solid rgba(var(--mockup-text), 0.04);
 	}
 
 	.summary-sep {
 		width: 1px;
 		height: 1.25rem;
-		background: rgba(0, 0, 0, 0.08);
+		background: rgba(var(--mockup-text), 0.08);
 	}
 
 	.summary-item {
@@ -127,13 +127,13 @@
 	.summary-num {
 		font-size: 0.875rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.65);
+		color: rgba(var(--mockup-text), 0.65);
 		line-height: 1.1;
 	}
 
 	.summary-label {
 		font-size: 0.5rem;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 		margin-top: 0.05rem;
 		white-space: nowrap;
 	}

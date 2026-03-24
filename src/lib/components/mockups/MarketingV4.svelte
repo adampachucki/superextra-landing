@@ -15,7 +15,7 @@
 
 	<!-- Share pill -->
 	<div class="pill pill-c">
-		<svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.5)" stroke-width="2">
+		<svg class="pill-icon" viewBox="0 0 24 24" fill="none" style="stroke: rgba(var(--mockup-text), 0.5)" stroke-width="2">
 			<line x1="22" y1="2" x2="11" y2="13"/>
 			<polygon points="22 2 15 22 11 13 2 9 22 2"/>
 		</svg>
@@ -24,7 +24,7 @@
 
 	<!-- Bookmark -->
 	<div class="pill pill-d">
-		<svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.5)" stroke-width="2">
+		<svg class="pill-icon" viewBox="0 0 24 24" fill="none" style="stroke: rgba(var(--mockup-text), 0.5)" stroke-width="2">
 			<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
 		</svg>
 		<span class="pill-text">Save</span>
@@ -43,7 +43,7 @@
 
 	<!-- Repost pill -->
 	<div class="pill pill-g">
-		<svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.5)" stroke-width="2">
+		<svg class="pill-icon" viewBox="0 0 24 24" fill="none" style="stroke: rgba(var(--mockup-text), 0.5)" stroke-width="2">
 			<path d="M17 1l4 4-4 4"/>
 			<path d="M3 11V9a4 4 0 014-4h14"/>
 			<path d="M7 23l-4-4 4-4"/>
@@ -67,10 +67,10 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.375rem;
-		background: #fff;
+		background: rgb(var(--mockup-bg));
 		border-radius: 999px;
 		padding: 0.625rem 1.125rem;
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+		box-shadow: 0 2px 12px rgba(var(--mockup-text), 0.07);
 		white-space: nowrap;
 	}
 
@@ -83,16 +83,16 @@
 	.pill-text {
 		font-size: 0.9375rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
+		color: rgba(var(--mockup-text), 0.6);
 	}
 
 	/* ── Shared card ── */
 	.card-float {
 		position: absolute;
-		background: #fff;
+		background: rgb(var(--mockup-bg));
 		border-radius: 14px;
 		padding: 0.625rem 1.125rem;
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+		box-shadow: 0 2px 12px rgba(var(--mockup-text), 0.07);
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
@@ -100,18 +100,18 @@
 
 	.comment-text {
 		font-size: 0.9375rem;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 	}
 
 	.follow-text {
 		font-size: 0.9375rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.7);
+		color: rgba(var(--mockup-text), 0.7);
 	}
 
 	.follow-chevron {
 		font-size: 1.125rem;
-		color: rgba(0, 0, 0, 0.25);
+		color: rgba(var(--mockup-text), 0.25);
 		line-height: 1;
 	}
 

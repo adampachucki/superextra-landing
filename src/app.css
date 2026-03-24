@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
 	--font-sans: -apple-system, BlinkMacSystemFont, 'Inter', ui-sans-serif, system-ui, sans-serif;
 	--color-cream: #fefdf9;
@@ -8,18 +10,38 @@
 	--color-cream-100: #f5f2ec;
 	--color-cream-200: #ebe7e0;
 	--color-cream-300: #d4d0c8;
+	--color-surface: #ffffff;
+	--color-text: #000000;
+}
+
+:root {
+	--mockup-text: 0, 0, 0;
+	--mockup-bg: 255, 255, 255;
+}
+
+:root.dark {
+	--color-cream: #141210;
+	--color-cream-50: #1a1714;
+	--color-cream-100: #211e1a;
+	--color-cream-200: #2e2a25;
+	--color-cream-300: #3d3832;
+	--color-surface: #1a1714;
+	--color-text: #ede9e3;
+	--mockup-text: 237, 233, 227;
+	--mockup-bg: 26, 23, 20;
+	color-scheme: dark;
 }
 
 @utility btn-primary {
 	border-radius: 9999px;
-	background-color: #000;
+	background-color: var(--color-text);
 	font-weight: 500;
-	color: #fff;
+	color: var(--color-cream);
 	transition-property: color, background-color;
 	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 	transition-duration: 150ms;
 	&:hover {
-		background-color: rgb(0 0 0 / 0.8);
+		background-color: color-mix(in srgb, var(--color-text) 80%, transparent);
 	}
 }
 
@@ -27,13 +49,13 @@
 	body {
 		font-family: var(--font-sans);
 		background-color: var(--color-cream);
-		color: #000000;
+		color: var(--color-text);
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
 	}
 
 	::selection {
-		background-color: #000000;
-		color: #ffffff;
+		background-color: var(--color-text);
+		color: var(--color-cream);
 	}
 }

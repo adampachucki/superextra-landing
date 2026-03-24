@@ -66,7 +66,7 @@
 	.header {
 		font-size: 0.9375rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.75);
+		color: rgba(var(--mockup-text), 0.75);
 		margin-bottom: 0.625rem;
 	}
 
@@ -86,7 +86,7 @@
 		text-align: center;
 		font-size: 0.5rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.25);
+		color: rgba(var(--mockup-text), 0.25);
 	}
 
 	.grid-wrapper {
@@ -105,7 +105,7 @@
 		width: 2.25rem;
 		flex-shrink: 0;
 		font-size: 0.4375rem;
-		color: rgba(0, 0, 0, 0.25);
+		color: rgba(var(--mockup-text), 0.25);
 		text-align: right;
 		padding-right: 0.375rem;
 		white-space: nowrap;

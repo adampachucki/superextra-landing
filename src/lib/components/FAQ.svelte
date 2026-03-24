@@ -55,12 +55,12 @@
 							aria-controls="faq-answer-{i}"
 							onclick={() => (openIndex = openIndex === i ? -1 : i)}
 						>
-							<h3 class="pr-8 text-base font-medium transition-colors {openIndex === i ? 'text-black' : 'text-black/60 group-hover:text-black'}">
+							<h3 class="pr-8 text-base font-medium transition-colors {openIndex === i ? 'text-black dark:text-white' : 'text-black/60 group-hover:text-black dark:text-white/60 dark:group-hover:text-white'}">
 								{faq.question}
 							</h3>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
-								class="h-5 w-5 shrink-0 text-black/25 transition-transform duration-300 {openIndex === i ? 'rotate-45' : ''}"
+								class="h-5 w-5 shrink-0 text-black/25 dark:text-white/25 transition-transform duration-300 {openIndex === i ? 'rotate-45' : ''}"
 								fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
@@ -72,7 +72,7 @@
 							class="grid transition-[grid-template-rows] duration-300 {openIndex === i ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}"
 						>
 							<div class="overflow-hidden">
-								<p class="pb-6 text-sm leading-snug text-black/60">
+								<p class="pb-6 text-sm leading-snug text-black/60 dark:text-white/60">
 									{faq.answer}
 								</p>
 							</div>

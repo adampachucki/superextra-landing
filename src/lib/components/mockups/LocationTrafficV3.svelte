@@ -93,7 +93,7 @@
 	.range-pills {
 		display: flex;
 		gap: 0;
-		background: rgba(0, 0, 0, 0.04);
+		background: rgba(var(--mockup-text), 0.04);
 		border-radius: 0.25rem;
 		overflow: hidden;
 		margin-left: auto;
@@ -102,14 +102,14 @@
 	.range-pill {
 		font-size: 0.5625rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 		padding: 0.2rem 0.4rem;
 		cursor: default;
 	}
 
 	.range-pill.active {
-		background: rgba(0, 0, 0, 0.06);
-		color: rgba(0, 0, 0, 0.5);
+		background: rgba(var(--mockup-text), 0.06);
+		color: rgba(var(--mockup-text), 0.5);
 		border-radius: 0.25rem;
 	}
 
@@ -140,7 +140,7 @@
 		text-align: center;
 		font-size: 0.5625rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.35);
+		color: rgba(var(--mockup-text), 0.35);
 	}
 
 	.heatmap-row {
@@ -154,7 +154,7 @@
 		flex-shrink: 0;
 		font-size: 0.6875rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.55);
+		color: rgba(var(--mockup-text), 0.55);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -171,7 +171,7 @@
 		border-radius: 0.25rem;
 		font-size: 0.625rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.65);
+		color: rgba(var(--mockup-text), 0.65);
 		line-height: 1;
 	}
 
@@ -179,7 +179,7 @@
 		display: flex;
 		align-items: baseline;
 		justify-content: space-between;
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		border-top: 1px solid rgba(var(--mockup-text), 0.04);
 		margin-top: 0.75rem;
 		padding-top: 0.75rem;
 	}
@@ -193,7 +193,7 @@
 	.summary-value {
 		font-size: 1.5rem;
 		font-weight: 700;
-		color: rgba(0, 0, 0, 0.88);
+		color: rgba(var(--mockup-text), 0.88);
 		line-height: 1.1;
 		letter-spacing: -0.02em;
 	}
@@ -201,7 +201,7 @@
 	.summary-denominator {
 		font-size: 0.75rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 	}
 
 	.summary-right {
@@ -218,7 +218,7 @@
 
 	.summary-context {
 		font-size: 0.625rem;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 	}
 
 	.legend {
@@ -227,13 +227,13 @@
 		gap: 0.375rem;
 		margin-top: 0.5rem;
 		padding-top: 0.5rem;
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		border-top: 1px solid rgba(var(--mockup-text), 0.04);
 	}
 
 	.legend-label {
 		font-size: 0.5rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.25);
+		color: rgba(var(--mockup-text), 0.25);
 		flex-shrink: 0;
 	}
 

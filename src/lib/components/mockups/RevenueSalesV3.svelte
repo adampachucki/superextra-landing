@@ -113,14 +113,14 @@
 		align-items: center;
 		gap: 0.375rem;
 		margin-left: auto;
-		background: rgba(0, 0, 0, 0.04);
+		background: rgba(var(--mockup-text), 0.04);
 		border-radius: 0.25rem;
 		padding: 0.2rem 0.4rem;
 	}
 
 	.month-arrow {
 		font-size: 0.75rem;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 		line-height: 1;
 		cursor: default;
 	}
@@ -128,7 +128,7 @@
 	.month-name {
 		font-size: 0.5625rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.5);
+		color: rgba(var(--mockup-text), 0.5);
 		min-width: 1.5rem;
 		text-align: center;
 	}
@@ -138,7 +138,7 @@
 		display: flex;
 		gap: 0.75rem;
 		padding: 0.625rem 0.875rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+		border-bottom: 1px solid rgba(var(--mockup-text), 0.04);
 	}
 
 	.stat {
@@ -162,7 +162,7 @@
 
 	.stat-label {
 		font-size: 0.5625rem;
-		color: rgba(0, 0, 0, 0.35);
+		color: rgba(var(--mockup-text), 0.35);
 		font-weight: 500;
 		line-height: 1.2;
 	}
@@ -170,7 +170,7 @@
 	.stat-value {
 		font-size: 0.8125rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.75);
+		color: rgba(var(--mockup-text), 0.75);
 		line-height: 1.2;
 	}
 
@@ -190,13 +190,13 @@
 	.chart-area :global(.center-value) {
 		font-size: 8px;
 		font-weight: 700;
-		fill: rgba(0, 0, 0, 0.8);
+		fill: rgba(var(--mockup-text), 0.8);
 	}
 
 	.chart-area :global(.center-label) {
 		font-size: 4px;
 		font-weight: 500;
-		fill: rgba(0, 0, 0, 0.3);
+		fill: rgba(var(--mockup-text), 0.3);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}
@@ -213,13 +213,13 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.5rem 0.875rem 0.75rem;
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		border-top: 1px solid rgba(var(--mockup-text), 0.04);
 	}
 
 	.footer-total {
 		font-size: 0.75rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.65);
+		color: rgba(var(--mockup-text), 0.65);
 	}
 
 	.footer-change {

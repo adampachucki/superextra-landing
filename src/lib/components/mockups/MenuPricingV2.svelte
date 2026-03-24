@@ -73,14 +73,14 @@
 	.item-name {
 		font-size: 0.8125rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.85);
+		color: rgba(var(--mockup-text), 0.85);
 		line-height: 1;
 	}
 
 	.item-avg {
 		font-size: 0.6875rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.35);
+		color: rgba(var(--mockup-text), 0.35);
 		line-height: 1;
 		white-space: nowrap;
 	}
@@ -98,7 +98,7 @@
 		left: 0;
 		right: 0;
 		height: 1px;
-		background: rgba(0, 0, 0, 0.06);
+		background: rgba(var(--mockup-text), 0.06);
 		border-radius: 2px;
 		transform: translateY(-50%);
 	}
@@ -108,7 +108,7 @@
 		top: 50%;
 		width: 2px;
 		height: 12px;
-		background: rgba(0, 0, 0, 0.8);
+		background: rgba(var(--mockup-text), 0.8);
 		border-radius: 1px;
 		transform: translate(-50%, -50%);
 	}
@@ -133,11 +133,11 @@
 	.narrative-border {
 		width: 2px;
 		flex-shrink: 0;
-		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.08), transparent);
+		background: linear-gradient(to bottom, rgba(var(--mockup-text), 0.08), transparent);
 	}
 
 	.narrative-text {
-		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.55) 40%, rgba(0, 0, 0, 0.25) 75%);
+		background: linear-gradient(to bottom, rgba(var(--mockup-text), 0.85) 0%, rgba(var(--mockup-text), 0.55) 40%, rgba(var(--mockup-text), 0.25) 75%);
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;

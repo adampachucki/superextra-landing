@@ -2,162 +2,162 @@
 	let { index, hovered = false }: { index: number; hovered: boolean } = $props();
 </script>
 
-<svg viewBox="0 0 200 200" fill="none" class="relative z-10 w-3/5" class:hovered>
+<svg viewBox="0 0 200 200" fill="none" class="relative z-10 w-3/5 text-black dark:text-white" class:hovered>
 {#if index === 0}
 	<!-- Market Research: Orbital ellipses -->
-	<line x1="10" y1="100" x2="190" y2="100" stroke="black" stroke-width="0.5" stroke-dasharray="2,3"/>
-	<line x1="100" y1="10" x2="100" y2="190" stroke="black" stroke-width="0.5" stroke-dasharray="2,3"/>
+	<line x1="10" y1="100" x2="190" y2="100" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,3"/>
+	<line x1="100" y1="10" x2="100" y2="190" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,3"/>
 	<g class="orbit-1-group">
-		<ellipse cx="100" cy="100" rx="82" ry="26" stroke="black" stroke-width="1"/>
-		<circle cx="18" cy="100" r="1.5" fill="black"/>
-		<circle cx="182" cy="100" r="1.5" fill="black"/>
+		<ellipse cx="100" cy="100" rx="82" ry="26" stroke="currentColor" stroke-width="1"/>
+		<circle cx="18" cy="100" r="1.5" fill="currentColor"/>
+		<circle cx="182" cy="100" r="1.5" fill="currentColor"/>
 	</g>
 	<g class="orbit-2-group">
-		<ellipse cx="100" cy="100" rx="64" ry="34" stroke="black" stroke-width="1"/>
-		<circle cx="145" cy="76" r="1.5" fill="black"/>
+		<ellipse cx="100" cy="100" rx="64" ry="34" stroke="currentColor" stroke-width="1"/>
+		<circle cx="145" cy="76" r="1.5" fill="currentColor"/>
 	</g>
 	<g class="orbit-3-group">
-		<ellipse class="ants" cx="100" cy="100" rx="46" ry="20" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
-		<circle cx="123" cy="82" r="1.5" fill="black"/>
+		<ellipse class="ants" cx="100" cy="100" rx="46" ry="20" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/>
+		<circle cx="123" cy="82" r="1.5" fill="currentColor"/>
 	</g>
-	<circle cx="100" cy="100" r="2.5" fill="black"/>
+	<circle cx="100" cy="100" r="2.5" fill="currentColor"/>
 
 {:else if index === 1}
 	<!-- Marketing Strategy: Overlapping spotlights / Venn -->
 	<g class="venn-a">
-		<circle cx="78" cy="88" r="52" stroke="black" stroke-width="0.8"/>
-		<circle cx="78" cy="36" r="1.5" fill="black"/>
+		<circle cx="78" cy="88" r="52" stroke="currentColor" stroke-width="0.8"/>
+		<circle cx="78" cy="36" r="1.5" fill="currentColor"/>
 	</g>
 	<g class="venn-b">
-		<circle cx="122" cy="88" r="48" stroke="black" stroke-width="0.8"/>
-		<circle cx="170" cy="88" r="1.5" fill="black"/>
+		<circle cx="122" cy="88" r="48" stroke="currentColor" stroke-width="0.8"/>
+		<circle cx="170" cy="88" r="1.5" fill="currentColor"/>
 	</g>
 	<g class="venn-c">
-		<circle class="ants" cx="100" cy="125" r="42" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
-		<circle cx="100" cy="167" r="1.5" fill="black"/>
+		<circle class="ants" cx="100" cy="125" r="42" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/>
+		<circle cx="100" cy="167" r="1.5" fill="currentColor"/>
 	</g>
-	<circle cx="100" cy="98" r="2" fill="black"/>
+	<circle cx="100" cy="98" r="2" fill="currentColor"/>
 
 {:else if index === 2}
 	<!-- Expansion Planning: Growth rings -->
-	<g class="ring-1"><rect x="88" y="88" width="24" height="24" stroke="black" stroke-width="1.2" rx="2"/></g>
+	<g class="ring-1"><rect x="88" y="88" width="24" height="24" stroke="currentColor" stroke-width="1.2" rx="2"/></g>
 	<g class="ring-2">
-		<rect x="68" y="68" width="64" height="64" stroke="black" stroke-width="1" rx="4"/>
-		<circle cx="69" cy="69" r="1.5" fill="black"/>
-		<circle cx="131" cy="69" r="1.5" fill="black"/>
-		<circle cx="69" cy="131" r="1.5" fill="black"/>
-		<circle cx="131" cy="131" r="1.5" fill="black"/>
+		<rect x="68" y="68" width="64" height="64" stroke="currentColor" stroke-width="1" rx="4"/>
+		<circle cx="69" cy="69" r="1.5" fill="currentColor"/>
+		<circle cx="131" cy="69" r="1.5" fill="currentColor"/>
+		<circle cx="69" cy="131" r="1.5" fill="currentColor"/>
+		<circle cx="131" cy="131" r="1.5" fill="currentColor"/>
 	</g>
-	<g class="ring-3"><rect class="ants" x="45" y="45" width="110" height="110" stroke="black" stroke-width="0.8" stroke-dasharray="4,3" rx="6"/></g>
-	<g class="ring-4"><rect class="ants-rev" x="20" y="20" width="160" height="160" stroke="black" stroke-width="0.5" stroke-dasharray="2,3" rx="8"/></g>
-	<circle cx="100" cy="100" r="2" fill="black"/>
-	<line x1="100" y1="20" x2="100" y2="88" stroke="black" stroke-width="0.4" stroke-dasharray="2,3"/>
-	<line x1="100" y1="112" x2="100" y2="180" stroke="black" stroke-width="0.4" stroke-dasharray="2,3"/>
-	<line x1="20" y1="100" x2="88" y2="100" stroke="black" stroke-width="0.4" stroke-dasharray="2,3"/>
-	<line x1="112" y1="100" x2="180" y2="100" stroke="black" stroke-width="0.4" stroke-dasharray="2,3"/>
+	<g class="ring-3"><rect class="ants" x="45" y="45" width="110" height="110" stroke="currentColor" stroke-width="0.8" stroke-dasharray="4,3" rx="6"/></g>
+	<g class="ring-4"><rect class="ants-rev" x="20" y="20" width="160" height="160" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,3" rx="8"/></g>
+	<circle cx="100" cy="100" r="2" fill="currentColor"/>
+	<line x1="100" y1="20" x2="100" y2="88" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
+	<line x1="100" y1="112" x2="100" y2="180" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
+	<line x1="20" y1="100" x2="88" y2="100" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
+	<line x1="112" y1="100" x2="180" y2="100" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
 
 {:else if index === 3}
 	<!-- Financial Modelling: Wave curves -->
-	<line x1="10" y1="110" x2="190" y2="110" stroke="black" stroke-width="0.5"/>
-	<line x1="20" y1="110" x2="20" y2="40" stroke="black" stroke-width="0.5"/>
+	<line x1="10" y1="110" x2="190" y2="110" stroke="currentColor" stroke-width="0.5"/>
+	<line x1="20" y1="110" x2="20" y2="40" stroke="currentColor" stroke-width="0.5"/>
 	<g class="wave-solid-group">
-		<path d="M 20,110 C 55,55 75,55 110,110 S 165,165 190,110" stroke="black" stroke-width="1"/>
-		<circle cx="65" cy="69" r="1.5" fill="black"/>
-		<circle cx="110" cy="110" r="2" fill="black"/>
+		<path d="M 20,110 C 55,55 75,55 110,110 S 165,165 190,110" stroke="currentColor" stroke-width="1"/>
+		<circle cx="65" cy="69" r="1.5" fill="currentColor"/>
+		<circle cx="110" cy="110" r="2" fill="currentColor"/>
 	</g>
 	<g class="wave-dash-group">
-		<path class="ants" d="M 20,125 C 60,75 90,75 120,110 S 170,145 190,100" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
-		<circle cx="155" cy="135" r="1.5" fill="black"/>
+		<path class="ants" d="M 20,125 C 60,75 90,75 120,110 S 170,145 190,100" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/>
+		<circle cx="155" cy="135" r="1.5" fill="currentColor"/>
 	</g>
-	<line x1="65" y1="65" x2="65" y2="155" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-	<line x1="110" y1="65" x2="110" y2="155" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-	<line x1="155" y1="65" x2="155" y2="155" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<line x1="65" y1="65" x2="65" y2="155" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<line x1="110" y1="65" x2="110" y2="155" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<line x1="155" y1="65" x2="155" y2="155" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
 
 {:else if index === 4}
 	<!-- Ops & Workforce: Gantt / shift schedule -->
-	<line x1="40" y1="25" x2="40" y2="180" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-	<line x1="80" y1="25" x2="80" y2="180" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-	<line x1="120" y1="25" x2="120" y2="180" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-	<line x1="160" y1="25" x2="160" y2="180" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/>
-	<g class="gantt-row-1"><rect x="25" y="32" width="95" height="10" rx="2" stroke="black" stroke-width="1"/><circle cx="25" cy="37" r="1.5" fill="black"/></g>
-	<g class="gantt-row-2"><rect x="55" y="55" width="50" height="10" rx="2" stroke="black" stroke-width="1"/><circle cx="55" cy="60" r="1.5" fill="black"/></g>
-	<g class="gantt-row-3"><rect class="ants" x="80" y="78" width="90" height="10" rx="2" stroke="black" stroke-width="0.8" stroke-dasharray="4,3"/><circle cx="80" cy="83" r="1.5" fill="black"/></g>
-	<g class="gantt-row-4"><rect x="25" y="101" width="55" height="10" rx="2" stroke="black" stroke-width="1"/><circle cx="25" cy="106" r="1.5" fill="black"/><rect x="100" y="101" width="75" height="10" rx="2" stroke="black" stroke-width="0.8"/><circle cx="100" cy="106" r="1.5" fill="black"/></g>
-	<g class="gantt-row-5"><rect class="ants-rev" x="40" y="124" width="135" height="10" rx="2" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/><circle cx="40" cy="129" r="1.5" fill="black"/></g>
-	<g class="gantt-row-6"><rect x="25" y="147" width="60" height="10" rx="2" stroke="black" stroke-width="1"/><circle cx="25" cy="152" r="1.5" fill="black"/><rect x="110" y="147" width="65" height="10" rx="2" stroke="black" stroke-width="0.8"/><circle cx="110" cy="152" r="1.5" fill="black"/></g>
+	<line x1="40" y1="25" x2="40" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<line x1="80" y1="25" x2="80" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<line x1="120" y1="25" x2="120" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<line x1="160" y1="25" x2="160" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<g class="gantt-row-1"><rect x="25" y="32" width="95" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="25" cy="37" r="1.5" fill="currentColor"/></g>
+	<g class="gantt-row-2"><rect x="55" y="55" width="50" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="55" cy="60" r="1.5" fill="currentColor"/></g>
+	<g class="gantt-row-3"><rect class="ants" x="80" y="78" width="90" height="10" rx="2" stroke="currentColor" stroke-width="0.8" stroke-dasharray="4,3"/><circle cx="80" cy="83" r="1.5" fill="currentColor"/></g>
+	<g class="gantt-row-4"><rect x="25" y="101" width="55" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="25" cy="106" r="1.5" fill="currentColor"/><rect x="100" y="101" width="75" height="10" rx="2" stroke="currentColor" stroke-width="0.8"/><circle cx="100" cy="106" r="1.5" fill="currentColor"/></g>
+	<g class="gantt-row-5"><rect class="ants-rev" x="40" y="124" width="135" height="10" rx="2" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/><circle cx="40" cy="129" r="1.5" fill="currentColor"/></g>
+	<g class="gantt-row-6"><rect x="25" y="147" width="60" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="25" cy="152" r="1.5" fill="currentColor"/><rect x="110" y="147" width="65" height="10" rx="2" stroke="currentColor" stroke-width="0.8"/><circle cx="110" cy="152" r="1.5" fill="currentColor"/></g>
 
 {:else if index === 5}
 	<!-- Sales & Leads: CRM network graph -->
-	<circle cx="100" cy="100" r="6" stroke="black" stroke-width="1.2"/>
-	<circle cx="100" cy="100" r="2" fill="black"/>
+	<circle cx="100" cy="100" r="6" stroke="currentColor" stroke-width="1.2"/>
+	<circle cx="100" cy="100" r="2" fill="currentColor"/>
 	<g class="node-a">
-		<line x1="95" y1="96" x2="41" y2="54" stroke="black" stroke-width="0.8"/>
-		<circle cx="38" cy="52" r="4" stroke="black" stroke-width="0.8"/>
+		<line x1="95" y1="96" x2="41" y2="54" stroke="currentColor" stroke-width="0.8"/>
+		<circle cx="38" cy="52" r="4" stroke="currentColor" stroke-width="0.8"/>
 	</g>
 	<g class="node-b">
-		<line x1="104" y1="96" x2="156" y2="46" stroke="black" stroke-width="0.8"/>
-		<circle cx="160" cy="42" r="5" stroke="black" stroke-width="0.8"/>
+		<line x1="104" y1="96" x2="156" y2="46" stroke="currentColor" stroke-width="0.8"/>
+		<circle cx="160" cy="42" r="5" stroke="currentColor" stroke-width="0.8"/>
 	</g>
 	<g class="node-c">
-		<line class="ants" x1="106" y1="100" x2="169" y2="98" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
-		<circle cx="172" cy="98" r="3" stroke="black" stroke-width="0.7"/>
+		<line class="ants" x1="106" y1="100" x2="169" y2="98" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/>
+		<circle cx="172" cy="98" r="3" stroke="currentColor" stroke-width="0.7"/>
 	</g>
 	<g class="node-d">
-		<line x1="104" y1="104" x2="149" y2="155" stroke="black" stroke-width="0.8"/>
-		<circle cx="152" cy="158" r="4.5" stroke="black" stroke-width="0.8"/>
+		<line x1="104" y1="104" x2="149" y2="155" stroke="currentColor" stroke-width="0.8"/>
+		<circle cx="152" cy="158" r="4.5" stroke="currentColor" stroke-width="0.8"/>
 	</g>
 	<g class="node-e">
-		<line class="ants" x1="96" y1="104" x2="51" y2="150" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
-		<circle cx="48" cy="152" r="3.5" stroke="black" stroke-width="0.7"/>
+		<line class="ants" x1="96" y1="104" x2="51" y2="150" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/>
+		<circle cx="48" cy="152" r="3.5" stroke="currentColor" stroke-width="0.7"/>
 	</g>
 	<g class="node-f">
-		<line x1="94" y1="101" x2="33" y2="114" stroke="black" stroke-width="0.8"/>
-		<circle cx="30" cy="115" r="3" stroke="black" stroke-width="0.8"/>
+		<line x1="94" y1="101" x2="33" y2="114" stroke="currentColor" stroke-width="0.8"/>
+		<circle cx="30" cy="115" r="3" stroke="currentColor" stroke-width="0.8"/>
 	</g>
 	<g class="node-g">
-		<line class="ants" x1="98" y1="94" x2="79" y2="30" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
-		<circle cx="78" cy="28" r="2.5" stroke="black" stroke-width="0.7"/>
+		<line class="ants" x1="98" y1="94" x2="79" y2="30" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/>
+		<circle cx="78" cy="28" r="2.5" stroke="currentColor" stroke-width="0.7"/>
 	</g>
 	<g class="node-h">
-		<line class="ants" x1="105" y1="104" x2="166" y2="150" stroke="black" stroke-width="0.7" stroke-dasharray="4,3"/>
-		<circle cx="168" cy="152" r="3" stroke="black" stroke-width="0.7"/>
+		<line class="ants" x1="105" y1="104" x2="166" y2="150" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/>
+		<circle cx="168" cy="152" r="3" stroke="currentColor" stroke-width="0.7"/>
 	</g>
-	<g class="link-bc"><line x1="161" y1="47" x2="171" y2="95" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/></g>
-	<g class="link-ef"><line x1="31" y1="118" x2="46" y2="149" stroke="black" stroke-width="0.3" stroke-dasharray="2,3"/></g>
+	<g class="link-bc"><line x1="161" y1="47" x2="171" y2="95" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/></g>
+	<g class="link-ef"><line x1="31" y1="118" x2="46" y2="149" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/></g>
 
 {:else if index === 6}
 	<!-- Due Diligence: Concentric circles with sweep -->
-	<circle class="ants" cx="100" cy="100" r="20" stroke="black" stroke-width="0.5" stroke-dasharray="2,3"/>
-	<circle cx="100" cy="100" r="40" stroke="black" stroke-width="0.7"/>
-	<circle cx="100" cy="100" r="60" stroke="black" stroke-width="0.7"/>
-	<circle class="ants-rev" cx="100" cy="100" r="80" stroke="black" stroke-width="0.5" stroke-dasharray="3,3"/>
-	<path class="sweep-arc" d="M 100,20 A 80,80 0 0,1 174,68" stroke="black" stroke-width="2.5"/>
-	<path class="sweep-arc" d="M 100,40 A 60,60 0 0,1 152,72" stroke="black" stroke-width="1.8"/>
-	<circle cx="100" cy="100" r="2" fill="black"/>
-	<circle cx="100" cy="20" r="1.5" fill="black"/>
-	<circle cx="174" cy="68" r="1.5" fill="black"/>
-	<circle cx="140" cy="100" r="1.5" fill="black"/>
+	<circle class="ants" cx="100" cy="100" r="20" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,3"/>
+	<circle cx="100" cy="100" r="40" stroke="currentColor" stroke-width="0.7"/>
+	<circle cx="100" cy="100" r="60" stroke="currentColor" stroke-width="0.7"/>
+	<circle class="ants-rev" cx="100" cy="100" r="80" stroke="currentColor" stroke-width="0.5" stroke-dasharray="3,3"/>
+	<path class="sweep-arc" d="M 100,20 A 80,80 0 0,1 174,68" stroke="currentColor" stroke-width="2.5"/>
+	<path class="sweep-arc" d="M 100,40 A 60,60 0 0,1 152,72" stroke="currentColor" stroke-width="1.8"/>
+	<circle cx="100" cy="100" r="2" fill="currentColor"/>
+	<circle cx="100" cy="20" r="1.5" fill="currentColor"/>
+	<circle cx="174" cy="68" r="1.5" fill="currentColor"/>
+	<circle cx="140" cy="100" r="1.5" fill="currentColor"/>
 
 {:else if index === 7}
 	<!-- Enrichment: Vertically stacked isometric layers -->
 	<g class="enrich-layer-1">
-		<path class="ants" d="M 100,28 L 170,58 L 100,88 L 30,58 Z" stroke="black" stroke-width="0.5" stroke-dasharray="3,3"/>
-		<circle cx="135" cy="43" r="1.5" fill="black"/>
+		<path class="ants" d="M 100,28 L 170,58 L 100,88 L 30,58 Z" stroke="currentColor" stroke-width="0.5" stroke-dasharray="3,3"/>
+		<circle cx="135" cy="43" r="1.5" fill="currentColor"/>
 	</g>
 	<g class="enrich-layer-2">
-		<path d="M 100,58 L 170,88 L 100,118 L 30,88 Z" stroke="black" stroke-width="0.7"/>
-		<circle cx="130" cy="71" r="1.5" fill="black"/>
+		<path d="M 100,58 L 170,88 L 100,118 L 30,88 Z" stroke="currentColor" stroke-width="0.7"/>
+		<circle cx="130" cy="71" r="1.5" fill="currentColor"/>
 	</g>
 	<g class="enrich-layer-3">
-		<path d="M 100,88 L 170,118 L 100,148 L 30,118 Z" stroke="black" stroke-width="0.8"/>
-		<circle cx="70" cy="101" r="1.5" fill="black"/>
+		<path d="M 100,88 L 170,118 L 100,148 L 30,118 Z" stroke="currentColor" stroke-width="0.8"/>
+		<circle cx="70" cy="101" r="1.5" fill="currentColor"/>
 	</g>
 	<g class="enrich-layer-4">
-		<path d="M 100,118 L 170,148 L 100,178 L 30,148 Z" stroke="black" stroke-width="1"/>
-		<circle cx="120" cy="127" r="1.5" fill="black"/>
-		<circle cx="80" cy="169" r="1.5" fill="black"/>
+		<path d="M 100,118 L 170,148 L 100,178 L 30,148 Z" stroke="currentColor" stroke-width="1"/>
+		<circle cx="120" cy="127" r="1.5" fill="currentColor"/>
+		<circle cx="80" cy="169" r="1.5" fill="currentColor"/>
 	</g>
-	<line x1="100" y1="20" x2="100" y2="185" stroke="black" stroke-width="0.4" stroke-dasharray="2,3"/>
+	<line x1="100" y1="20" x2="100" y2="185" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
 {/if}
 </svg>
 
@@ -175,7 +175,7 @@
 		stroke: white;
 	}
 
-	.hovered [fill="black"] {
+	.hovered [fill="currentColor"] {
 		fill: white;
 	}
 
