@@ -1,6 +1,6 @@
 # Superextra Landing Page
 
-AI-native market intelligence and competitor benchmarking platform for the restaurant industry. Prerendered static SvelteKit site deployed to Firebase Hosting.
+AI-native market intelligence and competitor benchmarking for the restaurant industry. Four layers: data sources → platform → AI agents → human experts. Prerendered static SvelteKit site deployed to Firebase Hosting.
 
 ## Commands
 
@@ -12,6 +12,10 @@ AI-native market intelligence and competitor benchmarking platform for the resta
 
 - Name is **Superextra** — not SuperExtra, Super Extra, or SUPEREXTRA
 - Avoid "you/your" — product-focused, Apple-style, minimalistic tone
+- Four layers: data sources → platform → AI agents → human experts — lead with outcomes, not any single layer
+- "Platform" is valid but shouldn't headline — it's one layer, not the whole product
+- Use "service", "delivered", "combined" — don't lead with "platform" or "dashboard" alone
+- CTAs: "Get Started" (not "Get Access")
 - Refer to `docs/copy.md`, `docs/notes.md`, `docs/scope.md` when working on copy or features
 
 ## Stack
