@@ -11,6 +11,14 @@
 	import MarketingV1 from '$lib/components/mockups/MarketingV1.svelte';
 	import MarketingV2 from '$lib/components/mockups/MarketingV2.svelte';
 	import MarketingV4 from '$lib/components/mockups/MarketingV4.svelte';
+	import GuestIntelligenceV1 from '$lib/components/mockups/GuestIntelligenceV1.svelte';
+	import GuestIntelligenceV2 from '$lib/components/mockups/GuestIntelligenceV2.svelte';
+	import GuestIntelligenceV3 from '$lib/components/mockups/GuestIntelligenceV3.svelte';
+	import LocationTrafficV1 from '$lib/components/mockups/LocationTrafficV1.svelte';
+	import LocationTrafficV2 from '$lib/components/mockups/LocationTrafficV2.svelte';
+	import LocationTrafficV3 from '$lib/components/mockups/LocationTrafficV3.svelte';
+	import OperationsV1 from '$lib/components/mockups/OperationsV1.svelte';
+	import OperationsV2 from '$lib/components/mockups/OperationsV2.svelte';
 
 	const cards = [
 		{
@@ -42,6 +50,36 @@
 				{ label: 'V1 — Insight Cards', component: RevenueSalesV1 },
 				{ label: 'V2 — Revenue Overview Chart', component: RevenueSalesV2 },
 				{ label: 'V3 — Channel Breakdown', component: RevenueSalesV3 }
+			]
+		},
+		{
+			id: 'guest-intelligence',
+			title: 'Guest Intelligence',
+			desc: 'Sentiment patterns, guest segments, and review insights — decoded from every touchpoint.',
+			mockupEdge: true,
+			variants: [
+				{ label: 'V1 — Sentiment Heatmap', component: GuestIntelligenceV1 },
+				{ label: 'V2 — Reviewer Profile', component: GuestIntelligenceV2 },
+				{ label: 'V3 — Review Insights', component: GuestIntelligenceV3 }
+			]
+		},
+		{
+			id: 'location-traffic',
+			title: 'Location & Traffic',
+			desc: 'Foot traffic patterns, location density, and proximity insights across the competitive landscape.',
+			variants: [
+				{ label: 'V1 — Heat Map Grid', component: LocationTrafficV1 },
+				{ label: 'V2 — Daily Patterns', component: LocationTrafficV2, mockupEdge: true },
+				{ label: 'V3 — Traffic Heatmap', component: LocationTrafficV3, mockupEdge: true }
+			]
+		},
+		{
+			id: 'operations',
+			title: 'Operations',
+			desc: 'Labor efficiency, supply chain health, and operational benchmarks — tracked across every location.',
+			variants: [
+				{ label: 'V1 — Workforce', component: OperationsV1 },
+				{ label: 'V2 — Supplier Costs', component: OperationsV2 }
 			]
 		},
 		{
@@ -120,8 +158,8 @@
 	}
 
 	.card-text {
-		height: 5.25rem;
-		margin-bottom: 2.5rem;
+		height: 6rem;
+		margin-bottom: 2rem;
 		overflow: hidden;
 		flex-shrink: 0;
 	}

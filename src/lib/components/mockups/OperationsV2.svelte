@@ -1,0 +1,203 @@
+<script lang="ts">
+	const stats = [
+		{ label: 'Chicken Breast', sub: '$4.20/lb', change: '+8%', trend: [3.5, 3.9, 4.2], stroke: '#f472b6' },
+		{ label: 'Ground Beef', sub: '$5.85/lb', change: '+12%', trend: [4.8, 5.3, 5.85], stroke: '#f472b6' },
+		{ label: 'Romaine Lettuce', sub: '$1.90/hd', change: '−3%', trend: [2.1, 2.0, 1.9], stroke: '#06b6d4' },
+		{ label: 'Cooking Oil', sub: '$38.50/cs', change: '+15%', trend: [30, 34, 38.5], stroke: '#f472b6' },
+		{ label: 'Mozzarella', sub: '$3.40/lb', change: '+2%', trend: [3.3, 3.35, 3.4], stroke: '#f472b6' }
+	];
+
+	function sparklinePoints(trend: number[]): string {
+		const min = Math.min(...trend);
+		const max = Math.max(...trend);
+		const range = max - min || 1;
+
+		return trend
+			.map((v, i) => {
+				const x = i * 15;
+				const y = 11 - ((v - min) / range) * 10;
+				return `${x},${y}`;
+			})
+			.join(' ');
+	}
+</script>
+
+<div class="top-bar">
+	<div class="bar-icon"><span></span><span></span></div>
+	<span class="bar-label">Supplier Costs</span>
+	<div class="period-selector">
+		<span class="period">3M</span>
+		<span class="period active">6M</span>
+		<span class="period">1Y</span>
+	</div>
+</div>
+
+<div class="body">
+	<div class="hero">
+		<div class="hero-main">
+			<span class="hero-value">$48.2K</span>
+			<span class="hero-change">+4.1%</span>
+		</div>
+		<div class="hero-sub">Monthly Avg. COGS</div>
+	</div>
+
+	<div class="stat-list">
+		{#each stats as s, i}
+			<div class="stat-row" class:first={i === 0}>
+				<div class="stat-name">
+					<span class="stat-label">{s.label}</span>
+					<span class="stat-sub">{s.sub}</span>
+				</div>
+				<svg class="sparkline" viewBox="0 0 30 12" fill="none">
+					<polyline
+						points={sparklinePoints(s.trend)}
+						stroke={s.stroke}
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
+				<span class="net-badge" style="color: {s.stroke}; background: {s.stroke}14;">
+					{s.change}
+				</span>
+			</div>
+		{/each}
+	</div>
+</div>
+
+<style>
+	.top-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.25rem;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+	}
+
+	.bar-icon {
+		display: flex;
+		gap: 2px;
+	}
+	.bar-icon span {
+		display: block;
+		width: 2.5px;
+		height: 12px;
+		background: rgba(0, 0, 0, 0.25);
+		border-radius: 1px;
+	}
+
+	.bar-label {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: rgba(0, 0, 0, 0.6);
+	}
+
+	.period-selector {
+		display: flex;
+		gap: 0;
+		background: rgba(0, 0, 0, 0.04);
+		border-radius: 0.25rem;
+		overflow: hidden;
+		margin-left: auto;
+	}
+
+	.period {
+		font-size: 0.5625rem;
+		font-weight: 500;
+		color: rgba(0, 0, 0, 0.3);
+		padding: 0.2rem 0.4rem;
+		cursor: default;
+	}
+
+	.period.active {
+		background: rgba(0, 0, 0, 0.06);
+		color: rgba(0, 0, 0, 0.5);
+		border-radius: 0.25rem;
+	}
+
+	.body {
+		padding: 0.875rem 1.25rem 0.75rem;
+	}
+
+	.hero {
+		margin-bottom: 0.875rem;
+	}
+
+	.hero-main {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+	}
+
+	.hero-value {
+		font-size: 1.75rem;
+		font-weight: 700;
+		color: rgba(0, 0, 0, 0.88);
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+	}
+
+	.hero-change {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: #f472b6;
+	}
+
+	.hero-sub {
+		font-size: 0.6875rem;
+		color: rgba(0, 0, 0, 0.35);
+		margin-top: 0.2rem;
+	}
+
+	.stat-list {
+		display: flex;
+		flex-direction: column;
+		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		padding-top: 0.5rem;
+	}
+
+	.stat-row {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		padding: 0.4rem 0;
+		border-top: 1px solid rgba(0, 0, 0, 0.04);
+	}
+
+	.stat-row.first {
+		border-top: none;
+	}
+
+	.stat-name {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+	}
+
+	.stat-label {
+		font-size: 0.6875rem;
+		font-weight: 500;
+		color: rgba(0, 0, 0, 0.55);
+	}
+
+	.stat-sub {
+		font-size: 0.5625rem;
+		color: rgba(0, 0, 0, 0.3);
+	}
+
+	.sparkline {
+		width: 2.5rem;
+		height: 1rem;
+		flex-shrink: 0;
+	}
+
+	.net-badge {
+		font-size: 0.625rem;
+		font-weight: 600;
+		padding: 0.2rem 0.45rem;
+		border-radius: 0.3rem;
+		flex-shrink: 0;
+		line-height: 1.2;
+	}
+</style>
