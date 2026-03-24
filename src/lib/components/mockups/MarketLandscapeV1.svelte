@@ -45,14 +45,14 @@
 <MockupBar label="Market Activity" icon="barchart">
 	<div class="header-legend">
 		<span class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>Open</span>
-		<span class="legend-item"><span class="legend-dot" style="background:rgba(0,0,0,0.15)"></span>Close</span>
+		<span class="legend-item"><span class="legend-dot" style="background:rgba(var(--mockup-text),0.15)"></span>Close</span>
 	</div>
 </MockupBar>
 
 <div class="body">
 	<svg class="chart" viewBox="0 0 {viewW} {viewH}" preserveAspectRatio="none">
 		{#each gridLines as line}
-			<line x1={padX} y1={line.y} x2={viewW - padX} y2={line.y} stroke="rgba(0,0,0,0.06)" stroke-width="0.5" stroke-dasharray="3,3" />
+			<line x1={padX} y1={line.y} x2={viewW - padX} y2={line.y} style="stroke: rgba(var(--mockup-text), 0.06)" stroke-width="0.5" stroke-dasharray="3,3" />
 		{/each}
 		<polyline
 			points={openingsPoints}
@@ -65,7 +65,7 @@
 		<polyline
 			points={closingsPoints}
 			fill="none"
-			stroke="rgba(0,0,0,0.15)"
+			style="stroke: rgba(var(--mockup-text), 0.15)"
 			stroke-width="1.5"
 			stroke-linecap="round"
 			stroke-linejoin="round"
@@ -112,7 +112,7 @@
 		align-items: center;
 		gap: 0.2rem;
 		font-size: 0.5625rem;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 	}
 
 	.legend-dot {
@@ -124,7 +124,7 @@
 
 	/* ── Category rows ── */
 	.category-section {
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		border-top: 1px solid rgba(var(--mockup-text), 0.04);
 		margin-top: 0.625rem;
 		padding-top: 0.625rem;
 	}
@@ -147,7 +147,7 @@
 		flex: 1;
 		font-size: 0.8125rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.75);
+		color: rgba(var(--mockup-text), 0.75);
 	}
 
 	.category-pair {
@@ -163,11 +163,11 @@
 	}
 
 	.pair-slash {
-		color: rgba(0, 0, 0, 0.12);
+		color: rgba(var(--mockup-text), 0.12);
 	}
 
 	.pair-close {
-		color: rgba(0, 0, 0, 0.2);
+		color: rgba(var(--mockup-text), 0.2);
 	}
 
 </style>

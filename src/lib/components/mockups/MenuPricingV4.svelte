@@ -71,7 +71,7 @@
 				y1={yTickY(tick)}
 				x2={viewW - padRight}
 				y2={yTickY(tick)}
-				stroke="rgba(0,0,0,0.15)"
+				style="stroke: rgba(var(--mockup-text), 0.15)"
 				stroke-width="0.5"
 				stroke-dasharray="2,2.5"
 			/>
@@ -153,13 +153,13 @@
 
 	.chart .y-label {
 		font-size: 6px;
-		fill: rgba(0, 0, 0, 0.5);
+		fill: rgba(var(--mockup-text), 0.5);
 		font-weight: 400;
 	}
 
 	.chart .bar-value {
 		font-size: 6.5px;
-		fill: rgba(0, 0, 0, 0.65);
+		fill: rgba(var(--mockup-text), 0.65);
 		font-weight: 600;
 	}
 
@@ -169,12 +169,12 @@
 
 	.chart .bar-name {
 		font-size: 5.5px;
-		fill: rgba(0, 0, 0, 0.5);
+		fill: rgba(var(--mockup-text), 0.5);
 		font-weight: 400;
 	}
 
 	.chart .bar-name-featured {
-		fill: rgba(0, 0, 0, 0.85);
+		fill: rgba(var(--mockup-text), 0.85);
 		font-weight: 600;
 	}
 
@@ -185,7 +185,7 @@
 		gap: 0.375rem;
 		padding-top: 0.625rem;
 		margin-top: 0.625rem;
-		border-top: 1px solid rgba(0, 0, 0, 0.06);
+		border-top: 1px solid rgba(var(--mockup-text), 0.06);
 	}
 
 	.filters-row {
@@ -199,9 +199,9 @@
 		gap: 0.3rem;
 		font-size: 0.6875rem;
 		font-weight: 450;
-		color: rgba(0, 0, 0, 0.5);
-		background: rgba(0, 0, 0, 0.03);
-		border: 1px solid rgba(0, 0, 0, 0.07);
+		color: rgba(var(--mockup-text), 0.5);
+		background: rgba(var(--mockup-text), 0.03);
+		border: 1px solid rgba(var(--mockup-text), 0.07);
 		border-radius: 9999px;
 		padding: 0.25rem 0.625rem;
 		cursor: default;

@@ -1,9 +1,9 @@
 <div class="wrapper">
 	<div class="top-bar">
 		<svg class="bar-svg" viewBox="0 0 12 12" fill="none">
-			<rect x="1" y="7" width="2" height="4" fill="rgba(0,0,0,0.2)"/>
-			<rect x="5" y="4" width="2" height="7" fill="rgba(0,0,0,0.25)"/>
-			<rect x="9" y="1" width="2" height="10" fill="rgba(0,0,0,0.3)"/>
+			<rect x="1" y="7" width="2" height="4" style="fill: rgba(var(--mockup-text), 0.2)"/>
+			<rect x="5" y="4" width="2" height="7" style="fill: rgba(var(--mockup-text), 0.25)"/>
+			<rect x="9" y="1" width="2" height="10" style="fill: rgba(var(--mockup-text), 0.3)"/>
 		</svg>
 		<span class="bar-label">Review Insights</span>
 	</div>
@@ -56,7 +56,7 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.875rem 1rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+		border-bottom: 1px solid rgba(var(--mockup-text), 0.04);
 	}
 
 	.bar-svg {
@@ -67,7 +67,7 @@
 	.bar-label {
 		font-size: 0.875rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
+		color: rgba(var(--mockup-text), 0.6);
 	}
 
 	/* ── Topic strip ── */
@@ -76,13 +76,13 @@
 		align-items: center;
 		gap: 0.375rem;
 		padding: 0.625rem 1rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+		border-bottom: 1px solid rgba(var(--mockup-text), 0.04);
 	}
 
 	.topic-header {
 		font-size: 0.5625rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 		text-transform: uppercase;
 		letter-spacing: 0.03em;
 		margin-right: 0.125rem;
@@ -139,13 +139,13 @@
 	.narrative-text {
 		font-size: 0.75rem;
 		line-height: 1.65;
-		color: rgba(0, 0, 0, 0.5);
+		color: rgba(var(--mockup-text), 0.5);
 		margin-bottom: 0;
 	}
 
 	.narrative-text :global(strong) {
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.75);
+		color: rgba(var(--mockup-text), 0.75);
 	}
 
 	/* ── Footer ── */
@@ -158,6 +158,6 @@
 
 	.footer-sources {
 		font-size: 0.625rem;
-		color: rgba(0, 0, 0, 0.25);
+		color: rgba(var(--mockup-text), 0.25);
 	}
 </style>

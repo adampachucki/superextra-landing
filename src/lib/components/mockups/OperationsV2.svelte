@@ -68,7 +68,7 @@
 	.period-selector {
 		display: flex;
 		gap: 0;
-		background: rgba(0, 0, 0, 0.04);
+		background: rgba(var(--mockup-text), 0.04);
 		border-radius: 0.25rem;
 		overflow: hidden;
 		margin-left: auto;
@@ -77,14 +77,14 @@
 	.period {
 		font-size: 0.5625rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 		padding: 0.2rem 0.4rem;
 		cursor: default;
 	}
 
 	.period.active {
-		background: rgba(0, 0, 0, 0.06);
-		color: rgba(0, 0, 0, 0.5);
+		background: rgba(var(--mockup-text), 0.06);
+		color: rgba(var(--mockup-text), 0.5);
 		border-radius: 0.25rem;
 	}
 
@@ -105,7 +105,7 @@
 	.hero-value {
 		font-size: 1.75rem;
 		font-weight: 700;
-		color: rgba(0, 0, 0, 0.88);
+		color: rgba(var(--mockup-text), 0.88);
 		line-height: 1.1;
 		letter-spacing: -0.02em;
 	}
@@ -118,14 +118,14 @@
 
 	.hero-sub {
 		font-size: 0.6875rem;
-		color: rgba(0, 0, 0, 0.35);
+		color: rgba(var(--mockup-text), 0.35);
 		margin-top: 0.2rem;
 	}
 
 	.stat-list {
 		display: flex;
 		flex-direction: column;
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		border-top: 1px solid rgba(var(--mockup-text), 0.04);
 		padding-top: 0.5rem;
 	}
 
@@ -134,7 +134,7 @@
 		align-items: center;
 		gap: 0.625rem;
 		padding: 0.4rem 0;
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		border-top: 1px solid rgba(var(--mockup-text), 0.04);
 	}
 
 	.stat-row.first {
@@ -151,12 +151,12 @@
 	.stat-label {
 		font-size: 0.6875rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.55);
+		color: rgba(var(--mockup-text), 0.55);
 	}
 
 	.stat-sub {
 		font-size: 0.5625rem;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 	}
 
 	.sparkline {

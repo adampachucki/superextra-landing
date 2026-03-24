@@ -79,7 +79,7 @@
 				y1={line.y}
 				x2={viewW - padR}
 				y2={line.y}
-				stroke="rgba(0,0,0,0.06)"
+				style="stroke: rgba(var(--mockup-text), 0.06)"
 				stroke-width="0.4"
 				stroke-dasharray="2,2"
 			/>
@@ -126,7 +126,7 @@
 	.year-pills {
 		display: flex;
 		gap: 0;
-		background: rgba(0, 0, 0, 0.04);
+		background: rgba(var(--mockup-text), 0.04);
 		border-radius: 0.25rem;
 		overflow: hidden;
 		margin-left: auto;
@@ -135,14 +135,14 @@
 	.year-pill {
 		font-size: 0.5625rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 		padding: 0.2rem 0.4rem;
 		cursor: default;
 	}
 
 	.year-pill.active {
-		background: rgba(0, 0, 0, 0.06);
-		color: rgba(0, 0, 0, 0.5);
+		background: rgba(var(--mockup-text), 0.06);
+		color: rgba(var(--mockup-text), 0.5);
 		border-radius: 0.25rem;
 	}
 
@@ -161,7 +161,7 @@
 	.hero-value {
 		font-size: 1.75rem;
 		font-weight: 700;
-		color: rgba(0, 0, 0, 0.88);
+		color: rgba(var(--mockup-text), 0.88);
 		line-height: 1.1;
 		letter-spacing: -0.02em;
 	}
@@ -175,7 +175,7 @@
 
 	.hero-subtitle {
 		font-size: 0.6875rem;
-		color: rgba(0, 0, 0, 0.35);
+		color: rgba(var(--mockup-text), 0.35);
 		margin-top: 0.2rem;
 		margin-bottom: 0.75rem;
 	}
@@ -191,7 +191,7 @@
 	.chart :global(.axis-label),
 	.axis-label {
 		font-size: 5px;
-		fill: rgba(0, 0, 0, 0.35);
+		fill: rgba(var(--mockup-text), 0.35);
 		font-weight: 400;
 	}
 
@@ -199,7 +199,7 @@
 	.metric-tabs {
 		display: flex;
 		gap: 0;
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
+		border-top: 1px solid rgba(var(--mockup-text), 0.04);
 		padding-top: 0.625rem;
 	}
 
@@ -208,14 +208,14 @@
 		text-align: center;
 		font-size: 0.6875rem;
 		font-weight: 500;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 		padding: 0.375rem 0;
 		border-radius: 0.375rem;
 		cursor: default;
 	}
 
 	.metric-tab.active {
-		background: rgba(0, 0, 0, 0.05);
-		color: rgba(0, 0, 0, 0.6);
+		background: rgba(var(--mockup-text), 0.05);
+		color: rgba(var(--mockup-text), 0.6);
 	}
 </style>

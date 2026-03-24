@@ -57,11 +57,11 @@
 - Commercial rent prices & trends
 - Supplier pricing trends
 
-> **Platform capabilities:** Curated industry report library for market analysis & benchmarking. AI-powered agents for custom market data queries & analysis.
+> **How it's delivered:** Data sources aggregated into a single platform. AI agents for interactive analysis and monitoring. Human experts delivering tailored research reports and briefings.
 
 ---
 
-## Platform Coverage Summary
+## Intelligence Coverage Summary
 
 | Category             | Covers                                                                                                           |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -71,6 +71,6 @@
 | Revenue & Financials | revenue estimates, check size, RevPAS, occupancy, food/labor costs, margins                                      |
 | Delivery & Digital   | platform market share, dynamic pricing, digital ordering, social media, marketing spend                          |
 | Operations           | workforce availability & costs, real estate, supply chain pricing                                                |
-| Research & Tools     | curated report library, AI-powered market analysis agents                                                        |
+| Research & Delivery  | tailored research reports, AI agents for follow-up analysis and monitoring                                        |
 
 ---

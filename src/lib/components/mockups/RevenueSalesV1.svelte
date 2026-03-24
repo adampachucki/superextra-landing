@@ -90,20 +90,20 @@
 	}
 
 	.bubble-user {
-		background: rgba(0, 0, 0, 0.04);
-		color: rgba(0, 0, 0, 0.7);
+		background: rgba(var(--mockup-text), 0.04);
+		color: rgba(var(--mockup-text), 0.7);
 		border-bottom-right-radius: 0.25rem;
 	}
 
 	.bubble-ai {
 		background: linear-gradient(135deg, rgba(99, 102, 241, 0.07), rgba(6, 182, 212, 0.06));
-		color: rgba(0, 0, 0, 0.7);
+		color: rgba(var(--mockup-text), 0.7);
 		border-top-left-radius: 0.25rem;
 	}
 
 	.bubble strong {
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.85);
+		color: rgba(var(--mockup-text), 0.85);
 	}
 
 	/* ── Status indicator ── */
@@ -126,7 +126,7 @@
 
 	.status-text {
 		font-size: 0.625rem;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 		font-style: italic;
 	}
 
@@ -136,21 +136,21 @@
 	}
 
 	.prompt-box {
-		background: #fff;
+		background: rgb(var(--mockup-bg));
 		border-radius: 1rem;
 		padding: 0.75rem 0.875rem 0.5rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.625rem;
 		box-shadow:
-			0 1px 3px rgba(0, 0, 0, 0.06),
-			0 4px 12px rgba(0, 0, 0, 0.04);
-		border: 1px solid rgba(0, 0, 0, 0.04);
+			0 1px 3px rgba(var(--mockup-text), 0.06),
+			0 4px 12px rgba(var(--mockup-text), 0.04);
+		border: 1px solid rgba(var(--mockup-text), 0.04);
 	}
 
 	.prompt-text {
 		font-size: 0.8125rem;
-		color: rgba(0, 0, 0, 0.82);
+		color: rgba(var(--mockup-text), 0.82);
 		line-height: 1.5;
 	}
 
@@ -158,7 +158,7 @@
 		display: inline-block;
 		width: 1.5px;
 		height: 0.875rem;
-		background: rgba(0, 0, 0, 0.7);
+		background: rgba(var(--mockup-text), 0.7);
 		margin-left: 1px;
 		vertical-align: text-bottom;
 	}
@@ -179,13 +179,13 @@
 	.meta-icon {
 		width: 0.875rem;
 		height: 0.875rem;
-		color: rgba(0, 0, 0, 0.2);
+		color: rgba(var(--mockup-text), 0.2);
 	}
 
 	.meta-label {
 		font-size: 0.6875rem;
 		font-weight: 450;
-		color: rgba(0, 0, 0, 0.22);
+		color: rgba(var(--mockup-text), 0.22);
 		margin-right: 0.375rem;
 	}
 
@@ -193,11 +193,11 @@
 		width: 1.5rem;
 		height: 1.5rem;
 		border-radius: 50%;
-		background: rgba(0, 0, 0, 0.06);
+		background: rgba(var(--mockup-text), 0.06);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: rgba(0, 0, 0, 0.3);
+		color: rgba(var(--mockup-text), 0.3);
 	}
 
 	.prompt-send svg {

@@ -38,7 +38,7 @@
 	.username {
 		font-size: 0.8125rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.8);
+		color: rgba(var(--mockup-text), 0.8);
 	}
 
 	.post-image {
@@ -63,13 +63,13 @@
 	.action-icon {
 		width: 16px;
 		height: 16px;
-		color: rgba(0, 0, 0, 0.5);
+		color: rgba(var(--mockup-text), 0.5);
 	}
 
 	.ig-likes {
 		font-size: 0.75rem;
 		font-weight: 600;
-		color: rgba(0, 0, 0, 0.7);
+		color: rgba(var(--mockup-text), 0.7);
 		padding: 0.1rem 0.75rem 0.625rem;
 	}
 </style>

@@ -127,20 +127,20 @@
 <div class="min-h-screen bg-cream py-12">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<header class="mb-12">
-			<a href="/" class="text-sm text-black/40 hover:text-black/60 transition-colors">&larr; Back to site</a>
-			<h1 class="mt-4 text-3xl font-medium text-black">Card Mockup Variants</h1>
-			<p class="mt-2 text-base text-black/50">Compare design directions for each platform card.</p>
+			<a href="/" class="text-sm text-black/40 dark:text-white/40 hover:text-black/60 dark:hover:text-white/60 transition-colors">&larr; Back to site</a>
+			<h1 class="mt-4 text-3xl font-medium text-black dark:text-white">Card Mockup Variants</h1>
+			<p class="mt-2 text-base text-black/50 dark:text-white/50">Compare design directions for each platform card.</p>
 		</header>
 
 		{#each cards as card}
 			<section class="mb-16">
-				<h2 class="text-xl font-medium text-black mb-2">{card.title}</h2>
-				<p class="text-sm text-black/50 mb-8">{card.desc}</p>
+				<h2 class="text-xl font-medium text-black dark:text-white mb-2">{card.title}</h2>
+				<p class="text-sm text-black/50 dark:text-white/50 mb-8">{card.desc}</p>
 
 				<div class="grid grid-cols-1 gap-5 md:grid-cols-3">
 					{#each card.variants as variant}
 						<div class="card-wrapper">
-							<p class="text-xs font-medium text-black/40 mb-3 uppercase tracking-wide">{variant.label}</p>
+							<p class="text-xs font-medium text-black/40 dark:text-white/40 mb-3 uppercase tracking-wide">{variant.label}</p>
 							<PlatformCard title={card.title} desc={card.desc} mode={variantMode(card, variant)}>
 								<variant.component />
 							</PlatformCard>

@@ -11,10 +11,10 @@
 <Navbar />
 
 <article class="mx-auto max-w-[720px] px-6 pt-32 pb-20">
-	<h1 class="text-3xl font-medium tracking-tight text-black">Privacy Policy</h1>
-	<p class="mt-2 text-sm text-black/40">Last updated: March 10, 2026</p>
+	<h1 class="text-3xl font-medium tracking-tight text-black dark:text-white">Privacy Policy</h1>
+	<p class="mt-2 text-sm text-black/40 dark:text-white/40">Last updated: March 10, 2026</p>
 
-	<div class="prose prose-sm prose-neutral mt-10 max-w-none text-black/60 prose-headings:text-black prose-headings:font-medium prose-h2:text-lg prose-h2:mt-10 prose-h2:mb-4 prose-p:leading-relaxed prose-li:leading-relaxed prose-a:text-black prose-a:underline">
+	<div class="prose prose-sm prose-neutral dark:prose-invert mt-10 max-w-none text-black/60 dark:text-white/60 prose-headings:text-black dark:prose-headings:text-white prose-headings:font-medium prose-h2:text-lg prose-h2:mt-10 prose-h2:mb-4 prose-p:leading-relaxed prose-li:leading-relaxed prose-a:text-black dark:prose-a:text-white prose-a:underline">
 		<h2>1. Introduction</h2>
 		<p>Superextra ("we", "our", or "us") operates the superextra.ai website and the Superextra platform (collectively, the "Service"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website or use our Service.</p>
 		<p>By accessing or using the Service, you agree to this Privacy Policy. If you do not agree, please do not use the Service.</p>

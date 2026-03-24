@@ -2,8 +2,24 @@
 
 ## Context
 
-Superxtra is an intelligence and benchmarking platform for the restaurant industry.
-We may call it "Palantir for the restaurant industry". It's punchy but not factually correct - the difference is that we bring the market data so that customers can analyze their perfromance against it and make better decisions. We don't conenct with customers' own data.
+Superextra is an AI-enhanced intelligence service for the restaurant industry. Not a pure SaaS dashboard and not a pure service — four layers working together: data sources, a single platform, AI agents, and human experts.
+
+We may call it "Palantir for the restaurant industry". It's punchy but not factually correct — the difference is that we bring the market data so that customers can analyze their performance against it and make better decisions. We don't connect with customers' own data.
+
+## Positioning
+
+Inspired by the "services as the new software" thesis (see Sequoia: https://sequoiacap.com/article/services-the-new-software/) — AI + human expertise delivering outcomes, not just a tool to log into.
+
+**Four layers:**
+1. **Data sources** — dozens of public and proprietary sources aggregated and validated
+2. **Platform** — single intelligence platform where it all comes together
+3. **AI agents** — conversational agents for analysis, follow-up questions, and monitoring
+4. **Human experts** — research team delivering tailored reports and briefings
+
+- **Hierarchy in copy**: lead with the intelligence and outcomes, not with any single layer — all four work together
+- **"Platform" is valid** but shouldn't be the headline — it's one layer, not the whole product
+- **Language**: use "service", "delivered", "combined" — don't lead with "platform" or "dashboard" alone
+- **CTAs**: "Get Started" (not "Get Access" which implies SaaS onboarding)
 
 ## Branding
 

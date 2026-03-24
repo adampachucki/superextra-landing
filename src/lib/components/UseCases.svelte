@@ -164,7 +164,7 @@
 				onmouseleave={() => hoveredIndex = -1}
 			>
 				<div
-					class="relative mb-5 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl bg-cream-100"
+					class="relative mb-5 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl border-[0.5px] border-black/[0.03] dark:border-white/[0.03] bg-cream-100"
 				>
 					<CardCanvas
 						active={effectiveHovered === i}
@@ -174,11 +174,11 @@
 					<UseCaseGraphics index={i} hovered={effectiveHovered === i} />
 				</div>
 
-				<p class="mb-1 text-xs font-medium text-black/25">{useCase.audience}</p>
-				<h3 class="mb-2 text-lg font-medium tracking-[-0.01em] text-black">
+				<p class="mb-1 text-xs font-medium text-black/25 dark:text-white/25">{useCase.audience}</p>
+				<h3 class="mb-2 text-lg font-medium tracking-[-0.01em] text-black dark:text-white">
 					{useCase.title}
 				</h3>
-				<p class="pr-4 text-sm leading-snug text-black/60">
+				<p class="pr-4 text-sm leading-snug text-black/60 dark:text-white/60">
 					{useCase.description}
 				</p>
 			</div>
