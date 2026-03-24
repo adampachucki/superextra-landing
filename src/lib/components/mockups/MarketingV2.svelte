@@ -13,14 +13,18 @@
 		<div class="post-image" style="background: linear-gradient(135deg, #f59e0b, #ec4899);"></div>
 		<div class="post-footer">
 			<div class="ig-actions">
-				<svg class="action-icon" viewBox="0 0 20 20" fill="none">
-					<path d="M10 17S2 12 2 7a4 4 0 018 0 4 4 0 018 0c0 5-8 10-8 10z" fill="#ec4899" opacity="0.85"/>
+				<!-- Heart (outline) -->
+				<svg class="action-icon" viewBox="0 0 24 24" fill="none">
+					<path d="M16.792 3.904A4.989 4.989 0 0121.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-1.834-1.527-4.303-3.752C5.152 14.08 2.5 12.194 2.5 9.122a4.989 4.989 0 014.708-5.218 4.21 4.21 0 013.675 1.941c.84 1.175.616 1.175 1.455 0a4.21 4.21 0 013.675-1.941z" fill="#ed4956"/>
 				</svg>
-				<svg class="action-icon" viewBox="0 0 20 20" fill="none">
-					<path d="M2 3a1 1 0 011-1h14a1 1 0 011 1v10a1 1 0 01-1 1H6l-4 3V3z" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="1.5"/>
+				<!-- Comment (speech bubble) -->
+				<svg class="action-icon" viewBox="0 0 24 24" fill="none">
+					<path d="M20.656 17.008a9.993 9.993 0 10-3.59 3.615L22 22z" stroke="rgba(0,0,0,0.7)" stroke-width="1.8" stroke-linejoin="round"/>
 				</svg>
-				<svg class="action-icon" viewBox="0 0 20 20" fill="none">
-					<path d="M14 10l-4-5v3H3v4h7v3l4-5z" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="1.5"/>
+				<!-- Share (paper plane) -->
+				<svg class="action-icon" viewBox="0 0 24 24" fill="none">
+					<line x1="22" y1="3" x2="9.218" y2="10.083" stroke="rgba(0,0,0,0.7)" stroke-width="1.8"/>
+					<polygon points="22,3 15,22 9.218,10.083 2,9" fill="none" stroke="rgba(0,0,0,0.7)" stroke-width="1.8" stroke-linejoin="round"/>
 				</svg>
 			</div>
 			<span class="likes-count">2.847 likes</span>
@@ -97,7 +101,6 @@
 		position: absolute;
 		width: 52%;
 		border-radius: 0.75rem;
-		border: 1px solid rgba(0, 0, 0, 0.06);
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 		overflow: hidden;
 		display: flex;
@@ -108,7 +111,7 @@
 	.card-left {
 		left: -8%;
 		top: 2rem;
-		z-index: 1;
+		z-index: 2;
 		background: #ffffff;
 	}
 
@@ -123,7 +126,7 @@
 	.card-right {
 		right: -16%;
 		top: 3.5rem;
-		z-index: 2;
+		z-index: 1;
 		background: #ffffff;
 	}
 
