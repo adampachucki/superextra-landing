@@ -43,7 +43,7 @@
 	}
 </script>
 
-<MockupBar label="Price Index" />
+<MockupBar label="Price Index" icon="list" />
 
 <div class="body">
 	<svg class="chart" viewBox="0 0 {viewW} {viewH}">

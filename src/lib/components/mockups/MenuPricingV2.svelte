@@ -17,7 +17,7 @@
 	}
 </script>
 
-<MockupBar label="Price Positioning" />
+<MockupBar label="Price Positioning" icon="list" />
 
 <div class="body">
 	{#each items as item}

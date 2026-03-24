@@ -23,7 +23,7 @@
 	}
 </script>
 
-<MockupBar label="Supplier Costs">
+<MockupBar label="Supplier Costs" icon="user">
 	<div class="period-selector">
 		<span class="period">3M</span>
 		<span class="period active">6M</span>

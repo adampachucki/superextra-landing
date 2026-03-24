@@ -22,7 +22,7 @@
 	}
 </script>
 
-<MockupBar label="Workforce">
+<MockupBar label="Workforce" icon="user">
 	<div class="period-selector">
 		<span class="period">3M</span>
 		<span class="period active">6M</span>

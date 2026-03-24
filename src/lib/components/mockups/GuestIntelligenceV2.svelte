@@ -38,7 +38,7 @@
 	});
 </script>
 
-<MockupBar label="Reviewer Profile" compact>
+<MockupBar label="Reviewer Profile" icon="chat" compact>
 	<div class="range-pills">
 		<span class="range-pill">7d</span>
 		<span class="range-pill active">14d</span>

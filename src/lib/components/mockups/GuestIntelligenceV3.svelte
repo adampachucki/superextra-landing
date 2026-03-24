@@ -1,8 +1,8 @@
 <div class="wrapper">
 	<div class="top-bar">
-		<div class="bar-icon">
-			<span></span><span></span>
-		</div>
+		<svg class="bar-svg" viewBox="0 0 12 12" fill="none">
+			<path d="M2,1 H10 Q11,1 11,2 V7 Q11,8 10,8 H5 L2.5,11 V8 H2 Q1,8 1,7 V2 Q1,1 2,1 Z" stroke="rgba(0,0,0,0.3)" stroke-width="1.1"/>
+		</svg>
 		<span class="bar-label">Review Insights</span>
 	</div>
 
@@ -57,16 +57,9 @@
 		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 	}
 
-	.bar-icon {
-		display: flex;
-		gap: 2px;
-	}
-	.bar-icon span {
-		display: block;
-		width: 2.5px;
-		height: 12px;
-		background: rgba(0, 0, 0, 0.25);
-		border-radius: 1px;
+	.bar-svg {
+		width: 13px;
+		height: 13px;
 	}
 
 	.bar-label {

@@ -58,7 +58,7 @@
 	}
 </script>
 
-<MockupBar label="Category Trends">
+<MockupBar label="Category Trends" icon="trend">
 	<div class="period-selector">
 		<span class="period">3M</span>
 		<span class="period active">6M</span>
