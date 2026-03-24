@@ -7,7 +7,7 @@
 		<div class="msg msg-ai">
 			<div class="avatar"></div>
 			<p class="bubble bubble-ai">
-				Average entrée price sits at <strong>$27</strong>, about 12% below the local competitive set. Delivery menus carry a <strong>$3.40</strong> markup on average, with appetizers showing the widest gap.
+				Average entrée price sits at <strong>€27</strong>, about 12% below the local competitive set. Delivery menus carry a <strong>€3.40</strong> markup on average, with appetizers showing the widest gap.
 			</p>
 		</div>
 

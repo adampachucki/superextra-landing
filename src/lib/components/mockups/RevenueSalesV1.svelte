@@ -7,7 +7,7 @@
 		<div class="msg msg-ai">
 			<div class="avatar"></div>
 			<p class="bubble bubble-ai">
-				Monthly revenue averaging <strong>$142K</strong>, with consistent 12% year-over-year growth. Delivery channel growing at <strong>18%</strong>, now accounting for 28% of total revenue.
+				Monthly revenue averaging <strong>€142K</strong>, with consistent 12% year-over-year growth. Delivery channel growing at <strong>18%</strong>, now accounting for 28% of total revenue.
 			</p>
 		</div>
 

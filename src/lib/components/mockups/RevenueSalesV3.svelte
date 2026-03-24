@@ -56,7 +56,7 @@
 			<span class="stat-dot" style="background: {ch.color}"></span>
 			<div class="stat-text">
 				<span class="stat-label">{ch.name}</span>
-				<span class="stat-value">${ch.value}K</span>
+				<span class="stat-value">€{ch.value}K</span>
 			</div>
 		</div>
 	{/each}

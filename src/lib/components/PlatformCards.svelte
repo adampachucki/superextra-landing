@@ -5,6 +5,7 @@
 	import RevenueSalesV2 from './mockups/RevenueSalesV2.svelte';
 	import MarketingV2 from './mockups/MarketingV2.svelte';
 	import GuestIntelligenceV2 from './mockups/GuestIntelligenceV2.svelte';
+	import OperationsV1 from './mockups/OperationsV1.svelte';
 </script>
 
 <section class="border-t border-cream-200 py-24 md:py-32">
@@ -139,31 +140,7 @@
 				</div>
 
 				<div class="mockup">
-					<div class="mockup-bar">
-						<div class="bar-icon">
-							<span></span><span></span>
-						</div>
-						<span class="bar-label">Cost Benchmarks</span>
-					</div>
-
-					<div class="mockup-body">
-						{#each [
-							{ name: 'Labor', amount: '$8.2K' },
-							{ name: 'Rent', amount: '$4.5K' },
-							{ name: 'Supply Chain', amount: '$6.1K' },
-							{ name: 'Marketing', amount: '$2.3K' },
-							{ name: 'Utilities', amount: '$1.8K' },
-							{ name: 'Insurance', amount: '$1.2K' }
-						] as cost, i}
-							{#if i > 0}
-								<div class="border-t border-black/[0.04]"></div>
-							{/if}
-							<div class="cost-row">
-								<span class="list-name">{cost.name}</span>
-								<span class="cost-amount">{cost.amount}</span>
-							</div>
-						{/each}
-					</div>
+					<OperationsV1 />
 				</div>
 			</div>
 

@@ -59,7 +59,7 @@
 		<p>Access to certain features of the Service may require payment of fees. If applicable:</p>
 		<ul>
 			<li>Fees are as described on our pricing page or in your subscription agreement.</li>
-			<li>All fees are quoted in USD unless otherwise stated and are non-refundable except as required by law or as expressly stated in these Terms.</li>
+			<li>All fees are quoted in EUR unless otherwise stated and are non-refundable except as required by law or as expressly stated in these Terms.</li>
 			<li>We reserve the right to change fees upon 30 days' notice.</li>
 			<li>Failure to pay may result in suspension or termination of access.</li>
 		</ul>

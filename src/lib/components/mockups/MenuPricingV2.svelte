@@ -28,7 +28,7 @@
 		<div class="row">
 			<div class="row-header">
 				<span class="item-name">{item.name}</span>
-				<span class="item-avg">${item.avg} avg</span>
+				<span class="item-avg">€{item.avg} avg</span>
 			</div>
 			<div class="range-bar">
 				<div class="track"></div>

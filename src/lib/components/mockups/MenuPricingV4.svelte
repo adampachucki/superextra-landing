@@ -65,7 +65,7 @@
 				y={yTickY(tick) + 2}
 				text-anchor="end"
 				class="y-label"
-			>${tick}</text>
+			>€{tick}</text>
 		{/each}
 
 		<!-- Horizontal dotted grid lines -->
@@ -100,7 +100,7 @@
 					y={barY(bar.value) - 4}
 					text-anchor="middle"
 					class="bar-value featured-value"
-				>${bar.value.toFixed(2)}</text>
+				>€{bar.value.toFixed(2)}</text>
 			{/if}
 
 			<!-- Quarter label below -->
