@@ -45,7 +45,7 @@
 
 		<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-px overflow-hidden border-t border-cream-200 bg-cream-200">
 			{#each sources as source}
-				<div class="group flex items-center justify-center bg-white px-3 py-5 sm:px-5 sm:py-8" title="{source.name}">
+				<div class="group flex items-center justify-center bg-cream px-3 py-5 sm:px-5 sm:py-8" title="{source.name}">
 					<img
 						src="/logos/{source.logo}.svg"
 						alt="{source.name}"
@@ -55,7 +55,7 @@
 			{/each}
 
 			<!-- "And more" cell -->
-			<div class="flex items-center justify-center bg-white px-3 py-5 sm:px-5 sm:py-8">
+			<div class="flex items-center justify-center bg-cream px-3 py-5 sm:px-5 sm:py-8">
 				<span class="text-sm text-black/40">...and more</span>
 			</div>
 		</div>

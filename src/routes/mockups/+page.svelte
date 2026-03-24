@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PlatformCard from '$lib/components/PlatformCard.svelte';
 	import MarketLandscapeV1 from '$lib/components/mockups/MarketLandscapeV1.svelte';
 	import MarketLandscapeV2 from '$lib/components/mockups/MarketLandscapeV2.svelte';
 	import MarketLandscapeV3 from '$lib/components/mockups/MarketLandscapeV3.svelte';
@@ -20,7 +21,25 @@
 	import OperationsV1 from '$lib/components/mockups/OperationsV1.svelte';
 	import OperationsV2 from '$lib/components/mockups/OperationsV2.svelte';
 
-	const cards = [
+	type CardMode = 'standard' | 'edge' | 'free';
+
+	interface Variant {
+		label: string;
+		component: typeof MarketLandscapeV1;
+		mockupEdge?: boolean;
+		noMockup?: boolean;
+	}
+
+	interface Card {
+		id: string;
+		title: string;
+		desc: string;
+		mockupEdge?: boolean;
+		noMockup?: boolean;
+		variants: Variant[];
+	}
+
+	const cards: Card[] = [
 		{
 			id: 'market-landscape',
 			title: 'Market Landscape',
@@ -65,7 +84,7 @@
 		},
 		{
 			id: 'location-traffic',
-			title: 'Location & Traffic',
+			title: 'Location & Foot Traffic',
 			desc: 'Measured and projected foot traffic, demographic profiles, purchasing power, and visit time distribution.',
 			variants: [
 				{ label: 'V1 — Heat Map Grid', component: LocationTrafficV1 },
@@ -93,13 +112,19 @@
 			]
 		}
 	];
+
+	function variantMode(card: Card, variant: Variant): CardMode {
+		if (variant.noMockup || card.noMockup) return 'free';
+		if (variant.mockupEdge ?? card.mockupEdge) return 'edge';
+		return 'standard';
+	}
 </script>
 
 <svelte:head>
 	<title>Mockups — Superextra</title>
 </svelte:head>
 
-<div class="min-h-screen bg-[#fefdfb] py-12">
+<div class="min-h-screen bg-cream py-12">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<header class="mb-12">
 			<a href="/" class="text-sm text-black/40 hover:text-black/60 transition-colors">&larr; Back to site</a>
@@ -116,21 +141,9 @@
 					{#each card.variants as variant}
 						<div class="card-wrapper">
 							<p class="text-xs font-medium text-black/40 mb-3 uppercase tracking-wide">{variant.label}</p>
-							<div class="card">
-								<div class="card-text">
-									<h3 class="title">{card.title}</h3>
-									<p class="desc">{card.desc}</p>
-								</div>
-								{#if ('noMockup' in variant && variant.noMockup) || ('noMockup' in card && card.noMockup)}
-									<div class="card-body">
-										<variant.component />
-									</div>
-								{:else}
-									<div class="mockup" class:mockup-edge={'mockupEdge' in variant ? variant.mockupEdge : card.mockupEdge}>
-										<variant.component />
-									</div>
-								{/if}
-							</div>
+							<PlatformCard title={card.title} desc={card.desc} mode={variantMode(card, variant)}>
+								<variant.component />
+							</PlatformCard>
 						</div>
 					{/each}
 				</div>
@@ -143,68 +156,5 @@
 	.card-wrapper {
 		display: flex;
 		flex-direction: column;
-	}
-
-	.card {
-		border-radius: 1rem;
-		background: var(--color-cream-100);
-		border: 1px solid rgba(0, 0, 0, 0.03);
-		padding: 1.75rem 1.75rem;
-		padding-bottom: 0;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-		height: clamp(25rem, 30vw, 28rem);
-	}
-
-	.card-text {
-		height: 6rem;
-		margin-bottom: 2rem;
-		overflow: hidden;
-		flex-shrink: 0;
-	}
-	@media (max-width: 767px) {
-		.card-text {
-			height: auto;
-			overflow: visible;
-		}
-	}
-
-	.title {
-		font-size: 1.25rem;
-		font-weight: 500;
-		color: #000;
-	}
-
-	.desc {
-		font-size: 0.875rem;
-		line-height: 1.5;
-		margin-top: 0.25rem;
-		color: rgba(0, 0, 0, 0.6);
-	}
-
-	.mockup {
-		border-radius: 0.75rem 0.75rem 0 0;
-		background: #fff;
-		border: 1px solid rgba(0, 0, 0, 0.08);
-		border-bottom: none;
-		margin-bottom: -3.5rem;
-		display: flex;
-		flex-direction: column;
-		flex: 1;
-	}
-
-	.mockup-edge {
-		border-radius: 0.75rem 0 0 0;
-		margin-right: -1.75rem;
-		border-right: none;
-	}
-
-	.card-body {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-		margin: 0 -1.75rem;
 	}
 </style>
