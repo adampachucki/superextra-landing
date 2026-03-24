@@ -78,6 +78,12 @@
 		flex: 1;
 	}
 
+	@media (max-width: 767px) {
+		.body {
+			transform: scale(1.4);
+		}
+	}
+
 	.grid-map {
 		display: grid;
 		grid-template-columns: repeat(7, 1fr);
