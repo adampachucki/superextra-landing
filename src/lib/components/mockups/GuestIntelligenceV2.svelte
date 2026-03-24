@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MockupBar from './MockupBar.svelte';
 	const segments = [
 		{ name: 'Local Critics', value: 4860, color: '#6366f1' },
 		{ name: 'Local Visitors', value: 3120, color: '#f472b6' },
@@ -37,17 +38,13 @@
 	});
 </script>
 
-<div class="top-bar">
-	<div class="bar-icon">
-		<span></span><span></span>
-	</div>
-	<span class="bar-label">Reviewer Profile</span>
+<MockupBar label="Reviewer Profile" compact>
 	<div class="range-pills">
 		<span class="range-pill">7d</span>
 		<span class="range-pill active">14d</span>
 		<span class="range-pill">30d</span>
 	</div>
-</div>
+</MockupBar>
 
 <div class="summary">
 	{#each segments as seg}
@@ -105,33 +102,6 @@
 </div>
 
 <style>
-	/* ── Top bar ── */
-	.top-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 0.875rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-	}
-
-	.bar-icon {
-		display: flex;
-		gap: 2px;
-	}
-	.bar-icon span {
-		display: block;
-		width: 2.5px;
-		height: 12px;
-		background: rgba(0, 0, 0, 0.25);
-		border-radius: 1px;
-	}
-
-	.bar-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
-	}
-
 	/* ── Range pills ── */
 	.range-pills {
 		display: flex;

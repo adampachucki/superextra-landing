@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MockupBar from './MockupBar.svelte';
 	const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 	const values = [90, 105, 130, 115, 150, 170, 160, 185, 155, 200, 215, 230];
 
@@ -49,17 +50,13 @@
 	const dotPointY = toY(values[dotIndex]);
 </script>
 
-<div class="top-bar">
-	<div class="bar-icon">
-		<span></span><span></span>
-	</div>
-	<span class="bar-label">Financial Overview</span>
+<MockupBar label="Financial Overview">
 	<div class="year-pills">
 		<span class="year-pill">2023</span>
 		<span class="year-pill">2024</span>
 		<span class="year-pill active">2025</span>
 	</div>
-</div>
+</MockupBar>
 
 <div class="body">
 	<div class="hero">
@@ -126,33 +123,6 @@
 </div>
 
 <style>
-	/* ── Top bar ── */
-	.top-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1.25rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-	}
-
-	.bar-icon {
-		display: flex;
-		gap: 2px;
-	}
-	.bar-icon span {
-		display: block;
-		width: 2.5px;
-		height: 12px;
-		background: rgba(0, 0, 0, 0.25);
-		border-radius: 1px;
-	}
-
-	.bar-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
-	}
-
 	.year-pills {
 		display: flex;
 		gap: 0;

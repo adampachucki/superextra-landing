@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MockupBar from './MockupBar.svelte';
 	const grid: number[][] = [
 		[0, 1, 1, 2, 1, 0, 0],
 		[1, 2, 3, 3, 2, 1, 0],
@@ -32,10 +33,7 @@
 </script>
 
 <div class="outer">
-<div class="top-bar">
-	<div class="bar-icon"><span></span><span></span></div>
-	<span class="bar-label">Location Density</span>
-</div>
+<MockupBar label="Location Density" />
 
 <div class="body">
 	<div class="grid-map">
@@ -70,32 +68,6 @@
 		flex-direction: column;
 		flex: 1;
 		overflow: hidden;
-	}
-
-	.top-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1.25rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-	}
-
-	.bar-icon {
-		display: flex;
-		gap: 2px;
-	}
-	.bar-icon span {
-		display: block;
-		width: 2.5px;
-		height: 12px;
-		background: rgba(0, 0, 0, 0.25);
-		border-radius: 1px;
-	}
-
-	.bar-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
 	}
 
 	.body {

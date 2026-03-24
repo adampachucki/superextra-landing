@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MockupBar from './MockupBar.svelte';
 	const channels = [
 		{ name: 'Dine-in', value: 160, color: '#6366f1' },
 		{ name: 'Delivery', value: 88, color: '#f472b6' },
@@ -38,17 +39,13 @@
 	});
 </script>
 
-<div class="top-bar">
-	<div class="bar-icon">
-		<span></span><span></span>
-	</div>
-	<span class="bar-label">Channel Breakdown</span>
+<MockupBar label="Channel Breakdown" compact>
 	<div class="month-selector">
 		<span class="month-arrow">&#8249;</span>
 		<span class="month-name">Nov</span>
 		<span class="month-arrow">&#8250;</span>
 	</div>
-</div>
+</MockupBar>
 
 <div class="summary">
 	{#each channels as ch}
@@ -110,33 +107,6 @@
 </div>
 
 <style>
-	/* ── Top bar ── */
-	.top-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 0.875rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-	}
-
-	.bar-icon {
-		display: flex;
-		gap: 2px;
-	}
-	.bar-icon span {
-		display: block;
-		width: 2.5px;
-		height: 12px;
-		background: rgba(0, 0, 0, 0.25);
-		border-radius: 1px;
-	}
-
-	.bar-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
-	}
-
 	/* ── Month selector ── */
 	.month-selector {
 		display: flex;

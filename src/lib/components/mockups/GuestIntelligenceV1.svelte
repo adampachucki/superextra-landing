@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MockupBar from './MockupBar.svelte';
 	const categories = ['Food Quality', 'Service', 'Ambiance', 'Value'];
 	const months = ['Nov', 'Dec', 'Jan', 'Feb'];
 
@@ -33,17 +34,13 @@
 </script>
 
 <div class="wrapper">
-	<div class="top-bar">
-		<div class="bar-icon">
-			<span></span><span></span>
-		</div>
-		<span class="bar-label">Guest Sentiment</span>
+	<MockupBar label="Guest Sentiment" compact>
 		<div class="range-pills">
 			<span class="range-pill">3m</span>
 			<span class="range-pill active">6m</span>
 			<span class="range-pill">1y</span>
 		</div>
-	</div>
+	</MockupBar>
 
 	<div class="body">
 		<div class="heatmap">
@@ -95,33 +92,6 @@
 		flex-direction: column;
 		flex: 1;
 		min-width: 115%;
-	}
-
-	/* ── Top bar ── */
-	.top-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 0.875rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-	}
-
-	.bar-icon {
-		display: flex;
-		gap: 2px;
-	}
-	.bar-icon span {
-		display: block;
-		width: 2.5px;
-		height: 12px;
-		background: rgba(0, 0, 0, 0.25);
-		border-radius: 1px;
-	}
-
-	.bar-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
 	}
 
 	.range-pills {

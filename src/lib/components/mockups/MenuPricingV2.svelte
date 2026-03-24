@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MockupBar from './MockupBar.svelte';
 	const items = [
 		{ name: 'Negroni', you: 12, avg: 14, min: 9, max: 18 },
 		{ name: 'Espresso Martini', you: 15, avg: 16, min: 11, max: 21 },
@@ -16,12 +17,7 @@
 	}
 </script>
 
-<div class="top-bar">
-	<div class="bar-icon">
-		<span></span><span></span>
-	</div>
-	<span class="bar-label">Price Positioning</span>
-</div>
+<MockupBar label="Price Positioning" />
 
 <div class="body">
 	{#each items as item}
@@ -53,33 +49,6 @@
 </div>
 
 <style>
-	/* ── Top bar ── */
-	.top-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1.25rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-	}
-
-	.bar-icon {
-		display: flex;
-		gap: 2px;
-	}
-	.bar-icon span {
-		display: block;
-		width: 2.5px;
-		height: 12px;
-		background: rgba(0, 0, 0, 0.25);
-		border-radius: 1px;
-	}
-
-	.bar-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
-	}
-
 	/* ── Body ── */
 	.body {
 		display: flex;

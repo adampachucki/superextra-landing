@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MockupBar from './MockupBar.svelte';
 	const stats = [
 		{ label: 'Avg. Salary (BOH)', sub: '€17.40/hr', trend: [15, 16, 17], change: '+6%', stroke: '#06b6d4' },
 		{ label: 'Avg. Salary (FOH)', sub: '€14.20/hr', trend: [13, 14, 14], change: '+3%', stroke: '#06b6d4' },
@@ -21,15 +22,13 @@
 	}
 </script>
 
-<div class="top-bar">
-	<div class="bar-icon"><span></span><span></span></div>
-	<span class="bar-label">Workforce</span>
+<MockupBar label="Workforce">
 	<div class="period-selector">
 		<span class="period">3M</span>
 		<span class="period active">6M</span>
 		<span class="period">1Y</span>
 	</div>
-</div>
+</MockupBar>
 
 <div class="body">
 	<div class="hero">
@@ -67,32 +66,6 @@
 </div>
 
 <style>
-	.top-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1.25rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-	}
-
-	.bar-icon {
-		display: flex;
-		gap: 2px;
-	}
-	.bar-icon span {
-		display: block;
-		width: 2.5px;
-		height: 12px;
-		background: rgba(0, 0, 0, 0.25);
-		border-radius: 1px;
-	}
-
-	.bar-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
-	}
-
 	.period-selector {
 		display: flex;
 		gap: 0;

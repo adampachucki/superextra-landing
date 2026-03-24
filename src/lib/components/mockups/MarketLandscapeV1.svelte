@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MockupBar from './MockupBar.svelte';
 	const openings = [8, 12, 10, 14, 13, 14];
 	const closings = [10, 8, 12, 9, 8, 7];
 
@@ -41,16 +42,12 @@
 	];
 </script>
 
-<div class="top-bar">
-	<div class="bar-icon">
-		<span></span><span></span>
-	</div>
-	<span class="bar-label">Market Activity</span>
+<MockupBar label="Market Activity">
 	<div class="header-legend">
 		<span class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>Open</span>
 		<span class="legend-item"><span class="legend-dot" style="background:rgba(0,0,0,0.15)"></span>Close</span>
 	</div>
-</div>
+</MockupBar>
 
 <div class="body">
 	<svg class="chart" viewBox="0 0 {viewW} {viewH}" preserveAspectRatio="none">
@@ -92,33 +89,6 @@
 </div>
 
 <style>
-	/* ── Top bar ── */
-	.top-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1.25rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-	}
-
-	.bar-icon {
-		display: flex;
-		gap: 2px;
-	}
-	.bar-icon span {
-		display: block;
-		width: 2.5px;
-		height: 12px;
-		background: rgba(0, 0, 0, 0.25);
-		border-radius: 1px;
-	}
-
-	.bar-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
-	}
-
 	/* ── Body ── */
 	.body {
 		padding: 0.75rem 1.25rem;

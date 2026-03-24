@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MockupBar from './MockupBar.svelte';
 	const categories = [
 		{ name: 'Vegan', locations: 127, trend: [4, 7, 11], stroke: '#06b6d4', grad: 'from-[#6ee7b7] to-[#06b6d4]' },
 		{ name: 'Asian Fusion', locations: 203, trend: [5, 6, 8], stroke: '#6366f1', grad: 'from-[#06b6d4] to-[#6366f1]' },
@@ -21,17 +22,13 @@
 	}
 </script>
 
-<div class="top-bar">
-	<div class="bar-icon">
-		<span></span><span></span>
-	</div>
-	<span class="bar-label">Category Trends</span>
+<MockupBar label="Category Trends" compact>
 	<div class="period-selector">
 		<span class="period">3M</span>
 		<span class="period active">6M</span>
 		<span class="period">1Y</span>
 	</div>
-</div>
+</MockupBar>
 
 <div class="body">
 	{#each categories as cat, i}
@@ -56,32 +53,6 @@
 
 
 <style>
-	.top-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 0.875rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-	}
-
-	.bar-icon {
-		display: flex;
-		gap: 2px;
-	}
-	.bar-icon span {
-		display: block;
-		width: 2.5px;
-		height: 12px;
-		background: rgba(0, 0, 0, 0.25);
-		border-radius: 1px;
-	}
-
-	.bar-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.6);
-	}
-
 	.period-selector {
 		display: flex;
 		gap: 0;
