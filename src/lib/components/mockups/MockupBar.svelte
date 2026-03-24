@@ -63,17 +63,17 @@
 	}
 	.bar-icon {
 		display: flex;
-		gap: 2px;
+		gap: 0.125rem;
 	}
 	.bar-icon span {
 		display: block;
-		width: 2.5px;
-		height: 12px;
+		width: 0.156rem;
+		height: 0.75rem;
 		background: rgba(0, 0, 0, 0.25);
 	}
 	.bar-svg {
-		width: 13px;
-		height: 13px;
+		width: 0.8125rem;
+		height: 0.8125rem;
 	}
 	.bar-label {
 		font-size: 0.8125rem;

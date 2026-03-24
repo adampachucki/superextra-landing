@@ -96,7 +96,7 @@
 	.post-card {
 		position: absolute;
 		width: 52%;
-		border-radius: 12px;
+		border-radius: 0.75rem;
 		border: 1px solid rgba(0, 0, 0, 0.06);
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 		overflow: hidden;
@@ -138,8 +138,8 @@
 	/* ── Avatars ── */
 	.avatar {
 		flex-shrink: 0;
-		width: 20px;
-		height: 20px;
+		width: 1.25rem;
+		height: 1.25rem;
 		border-radius: 50%;
 		display: flex;
 		align-items: center;
@@ -173,7 +173,7 @@
 		font-weight: 500;
 		color: rgba(0, 0, 0, 0.4);
 		background: rgba(0, 0, 0, 0.06);
-		border-radius: 2px;
+		border-radius: 0.125rem;
 		padding: 0.1em 0.35em;
 		white-space: nowrap;
 	}
@@ -194,8 +194,8 @@
 	}
 
 	.play-btn {
-		width: 24px;
-		height: 24px;
+		width: 1.5rem;
+		height: 1.5rem;
 		flex-shrink: 0;
 		position: relative;
 		z-index: 1;
@@ -203,8 +203,8 @@
 
 	.tt-side {
 		position: absolute;
-		right: 5px;
-		bottom: 32px;
+		right: 0.3125rem;
+		bottom: 2rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
@@ -215,12 +215,12 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 1px;
+		gap: 0.0625rem;
 	}
 
 	.tt-action svg {
-		width: 14px;
-		height: 14px;
+		width: 0.875rem;
+		height: 0.875rem;
 		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
 	}
 
@@ -270,8 +270,8 @@
 	}
 
 	.action-icon {
-		width: 11px;
-		height: 11px;
+		width: 0.6875rem;
+		height: 0.6875rem;
 		flex-shrink: 0;
 	}
 

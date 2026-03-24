@@ -283,8 +283,8 @@
 	}
 
 	.legend-dot {
-		width: 5px;
-		height: 5px;
+		width: 0.3125rem;
+		height: 0.3125rem;
 		border-radius: 50%;
 		flex-shrink: 0;
 	}

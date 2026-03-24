@@ -142,8 +142,8 @@
 	}
 
 	.stat-dot {
-		width: 6px;
-		height: 6px;
+		width: 0.375rem;
+		height: 0.375rem;
 		border-radius: 50%;
 		flex-shrink: 0;
 	}
@@ -192,7 +192,7 @@
 		font-weight: 500;
 		fill: rgba(0, 0, 0, 0.3);
 		text-transform: uppercase;
-		letter-spacing: 0.5px;
+		letter-spacing: 0.03125rem;
 	}
 
 	.chart-area :global(.overflow-text) {

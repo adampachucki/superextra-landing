@@ -86,20 +86,20 @@
 		display: grid;
 		grid-template-columns: repeat(7, 1fr);
 		grid-template-rows: repeat(5, 1fr);
-		gap: 4px;
+		gap: 0.25rem;
 	}
 
 	.cell {
 		aspect-ratio: 1;
-		border-radius: 3px;
+		border-radius: 0.1875rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 	}
 
 	.dot {
-		width: 5px;
-		height: 5px;
+		width: 0.3125rem;
+		height: 0.3125rem;
 		border-radius: 50%;
 		display: block;
 	}
