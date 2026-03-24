@@ -89,7 +89,7 @@
 
 	.bubble {
 		font-size: 0.75rem;
-		line-height: 1.5;
+		line-height: 1.3;
 		padding: 0.75rem 1rem;
 		border-radius: 1rem;
 	}
@@ -151,7 +151,7 @@
 
 	/* ── Floating prompt ── */
 	.prompt-float {
-		padding: 0.5rem 1rem 0.5rem 1rem;
+		padding: 1.25rem 1rem 0.5rem 1rem;
 	}
 
 	.prompt-box {
