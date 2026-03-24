@@ -5,6 +5,7 @@
 	import RevenueSalesV2 from './mockups/RevenueSalesV2.svelte';
 	import MarketingV2 from './mockups/MarketingV2.svelte';
 	import GuestIntelligenceV2 from './mockups/GuestIntelligenceV2.svelte';
+	import LocationTrafficV1 from './mockups/LocationTrafficV1.svelte';
 	import OperationsV1 from './mockups/OperationsV1.svelte';
 </script>
 
@@ -33,7 +34,7 @@
 			<div class="card">
 				<div class="card-text">
 					<h3 class="title">Menu & Pricing</h3>
-					<p class="desc">How the market positions menus, at what price point, and how delivery shapes the landscape.</p>
+					<p class="desc">Trending items, price tracking, competitor menus, delivery markups, and promotional activity across the market.</p>
 				</div>
 
 				<div class="mockup mockup-edge">
@@ -45,7 +46,7 @@
 			<div class="card">
 				<div class="card-text">
 					<h3 class="title">Revenue & Sales</h3>
-					<p class="desc">Revenue estimates, seasonality patterns, and channel splits across the competitive set.</p>
+					<p class="desc">Revenue estimates, margin and food cost analysis, seasonality patterns, channel splits, and delivery platform market share.</p>
 				</div>
 
 				<div class="mockup mockup-edge">
@@ -57,7 +58,7 @@
 			<div class="card">
 				<div class="card-text">
 					<h3 class="title">Marketing & Digital</h3>
-					<p class="desc">Where budgets go, which channels drive results, and what tools the market relies on.</p>
+					<p class="desc">Social media activity, marketing channels, estimated ad spend, and tools and platforms in use across competitors.</p>
 				</div>
 
 				<div class="mockup-free">
@@ -69,7 +70,7 @@
 			<div class="card">
 				<div class="card-text">
 					<h3 class="title">Guest Intelligence</h3>
-					<p class="desc">What guests think, want, and expect — from real reviews and behavioural data.</p>
+					<p class="desc">Review sentiment, local guest preferences, tourist vs local mix, and payment method trends, all derived from real guest data.</p>
 				</div>
 
 				<div class="mockup mockup-edge">
@@ -81,54 +82,11 @@
 			<div class="card">
 				<div class="card-text">
 					<h3 class="title">Location & Foot Traffic</h3>
-					<p class="desc">Traffic patterns, demographics, purchasing power, and rent trends.</p>
+					<p class="desc">Measured and projected foot traffic, demographic profiles, purchasing power, and visit time distribution.</p>
 				</div>
 
-				<div class="mockup mockup-edge">
-					<div class="mockup-bar">
-						<div class="bar-icon">
-							<span></span><span></span>
-						</div>
-						<span class="bar-label">Foot Traffic Index</span>
-					</div>
-
-					<div class="mockup-body">
-						<div class="ht-grid">
-							<div class="ht-header">
-								<div class="ht-row-spacer"></div>
-								{#each ['Q1', 'Q2', 'Q3', 'Q4'] as period}
-									<div class="ht-col-head">{period}</div>
-								{/each}
-							</div>
-
-							{#each [
-								{ zone: 'Kollwitzplatz', scores: [8.4, 9.1, 9.5, 9.2] },
-								{ zone: 'Helmholtzpl.', scores: [6.8, 7.2, 7.5, 7.8] },
-								{ zone: 'Kastanienallee', scores: [5.2, 5.0, 5.8, 6.1] },
-								{ zone: 'Schönhauser', scores: [4.1, 4.5, 4.3, 4.8] }
-							] as row}
-								<div class="ht-row">
-									<div class="ht-row-label">{row.zone}</div>
-									{#each row.scores as s}
-										<div class="ht-cell" style="background:{s >= 9 ? 'rgba(99,102,241,0.55)' : s >= 8 ? 'rgba(99,102,241,0.35)' : s >= 7 ? 'rgba(6,182,212,0.35)' : s >= 6 ? 'rgba(6,182,212,0.2)' : s >= 5 ? 'rgba(244,114,182,0.25)' : 'rgba(244,114,182,0.4)'}">
-											{s.toFixed(1)}
-										</div>
-									{/each}
-								</div>
-							{/each}
-						</div>
-
-						<div class="ht-summary">
-							<div class="ht-summary-left">
-								<span class="ht-big">7.4</span>
-								<span class="ht-denom">/ 10</span>
-							</div>
-							<div class="ht-summary-right">
-								<span class="ht-change">+0.6</span>
-								<span class="ht-ctx">vs prior year</span>
-							</div>
-						</div>
-					</div>
+				<div class="mockup">
+					<LocationTrafficV1 />
 				</div>
 			</div>
 
@@ -136,7 +94,7 @@
 			<div class="card">
 				<div class="card-text">
 					<h3 class="title">Operations</h3>
-					<p class="desc">The real cost of running a restaurant — from staffing to supplier pricing.</p>
+					<p class="desc">Labor pool availability, salary benchmarks, job market activity, staff turnover, commercial rent, and supplier pricing.</p>
 				</div>
 
 				<div class="mockup">
@@ -163,8 +121,8 @@
 	}
 
 	.card-text {
-		height: 5.25rem;
-		margin-bottom: 2.5rem;
+		height: 6rem;
+		margin-bottom: 2rem;
 		overflow: hidden;
 		flex-shrink: 0;
 	}
@@ -416,95 +374,4 @@
 		color: rgba(0, 0, 0, 0.6);
 	}
 
-	/* ── Foot Traffic heatmap table ── */
-	.ht-grid {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-	}
-	.ht-header {
-		display: flex;
-		align-items: flex-end;
-		gap: 0.3rem;
-		padding-bottom: 0.25rem;
-	}
-	.ht-row-spacer {
-		width: 4.75rem;
-		flex-shrink: 0;
-	}
-	.ht-col-head {
-		flex: 1;
-		text-align: center;
-		font-size: 0.5625rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.35);
-	}
-	.ht-row {
-		display: flex;
-		align-items: center;
-		gap: 0.3rem;
-	}
-	.ht-row-label {
-		width: 4.75rem;
-		flex-shrink: 0;
-		font-size: 0.6875rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.55);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		text-align: right;
-		padding-right: 0.5rem;
-	}
-	.ht-cell {
-		flex: 1;
-		aspect-ratio: 1.3;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 0.25rem;
-		font-size: 0.625rem;
-		font-weight: 600;
-		color: rgba(0, 0, 0, 0.65);
-		line-height: 1;
-	}
-	.ht-summary {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		border-top: 1px solid rgba(0, 0, 0, 0.04);
-		margin-top: 0.75rem;
-		padding-top: 0.75rem;
-	}
-	.ht-summary-left {
-		display: flex;
-		align-items: baseline;
-		gap: 0.25rem;
-	}
-	.ht-big {
-		font-size: 1.5rem;
-		font-weight: 700;
-		color: rgba(0, 0, 0, 0.88);
-		line-height: 1.1;
-		letter-spacing: -0.02em;
-	}
-	.ht-denom {
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: rgba(0, 0, 0, 0.3);
-	}
-	.ht-summary-right {
-		display: flex;
-		align-items: baseline;
-		gap: 0.25rem;
-	}
-	.ht-change {
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: #0d9488;
-	}
-	.ht-ctx {
-		font-size: 0.625rem;
-		color: rgba(0, 0, 0, 0.3);
-	}
 </style>

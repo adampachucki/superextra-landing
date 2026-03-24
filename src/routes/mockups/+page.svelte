@@ -24,7 +24,7 @@
 		{
 			id: 'market-landscape',
 			title: 'Market Landscape',
-			desc: "Who's opening, closing, and gaining ground — benchmarked against relevant cohorts.",
+			desc: "Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market.",
 			variants: [
 				{ label: 'V1 — Line Chart + Activity', component: MarketLandscapeV1 },
 				{ label: 'V2 — Category Trends', component: MarketLandscapeV2 },
@@ -34,7 +34,7 @@
 		{
 			id: 'menu-pricing',
 			title: 'Menu & Pricing',
-			desc: 'How the market positions menus, at what price point, and how delivery shapes the landscape.',
+			desc: 'Trending items, price tracking, competitor menus, delivery markups, and promotional activity across the market.',
 			variants: [
 				{ label: 'V1 — Insight Cards', component: MenuPricingV1, mockupEdge: true },
 				{ label: 'V2 — Item Price Comparison', component: MenuPricingV2 },
@@ -44,7 +44,7 @@
 		{
 			id: 'revenue-sales',
 			title: 'Revenue & Sales',
-			desc: 'Revenue estimates, seasonality patterns, and channel splits across the competitive set.',
+			desc: 'Revenue estimates, margin and food cost analysis, seasonality patterns, channel splits, and delivery platform market share.',
 			mockupEdge: true,
 			variants: [
 				{ label: 'V1 — Insight Cards', component: RevenueSalesV1 },
@@ -55,7 +55,7 @@
 		{
 			id: 'guest-intelligence',
 			title: 'Guest Intelligence',
-			desc: 'Sentiment patterns, guest segments, and review insights — decoded from every touchpoint.',
+			desc: 'Review sentiment, local guest preferences, tourist vs local mix, and payment method trends, all derived from real guest data.',
 			mockupEdge: true,
 			variants: [
 				{ label: 'V1 — Sentiment Heatmap', component: GuestIntelligenceV1 },
@@ -66,7 +66,7 @@
 		{
 			id: 'location-traffic',
 			title: 'Location & Traffic',
-			desc: 'Foot traffic patterns, location density, and proximity insights across the competitive landscape.',
+			desc: 'Measured and projected foot traffic, demographic profiles, purchasing power, and visit time distribution.',
 			variants: [
 				{ label: 'V1 — Heat Map Grid', component: LocationTrafficV1 },
 				{ label: 'V2 — Daily Patterns', component: LocationTrafficV2, mockupEdge: true },
@@ -76,7 +76,7 @@
 		{
 			id: 'operations',
 			title: 'Operations',
-			desc: 'Labor efficiency, supply chain health, and operational benchmarks — tracked across every location.',
+			desc: 'Labor pool availability, salary benchmarks, job market activity, staff turnover, commercial rent, and supplier pricing.',
 			variants: [
 				{ label: 'V1 — Workforce', component: OperationsV1 },
 				{ label: 'V2 — Supplier Costs', component: OperationsV2 }
@@ -85,7 +85,7 @@
 		{
 			id: 'marketing-digital',
 			title: 'Marketing & Digital',
-			desc: 'Where budgets go, which channels drive results, and what tools the market relies on.',
+			desc: 'Social media activity, marketing channels, estimated ad spend, and tools and platforms in use across competitors.',
 			variants: [
 				{ label: 'V1 — Instagram Post', component: MarketingV1, noMockup: false },
 				{ label: 'V2 — Spread Cards', component: MarketingV2, noMockup: true },
