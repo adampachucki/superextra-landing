@@ -43,7 +43,7 @@
 		{
 			id: 'market-landscape',
 			title: 'Market Landscape',
-			desc: "Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market.",
+			desc: "Restaurant openings and closings, cuisine trends and top-performing venues continuously tracked and benchmarked.",
 			variants: [
 				{ label: 'V1 — Line Chart + Activity', component: MarketLandscapeV1 },
 				{ label: 'V2 — Category Trends', component: MarketLandscapeV2 },

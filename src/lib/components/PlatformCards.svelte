@@ -22,7 +22,7 @@
 
 		<div class="grid grid-cols-1 gap-5 md:grid-cols-[repeat(auto-fill,minmax(18rem,1fr))]">
 
-			<PlatformCard title="Market Landscape" desc="Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market. Deep narrative reports that turn raw signals into actionable insights." wide mode="edge">
+			<PlatformCard title="Market Landscape" desc="Restaurant openings and closings, cuisine trends and top-performing venues continuously tracked and benchmarked. With deep narrative reports that turn raw signals into actionable insights." wide mode="edge">
 				<MarketLandscapeWideV1 />
 			</PlatformCard>
 
