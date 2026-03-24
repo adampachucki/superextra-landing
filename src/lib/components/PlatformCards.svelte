@@ -68,7 +68,7 @@
 		<div class="mt-10 flex justify-center">
 			<button
 				onclick={() => expanded = !expanded}
-				class="cursor-pointer rounded-full border border-black/10 bg-cream-100 px-6 py-2.5 text-sm font-medium text-black/70 transition-all hover:border-black/20 hover:bg-cream-200 hover:text-black"
+				class="cursor-pointer rounded-full border border-black/10 px-6 py-2.5 text-sm font-medium text-black/70 transition-all hover:border-black/15 hover:text-black/90"
 			>
 				{expanded ? 'Show less' : 'Show more'}
 			</button>
