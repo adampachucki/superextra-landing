@@ -20,7 +20,7 @@
 			Seven intelligence layers, one platform. Built for every decision a restaurant makes.
 		</p>
 
-		<div class="grid grid-cols-1 gap-5 md:grid-cols-3">
+		<div class="grid grid-cols-1 gap-5 md:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]">
 
 			<PlatformCard title="Market Landscape" desc="Restaurant openings and closings, cuisine trends, competitor benchmarking, and top-performing venues — continuously tracked across the market. Deep narrative reports that turn raw signals into actionable insights." wide mode="edge">
 				<MarketLandscapeWideV1 />
@@ -48,7 +48,7 @@
 
 		</div>
 
-		<div class="mt-5 grid grid-cols-1 gap-5 overflow-hidden transition-all duration-500 ease-out md:grid-cols-3"
+		<div class="mt-5 grid grid-cols-1 gap-5 overflow-hidden transition-all duration-500 ease-out md:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]"
 			class:max-h-0={!expanded}
 			class:max-h-[55rem]={expanded}
 			class:md:max-h-[40rem]={expanded}

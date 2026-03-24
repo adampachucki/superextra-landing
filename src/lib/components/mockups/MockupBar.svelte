@@ -79,5 +79,10 @@
 		font-size: 0.8125rem;
 		font-weight: 500;
 		color: rgba(0, 0, 0, 0.6);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+		flex: 1;
 	}
 </style>

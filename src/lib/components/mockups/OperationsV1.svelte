@@ -153,6 +153,7 @@
 		font-size: 0.6875rem;
 		font-weight: 500;
 		color: rgba(0, 0, 0, 0.55);
+		white-space: nowrap;
 	}
 
 	.stat-sub {

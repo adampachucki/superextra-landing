@@ -135,5 +135,6 @@
 		font-size: 0.5rem;
 		color: rgba(0, 0, 0, 0.3);
 		margin-top: 0.05rem;
+		white-space: nowrap;
 	}
 </style>

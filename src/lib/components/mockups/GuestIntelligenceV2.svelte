@@ -158,6 +158,7 @@
 		color: rgba(0, 0, 0, 0.35);
 		font-weight: 500;
 		line-height: 1.2;
+		white-space: nowrap;
 	}
 
 	.stat-value {
