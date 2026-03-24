@@ -31,7 +31,7 @@
 	.card {
 		border-radius: 1rem;
 		background: var(--color-cream-100);
-		border: 1px solid rgba(0, 0, 0, 0.03);
+		border: 0.5px solid rgba(0, 0, 0, 0.03);
 		padding: 1.75rem 1.75rem;
 		padding-bottom: 0;
 		display: flex;
@@ -75,7 +75,7 @@
 	.mockup {
 		border-radius: 0.75rem 0.75rem 0 0;
 		background: #fff;
-		border: 1px solid rgba(0, 0, 0, 0.08);
+		border: 0.5px solid rgba(0, 0, 0, 0.08);
 		border-bottom: none;
 		margin-bottom: -3.5rem;
 		display: flex;
