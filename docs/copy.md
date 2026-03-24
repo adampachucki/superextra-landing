@@ -71,11 +71,6 @@ Variants for "Unrivaled data" (replacing the comma list with a sharper angle):
 3. Unrivaled data
    A living picture of the market assembled from dozens of sources — updated continuously, not quarterly.
 
-Variants for "Hyper-local focus" (replacing the comma list with a distinct angle from Platform):
+## Platform section
 
-1. Hyper-local focus
-   Every metric benchmarked down to the neighbourhood. Not city averages — the blocks and streets that actually shape a restaurant's trade.
-2. Hyper-local focus
-   Intelligence scoped to the streets around each location. National trends are noise — neighbourhood-level data is signal.
-3. Hyper-local focus
-   Neighbourhood-level benchmarks that reveal how conditions shift block by block — not broad metro summaries that obscure what matters.
+The principle: descriptions should explain what you learn or can do with the data, not re-list what the pills already name.
