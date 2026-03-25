@@ -1,7 +1,5 @@
 <script lang="ts">
 	import '../app.css';
-	import favicon from '$lib/assets/favicon.svg';
-	import { browser } from '$app/environment';
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import PreviewBadge from '$lib/components/PreviewBadge.svelte';
@@ -47,7 +45,6 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
 	<title>Superextra - Super Local Intelligence for Restaurants</title>
 	<meta name="description" content="Super local intelligence and competitor benchmarking platform for the restaurant industry. The extra advantage behind smarter decisions." />
 	<meta property="og:title" content="Superextra - Super Local Intelligence for Restaurants" />
