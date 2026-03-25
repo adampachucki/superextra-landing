@@ -217,7 +217,7 @@
 	}
 
 	.narrative {
-		font-size: 0.75rem;
+		font-size: 0.8125rem;
 		line-height: 1.7;
 		color: rgba(var(--mockup-text), 0.6);
 		margin-bottom: 1.5rem;

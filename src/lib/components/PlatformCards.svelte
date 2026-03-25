@@ -86,7 +86,7 @@
 			left: 0;
 			right: 0;
 			bottom: 0;
-			height: 5rem;
+			height: 3.5rem;
 			background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--color-cream) 80%, transparent));
 			pointer-events: none;
 			z-index: 1;
