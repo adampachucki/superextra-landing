@@ -20,12 +20,6 @@
 
 	const useCases = [
 		{
-			title: 'Market Research',
-			audience: 'Operators & Chains',
-			description:
-				'Understand market dynamics, competitive positioning, and emerging white spaces. Continuously monitor shifts so you spot opportunities before anyone else.'
-		},
-		{
 			title: 'Marketing Strategy',
 			audience: 'Operators & Agencies',
 			description:
@@ -38,16 +32,22 @@
 				'Evaluate locations with foot traffic, demographics, competition density, and rent data side by side. De-risk every new site decision.'
 		},
 		{
-			title: 'Financial Modelling',
-			audience: 'Operators & Investors',
+			title: 'Market Research',
+			audience: 'Operators & Chains',
 			description:
-				'Build projections grounded in real revenue benchmarks, occupancy rates, labor costs, and seasonality patterns — not assumptions.'
+				'Understand market dynamics, competitive positioning, and emerging white spaces. Continuously monitor shifts so you spot opportunities before anyone else.'
 		},
 		{
 			title: 'Ops & Workforce',
 			audience: 'Operators & Chains',
 			description:
 				'Track how your costs, staffing, and channel performance compare to the local market. Spot inefficiencies before they hit margins.'
+		},
+		{
+			title: 'Financial Modelling',
+			audience: 'Operators & Investors',
+			description:
+				'Build projections grounded in real revenue benchmarks, occupancy rates, labor costs, and seasonality patterns — not assumptions.'
 		},
 		{
 			title: 'Sales & Leads',

@@ -30,8 +30,8 @@
 >
 	<div class="absolute inset-x-0 bottom-0 h-px bg-cream-200 transition-opacity duration-300 {scrolled ? 'opacity-100' : 'opacity-0'}"></div>
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
-		<a href="/" class="flex items-center gap-0.5">
-			<svg class="h-[18px] w-[18px] -mt-2" viewBox="0 0 12 12" fill="none">
+		<a href="/" class="flex items-center gap-0 md:gap-0.5">
+			<svg class="h-[18px] w-[18px] -mt-2.5 md:-mt-2" viewBox="0 0 12 12" fill="none">
 				<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5"/>
 				<line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="currentColor" stroke-width="1.5"/>
 				<line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="currentColor" stroke-width="1.5"/>
