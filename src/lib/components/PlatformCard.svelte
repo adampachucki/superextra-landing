@@ -12,7 +12,7 @@
 	} = $props();
 </script>
 
-<div class="card border-t border-cream-200{separator ? ' md:border-l' : ''}{end ? ' md:border-r' : ''} md:px-8" class:card-wide={wide}>
+<div class="card border-t border-cream-200{separator ? ' md:border-l' : ''}{end ? ' md:border-r' : ''} px-4 md:px-8" class:card-wide={wide}>
 	<div class="card-text">
 		<h3 class="title">{title}</h3>
 		<p class="desc">{desc}</p>
