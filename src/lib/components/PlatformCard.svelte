@@ -1,17 +1,18 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	let { title, desc, mode = 'standard', wide = false, separator = false, children }: {
+	let { title, desc, mode = 'standard', wide = false, separator = false, end = false, children }: {
 		title: string;
 		desc: string;
 		mode?: 'standard' | 'edge' | 'free';
 		wide?: boolean;
 		separator?: boolean;
+		end?: boolean;
 		children: Snippet;
 	} = $props();
 </script>
 
-<div class="card border-t border-cream-200{separator ? ' md:border-l md:pl-6' : ''} md:pr-6" class:card-wide={wide}>
+<div class="card border-t border-cream-200{separator ? ' md:border-l' : ''}{end ? ' md:border-r' : ''} md:px-8" class:card-wide={wide}>
 	<div class="card-text">
 		<h3 class="title">{title}</h3>
 		<p class="desc">{desc}</p>
@@ -30,7 +31,7 @@
 
 <style>
 	.card {
-		padding-top: 1.75rem;
+		padding-top: 2.25rem;
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
@@ -67,6 +68,7 @@
 		line-height: 1.5;
 		margin-top: 0.25rem;
 		color: rgba(var(--mockup-text), 0.6);
+		max-width: 36rem;
 	}
 
 	.mockup {
@@ -88,7 +90,7 @@
 
 	@media (min-width: 768px) {
 		.mockup-edge {
-			margin-right: -1.5rem;
+			margin-right: -2rem;
 		}
 	}
 
@@ -101,8 +103,8 @@
 
 	@media (min-width: 768px) {
 		.mockup-free {
-			margin-left: -1.5rem;
-			margin-right: -1.5rem;
+			margin-left: -2rem;
+			margin-right: -2rem;
 		}
 	}
 </style>

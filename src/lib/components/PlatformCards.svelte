@@ -20,7 +20,7 @@
 			Seven intelligence layers, combined.
 		</p>
 
-		<div class="grid grid-cols-1 md:grid-cols-3">
+		<div class="grid grid-cols-1 md:grid-cols-3 relative" class:cards-grid={!expanded}>
 
 			<PlatformCard title="Market Landscape" desc="Restaurant openings and closings, cuisine trends and top-performing venues continuously tracked and benchmarked. With deep narrative reports that turn raw signals into actionable insights." wide mode="edge">
 				<MarketLandscapeWideV1 />
@@ -42,13 +42,13 @@
 				<GuestIntelligenceV2 />
 			</PlatformCard>
 
-			<PlatformCard title="Marketing & Digital" desc="Social media activity, marketing channels, estimated ad spend, and tools and platforms in use across competitors." mode="free" separator>
-				<MarketingV2 />
+			<PlatformCard title="Operations" desc="Labor pool availability, salary benchmarks, job market activity, staff turnover, commercial rent, and supplier pricing." separator>
+				<OperationsV1 />
 			</PlatformCard>
 
 		</div>
 
-		<div class="grid grid-cols-1 md:grid-cols-3 overflow-hidden transition-all duration-500 ease-out"
+		<div class="relative grid grid-cols-1 md:grid-cols-3 overflow-hidden transition-all duration-500 ease-out"
 			class:max-h-0={!expanded}
 			class:max-h-[55rem]={expanded}
 			class:md:max-h-[40rem]={expanded}
@@ -59,9 +59,12 @@
 				<LocationTrafficV1 />
 			</PlatformCard>
 
-			<PlatformCard title="Operations" desc="Labor pool availability, salary benchmarks, job market activity, staff turnover, commercial rent, and supplier pricing." separator>
-				<OperationsV1 />
+			<PlatformCard title="Marketing & Digital" desc="Social media activity, marketing channels, estimated ad spend, and tools and platforms in use across competitors." mode="free" separator>
+				<MarketingV2 />
 			</PlatformCard>
+
+			<div class="max-md:hidden border-t border-l border-cream-200"></div>
+
 		</div>
 
 		<div class="mt-10 flex justify-center">
@@ -74,3 +77,19 @@
 		</div>
 	</div>
 </section>
+
+<style>
+	@media (min-width: 768px) {
+		.cards-grid::after {
+			content: '';
+			position: absolute;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			height: 5rem;
+			background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--color-cream) 80%, transparent));
+			pointer-events: none;
+			z-index: 1;
+		}
+	}
+</style>
