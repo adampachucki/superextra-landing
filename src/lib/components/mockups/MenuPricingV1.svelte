@@ -68,14 +68,14 @@
 
 	.msg-user {
 		justify-content: flex-end;
-		padding-left: 1.5rem;
+		padding-left: 2.5rem;
 		margin-right: 0;
 	}
 
 	.msg-ai {
 		align-items: flex-start;
 		gap: 0.5rem;
-		margin-right: 0;
+		margin-right: 2.5rem;
 	}
 
 	.avatar {
@@ -131,7 +131,7 @@
 	.status-text {
 		font-size: 0.625rem;
 		color: rgba(var(--mockup-text), 0.3);
-		font-style: italic;
+		font-style: normal;
 	}
 
 	.status-text.shimmer {
@@ -151,7 +151,7 @@
 
 	/* ── Floating prompt ── */
 	.prompt-float {
-		padding: 1.25rem 1rem 0.5rem 1rem;
+		padding: 0.75rem 1rem 0.5rem 1rem;
 	}
 
 	.prompt-box {
