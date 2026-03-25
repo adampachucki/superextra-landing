@@ -159,8 +159,8 @@
 		flex: 1;
 		min-height: 0;
 		overflow: hidden;
-		transform: scale(1.15);
 		transform-origin: top left;
+		padding-top: 0.5rem;
 	}
 
 	@media (max-width: 767px) {
