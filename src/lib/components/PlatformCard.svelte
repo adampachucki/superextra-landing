@@ -74,7 +74,7 @@
 	.mockup {
 		border-radius: 0.75rem 0.75rem 0 0;
 		background: rgb(var(--mockup-bg));
-		border: 0.5px solid rgba(var(--mockup-text), 0.08);
+		border: 1px solid rgba(var(--mockup-text), 0.08);
 		border-bottom: none;
 		margin-bottom: -3.5rem;
 		display: flex;
