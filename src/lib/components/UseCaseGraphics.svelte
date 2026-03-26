@@ -4,6 +4,40 @@
 
 <svg viewBox="0 0 200 200" fill="none" class="relative z-10 w-3/5 text-black dark:text-white" class:hovered>
 {#if index === 0}
+	<!-- Marketing Strategy: Overlapping spotlights / Venn -->
+	<g class="venn-a">
+		<circle cx="78" cy="88" r="52" stroke="currentColor" stroke-width="0.8"/>
+		<circle cx="78" cy="36" r="1.5" fill="currentColor"/>
+	</g>
+	<g class="venn-b">
+		<circle cx="122" cy="88" r="48" stroke="currentColor" stroke-width="0.8"/>
+		<circle cx="170" cy="88" r="1.5" fill="currentColor"/>
+	</g>
+	<g class="venn-c">
+		<circle class="ants" cx="100" cy="125" r="42" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/>
+		<circle cx="100" cy="167" r="1.5" fill="currentColor"/>
+	</g>
+	<circle cx="100" cy="98" r="2" fill="currentColor"/>
+
+{:else if index === 1}
+	<!-- Expansion Planning: Growth rings -->
+	<g class="ring-1"><rect x="88" y="88" width="24" height="24" stroke="currentColor" stroke-width="1.2" rx="2"/></g>
+	<g class="ring-2">
+		<rect x="68" y="68" width="64" height="64" stroke="currentColor" stroke-width="1" rx="4"/>
+		<circle cx="69" cy="69" r="1.5" fill="currentColor"/>
+		<circle cx="131" cy="69" r="1.5" fill="currentColor"/>
+		<circle cx="69" cy="131" r="1.5" fill="currentColor"/>
+		<circle cx="131" cy="131" r="1.5" fill="currentColor"/>
+	</g>
+	<g class="ring-3"><rect class="ants" x="45" y="45" width="110" height="110" stroke="currentColor" stroke-width="0.8" stroke-dasharray="4,3" rx="6"/></g>
+	<g class="ring-4"><rect class="ants-rev" x="20" y="20" width="160" height="160" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,3" rx="8"/></g>
+	<circle cx="100" cy="100" r="2" fill="currentColor"/>
+	<line x1="100" y1="20" x2="100" y2="88" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
+	<line x1="100" y1="112" x2="100" y2="180" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
+	<line x1="20" y1="100" x2="88" y2="100" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
+	<line x1="112" y1="100" x2="180" y2="100" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
+
+{:else if index === 2}
 	<!-- Market Research: Orbital ellipses -->
 	<line x1="10" y1="100" x2="190" y2="100" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,3"/>
 	<line x1="100" y1="10" x2="100" y2="190" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,3"/>
@@ -22,41 +56,20 @@
 	</g>
 	<circle cx="100" cy="100" r="2.5" fill="currentColor"/>
 
-{:else if index === 1}
-	<!-- Marketing Strategy: Overlapping spotlights / Venn -->
-	<g class="venn-a">
-		<circle cx="78" cy="88" r="52" stroke="currentColor" stroke-width="0.8"/>
-		<circle cx="78" cy="36" r="1.5" fill="currentColor"/>
-	</g>
-	<g class="venn-b">
-		<circle cx="122" cy="88" r="48" stroke="currentColor" stroke-width="0.8"/>
-		<circle cx="170" cy="88" r="1.5" fill="currentColor"/>
-	</g>
-	<g class="venn-c">
-		<circle class="ants" cx="100" cy="125" r="42" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/>
-		<circle cx="100" cy="167" r="1.5" fill="currentColor"/>
-	</g>
-	<circle cx="100" cy="98" r="2" fill="currentColor"/>
-
-{:else if index === 2}
-	<!-- Expansion Planning: Growth rings -->
-	<g class="ring-1"><rect x="88" y="88" width="24" height="24" stroke="currentColor" stroke-width="1.2" rx="2"/></g>
-	<g class="ring-2">
-		<rect x="68" y="68" width="64" height="64" stroke="currentColor" stroke-width="1" rx="4"/>
-		<circle cx="69" cy="69" r="1.5" fill="currentColor"/>
-		<circle cx="131" cy="69" r="1.5" fill="currentColor"/>
-		<circle cx="69" cy="131" r="1.5" fill="currentColor"/>
-		<circle cx="131" cy="131" r="1.5" fill="currentColor"/>
-	</g>
-	<g class="ring-3"><rect class="ants" x="45" y="45" width="110" height="110" stroke="currentColor" stroke-width="0.8" stroke-dasharray="4,3" rx="6"/></g>
-	<g class="ring-4"><rect class="ants-rev" x="20" y="20" width="160" height="160" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,3" rx="8"/></g>
-	<circle cx="100" cy="100" r="2" fill="currentColor"/>
-	<line x1="100" y1="20" x2="100" y2="88" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
-	<line x1="100" y1="112" x2="100" y2="180" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
-	<line x1="20" y1="100" x2="88" y2="100" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
-	<line x1="112" y1="100" x2="180" y2="100" stroke="currentColor" stroke-width="0.4" stroke-dasharray="2,3"/>
-
 {:else if index === 3}
+	<!-- Ops & Workforce: Gantt / shift schedule -->
+	<line x1="40" y1="25" x2="40" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<line x1="80" y1="25" x2="80" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<line x1="120" y1="25" x2="120" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<line x1="160" y1="25" x2="160" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
+	<g class="gantt-row-1"><rect x="25" y="32" width="95" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="25" cy="37" r="1.5" fill="currentColor"/></g>
+	<g class="gantt-row-2"><rect x="55" y="55" width="50" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="55" cy="60" r="1.5" fill="currentColor"/></g>
+	<g class="gantt-row-3"><rect class="ants" x="80" y="78" width="90" height="10" rx="2" stroke="currentColor" stroke-width="0.8" stroke-dasharray="4,3"/><circle cx="80" cy="83" r="1.5" fill="currentColor"/></g>
+	<g class="gantt-row-4"><rect x="25" y="101" width="55" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="25" cy="106" r="1.5" fill="currentColor"/><rect x="100" y="101" width="75" height="10" rx="2" stroke="currentColor" stroke-width="0.8"/><circle cx="100" cy="106" r="1.5" fill="currentColor"/></g>
+	<g class="gantt-row-5"><rect class="ants-rev" x="40" y="124" width="135" height="10" rx="2" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/><circle cx="40" cy="129" r="1.5" fill="currentColor"/></g>
+	<g class="gantt-row-6"><rect x="25" y="147" width="60" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="25" cy="152" r="1.5" fill="currentColor"/><rect x="110" y="147" width="65" height="10" rx="2" stroke="currentColor" stroke-width="0.8"/><circle cx="110" cy="152" r="1.5" fill="currentColor"/></g>
+
+{:else if index === 4}
 	<!-- Financial Modelling: Wave curves -->
 	<line x1="10" y1="110" x2="190" y2="110" stroke="currentColor" stroke-width="0.5"/>
 	<line x1="20" y1="110" x2="20" y2="40" stroke="currentColor" stroke-width="0.5"/>
@@ -72,19 +85,6 @@
 	<line x1="65" y1="65" x2="65" y2="155" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
 	<line x1="110" y1="65" x2="110" y2="155" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
 	<line x1="155" y1="65" x2="155" y2="155" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
-
-{:else if index === 4}
-	<!-- Ops & Workforce: Gantt / shift schedule -->
-	<line x1="40" y1="25" x2="40" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
-	<line x1="80" y1="25" x2="80" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
-	<line x1="120" y1="25" x2="120" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
-	<line x1="160" y1="25" x2="160" y2="180" stroke="currentColor" stroke-width="0.3" stroke-dasharray="2,3"/>
-	<g class="gantt-row-1"><rect x="25" y="32" width="95" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="25" cy="37" r="1.5" fill="currentColor"/></g>
-	<g class="gantt-row-2"><rect x="55" y="55" width="50" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="55" cy="60" r="1.5" fill="currentColor"/></g>
-	<g class="gantt-row-3"><rect class="ants" x="80" y="78" width="90" height="10" rx="2" stroke="currentColor" stroke-width="0.8" stroke-dasharray="4,3"/><circle cx="80" cy="83" r="1.5" fill="currentColor"/></g>
-	<g class="gantt-row-4"><rect x="25" y="101" width="55" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="25" cy="106" r="1.5" fill="currentColor"/><rect x="100" y="101" width="75" height="10" rx="2" stroke="currentColor" stroke-width="0.8"/><circle cx="100" cy="106" r="1.5" fill="currentColor"/></g>
-	<g class="gantt-row-5"><rect class="ants-rev" x="40" y="124" width="135" height="10" rx="2" stroke="currentColor" stroke-width="0.7" stroke-dasharray="4,3"/><circle cx="40" cy="129" r="1.5" fill="currentColor"/></g>
-	<g class="gantt-row-6"><rect x="25" y="147" width="60" height="10" rx="2" stroke="currentColor" stroke-width="1"/><circle cx="25" cy="152" r="1.5" fill="currentColor"/><rect x="110" y="147" width="65" height="10" rx="2" stroke="currentColor" stroke-width="0.8"/><circle cx="110" cy="152" r="1.5" fill="currentColor"/></g>
 
 {:else if index === 5}
 	<!-- Sales & Leads: CRM network graph -->
@@ -187,7 +187,7 @@
 	.hovered .ants { stroke-dashoffset: -21; }
 	.hovered .ants-rev { stroke-dashoffset: 18; }
 
-	/* === 0: Market Research — orbits shift and rescale === */
+	/* === 2: Market Research — orbits shift and rescale === */
 	.orbit-1-group {
 		transform: rotate(-30deg);
 		transform-origin: 100px 100px;
@@ -207,7 +207,7 @@
 	.hovered .orbit-2-group { transform: rotate(18deg) scaleX(1.08) scaleY(0.9); }
 	.hovered .orbit-3-group { transform: rotate(88deg) scaleX(0.9) scaleY(1.12); }
 
-	/* === 1: Marketing Strategy — circles drift apart + resize === */
+	/* === 0: Marketing Strategy — circles drift apart + resize === */
 	.venn-a {
 		transform-origin: 78px 88px;
 		transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -224,7 +224,7 @@
 	.hovered .venn-b { transform: translate(4px, -3px) scale(0.92); }
 	.hovered .venn-c { transform: translate(0, 5px) scale(1.08); }
 
-	/* === 2: Expansion Planning — rings scale outward === */
+	/* === 1: Expansion Planning — rings scale outward === */
 	.ring-2, .ring-3 {
 		transition: transform 0.5s ease;
 		transform-origin: 100px 100px;
@@ -232,7 +232,7 @@
 	.hovered .ring-2 { transform: scale(1.03); }
 	.hovered .ring-3 { transform: scale(1.018); }
 
-	/* === 3: Financial Modelling — waves undulate === */
+	/* === 4: Financial Modelling — waves undulate === */
 	.wave-solid-group {
 		transform-origin: 105px 110px;
 		transform: scaleY(1) scaleX(1);
@@ -246,7 +246,7 @@
 	}
 	.hovered .wave-dash-group { transform: scaleY(0.88) scaleX(1.02); }
 
-	/* === 4: Ops & Workforce — subtle bar resize === */
+	/* === 3: Ops & Workforce — subtle bar resize === */
 	.gantt-row-1, .gantt-row-4 {
 		transition: transform 0.5s ease;
 	}
