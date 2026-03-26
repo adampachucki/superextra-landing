@@ -75,7 +75,7 @@
 	.msg-ai {
 		align-items: flex-start;
 		gap: 0.5rem;
-		margin-right: 2.5rem;
+		margin-right: 1.5rem;
 	}
 
 	.avatar {

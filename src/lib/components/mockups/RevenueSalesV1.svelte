@@ -70,7 +70,7 @@
 	.msg-ai {
 		align-items: flex-start;
 		gap: 0.5rem;
-		padding-right: 0.5rem;
+		padding-right: 0;
 	}
 
 	.avatar {
