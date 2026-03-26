@@ -165,7 +165,7 @@
 
 	@media (max-width: 767px) {
 		.report {
-			transform: scale(1.18);
+			transform: scale(0.9);
 			min-width: 140%;
 		}
 	}
