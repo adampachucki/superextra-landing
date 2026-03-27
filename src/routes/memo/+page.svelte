@@ -28,19 +28,19 @@
 
 <article class="memo mx-auto px-6 pb-32" style="max-width: 780px; padding-top: 5.5rem;">
 	<h2>The missing context</h2>
-	<p>Restaurants already know their internal numbers: covers, average tickets, labor costs, and delivery mix. What they cannot see is the context.</p>
+	<p>Restaurants already know their internal numbers: covers, average tickets, labor costs, and delivery mix. What they cannot see is the broader market context.</p>
 	<p>When a month is weak, they don't know if it's an internal failure or a market-wide slump. They lack a view on whether they are priced correctly against their true competitor set, what local labor actually costs, or where the next logical site should be.</p>
-	<p>Hotels solved this decades ago. STR provided every hotel with real-time benchmarking against its competitive set. The restaurant sector is larger and more fragmented, yet it has had nothing comparable&mdash;until now.</p>
+	<p>Hotels solved this decades ago. STR provided every hotel with real-time benchmarking against its competitive set. The restaurant sector is larger and more fragmented, and has had nothing comparable.</p>
 
 	<h2>Gossip, gut feel, guesswork</h2>
-	<p>Currently, the industry does market intelligence badly. When a bad stretch hits or a competitor pulls ahead, operators fall back on a manual, unreliable workflow:</p>
+	<p>Restaurants already do market intelligence. They just do it badly. When things go off, operators fall back on a manual workflow:</p>
 	<ul>
 		<li>Calling other restaurateurs for anecdotes.</li>
 		<li>Asking supplier account managers for "vibes" on the market.</li>
 		<li>Manually scrolling delivery apps and review platforms.</li>
 		<li>Scanning public filings or counting physical receipts.</li>
 	</ul>
-	<p>Operators care deeply about external data, but their current process is messy, anecdotal, and impossible to scale. We are replacing this broken workflow with a professional intelligence infrastructure.</p>
+	<p>Operators care deeply about external data, but their current process is messy, anecdotal, and impossible to scale. We want to solve this for them.</p>
 
 	<h2>Answers, not analytics</h2>
 	<p>Operators don't need more "data"; they need reliable answers to concrete questions:</p>
@@ -60,8 +60,8 @@
 	<p><strong>We keep the intelligence current.</strong> Markets move. Competitors open and close. Prices shift. Sentiment changes. Superextra monitors those changes and turns them into ongoing updates.</p>
 	<p>The goal is not to replace operator judgment. It is to give that judgment context, so an operator can move from "I think this is happening" to "I know what is happening, and I know what to do next."</p>
 
-	<h2>Every signal, one view</h2>
-	<p>We aggregate signals from dozens of external sources&mdash;including discovery platforms, delivery apps, menus, reviews, hiring boards, registries, and foot traffic patterns&mdash;to build seven distinct layers of intelligence:</p>
+	<h2>Every signal, one place</h2>
+	<p>To make this work, we aggregate signals from dozens of external sources&mdash;including discovery platforms, delivery apps, menus, reviews, hiring boards, registries, and foot traffic patterns&mdash;to build seven connected layers of intelligence:</p>
 	<table>
 		<tbody>
 			<tr><td><strong>Market Landscape</strong></td><td>Openings, closings, saturation, and "white space" analysis.</td></tr>
