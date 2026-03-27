@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	let { animate = true, class: className = '', width = 680, height = 400 }: { animate?: boolean; class?: string; width?: number; height?: number } = $props();
+	let { animate = true, class: className = '', width = 680, height = 400, lineOffsetY = 0, lineSpacing = 0 }: { animate?: boolean; class?: string; width?: number; height?: number; lineOffsetY?: number; lineSpacing?: number } = $props();
 
 	let canvasEl: HTMLCanvasElement;
 
@@ -49,9 +49,9 @@
 
 		const rng = () => Math.random() * 100;
 		const lines = [
-			{ seed: rng(), baseY: 130, width: 1.5, amp: 55, freq: 0.006 + Math.random() * 0.006, phaseSpeed: 0.12 + Math.random() * 0.08, baseOpacity: 0.18 },
-			{ seed: rng(), baseY: 220, width: 1.5, amp: 60, freq: 0.005 + Math.random() * 0.006, phaseSpeed: 0.1 + Math.random() * 0.08, baseOpacity: 0.1 },
-			{ seed: rng(), baseY: 300, width: 1, amp: 50, freq: 0.007 + Math.random() * 0.006, phaseSpeed: 0.1 + Math.random() * 0.08, baseOpacity: 0.07 }
+			{ seed: rng(), baseY: 130 + lineOffsetY, width: 1.5, amp: 55, freq: 0.006 + Math.random() * 0.006, phaseSpeed: 0.12 + Math.random() * 0.08, baseOpacity: 0.18 },
+			{ seed: rng(), baseY: 220 + lineOffsetY + lineSpacing, width: 1.5, amp: 60, freq: 0.005 + Math.random() * 0.006, phaseSpeed: 0.1 + Math.random() * 0.08, baseOpacity: 0.1 },
+			{ seed: rng(), baseY: 300 + lineOffsetY + lineSpacing * 2, width: 1, amp: 50, freq: 0.007 + Math.random() * 0.006, phaseSpeed: 0.1 + Math.random() * 0.08, baseOpacity: 0.07 }
 		];
 
 		const circles = [

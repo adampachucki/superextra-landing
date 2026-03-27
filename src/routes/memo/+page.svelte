@@ -13,7 +13,7 @@
 
 <header class="relative overflow-hidden" style="background-color: #0a0a0a; padding-top: 8rem; padding-bottom: 5rem;">
 	<div class="pointer-events-none absolute inset-0" style="left: -5%; width: 110%; top: -5%; height: 110%;">
-		<HeroCanvas class="absolute inset-0 h-full w-full" width={1600} height={900} />
+		<HeroCanvas class="absolute inset-0 h-full w-full" width={1600} height={900} lineOffsetY={120} lineSpacing={60} />
 	</div>
 	<div class="relative mx-auto px-6" style="max-width: 780px;">
 		<p class="text-sm font-medium uppercase tracking-widest" style="color: rgba(255,255,255,0.4);">Berlin &middot; March 2026</p>
