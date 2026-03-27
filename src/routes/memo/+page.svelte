@@ -20,19 +20,19 @@
 		<h1 class="mt-8 font-normal" style="color: #fff; font-size: clamp(2.75rem, 6vw, 4.5rem); line-height: 1.05; letter-spacing: -0.03em;">
 			The market view restaurants have been missing
 		</h1>
-		<p class="mt-8 max-w-xl" style="color: rgba(255,255,255,0.8); font-size: clamp(1.125rem, 2vw, 1.25rem); line-height: 1.45;">
+		<p class="mt-8" style="color: rgba(255,255,255,0.8); font-size: clamp(1.125rem, 2vw, 1.25rem); line-height: 1.45;">
 			We are building the market intelligence platform for the restaurant industry. Our purpose is simple: to give operators a clear view of what is happening <em style="color: rgba(255,255,255,0.7);">outside</em> their four walls, not just inside them.
 		</p>
 	</div>
 </header>
 
 <article class="memo mx-auto px-6 pb-32" style="max-width: 780px; padding-top: 5.5rem;">
-	<h2>The operational blind spot</h2>
+	<h2>The missing context</h2>
 	<p>Restaurants already know their internal numbers: covers, average tickets, labor costs, and delivery mix. What they cannot see is the context.</p>
 	<p>When a month is weak, they don't know if it's an internal failure or a market-wide slump. They lack a view on whether they are priced correctly against their true competitor set, what local labor actually costs, or where the next logical site should be.</p>
 	<p>Hotels solved this decades ago. STR provided every hotel with real-time benchmarking against its competitive set. The restaurant sector is larger and more fragmented, yet it has had nothing comparable&mdash;until now.</p>
 
-	<h2>The guesswork era is over</h2>
+	<h2>Gossip, gut feel, guesswork</h2>
 	<p>Currently, the industry does market intelligence badly. When a bad stretch hits or a competitor pulls ahead, operators fall back on a manual, unreliable workflow:</p>
 	<ul>
 		<li>Calling other restaurateurs for anecdotes.</li>
@@ -88,18 +88,40 @@
 	<p><strong>Our pricing:</strong> &euro;899 setup fee + &euro;299 quarterly subscription per location.</p>
 
 	<h2>Superextra was pulled into existence</h2>
-	<p>Superextra was pulled into existence by the market. Our founding team previously built <strong>Everytap</strong> and <strong>Finebite</strong>, working with over 2,500 restaurants and 2 million guests.</p>
-	<p>We aren't entering this category cold. This product is a direct response to years of operators asking us the same questions: <em>What are my competitors doing? How should I price this? Where do I go next?</em> This history gives us a massive head start in access, pattern recognition, and distribution.</p>
+	<p>Our founding team previously built <strong>Everytap</strong> and <strong>Finebite</strong>, working with over 2,500 restaurants and 2 million guests.</p>
+	<p>This product is a direct response to years of operators asking us the same questions: <em>What are my competitors doing? How should I price this? Where do I go next?</em> This history gives us a massive head start in access, pattern recognition, and distribution.</p>
+	<p>We aren't entering this category cold.</p>
 
 	<h2 class="!text-[clamp(2rem,4vw,3rem)]">A large market is hiding behind a messy workflow</h2>
-	<p>Restaurants across Europe are already paying for market intelligence. They pay in consultant fees, agency retainers, management time, and bad decisions made with incomplete information.</p>
-	<p>Existing companies validate pieces of the demand, but the category remains open. Some players are US-centric. Some are enterprise-heavy. Some are tied to internal systems. Some solve only one narrow function. The gap is still there for a Europe-first product built specifically for restaurant operators and centred on external market context rather than internal system data.</p>
+	<p>Restaurants across Europe are already paying for market intelligence. They spend 2&ndash;3 hours of management time every week, pay consultant fees and agency retainers, and pay again in bad decisions made with incomplete information.</p>
+	<p>Existing companies validate pieces of the demand, but the category remains open. Some players are US-centric. Some are enterprise-heavy. Some are tied to internal systems. Some solve only one narrow function.</p>
+	<p>The gap is still there for a Europe-first product built specifically for restaurant operators and centred on external market context rather than internal system data.</p>
 	<p><strong>That is the position we are taking.</strong></p>
 
 	<h2>Every restaurant will need this</h2>
 	<p>By starting with a practical wedge in Poland and Germany, we are building a piece of infrastructure that every restaurant will eventually rely on for market context with the same confidence they have in their own bank balance.</p>
 	<p>Our ambition is to become the definitive external intelligence layer for the industry. Internal systems (POS, Inventory) tell operators what happened. Superextra tells them <em>why</em> it happened and what is changing next.</p>
 	<p><strong>That is the company we are building.</strong></p>
+
+	<svg class="signature" viewBox="0 0 260 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+		<!-- A -->
+		<path d="M8 68 C12 40, 20 18, 28 16 C32 15, 34 20, 34 30 C34 42, 30 58, 34 64 C36 68, 42 58, 46 52" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+		<!-- crossbar of A -->
+		<path d="M16 48 C22 46, 30 44, 38 46" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+		<!-- d -->
+		<path d="M46 52 C44 48, 42 42, 44 38 C46 34, 52 34, 54 38 C56 42, 56 50, 54 54 C52 58, 48 56, 46 52" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+		<path d="M56 18 C56 28, 55 42, 54 54 C54 58, 56 60, 60 56" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+		<!-- a -->
+		<path d="M60 56 C58 50, 58 42, 60 38 C62 34, 68 34, 70 38 C72 42, 70 52, 68 56 C66 60, 62 58, 60 56" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+		<path d="M70 38 C72 46, 72 54, 74 58" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+		<!-- m -->
+		<path d="M74 58 C74 50, 74 42, 76 38 C78 34, 80 36, 80 42 C80 48, 80 54, 82 56 C84 58, 86 48, 88 42 C90 36, 92 36, 92 42 C92 48, 92 56, 96 58" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+		<!-- space + P -->
+		<path d="M116 70 C116 54, 116 22, 116 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+		<path d="M116 14 C124 14, 134 16, 134 26 C134 36, 124 40, 116 38" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+		<!-- dot -->
+		<circle cx="144" cy="68" r="2" fill="currentColor"/>
+	</svg>
 </article>
 
 <Footer />
@@ -186,5 +208,13 @@
 
 	.memo :global(td:last-child) {
 		color: color-mix(in srgb, var(--color-text) 50%, transparent);
+	}
+
+	.memo :global(.signature) {
+		margin-top: 4rem;
+		width: 180px;
+		height: auto;
+		color: var(--color-text);
+		opacity: 0.5;
 	}
 </style>
