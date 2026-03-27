@@ -21,14 +21,14 @@
 			The market view restaurants have been missing
 		</h1>
 		<p class="mt-8" style="color: rgba(255,255,255,0.8); font-size: clamp(1.125rem, 2vw, 1.25rem); line-height: 1.45;">
-			We are building the market intelligence platform for the restaurant industry. Our purpose is simple: to give operators a clear view of what is happening <em style="color: rgba(255,255,255,0.7);">outside</em> their four walls, not just inside them.
+			We're building market intelligence to give restaurants a clear view of what is happening <em style="color: rgba(255,255,255,0.7);">outside</em> their four walls, not just inside them.
 		</p>
 	</div>
 </header>
 
-<article class="memo mx-auto px-6 pb-32" style="max-width: 780px; padding-top: 5.5rem;">
-	<h2>The missing context</h2>
-	<p>Restaurants already know their internal numbers: covers, average tickets, labor costs, and delivery mix. What they cannot see is the broader market context.</p>
+<article class="memo mx-auto px-6 pb-32" style="max-width: 780px; padding-top: 3.5rem;">
+	<!-- <h2>The missing context</h2> -->
+	<p>Every restaurant operator already knows their internal numbers: covers, average tickets, labor costs, and delivery mix. What they cannot see is the broader market context.</p>
 	<p>When a month is weak, they don't know if it's an internal failure or a market-wide slump. They lack a view on whether they are priced correctly relative to other venues, what local labor actually costs, or where the next logical site should be.</p>
 	<p>Hotels solved this decades ago. STR provided every hotel with real-time benchmarking against its competitive set. The restaurant sector is larger and more fragmented, and has nothing comparable.</p>
 
