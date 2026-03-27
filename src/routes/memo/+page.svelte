@@ -9,7 +9,7 @@
 	<meta name="description" content="Superextra — the market intelligence layer restaurants have been missing." />
 </svelte:head>
 
-<Navbar />
+<Navbar transparent />
 
 <header class="relative overflow-hidden" style="background-color: #0a0a0a; padding-top: 8rem; padding-bottom: 5rem;">
 	<div class="pointer-events-none absolute inset-0" style="left: -5%; width: 110%; top: -5%; height: 110%;">

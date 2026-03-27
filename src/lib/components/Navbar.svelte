@@ -3,6 +3,8 @@
 	import PreviewBadge from '$lib/components/PreviewBadge.svelte';
 	import { onMount } from 'svelte';
 
+	let { transparent = false }: { transparent?: boolean } = $props();
+
 	let scrolled = $state(false);
 	let mobileOpen = $state(false);
 
@@ -11,6 +13,8 @@
 	}
 
 	onMount(() => handleScroll());
+
+	let over = $derived(transparent && !scrolled && !mobileOpen);
 
 	function smoothScroll(e: MouseEvent) {
 		const href = (e.currentTarget as HTMLAnchorElement).getAttribute('href');
@@ -26,36 +30,36 @@
 <svelte:window onscroll={handleScroll} />
 
 <nav
-	class="fixed top-0 left-0 right-0 z-50 bg-cream"
+	class="fixed top-0 left-0 right-0 z-50 transition-colors duration-300 {over ? '' : 'bg-cream'}"
 >
 	<div class="absolute inset-x-0 bottom-0 h-px bg-cream-200 transition-opacity duration-300 {scrolled ? 'opacity-100' : 'opacity-0'}"></div>
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
-		<a href="/" class="flex items-center gap-0 md:gap-0.5">
+		<a href="/" class="flex items-center gap-0 md:gap-0.5 transition-colors {over ? 'text-white' : 'text-black dark:text-white'}">
 			<svg class="h-[18px] w-[18px] -mt-2.5 md:-mt-2" viewBox="0 0 12 12" fill="none">
 				<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5"/>
 				<line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="currentColor" stroke-width="1.5"/>
 				<line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="currentColor" stroke-width="1.5"/>
 			</svg>
-			<span class="text-[22px] font-light tracking-tight text-black dark:text-white"
+			<span class="text-[22px] font-light tracking-tight"
 				>Superextra</span
 			>
 		</a>
 
 		<div class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
-			<a href="/#intelligence" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white">Intelligence</a>
-			<a href="/#use-cases" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white">Use Cases</a>
-			<a href="/#faq" onclick={smoothScroll} class="text-sm text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white">FAQ</a>
+			<a href="/#intelligence" onclick={smoothScroll} class="text-sm transition-colors {over ? 'text-white/60 hover:text-white' : 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}">Intelligence</a>
+			<a href="/#use-cases" onclick={smoothScroll} class="text-sm transition-colors {over ? 'text-white/60 hover:text-white' : 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}">Use Cases</a>
+			<a href="/#faq" onclick={smoothScroll} class="text-sm transition-colors {over ? 'text-white/60 hover:text-white' : 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}">FAQ</a>
 		</div>
 
 		<div class="hidden items-center gap-3 md:flex">
-			<a href="mailto:hello@superextra.ai" class="rounded-full border border-black/10 px-6 py-2.5 text-sm font-medium text-black/70 transition-all hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90">Contact Us</a>
+			<a href="mailto:hello@superextra.ai" class="rounded-full border px-6 py-2.5 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Contact Us</a>
 			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-5 py-2 text-sm">Get Started</button>
 		</div>
 
 		<div class="flex items-center gap-3 md:hidden">
 			<PreviewBadge tooltipBelow />
 			<button
-				class="text-black dark:text-white"
+				class="{over ? 'text-white' : 'text-black dark:text-white'}"
 				onclick={() => (mobileOpen = !mobileOpen)}
 				aria-label="Toggle menu"
 			>
@@ -68,15 +72,17 @@
 		</div>
 	</div>
 
-	{#if mobileOpen}
-		<div class="border-t border-cream-100 bg-white dark:bg-cream-50 md:hidden">
-			<div class="flex flex-col gap-4 px-6 py-6">
-				<a href="/#intelligence" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Intelligence</a>
-				<a href="/#use-cases" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Use Cases</a>
-				<a href="/#faq" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>FAQ</a>
-				<hr class="border-cream-100" />
-				<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm">Get Started</button>
+	<div class="grid transition-[grid-template-rows] duration-300 md:hidden {mobileOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}">
+		<div class="overflow-hidden">
+			<div class="border-t border-cream-100 bg-cream">
+				<div class="flex flex-col gap-4 px-6 py-6">
+					<a href="/#intelligence" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Intelligence</a>
+					<a href="/#use-cases" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Use Cases</a>
+					<a href="/#faq" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>FAQ</a>
+					<hr class="border-cream-100" />
+					<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm">Get Started</button>
+				</div>
 			</div>
 		</div>
-	{/if}
+	</div>
 </nav>
