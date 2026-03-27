@@ -29,18 +29,18 @@
 <article class="memo mx-auto px-6 pb-32" style="max-width: 780px; padding-top: 5.5rem;">
 	<h2>The missing context</h2>
 	<p>Restaurants already know their internal numbers: covers, average tickets, labor costs, and delivery mix. What they cannot see is the broader market context.</p>
-	<p>When a month is weak, they don't know if it's an internal failure or a market-wide slump. They lack a view on whether they are priced correctly against their true competitor set, what local labor actually costs, or where the next logical site should be.</p>
-	<p>Hotels solved this decades ago. STR provided every hotel with real-time benchmarking against its competitive set. The restaurant sector is larger and more fragmented, and has had nothing comparable.</p>
+	<p>When a month is weak, they don't know if it's an internal failure or a market-wide slump. They lack a view on whether they are priced correctly relative to other venues, what local labor actually costs, or where the next logical site should be.</p>
+	<p>Hotels solved this decades ago. STR provided every hotel with real-time benchmarking against its competitive set. The restaurant sector is larger and more fragmented, and has nothing comparable.</p>
 
 	<h2>Gossip, gut feel, guesswork</h2>
-	<p>Restaurants already do market intelligence. They just do it badly. When things go off, operators fall back on a manual workflow:</p>
+	<p>Restaurants do market intelligence. They just do it badly. When things go off, operators fall back on a manual workflow:</p>
 	<ul>
-		<li>Calling other restaurateurs for anecdotes.</li>
-		<li>Asking supplier account managers for "vibes" on the market.</li>
-		<li>Manually scrolling delivery apps and review platforms.</li>
-		<li>Scanning public filings or counting physical receipts.</li>
+		<li>Calling other restaurateurs for anecdotes</li>
+		<li>Asking supplier account managers for "vibes" on the market</li>
+		<li>Manually scrolling delivery apps and review platforms</li>
+		<li>Scanning public filings or counting physical receipts</li>
 	</ul>
-	<p>Operators care deeply about external data, but their current process is messy, anecdotal, and impossible to scale. We want to solve this for them.</p>
+	<p>Operators care deeply about external data, but their current process is messy, anecdotal, and impossible to scale. We're solving this for them.</p>
 
 	<h2>Answers, not analytics</h2>
 	<p>Operators don't need more "data"; they need reliable answers to concrete questions:</p>
@@ -50,18 +50,17 @@
 		Which days and hours are actually worth operating in this climate?<br />
 		Where is the real expansion opportunity for our specific format?
 	</blockquote>
-	<p>We are not building another dashboard that asks the user to do the analytical heavy lifting. We are building a system that delivers specific, plain-language answers to the recurring decisions that shape revenue and margin.</p>
+	<p>We are not building another dashboard that asks the user to do the analytical heavy lifting. We're building a solution to deliver specific, plain-language answers to the recurring decisions that shape revenue and margin.</p>
 
-	<h2 class="!text-[clamp(2rem,4vw,3rem)]">A market analyst for every restaurant</h2>
-	<p>Superextra aggregates and synthesises external market data from dozens of sources, then delivers it through AI agents tailored to each restaurant's specific context.</p>
+	<h2>A market analyst for every restaurant</h2>
+	<p>Each restaurant gets an AI agent that knows its market, competitors, and neighbourhood &mdash; and can answer questions, build reports, and surface what matters.</p>
 	<p><strong>We set up the market context.</strong> Superextra maps the restaurant's competitive set, trade area, cuisine cohort, and pricing tier. The operator does not build anything from scratch.</p>
-	<p><strong>We deliver a structured market view.</strong> Each customer receives an initial intelligence layer that is specific to their business, interactive rather than static, and designed to be explored over time.</p>
-	<p><strong>We provide a tailored agent.</strong> Every customer gets an AI agent that understands the venue, its neighbourhood, and its benchmark cohort, and can answer market questions in natural language.</p>
+	<p><strong>The agent delivers tailored analysis.</strong> Reports, interactive dashboards, and deep dives &mdash; all generated around the specific questions the restaurant is asking.</p>
 	<p><strong>We keep the intelligence current.</strong> Markets move. Competitors open and close. Prices shift. Sentiment changes. Superextra monitors those changes and turns them into ongoing updates.</p>
-	<p>The goal is not to replace operator judgment. It is to give that judgment context, so an operator can move from "I think this is happening" to "I know what is happening, and I know what to do next."</p>
+	<p>The goal is to give context, so an operator can move from <em>I think this is happening</em> to <em>I know what is happening, and I know what to do next.</em></p>
 
 	<h2>Every signal, one place</h2>
-	<p>To make this work, we aggregate signals from dozens of external sources&mdash;including discovery platforms, delivery apps, menus, reviews, hiring boards, registries, and foot traffic patterns&mdash;to build seven connected layers of intelligence:</p>
+	<p>We aggregate signals from dozens of external sources&mdash;including discovery platforms, delivery apps, menus, reviews, hiring boards, registries, and foot traffic patterns&mdash;to build seven connected layers of intelligence:</p>
 	<table>
 		<tbody>
 			<tr><td><strong>Market Landscape</strong></td><td>Openings, closings, saturation, and "white space" analysis.</td></tr>
@@ -73,18 +72,23 @@
 			<tr><td><strong>Operations</strong></td><td>Local labor salary benchmarks and supplier pricing signals.</td></tr>
 		</tbody>
 	</table>
+	<p>Every layer feeds into the agents so their answers are grounded in real data, not hallucinations.</p>
 
 	<h2>It's never been possible before</h2>
-	<p>This opportunity exists now because the information trail is finally mature, but the noise is at an all-time high. Previously, connecting fragmented signals from menus, filings, and reviews was too manual to be profitable.</p>
-	<p>Our AI models materially change the economics of this industry. We can now continuously collect, refresh, and synthesize these noisy external signals into a usable market map at a fraction of the cost of a traditional consultant.</p>
+	<p>This opportunity exists now because the information trail is already there. For years, it was too fragmented to turn into something reliable without a lot of manual work.</p>
+	<p>What has changed is the ability to connect fragmented entities, structure noisy signals, maintain them over time, and deliver the output in plain language instead of raw analysis.</p>
+	<p>That is why our AI models materially change the economics. They make the full chain viable:</p>
+	<ul>
+		<li>Collect and refresh external market signals continuously</li>
+		<li>Connect them into a usable market map</li>
+		<li>Synthesise them into benchmarked intelligence</li>
+		<li>Deliver them in a form an operator can act on quickly</li>
+	</ul>
+	<p>That combination is what makes our product possible now in a way it was not a few years ago.</p>
 
 	<h2>Built for the operators who need it most</h2>
-	<p>We are starting with small multi-venue operators (groups with 2&ndash;5 locations). These businesses are the perfect "design center":</p>
-	<ul>
-		<li>They make consequential decisions on pricing and expansion.</li>
-		<li>They feel the immediate cost of getting those decisions wrong.</li>
-		<li>They are large enough to value professional intelligence but too small to have in-house analysts.</li>
-	</ul>
+	<p>We are starting with small multi-venue operators (groups with 2&ndash;5 locations). These businesses sit right in the sweet spot.</p>
+	<p>They make consequential decisions on pricing and expansion, and feel the immediate cost of getting those decisions wrong. They are large enough to value professional intelligence but too small to have in-house analysts.</p>
 	<p><strong>Our pricing:</strong> &euro;899 setup fee + &euro;299 quarterly subscription per location.</p>
 
 	<h2>Superextra was pulled into existence</h2>
@@ -92,15 +96,15 @@
 	<p>This product is a direct response to years of operators asking us the same questions: <em>What are my competitors doing? How should I price this? Where do I go next?</em> This history gives us a massive head start in access, pattern recognition, and distribution.</p>
 	<p>We aren't entering this category cold.</p>
 
-	<h2 class="!text-[clamp(2rem,4vw,3rem)]">A large market is hiding behind a messy workflow</h2>
-	<p>Restaurants across Europe are already paying for market intelligence. They spend 2&ndash;3 hours of management time every week, pay consultant fees and agency retainers, and pay again in bad decisions made with incomplete information.</p>
-	<p>Existing companies validate pieces of the demand, but the category remains open. Some players are US-centric. Some are enterprise-heavy. Some are tied to internal systems. Some solve only one narrow function.</p>
-	<p>The gap is still there for a Europe-first product built specifically for restaurant operators and centred on external market context rather than internal system data.</p>
+	<h2>A large market is hiding behind a messy workflow</h2>
+	<p>Restaurants are already paying for market intelligence. They spend 2&ndash;3 hours of management time every week, pay consultant fees and agency retainers.</p>
+	<p>Existing solutions validate pieces of the demand, but the category remains open. Some players are US-centric. Some are enterprise-heavy. Some are tied to internal systems. Some solve only one narrow function.</p>
+	<p>There is a gap for a Europe-first product built specifically for restaurant operators and centred on external market context rather than internal system data.</p>
 	<p><strong>That is the position we are taking.</strong></p>
 
 	<h2>Every restaurant will need this</h2>
-	<p>By starting with a practical wedge in Poland and Germany, we are building a piece of infrastructure that every restaurant will eventually rely on for market context with the same confidence they have in their own bank balance.</p>
-	<p>Our ambition is to become the definitive external intelligence layer for the industry. Internal systems (POS, Inventory) tell operators what happened. Superextra tells them <em>why</em> it happened and what is changing next.</p>
+	<p>We are building a piece of infrastructure that every restaurant will eventually rely on for market context with the same confidence they have in their own bank balance.</p>
+	<p>Our ambition is to become the definitive external intelligence layer for the industry. Internal systems tell operators what happened. Superextra tells them <em>why</em> it happened and what is changing next.</p>
 	<p><strong>That is the company we are building.</strong></p>
 
 	<svg class="signature" viewBox="0 0 260 90" fill="none" xmlns="http://www.w3.org/2000/svg">
