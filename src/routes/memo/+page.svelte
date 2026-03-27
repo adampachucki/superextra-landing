@@ -21,15 +21,15 @@
 			The market view restaurants have been missing
 		</h1>
 		<p class="mt-8" style="color: rgba(255,255,255,0.8); font-size: clamp(1.125rem, 2vw, 1.25rem); line-height: 1.45;">
-			We're building market intelligence to give restaurants a clear view of what is happening <em style="color: rgba(255,255,255,0.7);">outside</em> their four walls, not just inside them.
+			We're building a market intelligence platform to give them a clear view of what is happening <em style="color: rgba(255,255,255,0.7);">outside</em> their four walls, not just inside them.
 		</p>
 	</div>
 </header>
 
 <article class="memo mx-auto px-6 pb-32" style="max-width: 780px; padding-top: 3.5rem;">
 	<!-- <h2>The missing context</h2> -->
-	<p>Every restaurant operator already knows their internal numbers: covers, average tickets, labor costs, and delivery mix. What they cannot see is the broader market context.</p>
-	<p>When a month is weak, they don't know if it's an internal failure or a market-wide slump. They lack a view on whether they are priced correctly relative to other venues, what local labor actually costs, or where the next logical site should be.</p>
+	<p>Every restaurant operator already knows their internal numbers: covers, average tickets, labor costs, and delivery mix. What they can't see is the broader market context.</p>
+	<p>When a month is weak, the question is always the same: is this an internal failure, or a market-wide slump? They lack a view on whether they are priced correctly relative to other venues, what local labor actually costs, or where the next logical site should be.</p>
 	<p>Hotels solved this decades ago. STR provided every hotel with real-time benchmarking against its competitive set. The restaurant sector is larger and more fragmented, and has nothing comparable.</p>
 
 	<h2>Gossip, gut feel, guesswork</h2>
@@ -45,12 +45,12 @@
 	<h2>Answers, not analytics</h2>
 	<p>Operators don't need more "data"; they need reliable answers to concrete questions:</p>
 	<blockquote>
-		Are we underperforming, or is the whole neighborhood down?<br />
+		Are we underperforming, or is the whole neighbourhood down?<br />
 		What should we pay staff to ensure retention, not just hiring?<br />
 		Which days and hours are actually worth operating in this climate?<br />
 		Where is the real expansion opportunity for our specific format?
 	</blockquote>
-	<p>We are not building another dashboard that asks the user to do the analytical heavy lifting. We're building a solution to deliver specific, plain-language answers to the recurring decisions that shape revenue and margin.</p>
+	<p>We're not building another dashboard that asks the user to do the analytical heavy lifting. We're delivering specific, plain-language answers to the recurring decisions that shape revenue and margin.</p>
 
 	<h2>A market analyst for every restaurant</h2>
 	<p>Each restaurant gets an AI agent that knows its market, competitors, and neighbourhood &mdash; and can answer questions, build reports, and surface what matters.</p>
@@ -76,7 +76,7 @@
 
 	<h2>It's never been possible before</h2>
 	<p>This opportunity exists now because the information trail is already there. For years, it was too fragmented to turn into something reliable without a lot of manual work.</p>
-	<p>What has changed is the ability to connect fragmented entities, structure noisy signals, maintain them over time, and deliver the output in plain language instead of raw analysis.</p>
+	<p>What has changed is the ability to connect scattered entities, structure noisy signals, maintain them over time, and deliver the output in plain language instead of raw analysis.</p>
 	<p>That is why our AI models materially change the economics. They make the full chain viable:</p>
 	<ul>
 		<li>Collect and refresh external market signals continuously</li>
@@ -87,8 +87,8 @@
 	<p>That combination is what makes our product possible now in a way it was not a few years ago.</p>
 
 	<h2>Built for the operators who need it most</h2>
-	<p>We are starting with small multi-venue operators (groups with 2&ndash;5 locations). These businesses sit right in the sweet spot.</p>
-	<p>They make consequential decisions on pricing and expansion, and feel the immediate cost of getting those decisions wrong. They are large enough to value professional intelligence but too small to have in-house analysts.</p>
+	<p>We're starting with small multi-venue operators (groups with 2&ndash;5 locations). These businesses sit right in the sweet spot.</p>
+	<p>They make consequential decisions on pricing and expansion, and feel the immediate cost of getting those decisions wrong. They're large enough to value professional intelligence but too small to have in-house analysts.</p>
 	<p><strong>Our pricing:</strong> &euro;899 setup fee + &euro;299 quarterly subscription per location.</p>
 
 	<h2>Superextra was pulled into existence</h2>
@@ -178,8 +178,8 @@
 		border-left: 2px solid var(--color-cream-300);
 		padding-left: 1.5rem;
 		margin: 1.5rem 0;
-		font-size: 18px;
-		line-height: 2;
+		font-size: 17px;
+		line-height: 1.85;
 		font-style: italic;
 		color: color-mix(in srgb, var(--color-text) 70%, transparent);
 	}
