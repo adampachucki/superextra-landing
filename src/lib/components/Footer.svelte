@@ -28,6 +28,7 @@
 						<img src="/google-for-startups.svg" alt="Google for Startups" class="h-3.5 translate-y-px opacity-40 grayscale dark:invert" />
 					</div>
 					<span class="mx-2 hidden h-4 w-px bg-black/10 dark:bg-white/10 md:block"></span>
+					<a href="/memo" class="text-sm text-black/40 dark:text-white/40 transition-colors hover:text-black/60 dark:hover:text-white/60">Memo</a>
 					<a href="/privacy-policy" class="text-sm text-black/40 dark:text-white/40 transition-colors hover:text-black/60 dark:hover:text-white/60">Privacy</a>
 					<a href="/terms" class="text-sm text-black/40 dark:text-white/40 transition-colors hover:text-black/60 dark:hover:text-white/60">Terms</a>
 					<a href="https://www.linkedin.com/company/superextra" target="_blank" rel="noopener noreferrer" class="text-black/40 dark:text-white/40 transition-colors hover:text-black/60 dark:hover:text-white/60" aria-label="LinkedIn">
