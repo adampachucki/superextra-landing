@@ -21,7 +21,7 @@
 			The market view restaurants have been missing
 		</h1>
 		<p class="mt-8" style="color: rgba(255,255,255,0.8); font-size: clamp(1.125rem, 2vw, 1.25rem); line-height: 1.45;">
-			We're building a market intelligence platform to give them a clear view of what is happening <em style="color: rgba(255,255,255,0.7);">outside</em> their four walls, not just inside them.
+			We're building a market intelligence platform to give restaurants a clear view of what is happening <em style="color: rgba(255,255,255,0.7);">outside</em> their four walls, not just inside them.
 		</p>
 	</div>
 </header>
