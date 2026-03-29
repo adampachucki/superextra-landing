@@ -3,7 +3,7 @@
 	import PreviewBadge from '$lib/components/PreviewBadge.svelte';
 	import { onMount } from 'svelte';
 
-	let { transparent = false }: { transparent?: boolean } = $props();
+	let { transparent = false, minimal = false }: { transparent?: boolean; minimal?: boolean } = $props();
 
 	let scrolled = $state(false);
 	let mobileOpen = $state(false);
@@ -45,11 +45,13 @@
 			>
 		</a>
 
+		{#if !minimal}
 		<div class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
 			<a href="/#intelligence" onclick={smoothScroll} class="text-sm transition-colors {over ? 'text-white/60 hover:text-white' : 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}">Intelligence</a>
 			<a href="/#use-cases" onclick={smoothScroll} class="text-sm transition-colors {over ? 'text-white/60 hover:text-white' : 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}">Use Cases</a>
 			<a href="/#faq" onclick={smoothScroll} class="text-sm transition-colors {over ? 'text-white/60 hover:text-white' : 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}">FAQ</a>
 		</div>
+		{/if}
 
 		<div class="hidden items-center gap-3 md:flex">
 			<a href="mailto:hello@superextra.ai" class="rounded-full border px-6 py-2.5 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Contact Us</a>
@@ -76,10 +78,12 @@
 		<div class="overflow-hidden">
 			<div class="border-t border-cream-100 bg-cream">
 				<div class="flex flex-col gap-4 px-6 py-6">
+					{#if !minimal}
 					<a href="/#intelligence" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Intelligence</a>
 					<a href="/#use-cases" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Use Cases</a>
 					<a href="/#faq" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>FAQ</a>
 					<hr class="border-cream-100" />
+					{/if}
 					<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm">Get Started</button>
 				</div>
 			</div>
