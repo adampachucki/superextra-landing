@@ -125,10 +125,34 @@
 
 	let browserCountry = $state('');
 	$effect(() => {
-		const locale = navigator.language || '';
-		const parts = locale.split('-');
-		if (parts.length > 1) {
-			browserCountry = parts[parts.length - 1].toLowerCase();
+		try {
+			const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+			const tzCountryMap: Record<string, string> = {
+				'America/': 'us', 'US/': 'us',
+				'Europe/London': 'gb', 'Europe/Berlin': 'de', 'Europe/Warsaw': 'pl',
+				'Europe/Paris': 'fr', 'Europe/Rome': 'it', 'Europe/Madrid': 'es',
+				'Europe/Amsterdam': 'nl', 'Europe/Brussels': 'be', 'Europe/Vienna': 'at',
+				'Europe/Zurich': 'ch', 'Europe/Prague': 'cz', 'Europe/Stockholm': 'se',
+				'Europe/Copenhagen': 'dk', 'Europe/Oslo': 'no', 'Europe/Helsinki': 'fi',
+				'Europe/Dublin': 'ie', 'Europe/Lisbon': 'pt', 'Europe/Bucharest': 'ro',
+				'Europe/Budapest': 'hu', 'Europe/Athens': 'gr',
+				'Australia/': 'au', 'Pacific/Auckland': 'nz',
+				'Asia/Tokyo': 'jp', 'Asia/Seoul': 'kr', 'Asia/Singapore': 'sg',
+			};
+			for (const [prefix, code] of Object.entries(tzCountryMap)) {
+				if (tz.startsWith(prefix) || tz === prefix) {
+					browserCountry = code;
+					return;
+				}
+			}
+		} catch {}
+		const locales = navigator.languages || [navigator.language || ''];
+		for (const locale of locales) {
+			const parts = locale.split('-');
+			if (parts.length > 1) {
+				browserCountry = parts[parts.length - 1].toLowerCase();
+				return;
+			}
 		}
 	});
 
