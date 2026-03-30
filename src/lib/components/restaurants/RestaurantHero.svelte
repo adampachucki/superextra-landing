@@ -297,7 +297,7 @@
 							onkeydown={handleKeydown}
 							onfocus={() => {}}
 							placeholder={isAnimating ? display : 'What do you want to know about your market?'}
-							rows="2"
+							rows="3"
 							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating ? 'placeholder:text-black/70 dark:placeholder:text-white/70' : 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
 						></textarea>
 					</div>
