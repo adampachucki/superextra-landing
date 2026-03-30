@@ -361,7 +361,7 @@
 
 					<div class="context-expand" class:open={contextExpanded}>
 						<div class="context-expand-inner" class:allow-overflow={contextOverflow} inert={contextExpanded ? undefined : true}>
-							<div class="context-reveal relative mx-4 mb-4 pt-2" class:visible={contextExpanded}>
+							<div class="context-reveal relative mx-4 mb-4 pt-2" class:visible={contextExpanded} onclick={(e) => e.stopPropagation()}>
 								<div class="relative">
 									<input
 										bind:this={placeInputEl}
