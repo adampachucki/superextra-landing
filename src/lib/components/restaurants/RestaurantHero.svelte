@@ -263,7 +263,7 @@
 			class="hero-fade mx-auto md:max-w-none text-center font-semibold tracking-[-0.03em] text-black dark:text-white"
 			style="font-size: clamp(2.75rem, 6vw, 5.25rem); line-height: 1.02; animation-delay: 100ms;"
 		>
-			AI consultant <br />for every restaurant
+			AI consultant <br class="max-md:hidden" />for every restaurant
 		</h1>
 
 		<!-- Subheadline -->
