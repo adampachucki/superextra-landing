@@ -17,7 +17,7 @@
 					<span class="text-[22px] font-light tracking-tight text-black dark:text-white">Superextra</span>
 				</div>
 				<p class="text-sm text-black/40 dark:text-white/40">
-					&copy; {year} Superextra. All rights reserved.
+					&copy; {year} Superextra<span class="max-md:hidden">. All rights reserved.</span>
 				</p>
 			</div>
 
