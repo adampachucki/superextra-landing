@@ -177,7 +177,7 @@
 			<div class="relative z-10 bg-cream">
 			<div class="mx-auto max-w-[800px] px-4 pb-3 md:px-6">
 				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-				<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.35] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.35]">
+				<div onclick={() => chatState.active && inputEl?.focus()} class="{chatState.active ? 'cursor-text' : 'cursor-not-allowed'} prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.35] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.35]">
 					<div class="px-5 pt-4">
 						<textarea
 							bind:this={inputEl}
@@ -185,15 +185,16 @@
 							onkeydown={handleKeydown}
 							placeholder="Ask a follow-up..."
 							rows="1"
-							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none dark:text-white dark:placeholder:text-white/45"
+							disabled={!chatState.active}
+							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none disabled:cursor-not-allowed dark:text-white dark:placeholder:text-white/45"
 						></textarea>
 					</div>
 					<div class="flex items-center justify-end px-4 pb-4">
 						<button
 							onclick={handleSend}
-							disabled={!query.trim() || chatState.loading}
+							disabled={!chatState.active || !query.trim() || chatState.loading}
 							aria-label="Send"
-							class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:cursor-default disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
+							class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
 						>
 							<svg class="h-4 w-4 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />

@@ -24,7 +24,10 @@ function getOrCreateSessionId(): string {
 		sessionId = stored;
 		return stored;
 	}
-	const id = crypto.randomUUID();
+	const id = globalThis.crypto?.randomUUID?.()
+		?? Array.from(crypto.getRandomValues(new Uint8Array(16)))
+			.map((b, i) => ([4, 6, 8, 10].includes(i) ? '-' : '') + b.toString(16).padStart(2, '0'))
+			.join('');
 	sessionId = id;
 	if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('se_chat_session', id);
 	return id;
