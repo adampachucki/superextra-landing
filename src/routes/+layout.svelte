@@ -59,7 +59,7 @@
 
 {#if unlocked}
 	{@render children()}
-	{#if !page.url.pathname.startsWith('/agent')}
+	{#if !page.url.pathname.startsWith('/agent') && !page.url.pathname.startsWith('/login')}
 		<div class="fixed bottom-5 left-5 z-50 hidden md:block">
 			<PreviewBadge />
 		</div>
