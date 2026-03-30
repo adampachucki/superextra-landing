@@ -31,8 +31,6 @@
 	});
 
 	onMount(() => {
-		if (chatState.active) inputEl?.focus();
-
 		const onBeforeUnload = (e: BeforeUnloadEvent) => {
 			if (chatState.active && chatState.messages.length > 0) {
 				e.preventDefault();
@@ -154,7 +152,7 @@
 	<!-- Main area -->
 	<div class="relative flex min-w-0 flex-1 flex-col">
 		<!-- Floating sidebar toggle (when closed) -->
-		<button onclick={toggleSidebar} aria-label="Open sidebar" class="toggle-float absolute left-4 top-4 z-30 cursor-pointer text-black/25 transition-all hover:text-black/45 dark:text-white/25 dark:hover:text-white/45 {sidebarOpen ? 'pointer-events-none opacity-0' : 'opacity-100'}">
+		<button onclick={toggleSidebar} aria-label="Open sidebar" class="toggle-float absolute left-4 top-4 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/60 backdrop-blur-md text-black/40 transition-all hover:bg-white/80 hover:text-black/60 dark:bg-white/10 dark:backdrop-blur-md dark:text-white/40 dark:hover:bg-white/20 dark:hover:text-white/60 {sidebarOpen ? 'pointer-events-none opacity-0' : 'opacity-100'}">
 			<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
 				<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
 				<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
@@ -226,11 +224,12 @@
 	}
 
 	.sidebar {
-		transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+		transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+		will-change: transform;
 	}
 
 	.sidebar-overlay {
-		transition: opacity 0.25s ease;
+		transition: opacity 0.3s ease;
 	}
 
 	.toggle-float {
