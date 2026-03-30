@@ -1,4 +1,6 @@
 <script lang="ts">
+	let { title = 'Powered by dozens of data sources', subtitle = 'We aggregate, cross-reference, and validate data from public platforms, proprietary databases, and official registries across every market we cover.' }: { title?: string; subtitle?: string } = $props();
+
 	const sources = [
 		{ name: 'TripAdvisor', logo: 'tripadvisor' },
 		{ name: 'OpenTable', logo: 'opentable' },
@@ -36,11 +38,13 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="mb-16 text-center">
 			<h2 class="text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black dark:text-white">
-				Powered by dozens of data sources
+				{title}
 			</h2>
+			{#if subtitle}
 			<p class="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-black/60 dark:text-white/60">
-				We aggregate, cross-reference, and validate data from public platforms, proprietary databases, and official registries across every market we cover.
+				{subtitle}
 			</p>
+			{/if}
 		</div>
 
 		<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-px overflow-hidden border-t border-cream-200 bg-cream-200">

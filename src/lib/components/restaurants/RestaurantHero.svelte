@@ -107,7 +107,7 @@
 		</h1>
 
 		<!-- Subheadline -->
-		<p class="hero-fade mx-auto mt-6 text-center text-xl leading-relaxed text-black/45 dark:text-white/45" style="max-width: 540px; animation-delay: 170ms;">
+		<p class="hero-fade mx-auto mt-6 text-center text-xl leading-snug text-black/45 dark:text-white/45" style="max-width: 540px; animation-delay: 170ms;">
 			Stop relying on gossip and gut feel. Get clear answers about your competitors, pricing, and demand in minutes.
 		</p>
 

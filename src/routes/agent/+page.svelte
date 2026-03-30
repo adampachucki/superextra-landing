@@ -5,6 +5,9 @@
 	import RestaurantHero from '$lib/components/restaurants/RestaurantHero.svelte';
 	import ValueProps from '$lib/components/restaurants/ValueProps.svelte';
 
+	import UseCases from '$lib/components/UseCases.svelte';
+	import FAQ from '$lib/components/FAQ.svelte';
+	import DataSources from '$lib/components/DataSources.svelte';
 	import RestaurantCTA from '$lib/components/restaurants/RestaurantCTA.svelte';
 </script>
 
@@ -21,6 +24,9 @@
 <main>
 	<RestaurantHero />
 	<ValueProps />
+	<UseCases />
+	<FAQ />
+	<DataSources title="Dozens of data sources" subtitle="We aggregate and validate data across every market we cover." />
 	<RestaurantCTA />
 </main>
 
