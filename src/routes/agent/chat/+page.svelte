@@ -78,14 +78,14 @@
 	<meta name="description" content="Ask questions about your restaurant market. Powered by Superextra." />
 </svelte:head>
 
-<div class="fixed inset-0 flex bg-cream">
+<div class="chat-enter fixed inset-0 flex bg-cream">
 	<!-- Sidebar -->
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
 		class="sidebar-overlay fixed inset-0 z-40 bg-black/20 {!isDesktop && sidebarOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}"
 		onclick={() => (sidebarOpen = false)}
 	></div>
-	<aside class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen ? '' : isDesktop ? '-ml-64' : '-translate-x-full'}">
+	<aside class="sidebar chat-sidebar-enter flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen ? '' : isDesktop ? '-ml-64' : '-translate-x-full'}">
 		<!-- Logo + toggle -->
 		<div class="flex items-center justify-between px-6 py-5">
 			<div class="group flex cursor-default items-center gap-0.5 text-black dark:text-white">
@@ -161,9 +161,11 @@
 
 		<!-- Chat thread -->
 		{#if chatState.active}
-			<ChatThread />
+			<div class="chat-thread-enter flex flex-1 flex-col overflow-hidden">
+				<ChatThread />
+			</div>
 		{:else}
-			<div class="flex flex-1 items-center justify-center">
+			<div class="chat-thread-enter flex flex-1 items-center justify-center">
 				<div class="text-center">
 					<p class="text-[14px] text-black/30 dark:text-white/30">No active conversation.</p>
 					<a href="/agent" class="mt-3 inline-block text-[13px] text-black/50 underline transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70">Start a new chat</a>
