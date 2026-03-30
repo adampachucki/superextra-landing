@@ -273,7 +273,7 @@
 		<!-- Headline -->
 		<h1
 			class="hero-fade mx-auto md:max-w-none text-center font-semibold tracking-[-0.03em] text-black dark:text-white"
-			style="font-size: clamp(2.75rem, 6vw, 5.25rem); line-height: 1.02; animation-delay: 100ms;"
+			style="font-size: clamp(3rem, 6vw, 5.25rem); line-height: 1.02; animation-delay: 100ms;"
 		>
 			AI consultant <br class="max-md:hidden" />for every restaurant
 		</h1>
@@ -422,7 +422,7 @@
 				>
 					<button
 						onclick={() => selectTopic(topic.query)}
-						class="topic-pill inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-black/[0.06] px-3.5 py-2 text-[13px] text-black/40 transition-all duration-200 hover:border-black/[0.12] hover:text-black/60 dark:border-white/[0.06] dark:text-white/40 dark:hover:border-white/[0.12] dark:hover:text-white/60"
+						class="topic-pill inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-black/[0.06] px-3.5 py-2 text-[13px] text-black/40 transition-all duration-200 hover:border-black/[0.12] hover:text-black/60 active:border-black/[0.12] active:text-black/60 dark:border-white/[0.06] dark:text-white/40 dark:hover:border-white/[0.12] dark:hover:text-white/60 dark:active:border-white/[0.12] dark:active:text-white/60"
 					>
 						<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"></span>
 						{topic.label}
