@@ -179,7 +179,7 @@
 			<div class="relative z-10 bg-cream">
 			<div class="mx-auto max-w-[800px] px-4 pb-3 md:px-6">
 				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-				<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.2] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.2]">
+				<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.35] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.35]">
 					<div class="px-5 pt-4">
 						<textarea
 							bind:this={inputEl}
