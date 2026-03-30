@@ -7,7 +7,7 @@
 
 	let step = $state(1);
 	let selectedType = $state('');
-	let selectedCountry = $state('us');
+	let selectedCountry = $state('de');
 	let submitting = $state(false);
 	let submitted = $state(false);
 	let submitError = $state(false);
@@ -39,10 +39,10 @@
 	];
 
 	const countries = [
-		{ code: 'us', name: 'United States', dial: '+1' },
-		{ code: 'gb', name: 'United Kingdom', dial: '+44' },
 		{ code: 'de', name: 'Germany', dial: '+49' },
-		{ code: 'pl', name: 'Poland', dial: '+48' }
+		{ code: 'pl', name: 'Poland', dial: '+48' },
+		{ code: 'gb', name: 'United Kingdom', dial: '+44' },
+		{ code: 'us', name: 'United States', dial: '+1' }
 	];
 
 	let placeName = $state('');
@@ -177,7 +177,7 @@
 				formState.close();
 				step = 1;
 				selectedType = '';
-				selectedCountry = 'us';
+				selectedCountry = 'de';
 				placeName = '';
 				selectedPlaceId = '';
 				businessName = '';

@@ -67,7 +67,7 @@
 <main>
 	<RestaurantHero />
 	<About headline="The market view your restaurant has been missing" intro="Restaurant operators make critical decisions every day — where to open, how to price, when to hire — too often without a clear view of the market around them at all. Superextra changes that." description="Our AI models synthesize competitor, pricing, guest, delivery, and market signals into an external intelligence layer for your restaurant. Better context behind better decisions." class="border-t border-cream-200 md:border-t-0" />
-	<UseCases items={agentUseCases} title="The questions you're already asking \u2014 now with real answers" titleClass="max-w-3xl" subtitleClass="text-xs" />
+	<UseCases items={agentUseCases} title="The questions you've been asking – answered" titleClass="max-w-2xl" subtitleClass="text-xs" />
 	<DataSources title="Dozens of data sources" subtitle="We aggregate and validate data across every market we cover." />
 	<RestaurantCTA />
 </main>
