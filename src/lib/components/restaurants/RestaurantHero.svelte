@@ -210,7 +210,7 @@
 				includedPrimaryTypes: ['restaurant', 'cafe', 'bar', 'hotel', 'food']
 			};
 			if (browserCountry) {
-				opts.includedRegionCodes = [browserCountry];
+				opts.region = browserCountry;
 			}
 			const { suggestions } = await (google.maps.places.AutocompleteSuggestion as any).fetchAutocompleteSuggestions(opts);
 			placeSuggestions = suggestions.map((s: any) => ({
