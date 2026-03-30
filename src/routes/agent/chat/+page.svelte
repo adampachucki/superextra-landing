@@ -370,7 +370,7 @@
 	<!-- Main area -->
 	<div class="relative flex min-w-0 flex-1 flex-col">
 		<!-- Floating sidebar toggle (when closed) -->
-		<button onclick={toggleSidebar} aria-label="Open sidebar" class="toggle-float absolute left-4 top-4 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/60 backdrop-blur-md text-black/40 transition-all hover:bg-white/80 hover:text-black/60 dark:bg-white/10 dark:backdrop-blur-md dark:text-white/40 dark:hover:bg-white/20 dark:hover:text-white/60 {sidebarOpen ? 'pointer-events-none opacity-0' : 'opacity-100'}">
+		<button onclick={toggleSidebar} aria-label="Open sidebar" class="toggle-float absolute left-4 top-4 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 backdrop-blur-md text-white/90 transition-all hover:bg-black/60 hover:text-white dark:bg-white/20 dark:backdrop-blur-md dark:text-white/70 dark:hover:bg-white/30 dark:hover:text-white {sidebarOpen ? 'pointer-events-none opacity-0' : 'opacity-100'}">
 			<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
 				<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
 				<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
@@ -451,13 +451,13 @@
 										</svg>
 									</button>
 									{#if selectedPlace}
-										<span class="context-slide absolute inset-y-0 left-0 my-auto h-6 inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-cream-100 pl-2.5 pr-1 text-xs text-black/60 dark:border-white/[0.08] dark:bg-cream-50 dark:text-white/60">
+										<span class="context-slide absolute inset-y-0 left-0 my-auto h-6 inline-flex items-center gap-1.5 rounded-full border border-black/[0.12] bg-cream-100 pl-2.5 pr-1 text-xs text-black/70 dark:border-white/[0.12] dark:bg-cream-50 dark:text-white/70">
 											<span class="truncate">{selectedPlace.name}</span>
 											{#if selectedPlace.secondary}
-												<span class="hidden truncate text-black/30 dark:text-white/30 md:inline">{selectedPlace.secondary}</span>
+												<span class="hidden truncate text-black/45 dark:text-white/45 md:inline">{selectedPlace.secondary}</span>
 											{/if}
 											<button onclick={removePlace} aria-label="Remove place" class="cursor-pointer flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]">
-												<svg class="h-3 w-3 text-black/25 dark:text-white/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+												<svg class="h-3 w-3 text-black/40 dark:text-white/40" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 												</svg>
 											</button>
