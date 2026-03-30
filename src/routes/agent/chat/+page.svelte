@@ -87,17 +87,17 @@
 		class="sidebar-overlay fixed inset-0 z-40 bg-black/20 {!isDesktop && sidebarOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}"
 		onclick={() => (sidebarOpen = false)}
 	></div>
-	<aside class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen ? 'translate-x-0' : '-translate-x-full'}">
+	<aside class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen ? '' : isDesktop ? '-ml-64' : '-translate-x-full'}">
 		<!-- Logo + toggle -->
 		<div class="flex items-center justify-between px-6 py-5">
-			<a href="/" class="group flex items-center gap-0.5 text-black dark:text-white">
+			<div class="group flex cursor-default items-center gap-0.5 text-black dark:text-white">
 				<svg class="h-[18px] w-[18px] -mt-2.5 md:-mt-2 transition-transform duration-500 ease-out group-hover:rotate-45" viewBox="0 0 12 12" fill="none">
 					<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5"/>
 					<line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="currentColor" stroke-width="1.5"/>
 					<line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="currentColor" stroke-width="1.5"/>
 				</svg>
 				<span class="text-[22px] font-light tracking-tight">Superextra</span>
-			</a>
+			</div>
 			<button onclick={toggleSidebar} aria-label="Close sidebar" class="cursor-pointer text-black/30 transition-colors hover:text-black/50 dark:text-white/30 dark:hover:text-white/50">
 				<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
 					<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
@@ -108,7 +108,7 @@
 
 		<!-- Panel content -->
 		<div class="flex-1 overflow-y-auto px-5 py-2">
-			<button onclick={handleNewChat} class="mb-6 flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] text-black/70 transition-colors hover:bg-cream-100 hover:text-black dark:text-white/70 dark:hover:bg-cream-50 dark:hover:text-white">
+			<button onclick={handleNewChat} class="mb-6 flex w-full cursor-pointer items-center gap-2 rounded-lg bg-cream-100 px-2 py-1.5 text-[13px] text-black/70 transition-colors hover:bg-cream-200 hover:text-black dark:bg-cream-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white">
 				<svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
 				</svg>
@@ -154,14 +154,12 @@
 	<!-- Main area -->
 	<div class="relative flex min-w-0 flex-1 flex-col">
 		<!-- Floating sidebar toggle (when closed) -->
-		{#if !sidebarOpen}
-			<button onclick={toggleSidebar} aria-label="Open sidebar" class="absolute right-4 top-4 z-30 cursor-pointer text-black/25 transition-colors hover:text-black/45 dark:text-white/25 dark:hover:text-white/45">
-				<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
-					<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
-					<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
-				</svg>
-			</button>
-		{/if}
+		<button onclick={toggleSidebar} aria-label="Open sidebar" class="toggle-float absolute left-4 top-4 z-30 cursor-pointer text-black/25 transition-all hover:text-black/45 dark:text-white/25 dark:hover:text-white/45 {sidebarOpen ? 'pointer-events-none opacity-0' : 'opacity-100'}">
+			<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
+				<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
+				<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
+			</svg>
+		</button>
 
 		<!-- Chat thread -->
 		{#if chatState.active}
@@ -181,7 +179,7 @@
 			<div class="relative z-10 bg-cream">
 			<div class="mx-auto max-w-[800px] px-4 pb-3 md:px-6">
 				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-				<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.12] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.12]">
+				<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.2] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.2]">
 					<div class="px-5 pt-4">
 						<textarea
 							bind:this={inputEl}
@@ -228,10 +226,14 @@
 	}
 
 	.sidebar {
-		transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+		transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
 	.sidebar-overlay {
 		transition: opacity 0.25s ease;
+	}
+
+	.toggle-float {
+		transition: opacity 0.2s ease;
 	}
 </style>
