@@ -451,13 +451,13 @@
 										</svg>
 									</button>
 									{#if selectedPlace}
-										<span class="context-slide absolute inset-y-0 left-0 my-auto h-6 inline-flex items-center gap-1.5 rounded-full border border-black/[0.12] bg-cream-100 pl-2.5 pr-1 text-xs text-black/70 dark:border-white/[0.12] dark:bg-cream-50 dark:text-white/70">
+										<span class="context-slide absolute inset-y-0 left-0 my-auto h-6 inline-flex items-center gap-1.5 rounded-full border border-black/[0.10] bg-cream-100 pl-2.5 pr-1 text-xs text-black/65 dark:border-white/[0.10] dark:bg-cream-50 dark:text-white/65">
 											<span class="truncate">{selectedPlace.name}</span>
 											{#if selectedPlace.secondary}
-												<span class="hidden truncate text-black/45 dark:text-white/45 md:inline">{selectedPlace.secondary}</span>
+												<span class="hidden truncate text-black/35 dark:text-white/35 md:inline">{selectedPlace.secondary}</span>
 											{/if}
 											<button onclick={removePlace} aria-label="Remove place" class="cursor-pointer flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]">
-												<svg class="h-3 w-3 text-black/40 dark:text-white/40" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+												<svg class="h-3 w-3 text-black/30 dark:text-white/30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 												</svg>
 											</button>
@@ -514,7 +514,7 @@
 											{/if}
 										</div>
 										{#if showSuggestions && placeSuggestions.length > 0}
-											<ul class="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-xl border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50">
+											<ul class="absolute left-0 right-0 bottom-full z-50 mb-1 max-h-48 overflow-auto rounded-xl border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50">
 												{#each placeSuggestions as s}
 													<li>
 														<button

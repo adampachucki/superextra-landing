@@ -85,6 +85,7 @@
 	});
 
 	let placeNudge = $state(false);
+	let leaving = $state(false);
 
 	function handleExplore() {
 		if (!userQuery.trim()) {
@@ -97,9 +98,11 @@
 			requestAnimationFrame(() => placeInputEl?.focus());
 			return;
 		}
+		if (leaving) return;
 		placeNudge = false;
+		leaving = true;
 		chatState.start(userQuery.trim(), selectedPlace);
-		goto('/agent/chat');
+		setTimeout(() => goto('/agent/chat'), 400);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -268,7 +271,8 @@
 	}
 </script>
 
-<section class="pt-32 md:pt-40">
+<section class="page-exit-content pt-32 md:pt-40" class:is-leaving={leaving}>
+	{#if leaving}<div class="page-exit-overlay"></div>{/if}
 	<div class="mx-auto max-w-[1200px] px-6">
 		<!-- Headline -->
 		<h1
@@ -320,13 +324,13 @@
 							</button>
 							<!-- Selected place chip (overlays pin + map icons) -->
 							{#if selectedPlace}
-								<span class="context-slide absolute inset-y-0 left-0 my-auto h-6 inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-cream-100 pl-2.5 pr-1 text-xs text-black/60 dark:border-white/[0.08] dark:bg-cream-50 dark:text-white/60">
+								<span class="context-slide absolute inset-y-0 left-0 my-auto h-6 inline-flex items-center gap-1.5 rounded-full border border-black/[0.10] bg-cream-100 pl-2.5 pr-1 text-xs text-black/65 dark:border-white/[0.10] dark:bg-cream-50 dark:text-white/65">
 									<span class="truncate">{selectedPlace.name}</span>
 									{#if selectedPlace.secondary}
-										<span class="hidden truncate text-black/30 dark:text-white/30 md:inline">{selectedPlace.secondary}</span>
+										<span class="hidden truncate text-black/35 dark:text-white/35 md:inline">{selectedPlace.secondary}</span>
 									{/if}
 									<button onclick={removePlace} aria-label="Remove place" class="cursor-pointer flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]">
-										<svg class="h-3 w-3 text-black/25 dark:text-white/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<svg class="h-3 w-3 text-black/30 dark:text-white/30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 										</svg>
 									</button>
@@ -422,7 +426,7 @@
 				>
 					<button
 						onclick={() => selectTopic(topic.query)}
-						class="topic-pill inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-black/[0.06] px-3.5 py-2 text-[13px] text-black/40 transition-all duration-200 hover:border-black/[0.12] hover:text-black/60 active:border-black/[0.12] active:text-black/60 dark:border-white/[0.06] dark:text-white/40 dark:hover:border-white/[0.12] dark:hover:text-white/60 dark:active:border-white/[0.12] dark:active:text-white/60"
+						class="topic-pill inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] text-black/55 transition-all duration-200 hover:border-black/[0.22] hover:text-black/75 active:border-black/[0.22] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.22] dark:hover:text-white/75 dark:active:border-white/[0.22] dark:active:text-white/75"
 					>
 						<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"></span>
 						{topic.label}
@@ -504,6 +508,33 @@
 	.context-reveal.visible {
 		opacity: 1;
 		transition: opacity 0.7s ease;
+	}
+
+	/* Exit transition */
+	.page-exit-content {
+		transition: opacity 0.4s cubic-bezier(0.4, 0, 1, 1),
+			transform 0.4s cubic-bezier(0.4, 0, 1, 1),
+			filter 0.4s cubic-bezier(0.4, 0, 1, 1);
+	}
+
+	.page-exit-content.is-leaving {
+		opacity: 0;
+		transform: scale(0.98) translateY(-8px);
+		filter: blur(4px);
+		pointer-events: none;
+	}
+
+	.page-exit-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 9999;
+		background: var(--color-cream);
+		animation: overlayFadeIn 0.4s cubic-bezier(0.4, 0, 1, 1) both;
+	}
+
+	@keyframes overlayFadeIn {
+		from { opacity: 0; }
+		to { opacity: 1; }
 	}
 
 </style>
