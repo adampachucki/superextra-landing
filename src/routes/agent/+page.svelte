@@ -11,44 +11,44 @@
 
 	const agentUseCases = [
 		{
-			title: 'Down month \u2014 us or everyone?',
+			title: 'Down month',
 			description:
-				`Sales dropped 12% and the whole team is second-guessing the new menu. Superextra separates your performance from the market trend so you know whether to fix something or ride it out.`
+				`Sales dropped 12% and the team is second-guessing the new menu. Is it you or is everyone down? Separate your performance from the market trend.`
 		},
 		{
-			title: 'Expansion gamble',
+			title: 'Expansion risk',
 			description:
-				`Opening a second location is the biggest bet you'll make. Most operators choose based on gut feel and a few drive-bys. Superextra maps foot traffic, competition density, demographics, and rent before you sign a lease.`
+				`Opening a second location is the biggest bet you'll make. See foot traffic, competition, demographics, and rent before you sign.`
 		},
 		{
-			title: 'New concept, no proof',
+			title: 'Unproven concept',
 			description:
-				`You're betting a buildout on a concept that "feels right" for the area. Superextra shows what's already working nearby, where the gaps are, and whether local demand actually supports the idea.`
+				`You're betting a buildout on a concept that "feels right." Find out what's actually working nearby and whether local demand supports the idea.`
 		},
 		{
-			title: 'Staffing squeeze',
+			title: 'Staffing gaps',
 			description:
-				`You lost two line cooks this month and you're not sure if your pay is off or the whole market is tight. Superextra benchmarks what restaurants nearby actually pay for every role so you hire to retain, not just to fill.`
+				`Lost two line cooks this month. Is your pay off or is the whole market tight? Benchmark what nearby restaurants actually pay for every role.`
 		},
 		{
-			title: 'Pricing in the dark',
+			title: 'Pricing blind spots',
 			description:
-				`You set prices based on food cost and a rough sense of what the neighbourhood will bear. Meanwhile the place across the street undercut your lunch deal last week. Superextra shows exactly where your menu sits relative to every comparable venue nearby.`
+				`The place across the street undercut your lunch deal last week and you only noticed by accident. Know where your menu sits against every comparable venue.`
 		},
 		{
-			title: 'Review noise',
+			title: 'Review overload',
 			description:
-				`You read every review but still can't tell what's a one-off complaint and what's a real pattern. Superextra surfaces the sentiment trends that individual reviews never reveal \u2014 across your venues and the competition.`
+				`Every review feels urgent but which complaints are real patterns? Surface the sentiment trends that individual reviews never reveal.`
 		},
 		{
-			title: 'Competitor blind spot',
+			title: 'Late to know',
 			description:
-				'Your competitors changed their menu and adjusted prices. You heard about it months later from a supplier. Superextra tracks every move in your market so you can respond in days, not quarters.'
+				'They changed their menu and adjusted prices. You heard about it months later from a supplier. Track every competitor move as it happens.'
 		},
 		{
-			title: 'Slow to react',
+			title: 'New competition',
 			description:
-				'A new competitor opened two streets over and started pulling your weekday crowd. You found out when covers were already down. Superextra alerts you to openings, closures, and strategy shifts as they happen.'
+				'A new spot opened two streets over and started pulling your weekday crowd. Get alerted to openings, closures, and market shifts early.'
 		}
 	];
 
