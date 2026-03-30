@@ -226,13 +226,9 @@
 	}
 
 	function toggleContext() {
-		if (selectedPlace) {
-			removePlace();
-		} else {
-			contextOpen = !contextOpen;
-			if (contextOpen) {
-				requestAnimationFrame(() => placeInputEl?.focus());
-			}
+		contextOpen = !contextOpen;
+		if (contextOpen && !selectedPlace) {
+			requestAnimationFrame(() => placeInputEl?.focus());
 		}
 	}
 </script>
@@ -269,28 +265,9 @@
 						></textarea>
 					</div>
 
-					<!-- Selected place chip -->
-					{#if selectedPlace}
-						<div class="px-4 pb-2">
-							<button onclick={removePlace} class="context-slide cursor-pointer inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-cream-50/80 px-3 py-1.5 text-xs text-black/60 transition-colors hover:border-black/15 hover:text-black/80 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/60 dark:hover:border-white/15 dark:hover:text-white/80">
-								<svg class="h-3 w-3 shrink-0 text-black/30 dark:text-white/30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-									<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-								</svg>
-								<span class="max-w-[200px] truncate">{selectedPlace.name}</span>
-								{#if selectedPlace.secondary}
-									<span class="max-w-[120px] truncate text-black/30 dark:text-white/30">{selectedPlace.secondary}</span>
-								{/if}
-								<svg class="h-3 w-3 shrink-0 text-black/25 dark:text-white/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-								</svg>
-							</button>
-						</div>
-					{/if}
-
 					<div class="flex items-center justify-between px-4 pb-4">
-						<!-- Left icons: pin + map -->
-						<div class="flex items-center gap-1">
+						<!-- Left icons + place chip -->
+						<div class="relative flex items-center gap-1">
 							<!-- Pin icon (opens place search) -->
 							<button onclick={toggleContext} aria-label="Add place" class="cursor-pointer flex h-8 w-8 items-center justify-center rounded-full transition-colors {contextOpen || selectedPlace ? 'text-black/60 dark:text-white/60' : 'text-black/30 hover:text-black/50 dark:text-white/30 dark:hover:text-white/50'}">
 								<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
@@ -299,17 +276,31 @@
 								</svg>
 							</button>
 							<!-- Map icon (disabled) -->
-							<button disabled aria-label="Map view" class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15">
+							<button disabled aria-label="Map view" class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15">
 								<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
 									<path stroke-linecap="square" stroke-linejoin="miter" d="M3 7l6-3 6 3 6-3v14l-6 3-6-3-6 3V7zM9 4v14M15 7v14" />
 								</svg>
 							</button>
+							<!-- Selected place chip (overlays pin + map icons) -->
+							{#if selectedPlace}
+								<span class="context-slide absolute inset-y-0 left-0 my-auto h-6 inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-cream-100 pl-2.5 pr-1 text-xs text-black/60 dark:border-white/[0.08] dark:bg-cream-50 dark:text-white/60">
+									<span class="truncate">{selectedPlace.name}</span>
+									{#if selectedPlace.secondary}
+										<span class="hidden truncate text-black/30 dark:text-white/30 md:inline">{selectedPlace.secondary}</span>
+									{/if}
+									<button onclick={removePlace} aria-label="Remove place" class="cursor-pointer flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]">
+										<svg class="h-3 w-3 text-black/25 dark:text-white/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
+								</span>
+							{/if}
 						</div>
 
 						<!-- Right icons: mic + send -->
 						<div class="flex items-center gap-1">
 							<!-- Microphone icon (disabled) -->
-							<button disabled aria-label="Voice input" class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15">
+							<button disabled aria-label="Voice input" class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15">
 								<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
 									<path stroke-linecap="square" stroke-linejoin="miter" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
 									<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
