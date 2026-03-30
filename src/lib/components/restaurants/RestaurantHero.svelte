@@ -399,7 +399,7 @@
 												>
 													<span class="text-black dark:text-white">{s.name}</span>
 													{#if s.secondary}
-														<span class="ml-1.5 text-black/30 dark:text-white/30">{s.secondary}</span>
+														<span class="ml-1.5 text-black/45 dark:text-white/45">{s.secondary}</span>
 													{/if}
 												</button>
 											</li>
