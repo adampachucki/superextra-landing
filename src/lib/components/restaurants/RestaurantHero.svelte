@@ -132,7 +132,7 @@
 
 	function selectTopic(query: string) {
 		userQuery = query;
-		inputEl?.focus();
+		if (!isMobile) inputEl?.focus();
 	}
 
 	// --- Context / Google Places ---
@@ -273,7 +273,8 @@
 
 		<!-- Prompt card -->
 		<div class="prompt-fade relative z-20 mx-auto mt-10 md:mt-12" style="max-width: 650px; animation-delay: 280ms;">
-			<div class="prompt-card rounded-2xl border border-black/[0.06] bg-white dark:border-white/[0.06] dark:bg-cream-50">
+			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+			<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.12] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.12]">
 				<div class="flex flex-col">
 					<div class="px-5 pt-5">
 						<!-- svelte-ignore a11y_autofocus -->
@@ -341,13 +342,13 @@
 
 					<!-- Expanded context: place search -->
 					{#if placeNudge && !selectedPlace}
-						<p class="context-slide mx-5 mb-2 text-[12px] text-black/40 dark:text-white/40">
+						<p class="context-nudge mx-5 mb-2 text-[12px] text-black/40 dark:text-white/40">
 							Select your restaurant so we can focus on the right area.
 						</p>
 					{/if}
 
 					{#if contextOpen && !selectedPlace}
-						<div class="context-slide relative mx-4 mb-4">
+						<div class="context-reveal relative mx-4 mb-4">
 							<div class="relative">
 								<input
 									bind:this={placeInputEl}
@@ -436,14 +437,12 @@
 
 	.prompt-card {
 		box-shadow:
-			0 0 0 1px rgba(0, 0, 0, 0.03),
 			0 1px 2px rgba(0, 0, 0, 0.02),
 			0 8px 32px rgba(0, 0, 0, 0.06);
 	}
 
 	:global(.dark) .prompt-card {
 		box-shadow:
-			0 0 0 1px rgba(255, 255, 255, 0.06),
 			0 1px 2px rgba(0, 0, 0, 0.1),
 			0 8px 32px rgba(0, 0, 0, 0.3);
 	}
@@ -453,11 +452,25 @@
 	}
 
 	.context-slide {
-		animation: contextSlide 0.2s ease-out both;
+		animation: contextSlide 0.25s ease-out both;
 	}
 
 	@keyframes contextSlide {
 		from { opacity: 0; transform: translateY(-4px); }
 		to { opacity: 1; transform: translateY(0); }
 	}
+
+	.context-nudge {
+		animation: contextSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+
+	.context-reveal {
+		animation: contextReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+
+	@keyframes contextReveal {
+		from { opacity: 0; transform: translateY(6px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+
 </style>

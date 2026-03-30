@@ -130,7 +130,8 @@
 						</button>
 					</div>
 				{/if}
-				<div class="prompt-card rounded-2xl border border-black/[0.06] bg-white dark:border-white/[0.06] dark:bg-cream-50">
+				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+				<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.12] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.12]">
 					<div class="px-5 pt-4">
 						<textarea
 							bind:this={inputEl}
@@ -167,14 +168,12 @@
 <style>
 	.prompt-card {
 		box-shadow:
-			0 0 0 1px rgba(0, 0, 0, 0.03),
 			0 1px 2px rgba(0, 0, 0, 0.02),
 			0 8px 32px rgba(0, 0, 0, 0.06);
 	}
 
 	:global(.dark) .prompt-card {
 		box-shadow:
-			0 0 0 1px rgba(255, 255, 255, 0.06),
 			0 1px 2px rgba(0, 0, 0, 0.1),
 			0 8px 32px rgba(0, 0, 0, 0.3);
 	}
