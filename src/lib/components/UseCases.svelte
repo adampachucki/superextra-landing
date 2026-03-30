@@ -6,11 +6,15 @@
 	let {
 		items,
 		subtitle = 'Use Cases',
-		title = 'Supporting decisions across different functions'
+		title = 'Supporting decisions across different functions',
+		titleClass = 'max-w-2xl',
+		subtitleClass = ''
 	}: {
 		items?: { title: string; audience?: string; description: string }[];
 		subtitle?: string;
 		title?: string;
+		titleClass?: string;
+		subtitleClass?: string;
 	} = $props();
 
 	let scrollContainer: HTMLDivElement;
@@ -153,7 +157,7 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="mb-12 flex items-end justify-between">
 			<div>
-				<SectionHeader {subtitle} {title} titleClass="max-w-2xl" />
+				<SectionHeader {subtitle} {title} {titleClass} {subtitleClass} />
 			</div>
 
 			<div class="hidden items-center gap-2 md:flex">
