@@ -93,10 +93,10 @@
 	<title>Log in - Superextra</title>
 </svelte:head>
 
-<div class="fixed inset-0 flex flex-col overflow-hidden bg-cream">
+<div class="flex min-h-svh flex-col bg-cream">
 	<!-- Content -->
 	<div class="flex flex-1 items-center justify-center px-6">
-		<div class="w-full max-w-[340px]">
+		<div class="w-full max-w-xs">
 			{#if step === 'email'}
 				<form onsubmit={handleEmailSubmit} class="stagger-1">
 					<div class="relative">
