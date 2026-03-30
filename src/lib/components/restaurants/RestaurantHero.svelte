@@ -91,8 +91,8 @@
 		{ label: "Who's getting the traffic", color: '#a78bfa', query: 'What are the foot traffic patterns in my neighbourhood by day and daypart?' },
 		{ label: 'Salary benchmarks', color: '#f472b6', query: 'What are restaurants near us actually paying for every role?' },
 		{ label: 'What guests are saying', color: '#fbbf24', query: 'What are the real sentiment themes across our reviews and competitors?' },
-		{ label: 'Who just opened nearby', color: '#06b6d4', query: 'What new restaurants have opened or closed in my area recently?' },
-		{ label: 'Market-wide sales shifts', color: '#818cf8', query: 'Is a slow month just us or is the whole neighbourhood pulling back?' }
+		{ label: 'Market sales shifts', color: '#818cf8', query: 'Is a slow month just us or is the whole neighbourhood pulling back?' },
+		{ label: 'Who opened nearby', color: '#06b6d4', query: 'What new restaurants have opened or closed in my area recently?' }
 	];
 
 	function resizeTextarea() {
@@ -107,23 +107,8 @@
 		resizeTextarea();
 	});
 
-	let visibleIdx = $state(-1);
-	let hoverTimer: ReturnType<typeof setTimeout> | undefined;
-	let topicSelected = $state(false);
-
-	function showCard(i: number) {
-		clearTimeout(hoverTimer);
-		hoverTimer = setTimeout(() => { visibleIdx = i; }, 200);
-	}
-
-	function hideCard() {
-		clearTimeout(hoverTimer);
-		visibleIdx = -1;
-	}
-
 	function selectTopic(query: string) {
 		userQuery = query;
-		topicSelected = true;
 		inputEl?.focus();
 	}
 </script>
@@ -179,16 +164,12 @@
 		<!-- Topic suggestion pills -->
 		<div
 			class="topic-row mx-auto mt-12 flex flex-wrap justify-center gap-2 pb-1 transition-all duration-300 md:mt-12"
-			class:max-md:opacity-0={topicSelected}
-			class:max-md:pointer-events-none={topicSelected}
-			style="max-width: 900px;"
+			style="max-width: 750px;"
 		>
 			{#each topics as topic, i}
 				<div
-					class="topic-pill-wrap relative"
+					class="topic-pill-wrap"
 					style="animation-delay: {380 + i * 40}ms"
-					onmouseenter={() => showCard(i)}
-					onmouseleave={hideCard}
 				>
 					<button
 						onclick={() => selectTopic(topic.query)}
@@ -197,7 +178,6 @@
 						<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"></span>
 						{topic.label}
 					</button>
-					<span class="frost-card max-md:hidden" class:frost-card-visible={visibleIdx === i}>{topic.query}</span>
 				</div>
 			{/each}
 		</div>
@@ -238,40 +218,5 @@
 		animation: fadeIn 0.4s ease-out both;
 	}
 
-	.frost-card {
-		position: absolute;
-		bottom: calc(100% + 8px);
-		left: 50%;
-		width: max-content;
-		max-width: 260px;
-		padding: 10px 16px;
-		border-radius: 14px;
-		font-size: 13px;
-		line-height: 1.5;
-		white-space: normal;
-		text-align: center;
-		pointer-events: none;
-		z-index: 20;
-
-		background: rgba(0, 0, 0, 0.03);
-		backdrop-filter: blur(12px);
-		-webkit-backdrop-filter: blur(12px);
-		border: none;
-		color: rgba(0, 0, 0, 0.5);
-
-		opacity: 0;
-		transform: translateX(-50%) scale(0.96);
-		transition: opacity 0.35s ease, transform 0.35s ease;
-	}
-
-	:global(.dark) .frost-card {
-		background: rgba(0, 0, 0, 0.03);
-		color: rgba(255, 255, 255, 0.5);
-	}
-
-	.frost-card-visible {
-		opacity: 1;
-		transform: translateX(-50%) scale(1);
-	}
 
 </style>
