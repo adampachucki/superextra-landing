@@ -31,7 +31,7 @@
 <nav
 	class="fixed top-0 left-0 right-0 z-50 transition-colors duration-300 {over ? '' : 'bg-cream'}"
 >
-	<div class="absolute inset-x-0 bottom-0 h-px bg-cream-200 transition-opacity duration-300 {scrolled ? 'opacity-100' : 'opacity-0'}"></div>
+	<div class="absolute inset-x-0 bottom-0 h-px bg-cream-200 transition-opacity duration-300 {scrolled || minimal ? 'opacity-100' : 'opacity-0'}"></div>
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
 		<a href="/" class="group flex items-center gap-0 md:gap-0.5 transition-colors {over ? 'text-white' : 'text-black dark:text-white'}">
 			<svg class="h-[18px] w-[18px] -mt-2.5 md:-mt-2 transition-transform duration-500 ease-out group-hover:rotate-45" viewBox="0 0 12 12" fill="none">
@@ -54,14 +54,14 @@
 
 		<div class="hidden items-center gap-3 md:flex">
 			<button onclick={() => formState.open()} class="cursor-pointer rounded-full border px-6 py-2.5 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Contact Us</button>
-			<button class="cursor-pointer btn-primary px-5 py-2 text-sm">Log in</button>
+			<a href="/login" class="btn-primary px-5 py-2 text-sm">Log in</a>
 		</div>
 
 		<div class="flex items-center gap-3 md:hidden">
 			<button onclick={() => formState.open()} class="cursor-pointer rounded-full border p-2 {over ? 'border-white/15 text-white/40' : 'border-black/10 text-black/30 dark:border-white/10 dark:text-white/30'}" aria-label="Contact Us">
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linejoin="round" d="M2 4h20v16H2V4zm0 0l10 8 10-8" /></svg>
 			</button>
-			<button class="cursor-pointer btn-primary px-4 py-1.5 text-sm">Log in</button>
+			<a href="/login" class="btn-primary px-4 py-1.5 text-sm">Log in</a>
 			{#if !minimal}
 				<button
 					class="{over ? 'text-white' : 'text-black dark:text-white'}"

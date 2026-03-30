@@ -113,8 +113,10 @@
 		{/if}
 
 		<!-- Input bar -->
-		<div class="border-t border-black/[0.04] bg-cream dark:border-white/[0.04]">
-			<div class="mx-auto max-w-[700px] px-4 py-3 md:px-6">
+		<div class="relative">
+			<div class="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[var(--color-cream)]/80 to-transparent"></div>
+			<div class="relative z-10 bg-cream">
+			<div class="mx-auto max-w-[800px] px-4 pb-3 md:px-6">
 				<!-- Mobile: place context + new chat (visible only on small screens) -->
 				{#if chatState.placeContext}
 					<div class="mb-2 flex items-center gap-2 lg:hidden">
@@ -128,45 +130,52 @@
 						</button>
 					</div>
 				{/if}
-				<div class="input-card flex items-end gap-2 rounded-xl border border-black/[0.06] bg-white px-4 py-3 dark:border-white/[0.06] dark:bg-cream-50">
-					<textarea
-						bind:this={inputEl}
-						bind:value={query}
-						onkeydown={handleKeydown}
-						placeholder="Ask a follow-up..."
-						rows="1"
-						class="flex-1 resize-none border-0 bg-transparent text-[14px] leading-relaxed text-black placeholder:text-black/25 focus:outline-none dark:text-white dark:placeholder:text-white/25"
-					></textarea>
-					<button
-						onclick={handleSend}
-						disabled={!query.trim() || chatState.loading}
-						aria-label="Send"
-						class="shrink-0 rounded-full bg-black p-1.5 transition-colors hover:bg-black/80 disabled:cursor-default disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
-					>
-						<svg class="h-3.5 w-3.5 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
-						</svg>
-					</button>
+				<div class="prompt-card rounded-2xl border border-black/[0.06] bg-white dark:border-white/[0.06] dark:bg-cream-50">
+					<div class="px-5 pt-4">
+						<textarea
+							bind:this={inputEl}
+							bind:value={query}
+							onkeydown={handleKeydown}
+							placeholder="Ask a follow-up..."
+							rows="1"
+							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/25 focus:outline-none dark:text-white dark:placeholder:text-white/25"
+						></textarea>
+					</div>
+					<div class="flex items-center justify-end px-4 pb-4">
+						<button
+							onclick={handleSend}
+							disabled={!query.trim() || chatState.loading}
+							aria-label="Send"
+							class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:cursor-default disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
+						>
+							<svg class="h-4 w-4 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+							</svg>
+						</button>
+					</div>
 				</div>
 				<p class="mt-2 text-center text-[11px] text-black/20 dark:text-white/20">
-					Superextra may make mistakes. Verify important information.
+					Superextra may make mistakes.
 				</p>
 			</div>
+		</div>
 		</div>
 	</div>
 </div>
 </div>
 
 <style>
-	.input-card {
+	.prompt-card {
 		box-shadow:
-			0 0 0 1px rgba(0, 0, 0, 0.02),
-			0 1px 3px rgba(0, 0, 0, 0.04);
+			0 0 0 1px rgba(0, 0, 0, 0.03),
+			0 1px 2px rgba(0, 0, 0, 0.02),
+			0 8px 32px rgba(0, 0, 0, 0.06);
 	}
 
-	:global(.dark) .input-card {
+	:global(.dark) .prompt-card {
 		box-shadow:
-			0 0 0 1px rgba(255, 255, 255, 0.04),
-			0 1px 3px rgba(0, 0, 0, 0.15);
+			0 0 0 1px rgba(255, 255, 255, 0.06),
+			0 1px 2px rgba(0, 0, 0, 0.1),
+			0 8px 32px rgba(0, 0, 0, 0.3);
 	}
 </style>

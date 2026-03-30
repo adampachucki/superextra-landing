@@ -95,19 +95,7 @@
 		to { opacity: 1; transform: translateY(0); }
 	}
 
-	.agent-msg {
-		box-shadow:
-			0 0 0 1px rgba(0, 0, 0, 0.02),
-			0 1px 3px rgba(0, 0, 0, 0.04);
-	}
-
-	:global(.dark) .agent-msg {
-		box-shadow:
-			0 0 0 1px rgba(255, 255, 255, 0.04),
-			0 1px 3px rgba(0, 0, 0, 0.15);
-	}
-
-	.loading-dots span {
+.loading-dots span {
 		animation: dotPulse 1.4s ease-in-out infinite;
 	}
 	.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
