@@ -114,40 +114,42 @@
 		<!-- Prompt card -->
 		<div class="prompt-fade mx-auto mt-10 md:mt-12" style="max-width: 650px; animation-delay: 280ms;">
 			<div class="prompt-card overflow-hidden rounded-2xl border border-black/[0.06] bg-white dark:border-white/[0.06] dark:bg-cream-50">
-				<div class="flex items-center gap-3 border-b border-black/[0.04] px-5 dark:border-white/[0.06]">
-					<!-- svelte-ignore a11y_autofocus -->
-					<input
-						type="text"
-						autofocus
-						placeholder="Restaurant name or location..."
-						class="w-full border-0 bg-transparent py-4 text-[15px] text-black placeholder:text-black/25 focus:outline-none dark:text-white dark:placeholder:text-white/25"
-					/>
-				</div>
-				<div class="flex items-start gap-3 px-5 py-4">
-					<textarea
-						bind:this={inputEl}
-						bind:value={userQuery}
-						onfocus={() => {}}
-						placeholder={isAnimating ? display : 'What do you want to know about your market?'}
-						rows="1"
-						class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating ? 'placeholder:text-black/70 dark:placeholder:text-white/70' : 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
-					></textarea>
-
-					<button onclick={handleExplore} aria-label="Explore" class="mt-0.5 cursor-pointer shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80">
-						<svg class="h-4 w-4 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-						</svg>
-					</button>
+				<div class="flex flex-col" style="min-height: 140px;">
+					<div class="flex-1 px-5 pt-5">
+						<!-- svelte-ignore a11y_autofocus -->
+						<textarea
+							bind:this={inputEl}
+							autofocus
+							bind:value={userQuery}
+							onfocus={() => {}}
+							placeholder={isAnimating ? display : 'What do you want to know about your market?'}
+							rows="1"
+							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating ? 'placeholder:text-black/70 dark:placeholder:text-white/70' : 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
+						></textarea>
+					</div>
+					<div class="flex items-center justify-between px-4 pb-4">
+						<button aria-label="Add context" class="cursor-pointer flex items-center gap-1.5 rounded-full border border-black/[0.08] px-3 py-1.5 text-xs text-black/40 transition-colors hover:border-black/15 hover:text-black/60 dark:border-white/[0.08] dark:text-white/40 dark:hover:border-white/15 dark:hover:text-white/60">
+							<svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+							</svg>
+							Add context
+						</button>
+						<button aria-label="Explore" class="cursor-pointer shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80">
+							<svg class="h-4 w-4 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+							</svg>
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>
 
 		<!-- Topic suggestion pills -->
-		<div class="topic-row mx-auto mt-12 flex gap-2 overflow-x-auto pb-1 md:mt-12" style="max-width: 900px;">
+		<div class="topic-row mx-auto mt-12 flex flex-wrap justify-center gap-2 pb-1 md:mt-12" style="max-width: 900px;">
 			{#each topics as topic, i}
 				<button
 					onclick={() => selectTopic(topic.query)}
-					class="topic-pill inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-black/[0.06] px-3.5 py-2 text-[13px] text-black/40 transition-all hover:border-black/[0.12] hover:text-black/60 dark:border-white/[0.06] dark:text-white/40 dark:hover:border-white/[0.12] dark:hover:text-white/60"
+					class="topic-pill inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-black/[0.06] px-3.5 py-2 text-[13px] text-black/40 transition-all hover:border-black/[0.12] hover:text-black/60 dark:border-white/[0.06] dark:text-white/40 dark:hover:border-white/[0.12] dark:hover:text-white/60"
 					style="animation-delay: {380 + i * 40}ms"
 				>
 					<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"></span>
@@ -192,20 +194,4 @@
 		animation: fadeIn 0.4s ease-out both;
 	}
 
-	.topic-row {
-		scrollbar-width: none;
-		-ms-overflow-style: none;
-	}
-	.topic-row::-webkit-scrollbar {
-		display: none;
-	}
-
-	@media (min-width: 768px) {
-		.topic-row {
-			flex-wrap: wrap;
-			justify-content: center;
-			gap: 10px;
-			overflow: visible;
-		}
-	}
 </style>

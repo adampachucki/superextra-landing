@@ -3,6 +3,16 @@
 	import CardCanvas from './CardCanvas.svelte';
 	import SectionHeader from './SectionHeader.svelte';
 
+	let {
+		items,
+		subtitle = 'Use Cases',
+		title = 'Supporting decisions across different functions'
+	}: {
+		items?: { title: string; audience?: string; description: string }[];
+		subtitle?: string;
+		title?: string;
+	} = $props();
+
 	let scrollContainer: HTMLDivElement;
 	let activeIndex = $state(0);
 	let hoveredIndex = $state(-1);
@@ -18,7 +28,7 @@
 
 	let effectiveHovered = $derived(isMobile && hoveredIndex === -1 ? activeIndex : hoveredIndex);
 
-	const useCases = [
+	const defaultUseCases = [
 		{
 			title: 'Marketing Strategy',
 			audience: 'Operators & Agencies',
@@ -68,6 +78,8 @@
 				'Integrate hyper-local restaurant intelligence into your platform via API. Add market context, venue data, and competitive insights to your product.'
 		}
 	];
+
+	let useCases = $derived(items ?? defaultUseCases);
 
 	function scrollTo(index: number) {
 		if (!scrollContainer) return;
@@ -141,7 +153,7 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="mb-12 flex items-end justify-between">
 			<div>
-				<SectionHeader subtitle="Use Cases" title="Supporting decisions across different functions" titleClass="max-w-2xl" />
+				<SectionHeader {subtitle} {title} titleClass="max-w-2xl" />
 			</div>
 
 			<div class="hidden items-center gap-2 md:flex">
@@ -174,7 +186,7 @@
 					<UseCaseGraphics index={i} hovered={effectiveHovered === i} />
 				</div>
 
-				<p class="mb-1 text-xs font-medium text-black/25 dark:text-white/25">{useCase.audience}</p>
+				{#if useCase.audience}<p class="mb-1 text-xs font-medium text-black/25 dark:text-white/25">{useCase.audience}</p>{/if}
 				<h3 class="mb-2 text-lg font-medium tracking-[-0.01em] text-black dark:text-white">
 					{useCase.title}
 				</h3>

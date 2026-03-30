@@ -6,7 +6,7 @@
 
 		<div class="grid grid-cols-1 gap-12 lg:grid-cols-2 lg:gap-20">
 			<h2 class="text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black dark:text-white">
-				The market view restaurants have been missing
+				The market view your restaurant has been missing
 			</h2>
 
 			<div class="space-y-6">

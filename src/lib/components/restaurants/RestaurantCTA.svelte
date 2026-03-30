@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { formState } from '$lib/form-state.svelte';
+	function scrollToPrompt() {
+		const textarea = document.querySelector<HTMLTextAreaElement>('textarea[autofocus]');
+		if (textarea) {
+			textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			setTimeout(() => textarea.focus(), 500);
+		}
+	}
 </script>
 
 <section class="border-t border-cream-200 py-24 md:py-32">
@@ -11,10 +17,13 @@
 			Limited early access is now open.
 		</p>
 		<button
-			onclick={() => formState.open()}
-			class="mt-8 inline-flex cursor-pointer items-center gap-2 btn-primary px-8 py-3.5 text-sm"
+			onclick={scrollToPrompt}
+			aria-label="Scroll to prompt"
+			class="mt-8 inline-flex cursor-pointer items-center justify-center rounded-full bg-black p-4 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
 		>
-			Get Started
+			<svg class="h-5 w-5 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+			</svg>
 		</button>
 	</div>
 </section>

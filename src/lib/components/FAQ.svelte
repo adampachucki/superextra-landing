@@ -1,7 +1,13 @@
 <script lang="ts">
 	import SectionHeader from './SectionHeader.svelte';
 
-	const faqs = [
+	let {
+		items
+	}: {
+		items?: { question: string; answer: string }[];
+	} = $props();
+
+	const defaultFaqs = [
 		{
 			question: 'What types of restaurants is Superextra built for?',
 			answer: "Superextra is built for every segment of the restaurant industry — from independent operators and fast-casual concepts to fine dining groups and growing multi-unit brands. It's also used by suppliers, tech platforms, agencies, and investors who need restaurant market intelligence."
@@ -36,6 +42,7 @@
 		}
 	];
 
+	let faqs = $derived(items ?? defaultFaqs);
 	let openIndex = $state(-1);
 </script>
 
