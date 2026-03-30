@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { afterNavigate } from '$app/navigation';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import PreviewBadge from '$lib/components/PreviewBadge.svelte';
 	import CookieBanner from '$lib/components/CookieBanner.svelte';
@@ -58,9 +59,11 @@
 
 {#if unlocked}
 	{@render children()}
-	<div class="fixed bottom-5 left-5 z-50 hidden md:block">
-		<PreviewBadge />
-	</div>
+	{#if !page.url.pathname.startsWith('/agent')}
+		<div class="fixed bottom-5 left-5 z-50 hidden md:block">
+			<PreviewBadge />
+		</div>
+	{/if}
 	<CookieBanner />
 {:else}
 	<div class="fixed inset-0 z-[200] flex items-center justify-center bg-white dark:bg-cream">
