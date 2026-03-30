@@ -11,44 +11,44 @@
 
 	const agentUseCases = [
 		{
-			title: 'Competitive Benchmarking',
+			title: 'Competitor blind spot',
 			description:
-				'See how your pricing, reviews, and traffic stack up against the restaurants around you. Know exactly where you stand without the guesswork.'
+				'Your competitors changed their menu and adjusted prices. You heard about it months later from a supplier. Superextra tracks every move in your market so you can respond in days, not quarters.'
 		},
 		{
-			title: 'Menu & Pricing',
+			title: 'Pricing in the dark',
 			description:
-				'Track what competitors charge, which items are trending, and where your pricing sits in the local market. Adjust with data, not gut feel.'
+				'You set prices based on food cost and a rough sense of what the neighbourhood will bear. Meanwhile the place across the street undercut your lunch deal last week. Superextra shows exactly where your menu sits relative to every comparable venue nearby.'
 		},
 		{
-			title: 'Marketing Strategy',
+			title: 'Down month — us or everyone?',
 			description:
-				'Benchmark your brand against local competitors. Know which campaigns, channels, and price points are actually driving results in your market.'
+				'Sales dropped 12% and the whole team is second-guessing the new menu. Superextra separates your performance from the market trend so you know whether to fix something or ride it out.'
 		},
 		{
-			title: 'Expansion Planning',
+			title: 'Expansion gamble',
 			description:
-				'Evaluate new locations with foot traffic, competition density, demographics, and rent data side by side. De-risk every site decision before you sign a lease.'
+				'Opening a second location is the biggest bet you'll make. Most operators choose based on gut feel and a few drive-bys. Superextra maps foot traffic, competition density, demographics, and rent before you sign a lease.'
 		},
 		{
-			title: 'Concept Validation',
+			title: 'New concept, no proof',
 			description:
-				"Test a new concept against real market data before you commit. See what's already working in the area, where the gaps are, and whether demand supports your idea."
+				'You're betting a buildout on a concept that "feels right" for the area. Superextra shows what's already working nearby, where the gaps are, and whether local demand actually supports the idea.'
 		},
 		{
-			title: 'Guest Sentiment',
+			title: 'Review noise',
 			description:
-				'Understand what guests love and what frustrates them — across your venues and the competition. Spot patterns that individual reviews never reveal.'
+				'You read every review but still can't tell what's a one-off complaint and what's a real pattern. Superextra surfaces the sentiment trends that individual reviews never reveal — across your venues and the competition.'
 		},
 		{
-			title: 'Workforce & Costs',
+			title: 'Staffing squeeze',
 			description:
-				'Know what the market actually pays for every role, how your labor costs compare, and where staffing pressure is building around you.'
+				'You lost two line cooks this month and you're not sure if your pay is off or the whole market is tight. Superextra benchmarks what restaurants nearby actually pay for every role so you hire to retain, not just to fill.'
 		},
 		{
-			title: 'Market Monitoring',
+			title: 'Slow to react',
 			description:
-				'Get a clear picture when competitors open, close, change prices, or shift strategy. Stay ahead of changes instead of reacting to them.'
+				'A new competitor opened two streets over and started pulling your weekday crowd. You found out when covers were already down. Superextra alerts you to openings, closures, and strategy shifts as they happen.'
 		}
 	];
 
