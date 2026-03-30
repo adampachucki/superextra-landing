@@ -8,7 +8,12 @@ export default defineConfig({
 		host: true,
 		port: 5199,
 		proxy: {
-			'/api/intake': 'https://superextra-landing.web.app'
+			'/api/intake': 'https://superextra-landing.web.app',
+			'/api/agent': {
+				target: 'https://us-central1-superextra-site.cloudfunctions.net',
+				changeOrigin: true,
+				rewrite: (path: string) => path.replace(/^\/api\/agent/, '/agent')
+			}
 		}
 	}
 });

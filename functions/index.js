@@ -1,8 +1,13 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
+import { VertexAI } from '@google-cloud/vertexai';
 
 const relayKey = defineSecret('RELAY_KEY');
 const DEST = 'hello@superextra.ai';
+
+// --- Vertex AI config ---
+const PROJECT = 'superextra-site';
+const LOCATION = 'us-central1';
 
 export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req, res) => {
 	const RELAY_KEY = relayKey.value();
@@ -115,3 +120,119 @@ function confirmationHtml(name) {
 <p>Best,<br>Adam</p>
 </div>`;
 }
+
+// --- Agent chat endpoint ---
+
+const SYSTEM_INSTRUCTION = `You are a restaurant market analyst working for Superextra, an AI-native market intelligence service for the restaurant industry. Your job is to answer questions about the competitive landscape, pricing, guest sentiment, foot traffic, operations, and market trends relevant to a specific restaurant or area.
+
+Every conversation should be grounded in a specific restaurant or area. User messages may include a [Context: ...] prefix containing the restaurant name, location, and Google Place ID. Use this to focus your research on the relevant neighborhood, city, and competitive set.
+
+If no context is provided and the user has not mentioned a specific restaurant or area, your first response must ask them to specify one. Do not research or answer market questions without knowing the location.
+
+You cover seven layers of restaurant market intelligence:
+1. Market landscape — openings/closings, competitor activity, cuisine trends, saturation, white space
+2. Menu and pricing — competitor menus, price positioning, delivery markups, trending dishes
+3. Revenue and sales — revenue estimates, check size, occupancy, channel splits, platform share
+4. Marketing and digital — social media activity, ad spend, web presence, digital ordering
+5. Guest intelligence — review sentiment, guest expectations, complaints/praise, tourist vs local
+6. Location and traffic — foot traffic, demographics, purchasing power, rent, trade areas
+7. Operations — labor availability, salary benchmarks, staffing trends, supplier pricing
+
+Research thoroughly using web search before responding. Always cite sources. Structure answers with headings, lists, or tables. Lead with the most actionable insight. Be specific to the location. Acknowledge gaps honestly — never fabricate data. Keep responses concise but complete.
+
+Tone: knowledgeable, data-driven, direct, professional but approachable. You do not have access to internal data (POS, financials). Do not provide legal, tax, or medical advice.
+
+Always respond in the same language the user writes in. If the user writes in Polish, respond in Polish. If in German, respond in German. The language of the response must match the language of the user's message, regardless of the restaurant's location or the data sources used.`;
+
+const rateLimitMap = new Map();
+
+// Conversation history per session (in-memory, resets on cold start)
+const sessionHistory = new Map();
+
+export const agent = onRequest({ cors: true, timeoutSeconds: 120 }, async (req, res) => {
+	if (req.method !== 'POST') {
+		res.status(405).json({ ok: false, error: 'Method not allowed' });
+		return;
+	}
+
+	// Basic rate limiting (20 requests per 10 min per IP)
+	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+	const now = Date.now();
+	const window = 10 * 60 * 1000;
+	const entry = rateLimitMap.get(ip);
+	if (entry && now - entry.start < window) {
+		if (entry.count >= 20) {
+			res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+			return;
+		}
+		entry.count++;
+	} else {
+		rateLimitMap.set(ip, { start: now, count: 1 });
+	}
+
+	const { message, sessionId, placeContext, history } = req.body || {};
+
+	if (!message || typeof message !== 'string' || !sessionId) {
+		res.status(400).json({ ok: false, error: 'message and sessionId are required' });
+		return;
+	}
+
+	if (message.length > 2000) {
+		res.status(400).json({ ok: false, error: 'Message too long' });
+		return;
+	}
+
+	// Build the query text with optional place context (only on first message)
+	let queryText = message;
+	if (placeContext && placeContext.name) {
+		const hasHistory = (history && history.length > 0) || sessionHistory.has(sessionId);
+		if (!hasHistory) {
+			queryText = `[Context: asking about ${placeContext.name}, ${placeContext.secondary || ''} (Place ID: ${placeContext.placeId || 'unknown'})] ${message}`;
+		}
+	}
+
+	// Build conversation history for multi-turn
+	const prevHistory = history || sessionHistory.get(sessionId) || [];
+	const contents = [
+		...prevHistory,
+		{ role: 'user', parts: [{ text: queryText }] }
+	];
+
+	try {
+		const vertexAI = new VertexAI({ project: PROJECT, location: LOCATION });
+		const model = vertexAI.getGenerativeModel({
+			model: 'gemini-2.5-pro',
+			systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+			tools: [{ googleSearch: {} }]
+		});
+
+		const result = await model.generateContent({ contents });
+		const response = result.response;
+
+		// Extract text from response
+		const reply = response.candidates?.[0]?.content?.parts
+			?.filter(p => p.text)
+			?.map(p => p.text)
+			?.join('\n\n')
+			|| 'I wasn\'t able to generate a response. Please try rephrasing your question.';
+
+		// Store conversation history for this session
+		const updatedHistory = [
+			...contents,
+			{ role: 'model', parts: [{ text: reply }] }
+		];
+		sessionHistory.set(sessionId, updatedHistory);
+
+		// Extract grounding sources if available
+		const grounding = response.candidates?.[0]?.groundingMetadata;
+		const sources = grounding?.groundingChunks
+			?.filter(c => c.web)
+			?.map(c => ({ title: c.web.title, url: c.web.uri }))
+			|| [];
+
+		res.json({ ok: true, reply, sources });
+	} catch (err) {
+		console.error('Agent error:', err.message || err);
+		res.status(500).json({ ok: false, error: 'Agent unavailable. Please try again.' });
+	}
+});
