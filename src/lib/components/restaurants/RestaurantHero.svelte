@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
-	import { formState } from '$lib/form-state.svelte';
+	import { goto } from '$app/navigation';
+	import { chatState } from '$lib/chat-state.svelte';
 
 	const PREFIX = 'Ask Superextra ';
 	const PROMPTS = [
@@ -83,8 +84,29 @@
 		};
 	});
 
+	let placeNudge = $state(false);
+
 	function handleExplore() {
-		formState.open();
+		if (!userQuery.trim()) {
+			inputEl?.focus();
+			return;
+		}
+		if (!selectedPlace) {
+			placeNudge = true;
+			contextOpen = true;
+			requestAnimationFrame(() => placeInputEl?.focus());
+			return;
+		}
+		placeNudge = false;
+		chatState.start(userQuery.trim(), selectedPlace);
+		goto('/agent/chat');
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			handleExplore();
+		}
 	}
 
 	const topics = [
@@ -216,6 +238,7 @@
 		selectedPlace = s;
 		placeSuggestions = [];
 		showSuggestions = false;
+		placeNudge = false;
 	}
 
 	function removePlace() {
@@ -240,7 +263,7 @@
 			class="hero-fade mx-auto md:max-w-none text-center font-semibold tracking-[-0.03em] text-black dark:text-white"
 			style="font-size: clamp(2.75rem, 6vw, 5.25rem); line-height: 1.02; animation-delay: 100ms;"
 		>
-			A market analyst <br class="max-md:hidden" />for every restaurant
+			AI consultant <br />for every restaurant
 		</h1>
 
 		<!-- Subheadline -->
@@ -258,6 +281,7 @@
 							bind:this={inputEl}
 							autofocus
 							bind:value={userQuery}
+							onkeydown={handleKeydown}
 							onfocus={() => {}}
 							placeholder={isAnimating ? display : 'What do you want to know about your market?'}
 							rows="2"
@@ -316,6 +340,12 @@
 					</div>
 
 					<!-- Expanded context: place search -->
+					{#if placeNudge && !selectedPlace}
+						<p class="context-slide mx-5 mb-2 text-[12px] text-black/40 dark:text-white/40">
+							Select your restaurant so we can focus on the right area.
+						</p>
+					{/if}
+
 					{#if contextOpen && !selectedPlace}
 						<div class="context-slide relative mx-4 mb-4">
 							<div class="relative">
