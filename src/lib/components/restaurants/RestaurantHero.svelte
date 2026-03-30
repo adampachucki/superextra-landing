@@ -10,6 +10,22 @@
 		'what line cooks earn nearby...',
 		'which platforms perform best...'
 	];
+	const MOBILE_PROMPTS = [
+		'about local prices...',
+		'about competitor reviews...',
+		'how last month went...',
+		'where to open next...',
+		'what cooks earn nearby...',
+		'which platforms work...'
+	];
+	let isMobile = $state(false);
+	$effect(() => {
+		const mq = window.matchMedia('(max-width: 767px)');
+		isMobile = mq.matches;
+		const handler = (e: MediaQueryListEvent) => { isMobile = e.matches; };
+		mq.addEventListener('change', handler);
+		return () => mq.removeEventListener('change', handler);
+	});
 	const TYPE_MS = 45;
 	const DELETE_MS = 25;
 	const HOLD_MS = 2200;
@@ -36,7 +52,8 @@
 
 		async function run() {
 			while (!cancelled) {
-				const text = PROMPTS[idx % PROMPTS.length];
+				const prompts = isMobile ? MOBILE_PROMPTS : PROMPTS;
+				const text = prompts[idx % prompts.length];
 
 				for (let i = 1; i <= text.length; i++) {
 					if (cancelled) return;
@@ -92,6 +109,7 @@
 
 	let visibleIdx = $state(-1);
 	let hoverTimer: ReturnType<typeof setTimeout> | undefined;
+	let topicSelected = $state(false);
 
 	function showCard(i: number) {
 		clearTimeout(hoverTimer);
@@ -105,6 +123,7 @@
 
 	function selectTopic(query: string) {
 		userQuery = query;
+		topicSelected = true;
 		inputEl?.focus();
 	}
 </script>
@@ -136,7 +155,7 @@
 							bind:value={userQuery}
 							onfocus={() => {}}
 							placeholder={isAnimating ? display : 'What do you want to know about your market?'}
-							rows="1"
+							rows="2"
 							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating ? 'placeholder:text-black/70 dark:placeholder:text-white/70' : 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
 						></textarea>
 					</div>
@@ -158,7 +177,12 @@
 		</div>
 
 		<!-- Topic suggestion pills -->
-		<div class="topic-row mx-auto mt-12 flex flex-wrap justify-center gap-2 pb-1 md:mt-12" style="max-width: 900px;">
+		<div
+			class="topic-row mx-auto mt-12 flex flex-wrap justify-center gap-2 pb-1 transition-all duration-300 md:mt-12"
+			class:max-md:opacity-0={topicSelected}
+			class:max-md:pointer-events-none={topicSelected}
+			style="max-width: 900px;"
+		>
 			{#each topics as topic, i}
 				<div
 					class="topic-pill-wrap relative"
@@ -173,7 +197,7 @@
 						<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"></span>
 						{topic.label}
 					</button>
-					<span class="frost-card" class:frost-card-visible={visibleIdx === i}>{topic.query}</span>
+					<span class="frost-card max-md:hidden" class:frost-card-visible={visibleIdx === i}>{topic.query}</span>
 				</div>
 			{/each}
 		</div>

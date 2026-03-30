@@ -49,7 +49,8 @@
 						{/if}
 					</button>
 				</div>
-				<div class="flex items-center gap-2 md:hidden">
+				<div class="flex items-center gap-4 md:hidden">
+					<button class="cursor-pointer rounded-full border border-black/10 px-5 py-1.5 text-sm text-black/50 dark:border-white/10 dark:text-white/50">Log in</button>
 					<span class="text-xs text-black/40 dark:text-white/40">Supported by</span>
 					<img src="/google-for-startups.svg" alt="Google for Startups" class="h-3.5 translate-y-px opacity-40 grayscale dark:invert" />
 				</div>
