@@ -8,7 +8,7 @@
 	}
 </script>
 
-<section class="border-t border-cream-200 py-24 md:py-32">
+<section class="bg-cream-100 py-24 md:py-32">
 	<div class="mx-auto max-w-2xl px-6 text-center">
 		<h2 class="text-[clamp(1.75rem,3.5vw,2.75rem)] leading-[1.1] font-medium tracking-[-0.02em] text-black dark:text-white">
 			Start with a question

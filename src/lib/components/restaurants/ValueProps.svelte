@@ -8,7 +8,7 @@
 	} = $props();
 </script>
 
-<section class="py-24 md:py-32">
+<section class="border-t border-cream-200 md:border-t-0 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40 dark:text-white/40">
 			About Superextra
