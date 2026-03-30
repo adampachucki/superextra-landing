@@ -55,8 +55,8 @@
 
 		<div class="hidden items-center gap-3 md:flex">
 			{#if minimal}
-				<button class="cursor-pointer rounded-full border px-6 py-2.5 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Log in</button>
-				<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-5 py-2 text-sm">Contact Us</button>
+				<button onclick={() => formState.open()} class="cursor-pointer rounded-full border px-6 py-2.5 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Contact Us</button>
+				<button class="cursor-pointer btn-primary px-5 py-2 text-sm">Log in</button>
 			{:else}
 				<a href="mailto:hello@superextra.ai" class="rounded-full border px-6 py-2.5 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Contact Us</a>
 				<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-5 py-2 text-sm">Get Started</button>
@@ -65,7 +65,7 @@
 
 		<div class="flex items-center gap-3 md:hidden">
 			{#if minimal}
-				<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-4 py-1.5 text-sm">Contact Us</button>
+				<button class="cursor-pointer btn-primary px-4 py-1.5 text-sm">Log in</button>
 			{:else}
 				<PreviewBadge tooltipBelow />
 				<button
@@ -94,8 +94,8 @@
 					<hr class="border-cream-100" />
 					{/if}
 					{#if minimal}
-					<button class="cursor-pointer rounded-full border border-black/10 px-5 py-2.5 text-center text-sm text-black/70 dark:border-white/10 dark:text-white/70" onclick={() => { mobileOpen = false; }}>Log in</button>
-					<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm">Contact Us</button>
+					<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer rounded-full border border-black/10 px-5 py-2.5 text-center text-sm text-black/70 dark:border-white/10 dark:text-white/70">Contact Us</button>
+					<button class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm" onclick={() => { mobileOpen = false; }}>Log in</button>
 					{:else}
 					<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm">Get Started</button>
 					{/if}

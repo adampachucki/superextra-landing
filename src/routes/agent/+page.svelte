@@ -101,5 +101,5 @@
 	<RestaurantCTA />
 </main>
 
-<Footer />
+<Footer showLogin />
 <AccessForm />
