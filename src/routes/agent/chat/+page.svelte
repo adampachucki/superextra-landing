@@ -1,19 +1,85 @@
 <script lang="ts">
+	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
 	import { goto, beforeNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import ChatThread from '$lib/components/restaurants/ChatThread.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { theme } from '$lib/theme.svelte';
 
+	const PREFIX = 'Ask Superextra ';
+	const PROMPTS = [
+		'to compare prices in your area...',
+		'to analyze competitor reviews...',
+		'how was last month for others...',
+		'where to open next...',
+		'what line cooks earn nearby...',
+		'which platforms perform best...'
+	];
+	const MOBILE_PROMPTS = [
+		'about local prices...',
+		'about competitor reviews...',
+		'how last month went...',
+		'where to open next...',
+		'what cooks earn nearby...',
+		'which platforms work...'
+	];
+
 	let inputEl: HTMLTextAreaElement | undefined = $state();
 	let query = $state('');
 	let sidebarOpen = $state(false);
 	let isDesktop = $state(false);
+	let isMobile = $state(false);
+
+	let display = $state(PREFIX);
+	let isAnimating = $derived(!chatState.active && !query && display.length > 0);
+
+	$effect(() => {
+		if (chatState.active || query) return;
+
+		let timeout: ReturnType<typeof setTimeout>;
+		let cancelled = false;
+		let idx = 0;
+
+		function sleep(ms: number) {
+			return new Promise<void>((r) => { timeout = setTimeout(r, ms); });
+		}
+
+		async function run() {
+			while (!cancelled) {
+				const prompts = isMobile ? MOBILE_PROMPTS : PROMPTS;
+				const text = prompts[idx % prompts.length];
+				for (let i = 1; i <= text.length; i++) {
+					if (cancelled) return;
+					display = PREFIX + text.slice(0, i);
+					await sleep(45);
+				}
+				await sleep(2200);
+				for (let i = text.length - 1; i >= 0; i--) {
+					if (cancelled) return;
+					display = PREFIX + text.slice(0, i);
+					await sleep(25);
+				}
+				await sleep(400);
+				idx++;
+			}
+		}
+
+		run();
+		return () => { cancelled = true; clearTimeout(timeout); };
+	});
 
 	$effect(() => {
 		const mq = window.matchMedia('(min-width: 1024px)');
 		isDesktop = mq.matches;
 		const handler = (e: MediaQueryListEvent) => { isDesktop = e.matches; };
+		mq.addEventListener('change', handler);
+		return () => mq.removeEventListener('change', handler);
+	});
+
+	$effect(() => {
+		const mq = window.matchMedia('(max-width: 767px)');
+		isMobile = mq.matches;
+		const handler = (e: MediaQueryListEvent) => { isMobile = e.matches; };
 		mq.addEventListener('change', handler);
 		return () => mq.removeEventListener('change', handler);
 	});
@@ -43,9 +109,22 @@
 	function handleSend() {
 		const trimmed = query.trim();
 		if (!trimmed || chatState.loading) return;
-		chatState.send(trimmed);
-		query = '';
-		resizeTextarea();
+		if (chatState.active) {
+			chatState.send(trimmed);
+			query = '';
+			resizeTextarea();
+		} else {
+			if (!selectedPlace) {
+				placeNudge = true;
+				contextOpen = true;
+				requestAnimationFrame(() => placeInputEl?.focus());
+				return;
+			}
+			placeNudge = false;
+			chatState.start(trimmed, selectedPlace);
+			query = '';
+			resizeTextarea();
+		}
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -69,7 +148,143 @@
 
 	function handleNewChat() {
 		chatState.reset();
-		goto('/agent');
+		selectedPlace = null;
+		placeName = '';
+		placeSuggestions = [];
+		contextOpen = false;
+		placeNudge = false;
+		query = '';
+	}
+
+	// --- Place search (Google Places) ---
+	let placeNudge = $state(false);
+	let contextOpen = $state(false);
+	let placeName = $state('');
+	let selectedPlace = $state<{ name: string; secondary: string; placeId: string } | null>(null);
+	let contextExpanded = $derived(contextOpen && !selectedPlace);
+	let contextOverflow = $state(false);
+
+	$effect(() => {
+		if (contextExpanded) {
+			const timer = setTimeout(() => { contextOverflow = true; }, 380);
+			return () => { clearTimeout(timer); contextOverflow = false; };
+		} else {
+			contextOverflow = false;
+		}
+	});
+
+	let placeSuggestions = $state<Array<{ name: string; secondary: string; placeId: string }>>([]);
+	let showSuggestions = $state(false);
+	let loadingSuggestions = $state(false);
+	let debounceTimer: ReturnType<typeof setTimeout>;
+	let placeInputEl: HTMLInputElement | undefined = $state();
+
+	let browserCountry = $state('');
+	$effect(() => {
+		try {
+			const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+			const tzCountryMap: Record<string, string> = {
+				'America/': 'us', 'US/': 'us',
+				'Europe/London': 'gb', 'Europe/Berlin': 'de', 'Europe/Warsaw': 'pl',
+				'Europe/Paris': 'fr', 'Europe/Rome': 'it', 'Europe/Madrid': 'es',
+				'Europe/Amsterdam': 'nl', 'Europe/Brussels': 'be', 'Europe/Vienna': 'at',
+				'Europe/Zurich': 'ch', 'Europe/Prague': 'cz', 'Europe/Stockholm': 'se',
+				'Europe/Copenhagen': 'dk', 'Europe/Oslo': 'no', 'Europe/Helsinki': 'fi',
+				'Europe/Dublin': 'ie', 'Europe/Lisbon': 'pt', 'Europe/Bucharest': 'ro',
+				'Europe/Budapest': 'hu', 'Europe/Athens': 'gr',
+				'Australia/': 'au', 'Pacific/Auckland': 'nz',
+				'Asia/Tokyo': 'jp', 'Asia/Seoul': 'kr', 'Asia/Singapore': 'sg',
+			};
+			for (const [prefix, code] of Object.entries(tzCountryMap)) {
+				if (tz.startsWith(prefix) || tz === prefix) {
+					browserCountry = code;
+					return;
+				}
+			}
+		} catch {}
+		const locales = navigator.languages || [navigator.language || ''];
+		for (const locale of locales) {
+			const parts = locale.split('-');
+			if (parts.length > 1) {
+				browserCountry = parts[parts.length - 1].toLowerCase();
+				return;
+			}
+		}
+	});
+
+	let mapsPromise: Promise<void> | null = null;
+	function loadGoogleMaps(): Promise<void> {
+		if (mapsPromise) return mapsPromise;
+		mapsPromise = new Promise<void>((resolve, reject) => {
+			if (typeof google !== 'undefined' && google.maps?.places) {
+				resolve();
+				return;
+			}
+			const script = document.createElement('script');
+			script.src = `https://maps.googleapis.com/maps/api/js?key=${PUBLIC_GOOGLE_PLACES_KEY}&libraries=places`;
+			script.async = true;
+			script.onload = () => resolve();
+			script.onerror = reject;
+			document.head.appendChild(script);
+		});
+		return mapsPromise;
+	}
+
+	async function fetchPlaceSuggestions(input: string) {
+		if (input.length < 2) {
+			placeSuggestions = [];
+			loadingSuggestions = false;
+			return;
+		}
+		loadingSuggestions = true;
+		try {
+			await loadGoogleMaps();
+			const opts: any = {
+				input,
+				includedPrimaryTypes: ['restaurant', 'cafe', 'bar', 'hotel', 'food']
+			};
+			if (browserCountry) opts.region = browserCountry;
+			const { suggestions } = await (google.maps.places.AutocompleteSuggestion as any).fetchAutocompleteSuggestions(opts);
+			placeSuggestions = suggestions.map((s: any) => ({
+				name: s.placePrediction.mainText.text,
+				secondary: s.placePrediction.secondaryText?.text ?? '',
+				placeId: s.placePrediction.placeId
+			}));
+		} catch {
+			placeSuggestions = [];
+		}
+		loadingSuggestions = false;
+	}
+
+	function onPlaceInput(e: Event) {
+		const value = (e.target as HTMLInputElement).value;
+		placeName = value;
+		selectedPlace = null;
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => fetchPlaceSuggestions(value), 300);
+		showSuggestions = true;
+	}
+
+	function selectPlaceSuggestion(s: { name: string; secondary: string; placeId: string }) {
+		placeName = s.name;
+		selectedPlace = s;
+		placeSuggestions = [];
+		showSuggestions = false;
+		placeNudge = false;
+	}
+
+	function removePlace() {
+		selectedPlace = null;
+		placeName = '';
+		placeSuggestions = [];
+		contextOpen = false;
+	}
+
+	function toggleContext() {
+		contextOpen = !contextOpen;
+		if (contextOpen && !selectedPlace) {
+			requestAnimationFrame(() => placeInputEl?.focus());
+		}
 	}
 </script>
 
@@ -85,7 +300,7 @@
 		class="sidebar-overlay fixed inset-0 z-40 bg-black/20 {!isDesktop && sidebarOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}"
 		onclick={() => (sidebarOpen = false)}
 	></div>
-	<aside class="sidebar chat-sidebar-enter flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen ? '' : isDesktop ? '-ml-64' : '-translate-x-full'}">
+	<aside class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen ? '' : isDesktop ? '-ml-64' : '-translate-x-full'}"
 		<!-- Logo + toggle -->
 		<div class="flex items-center justify-between px-6 py-5">
 			<div class="group flex cursor-default items-center gap-0.5 text-black dark:text-white">
@@ -166,44 +381,160 @@
 			</div>
 		{:else}
 			<div class="chat-thread-enter flex flex-1 items-center justify-center">
-				<div class="text-center">
-					<p class="text-[14px] text-black/30 dark:text-white/30">No active conversation.</p>
-					<a href="/agent" class="mt-3 inline-block text-[13px] text-black/50 underline transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70">Start a new chat</a>
-				</div>
+				<p class="text-[14px] text-black/20 dark:text-white/20">Start a new conversation below.</p>
 			</div>
 		{/if}
 
 		<!-- Input bar -->
-		<div class="relative">
+		<div class="chat-input-enter relative">
 			<div class="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[var(--color-cream)]/80 to-transparent"></div>
 			<div class="relative z-10 bg-cream">
 			<div class="mx-auto max-w-[800px] px-4 pb-3 md:px-6">
-				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-				<div onclick={() => chatState.active && inputEl?.focus()} class="{chatState.active ? 'cursor-text' : 'cursor-not-allowed'} prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.35] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.35]">
-					<div class="px-5 pt-4">
-						<textarea
-							bind:this={inputEl}
-							bind:value={query}
-							onkeydown={handleKeydown}
-							placeholder="Ask a follow-up..."
-							rows="1"
-							disabled={!chatState.active}
-							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none disabled:cursor-not-allowed dark:text-white dark:placeholder:text-white/45"
-						></textarea>
+				{#if chatState.active}
+					<!-- Active conversation: simple follow-up prompt -->
+					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+					<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.35] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.35]">
+						<div class="px-5 pt-4">
+							<textarea
+								bind:this={inputEl}
+								bind:value={query}
+								onkeydown={handleKeydown}
+								placeholder="Ask a follow-up..."
+								rows="1"
+								class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none dark:text-white dark:placeholder:text-white/45"
+							></textarea>
+						</div>
+						<div class="flex items-center justify-end px-4 pb-4">
+							<button
+								onclick={handleSend}
+								disabled={!query.trim() || chatState.loading}
+								aria-label="Send"
+								class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
+							>
+								<svg class="h-4 w-4 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+								</svg>
+							</button>
+						</div>
 					</div>
-					<div class="flex items-center justify-end px-4 pb-4">
-						<button
-							onclick={handleSend}
-							disabled={!chatState.active || !query.trim() || chatState.loading}
-							aria-label="Send"
-							class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
-						>
-							<svg class="h-4 w-4 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-							</svg>
-						</button>
+				{:else}
+					<!-- No conversation: full prompt with place/map/mic -->
+					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+					<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.35] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.35]">
+						<div class="flex flex-col">
+							<div class="px-5 pt-5">
+								<textarea
+									bind:this={inputEl}
+									bind:value={query}
+									onkeydown={handleKeydown}
+									placeholder={isAnimating ? display : 'What do you want to know about your market?'}
+									rows="3"
+									class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating ? 'placeholder:text-black/70 dark:placeholder:text-white/70' : 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
+								></textarea>
+							</div>
+
+							<div class="flex items-center justify-between px-4 pb-2">
+								<!-- Left icons + place chip -->
+								<div class="relative flex items-center gap-1">
+									<button onclick={toggleContext} aria-label="Add place" class="cursor-pointer flex h-8 w-8 items-center justify-center rounded-full transition-colors {contextOpen || selectedPlace ? 'text-black/60 dark:text-white/60' : 'text-black/30 hover:text-black/50 dark:text-white/30 dark:hover:text-white/50'}">
+										<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+											<path stroke-linecap="square" stroke-linejoin="miter" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+											<path stroke-linecap="square" stroke-linejoin="miter" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+										</svg>
+									</button>
+									<button disabled aria-label="Map view" class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15">
+										<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+											<path stroke-linecap="square" stroke-linejoin="miter" d="M3 7l6-3 6 3 6-3v14l-6 3-6-3-6 3V7zM9 4v14M15 7v14" />
+										</svg>
+									</button>
+									{#if selectedPlace}
+										<span class="context-slide absolute inset-y-0 left-0 my-auto h-6 inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-cream-100 pl-2.5 pr-1 text-xs text-black/60 dark:border-white/[0.08] dark:bg-cream-50 dark:text-white/60">
+											<span class="truncate">{selectedPlace.name}</span>
+											{#if selectedPlace.secondary}
+												<span class="hidden truncate text-black/30 dark:text-white/30 md:inline">{selectedPlace.secondary}</span>
+											{/if}
+											<button onclick={removePlace} aria-label="Remove place" class="cursor-pointer flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]">
+												<svg class="h-3 w-3 text-black/25 dark:text-white/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+												</svg>
+											</button>
+										</span>
+									{/if}
+								</div>
+
+								<!-- Right icons: mic + send -->
+								<div class="flex items-center gap-1">
+									<button disabled aria-label="Voice input" class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15">
+										<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+											<path stroke-linecap="square" stroke-linejoin="miter" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
+											<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
+										</svg>
+									</button>
+									<button onclick={handleSend} aria-label="Explore" class="cursor-pointer shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80">
+										<svg class="h-4 w-4 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+										</svg>
+									</button>
+								</div>
+							</div>
+
+							<!-- Place nudge -->
+							{#if placeNudge && !selectedPlace}
+								<p class="context-nudge mx-5 mb-2 text-[12px] text-black/40 dark:text-white/40">
+									Select your restaurant so we can focus on the right area.
+								</p>
+							{/if}
+
+							<!-- Expanded context: place search -->
+							<div class="context-expand" class:open={contextExpanded}>
+								<div class="context-expand-inner" class:allow-overflow={contextOverflow} inert={contextExpanded ? undefined : true}>
+									<div class="context-reveal relative mx-4 mb-4 pt-2" class:visible={contextExpanded} onclick={(e) => e.stopPropagation()}>
+										<div class="relative">
+											<input
+												bind:this={placeInputEl}
+												type="text"
+												value={placeName}
+												oninput={onPlaceInput}
+												onfocus={() => { if (placeSuggestions.length) showSuggestions = true; }}
+												onblur={() => setTimeout(() => (showSuggestions = false), 150)}
+												placeholder="Restaurant name..."
+												autocomplete="off"
+												autocorrect="off"
+												spellcheck="false"
+												class="w-full rounded-xl border border-black/[0.08] bg-cream-50/50 py-2.5 px-4 pr-9 text-[13px] text-black placeholder:text-black/30 focus:border-black/15 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/15"
+											/>
+											{#if loadingSuggestions}
+												<svg class="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-black/25 dark:text-white/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+													<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+													<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+												</svg>
+											{/if}
+										</div>
+										{#if showSuggestions && placeSuggestions.length > 0}
+											<ul class="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-xl border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50">
+												{#each placeSuggestions as s}
+													<li>
+														<button
+															type="button"
+															class="w-full cursor-pointer px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-cream-50 dark:hover:bg-white/[0.04]"
+															onpointerdown={(e) => e.preventDefault()}
+															onclick={() => selectPlaceSuggestion(s)}
+														>
+															<span class="text-black dark:text-white">{s.name}</span>
+															{#if s.secondary}
+																<span class="ml-1.5 text-black/30 dark:text-white/30">{s.secondary}</span>
+															{/if}
+														</button>
+													</li>
+												{/each}
+											</ul>
+										{/if}
+									</div>
+								</div>
+							</div>
+						</div>
 					</div>
-				</div>
+				{/if}
 				<p class="mt-2 text-center text-[11px] text-black/20 dark:text-white/20">
 					Superextra may make mistakes.
 				</p>
@@ -237,5 +568,51 @@
 
 	.toggle-float {
 		transition: opacity 0.2s ease;
+	}
+
+	/* Entrance animations */
+	.chat-enter {
+		animation: chatFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+
+	.chat-thread-enter {
+		animation: threadFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+	}
+
+	.chat-input-enter {
+		animation: inputRiseIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+	}
+
+	@keyframes chatFadeIn {
+		from {
+			opacity: 0;
+			transform: scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
+	@keyframes threadFadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(-8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	@keyframes inputRiseIn {
+		from {
+			opacity: 0;
+			transform: translateY(20px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 </style>
