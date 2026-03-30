@@ -90,6 +90,19 @@
 		resizeTextarea();
 	});
 
+	let visibleIdx = $state(-1);
+	let hoverTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function showCard(i: number) {
+		clearTimeout(hoverTimer);
+		hoverTimer = setTimeout(() => { visibleIdx = i; }, 200);
+	}
+
+	function hideCard() {
+		clearTimeout(hoverTimer);
+		visibleIdx = -1;
+	}
+
 	function selectTopic(query: string) {
 		userQuery = query;
 		inputEl?.focus();
@@ -100,14 +113,14 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<!-- Headline -->
 		<h1
-			class="hero-fade mx-auto text-center font-semibold tracking-[-0.03em] text-black dark:text-white"
-			style="max-width: 14ch; font-size: clamp(2.75rem, 6vw, 5.25rem); line-height: 1.02; animation-delay: 100ms;"
+			class="hero-fade mx-auto md:max-w-none text-center font-semibold tracking-[-0.03em] text-black dark:text-white"
+			style="font-size: clamp(2.75rem, 6vw, 5.25rem); line-height: 1.02; animation-delay: 100ms;"
 		>
-			A market analyst <br />for every restaurant
+			A market analyst <br class="max-md:hidden" />for every restaurant
 		</h1>
 
 		<!-- Subheadline -->
-		<p class="hero-fade mx-auto mt-6 text-center text-xl leading-snug text-black/45 dark:text-white/45" style="max-width: 540px; animation-delay: 170ms;">
+		<p class="hero-fade mx-auto mt-6 text-center text-lg leading-snug text-black/60 dark:text-white/60 md:text-xl" style="max-width: 540px; animation-delay: 170ms;">
 			Stop relying on gossip and gut feel. Get clear answers about your competitors, pricing, and demand in minutes.
 		</p>
 
@@ -147,14 +160,21 @@
 		<!-- Topic suggestion pills -->
 		<div class="topic-row mx-auto mt-12 flex flex-wrap justify-center gap-2 pb-1 md:mt-12" style="max-width: 900px;">
 			{#each topics as topic, i}
-				<button
-					onclick={() => selectTopic(topic.query)}
-					class="topic-pill inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-black/[0.06] px-3.5 py-2 text-[13px] text-black/40 transition-all hover:border-black/[0.12] hover:text-black/60 dark:border-white/[0.06] dark:text-white/40 dark:hover:border-white/[0.12] dark:hover:text-white/60"
+				<div
+					class="topic-pill-wrap relative"
 					style="animation-delay: {380 + i * 40}ms"
+					onmouseenter={() => showCard(i)}
+					onmouseleave={hideCard}
 				>
-					<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"></span>
-					{topic.label}
-				</button>
+					<button
+						onclick={() => selectTopic(topic.query)}
+						class="topic-pill inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-black/[0.06] px-3.5 py-2 text-[13px] text-black/40 transition-all duration-200 hover:border-black/[0.12] hover:text-black/60 dark:border-white/[0.06] dark:text-white/40 dark:hover:border-white/[0.12] dark:hover:text-white/60"
+					>
+						<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"></span>
+						{topic.label}
+					</button>
+					<span class="frost-card" class:frost-card-visible={visibleIdx === i}>{topic.query}</span>
+				</div>
 			{/each}
 		</div>
 	</div>
@@ -190,8 +210,44 @@
 			0 8px 32px rgba(0, 0, 0, 0.3);
 	}
 
-	.topic-pill {
+	.topic-pill-wrap {
 		animation: fadeIn 0.4s ease-out both;
+	}
+
+	.frost-card {
+		position: absolute;
+		bottom: calc(100% + 8px);
+		left: 50%;
+		width: max-content;
+		max-width: 260px;
+		padding: 10px 16px;
+		border-radius: 14px;
+		font-size: 13px;
+		line-height: 1.5;
+		white-space: normal;
+		text-align: center;
+		pointer-events: none;
+		z-index: 20;
+
+		background: rgba(0, 0, 0, 0.03);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		border: none;
+		color: rgba(0, 0, 0, 0.5);
+
+		opacity: 0;
+		transform: translateX(-50%) scale(0.96);
+		transition: opacity 0.35s ease, transform 0.35s ease;
+	}
+
+	:global(.dark) .frost-card {
+		background: rgba(0, 0, 0, 0.03);
+		color: rgba(255, 255, 255, 0.5);
+	}
+
+	.frost-card-visible {
+		opacity: 1;
+		transform: translateX(-50%) scale(1);
 	}
 
 </style>
