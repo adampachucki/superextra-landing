@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { theme } from '$lib/theme.svelte';
 
-	import { formState } from '$lib/form-state.svelte';
-
-	let { showLogin = false }: { showLogin?: boolean } = $props();
 	let year = $state(new Date().getFullYear());
 </script>
 
@@ -60,9 +57,6 @@
 				</div>
 			</div>
 		</div>
-		{#if showLogin}
-			<button onclick={() => formState.open()} class="cursor-pointer rounded-full border border-black/10 px-5 py-1.5 text-sm text-black/50 dark:border-white/10 dark:text-white/50 md:hidden my-6 mx-auto block">Contact Us</button>
-		{/if}
 		<p class="mt-4 text-center text-xs text-black/40 dark:text-white/40 md:hidden">
 			We use <a href="/privacy-policy" class="underline transition-colors hover:text-black/60 dark:hover:text-white/60">cookies</a>
 		</p>

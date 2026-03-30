@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { formState } from '$lib/form-state.svelte';
-	import PreviewBadge from '$lib/components/PreviewBadge.svelte';
 	import { onMount } from 'svelte';
 
 	let { transparent = false, minimal = false }: { transparent?: boolean; minimal?: boolean } = $props();
@@ -54,20 +53,16 @@
 		{/if}
 
 		<div class="hidden items-center gap-3 md:flex">
-			{#if minimal}
-				<button onclick={() => formState.open()} class="cursor-pointer rounded-full border px-6 py-2.5 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Contact Us</button>
-				<button class="cursor-pointer btn-primary px-5 py-2 text-sm">Log in</button>
-			{:else}
-				<a href="mailto:hello@superextra.ai" class="rounded-full border px-6 py-2.5 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Contact Us</a>
-				<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-5 py-2 text-sm">Get Started</button>
-			{/if}
+			<button onclick={() => formState.open()} class="cursor-pointer rounded-full border px-6 py-2.5 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Contact Us</button>
+			<button class="cursor-pointer btn-primary px-5 py-2 text-sm">Log in</button>
 		</div>
 
 		<div class="flex items-center gap-3 md:hidden">
-			{#if minimal}
-				<button class="cursor-pointer btn-primary px-4 py-1.5 text-sm">Log in</button>
-			{:else}
-				<PreviewBadge tooltipBelow />
+			<button onclick={() => formState.open()} class="cursor-pointer rounded-full border p-2 {over ? 'border-white/15 text-white/40' : 'border-black/10 text-black/30 dark:border-white/10 dark:text-white/30'}" aria-label="Contact Us">
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linejoin="round" d="M2 4h20v16H2V4zm0 0l10 8 10-8" /></svg>
+			</button>
+			<button class="cursor-pointer btn-primary px-4 py-1.5 text-sm">Log in</button>
+			{#if !minimal}
 				<button
 					class="{over ? 'text-white' : 'text-black dark:text-white'}"
 					onclick={() => (mobileOpen = !mobileOpen)}
@@ -83,24 +78,17 @@
 		</div>
 	</div>
 
+	{#if !minimal}
 	<div class="grid transition-[grid-template-rows] duration-300 md:hidden {mobileOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}">
 		<div class="overflow-hidden">
 			<div class="border-t border-cream-100 bg-cream">
 				<div class="flex flex-col gap-4 px-6 py-6">
-					{#if !minimal}
 					<a href="/#intelligence" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Intelligence</a>
 					<a href="/#use-cases" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>Use Cases</a>
 					<a href="/#faq" class="text-sm text-black/60 dark:text-white/60" onclick={(e) => { mobileOpen = false; smoothScroll(e); }}>FAQ</a>
-					<hr class="border-cream-100" />
-					{/if}
-					{#if minimal}
-					<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer rounded-full border border-black/10 px-5 py-2.5 text-center text-sm text-black/70 dark:border-white/10 dark:text-white/70">Contact Us</button>
-					<button class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm" onclick={() => { mobileOpen = false; }}>Log in</button>
-					{:else}
-					<button onclick={() => { mobileOpen = false; formState.open(); }} class="cursor-pointer btn-primary px-5 py-2.5 text-center text-sm">Get Started</button>
-					{/if}
 				</div>
 			</div>
 		</div>
 	</div>
+	{/if}
 </nav>

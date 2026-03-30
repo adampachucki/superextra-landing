@@ -3,10 +3,9 @@
 	import Footer from '$lib/components/Footer.svelte';
 	import AccessForm from '$lib/components/AccessForm.svelte';
 	import RestaurantHero from '$lib/components/restaurants/RestaurantHero.svelte';
-	import ValueProps from '$lib/components/restaurants/ValueProps.svelte';
+	import About from '$lib/components/About.svelte';
 
 	import UseCases from '$lib/components/UseCases.svelte';
-	import FAQ from '$lib/components/FAQ.svelte';
 	import DataSources from '$lib/components/DataSources.svelte';
 	import RestaurantCTA from '$lib/components/restaurants/RestaurantCTA.svelte';
 
@@ -53,33 +52,6 @@
 		}
 	];
 
-	const agentFaqs = [
-		{
-			question: 'How does this actually work?',
-			answer:
-				"You ask a question about your market. Superextra searches across dozens of data sources — reviews, delivery platforms, foot traffic, pricing, public records — and returns a clear, sourced answer. No dashboards to learn, no reports to wait for."
-		},
-		{
-			question: 'How accurate is the data?',
-			answer:
-				"Every insight is grounded in real data from public and proprietary sources. AI models cross-reference and validate continuously. When something isn't available, the agent says so rather than guessing."
-		},
-		{
-			question: 'Do I need to connect my POS or share any internal data?',
-			answer:
-				'No. Superextra brings the market to you — competitor activity, local pricing, guest sentiment, foot traffic. Nothing to integrate, no internal data to share.'
-		},
-		{
-			question: 'What markets are covered?',
-			answer:
-				'Launching with deep coverage in select European markets and expanding rapidly. Reach out to check availability for your area.'
-		},
-		{
-			question: 'What does it cost?',
-			answer:
-				'Pricing is based on the number of locations and depth of intelligence needed. Early access customers get preferential rates.'
-		}
-	];
 </script>
 
 <svelte:head>
@@ -94,12 +66,11 @@
 
 <main>
 	<RestaurantHero />
-	<ValueProps intro="Restaurant operators make critical decisions every day — where to open, how to price, when to hire — too often without a clear view of the market around them at all. Superextra changes that." description="Our AI models synthesize competitor, pricing, guest, delivery, and market signals into an external intelligence layer for your restaurant. Better context behind better decisions." />
+	<About headline="The market view your restaurant has been missing" intro="Restaurant operators make critical decisions every day — where to open, how to price, when to hire — too often without a clear view of the market around them at all. Superextra changes that." description="Our AI models synthesize competitor, pricing, guest, delivery, and market signals into an external intelligence layer for your restaurant. Better context behind better decisions." class="border-t border-cream-200 md:border-t-0" />
 	<UseCases items={agentUseCases} title="The questions you're already asking — now with real answers" titleClass="max-w-3xl" subtitleClass="text-xs" />
-	<!-- <FAQ items={agentFaqs} /> -->
 	<DataSources title="Dozens of data sources" subtitle="We aggregate and validate data across every market we cover." />
 	<RestaurantCTA />
 </main>
 
-<Footer showLogin />
+<Footer />
 <AccessForm />
