@@ -187,7 +187,7 @@
 							onkeydown={handleKeydown}
 							placeholder="Ask a follow-up..."
 							rows="1"
-							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/25 focus:outline-none dark:text-white dark:placeholder:text-white/25"
+							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none dark:text-white dark:placeholder:text-white/45"
 						></textarea>
 					</div>
 					<div class="flex items-center justify-end px-4 pb-4">
