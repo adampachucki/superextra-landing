@@ -53,7 +53,7 @@
 							{/if}
 						</button>
 					</div>
-					<div class="flex items-center gap-4 md:hidden">
+					<div class="flex items-center gap-2 md:hidden">
 						<span class="text-xs text-black/40 dark:text-white/40">Supported by</span>
 						<img src="/google-for-startups.svg" alt="Google for Startups" class="h-3.5 translate-y-px opacity-40 grayscale dark:invert" />
 					</div>
