@@ -333,7 +333,7 @@
 
 			{#if chatState.placeContext}
 				<div class="mb-4">
-					<p class="mb-2 text-[11px] font-medium tracking-wide text-black/40 dark:text-white/40">CONTEXT</p>
+					<p class="mb-2 text-[11px] font-medium tracking-wide text-black/50 dark:text-white/50">CONTEXT</p>
 					<div class="min-w-0">
 						<p class="truncate text-[14px] text-black/80 dark:text-white/80">{chatState.placeContext.name}</p>
 						{#if chatState.placeContext.secondary}
