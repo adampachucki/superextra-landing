@@ -355,7 +355,7 @@
 					<!-- Expanded context: place search -->
 					{#if placeNudge && !selectedPlace}
 						<p class="context-nudge mx-5 mb-2 text-[12px] text-black/40 dark:text-white/40">
-							Select your restaurant so we can focus on the right area.
+							Select your restaurant so we can focus on the right area
 						</p>
 					{/if}
 

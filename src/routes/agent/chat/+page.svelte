@@ -29,6 +29,7 @@
 	let sidebarOpen = $state(false);
 	let isDesktop = $state(false);
 	let isMobile = $state(false);
+	let mounted = $state(false);
 
 	let display = $state(PREFIX);
 	let isAnimating = $derived(!chatState.active && !query && display.length > 0);
@@ -97,6 +98,8 @@
 	});
 
 	onMount(() => {
+		requestAnimationFrame(() => { mounted = true; });
+
 		const onBeforeUnload = (e: BeforeUnloadEvent) => {
 			if (chatState.active && chatState.messages.length > 0) {
 				e.preventDefault();
@@ -293,14 +296,14 @@
 	<meta name="description" content="Ask questions about your restaurant market. Powered by Superextra." />
 </svelte:head>
 
-<div class="chat-enter fixed inset-0 flex bg-cream">
+<div class="chat-enter fixed inset-0 flex bg-cream {mounted ? 'is-mounted' : ''}">
 	<!-- Sidebar -->
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
 		class="sidebar-overlay fixed inset-0 z-40 bg-black/20 {!isDesktop && sidebarOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}"
 		onclick={() => (sidebarOpen = false)}
 	></div>
-	<aside class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen ? '' : isDesktop ? '-ml-64' : '-translate-x-full'}"
+	<aside class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen ? '' : isDesktop ? '-ml-64' : '-translate-x-full'}">
 		<!-- Logo + toggle -->
 		<div class="flex items-center justify-between px-6 py-5">
 			<div class="group flex cursor-default items-center gap-0.5 text-black dark:text-white">
@@ -344,11 +347,11 @@
 		<!-- Footer -->
 		<div class="border-t border-black/[0.06] px-5 py-4 dark:border-white/[0.06]">
 			<div class="flex items-center gap-4">
-				<a href="/privacy-policy" class="text-[12px] text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60">Privacy</a>
-				<a href="/terms" class="text-[12px] text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60">Terms</a>
+				<a href="/privacy-policy" class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70">Privacy</a>
+				<a href="/terms" class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70">Terms</a>
 				<button
 					onclick={() => theme.cycle()}
-					class="ml-auto cursor-pointer text-black/30 transition-colors hover:text-black/50 dark:text-white/30 dark:hover:text-white/50"
+					class="ml-auto cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
 					aria-label="Toggle theme"
 				>
 					{#if theme.mode === 'dark'}
@@ -360,7 +363,7 @@
 					{/if}
 				</button>
 			</div>
-			<p class="mt-2 text-[11px] text-black/25 dark:text-white/25">&copy; {new Date().getFullYear()} Superextra</p>
+			<p class="mt-2 text-[11px] text-black/35 dark:text-white/35">&copy; {new Date().getFullYear()} Superextra</p>
 		</div>
 	</aside>
 
@@ -376,17 +379,17 @@
 
 		<!-- Chat thread -->
 		{#if chatState.active}
-			<div class="chat-thread-enter flex flex-1 flex-col overflow-hidden">
+			<div class="chat-thread-enter flex flex-1 flex-col overflow-hidden {mounted ? 'is-mounted' : ''}">
 				<ChatThread />
 			</div>
 		{:else}
-			<div class="chat-thread-enter flex flex-1 items-center justify-center">
-				<p class="text-[14px] text-black/20 dark:text-white/20">Start a new conversation below.</p>
+			<div class="chat-thread-enter flex flex-1 items-center justify-center {mounted ? 'is-mounted' : ''}">
+				<p class="text-[14px] text-black/40 dark:text-white/40">Start a new conversation below</p>
 			</div>
 		{/if}
 
 		<!-- Input bar -->
-		<div class="chat-input-enter relative">
+		<div class="chat-input-enter relative {mounted ? 'is-mounted' : ''}">
 			<div class="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[var(--color-cream)]/80 to-transparent"></div>
 			<div class="relative z-10 bg-cream">
 			<div class="mx-auto max-w-[800px] px-4 pb-3 md:px-6">
@@ -481,7 +484,7 @@
 							<!-- Place nudge -->
 							{#if placeNudge && !selectedPlace}
 								<p class="context-nudge mx-5 mb-2 text-[12px] text-black/40 dark:text-white/40">
-									Select your restaurant so we can focus on the right area.
+									Select your restaurant so we can focus on the right area
 								</p>
 							{/if}
 
@@ -558,8 +561,8 @@
 	}
 
 	.sidebar {
-		transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-		will-change: transform;
+		transition: translate 0.3s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+		will-change: translate, margin-left;
 	}
 
 	.sidebar-overlay {
@@ -570,49 +573,81 @@
 		transition: opacity 0.2s ease;
 	}
 
-	/* Entrance animations */
+	.context-slide {
+		animation: contextSlide 0.25s ease-out both;
+	}
+
+	@keyframes contextSlide {
+		from { opacity: 0; transform: translateY(-4px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+
+	.context-nudge {
+		animation: contextSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+
+	.context-expand {
+		display: grid;
+		grid-template-rows: 0fr;
+		transition: grid-template-rows 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	.context-expand.open {
+		grid-template-rows: 1fr;
+	}
+
+	.context-expand-inner {
+		overflow: hidden;
+	}
+
+	.context-expand-inner.allow-overflow {
+		overflow: visible;
+	}
+
+	.context-reveal {
+		opacity: 0;
+		transition: opacity 0.15s ease;
+	}
+
+	.context-reveal.visible {
+		opacity: 1;
+		transition: opacity 0.7s ease;
+	}
+
+	/* Entrance transitions — triggered by .is-mounted added after onMount */
 	.chat-enter {
-		animation: chatFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+		opacity: 0;
+		transform: scale(0.97);
+		transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+			transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	.chat-enter.is-mounted {
+		opacity: 1;
+		transform: scale(1);
 	}
 
 	.chat-thread-enter {
-		animation: threadFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+		opacity: 0;
+		transform: translateY(12px);
+		transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s,
+			transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s;
+	}
+
+	.chat-thread-enter.is-mounted {
+		opacity: 1;
+		transform: translateY(0);
 	}
 
 	.chat-input-enter {
-		animation: inputRiseIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+		opacity: 0;
+		transform: translateY(24px);
+		transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.25s,
+			transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.25s;
 	}
 
-	@keyframes chatFadeIn {
-		from {
-			opacity: 0;
-			transform: scale(0.98);
-		}
-		to {
-			opacity: 1;
-			transform: scale(1);
-		}
-	}
-
-	@keyframes threadFadeIn {
-		from {
-			opacity: 0;
-			transform: translateY(-8px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	@keyframes inputRiseIn {
-		from {
-			opacity: 0;
-			transform: translateY(20px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
+	.chat-input-enter.is-mounted {
+		opacity: 1;
+		transform: translateY(0);
 	}
 </style>
