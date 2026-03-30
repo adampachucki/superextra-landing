@@ -378,7 +378,7 @@
 										autocomplete="off"
 										autocorrect="off"
 										spellcheck="false"
-										class="w-full rounded-xl border border-black/[0.08] bg-cream-50/50 py-2.5 px-4 pr-9 text-[13px] text-black placeholder:text-black/30 focus:border-black/15 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/15"
+										class="w-full rounded-xl border border-black/[0.08] bg-cream-50/50 py-2.5 px-4 pr-9 text-[13px] text-black placeholder:text-black/30 focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/25"
 									/>
 									{#if loadingSuggestions}
 										<svg class="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-black/25 dark:text-white/25" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -426,7 +426,7 @@
 				>
 					<button
 						onclick={() => selectTopic(topic.query)}
-						class="topic-pill inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] text-black/55 transition-all duration-200 hover:border-black/[0.22] hover:text-black/75 active:border-black/[0.22] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.22] dark:hover:text-white/75 dark:active:border-white/[0.22] dark:active:text-white/75"
+						class="topic-pill inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] text-black/55 transition-all duration-200 hover:border-black/[0.30] hover:text-black/75 active:border-black/[0.30] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75 dark:active:border-white/[0.30] dark:active:text-white/75"
 					>
 						<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"></span>
 						{topic.label}
