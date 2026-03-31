@@ -113,7 +113,7 @@
 	}
 
 	const topics = [
-		{ label: 'Menu price gaps', color: '#6ee7b3', query: 'How does our menu pricing compare to competitors within a mile?' },
+		{ label: 'Menu price gaps', color: '#6ee7b3', query: 'How does our menu pricing compare to competitors within 1 km?' },
 		{ label: "Who's getting the traffic", color: '#a78bfa', query: 'What are the foot traffic patterns in my neighbourhood by day and daypart?' },
 		{ label: 'Salary benchmarks', color: '#f472b6', query: 'What are restaurants near us actually paying for every role?' },
 		{ label: 'What guests are saying', color: '#fbbf24', query: 'What are the real sentiment themes across our reviews and competitors?' },
