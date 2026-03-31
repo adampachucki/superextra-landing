@@ -30,3 +30,4 @@ vite.config.ts.timestamp-*
 # ADK
 agent/.venv
 agent/.adk
+__pycache__
