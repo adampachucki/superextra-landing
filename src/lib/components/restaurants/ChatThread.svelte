@@ -51,7 +51,10 @@
 							<button
 								onclick={() => tts.play(i, msg.text)}
 								disabled={tts.loading === i}
-								class="group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-black/5 px-2.5 py-1 text-[12px] text-black/40 transition-colors hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 disabled:opacity-50 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60"
+								class="group inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] transition-colors {tts.loading ===
+									i || tts.playingIndex === i
+									? 'border-black/15 bg-black/[0.03] text-black/70 dark:border-white/15 dark:bg-white/[0.03] dark:text-white/70'
+									: 'border-black/5 text-black/40 hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60'}"
 							>
 								{#if tts.loading === i}
 									<svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
