@@ -255,6 +255,14 @@ function switchTo(id: string) {
 	persist();
 }
 
+function switchToBySessionId(sid: string) {
+	const conv = conversations.find((c) => c.sessionId === sid);
+	if (!conv || conv.id === currentId) return;
+	syncCurrentToList();
+	loadConversation(conv);
+	persist();
+}
+
 function deleteConversation(id: string) {
 	conversations = conversations.filter((c) => c.id !== id);
 	if (id === currentId) {
@@ -278,9 +286,11 @@ export const chatState = {
 	set placeContext(p: PlaceContext | null) { placeContext = p; },
 	get conversations() { return conversations; },
 	get activeId() { return currentId; },
+	get sessionId() { return sessionId; },
 	send,
 	start,
 	reset,
 	switchTo,
+	switchToBySessionId,
 	deleteConversation
 };

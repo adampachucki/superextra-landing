@@ -5,6 +5,7 @@
 	import ChatThread from '$lib/components/restaurants/ChatThread.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { theme } from '$lib/theme.svelte';
+	import { dictation } from '$lib/dictation.svelte';
 
 	const PREFIX = 'Ask Superextra ';
 	const PROMPTS = [
@@ -90,8 +91,27 @@
 	}
 
 	onMount(() => {
+		const params = new URL(window.location.href).searchParams;
+		const sid = params.get('sid');
+		if (sid) {
+			chatState.switchToBySessionId(sid);
+		}
 		sidebarOpen = window.matchMedia('(min-width: 1024px)').matches;
 		requestAnimationFrame(() => { mounted = true; });
+	});
+
+	// Keep URL in sync with active session
+	$effect(() => {
+		if (!mounted) return;
+		const url = new URL(window.location.href);
+		if (chatState.sessionId) {
+			url.searchParams.set('sid', chatState.sessionId);
+		} else {
+			url.searchParams.delete('sid');
+		}
+		if (url.href !== window.location.href) {
+			history.replaceState(history.state, '', url);
+		}
 	});
 
 	function handleSend() {
@@ -445,7 +465,7 @@
 					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 					<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]">
 						<div class="flex flex-col">
-							<div class="px-5 pt-5">
+							<div class="relative px-5 pt-5">
 								<textarea
 									bind:this={inputEl}
 									bind:value={query}
@@ -454,6 +474,9 @@
 									rows="3"
 									class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating ? 'placeholder:text-black/70 dark:placeholder:text-white/70' : 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
 								></textarea>
+								{#if dictation.active && dictation.interim}
+									<div class="pointer-events-none absolute inset-x-5 bottom-0 text-[15px] leading-relaxed text-black/30 dark:text-white/30">{dictation.interim}</div>
+								{/if}
 							</div>
 
 							<div class="flex items-center justify-between px-4 pb-2">
@@ -487,12 +510,31 @@
 
 								<!-- Right icons: mic + send -->
 								<div class="flex items-center gap-1">
-									<button disabled aria-label="Voice input" class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15">
-										<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-											<path stroke-linecap="square" stroke-linejoin="miter" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
-											<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
-										</svg>
-									</button>
+									{#if dictation.supported}
+										<button
+											onclick={() => dictation.toggle((t) => { query += (query && !query.endsWith(' ') ? ' ' : '') + t; })}
+											aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
+											class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active ? 'text-red-500' : 'text-black/30 hover:text-black/60 dark:text-white/30 dark:hover:text-white/60'}"
+										>
+											{#if dictation.active}
+												<span
+													class="absolute inset-0 rounded-full bg-red-500/15"
+													style="transform: scale({1 + dictation.volume * 0.5}); opacity: {0.4 + dictation.volume * 0.6};"
+												></span>
+											{/if}
+											<svg class="relative h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+												<path stroke-linecap="square" stroke-linejoin="miter" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
+												<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
+											</svg>
+										</button>
+									{:else}
+										<button disabled aria-label="Voice input not supported" class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15">
+											<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+												<path stroke-linecap="square" stroke-linejoin="miter" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
+												<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
+											</svg>
+										</button>
+									{/if}
 									<button onclick={handleSend} aria-label="Explore" class="cursor-pointer shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80">
 										<svg class="h-4 w-4 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
