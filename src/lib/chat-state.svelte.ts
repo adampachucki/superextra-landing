@@ -272,6 +272,34 @@ function switchToBySessionId(sid: string) {
 	persist();
 }
 
+async function recover(): Promise<boolean> {
+	if (!sessionId || loading) return false;
+	loading = true;
+	error = '';
+	try {
+		const checkUrl = import.meta.env.DEV
+			? `/api/agent/check?sid=${sessionId}`
+			: `https://us-central1-superextra-site.cloudfunctions.net/agentCheck?sid=${sessionId}`;
+		const res = await fetch(checkUrl);
+		const data = await res.json();
+		if (
+			data.ok &&
+			data.reply &&
+			!messages.some((m) => m.role === 'agent' && m.text === data.reply)
+		) {
+			const sources: ChatSource[] | undefined = data.sources?.length ? data.sources : undefined;
+			messages.push({ role: 'agent', text: data.reply, timestamp: Date.now(), sources });
+			persist();
+			return true;
+		}
+	} catch {
+		// recovery failed silently — caller will fall back to resend
+	} finally {
+		loading = false;
+	}
+	return false;
+}
+
 function deleteConversation(id: string) {
 	conversations = conversations.filter((c) => c.id !== id);
 	if (id === currentId) {
@@ -317,6 +345,7 @@ export const chatState = {
 	send,
 	start,
 	reset,
+	recover,
 	switchTo,
 	switchToBySessionId,
 	deleteConversation
