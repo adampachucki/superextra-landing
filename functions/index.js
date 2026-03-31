@@ -278,10 +278,28 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 				const vertexAI = new VertexAI({ project: PROJECT, location: LOCATION });
 				const flashModel = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 				const titleResult = await flashModel.generateContent({
-					contents: [{ role: 'user', parts: [{ text: `Generate a short conversational title (max 5 words, no quotes) for a chat that starts with this question about restaurants: "${message}"` }] }]
+					contents: [{ role: 'user', parts: [{ text:
+						`Summarize this message into a short title, max 4 words.\n` +
+						`Rules:\n` +
+						`- Use the SAME LANGUAGE as the message\n` +
+						`- No markdown, no quotes, no punctuation, no numbering\n` +
+						`- Do not answer the question — just label the topic\n` +
+						`- Reply with ONLY the title, nothing else\n\n` +
+						`Message: "${message}"`
+					}] }]
 				});
 				const raw = titleResult.response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-				if (raw) title = raw.replace(/^["']|["']$/g, '').slice(0, 60);
+				if (raw) {
+					const cleaned = raw
+						.replace(/^["']|["']$/g, '')
+						.replace(/[*#_`~>\-]/g, '')
+						.replace(/^\d+\.\s*/, '')
+						.trim();
+					const words = cleaned.split(/\s+/);
+					if (words.length <= 8 && cleaned.length > 0) {
+						title = words.slice(0, 4).join(' ');
+					}
+				}
 			} catch (e) {
 				console.error('Title generation failed:', e.message);
 			}
