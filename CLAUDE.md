@@ -68,6 +68,7 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 - Never rely on training knowledge for factual claims. Every time you explore a topic, hit a coding issue, or reason through a decision — stop and check the real source: docs, code, APIs, actual data.
 - If you can look it up, look it up. If you can't, say you don't know. Never fill a gap with a plausible guess.
 - This applies to everything: library APIs, platform behavior, syntax, error causes, configuration options. Read the source before you answer.
+- **External APIs and services:** When integrating any external tool, SDK, or API (ElevenLabs, Firebase, Google, etc.), read the official documentation first — before writing any code. Understand the exact message formats, data flow, and expected behavior. Do not guess how an API works based on naming conventions or assumptions.
 
 ## Don'ts
 

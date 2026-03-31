@@ -5,8 +5,7 @@ const BUFFER_SIZE = 4096;
 let active = $state(false);
 let supported = $state(false);
 let volume = $state(0);
-let committed = $state('');
-let interim = $state('');
+let text = $state('');
 
 let connecting = false;
 let ws: WebSocket | null = null;
@@ -16,8 +15,17 @@ let processor: ScriptProcessorNode | null = null;
 let mediaStream: MediaStream | null = null;
 let rafId = 0;
 
+let commits: string[] = [];
+let partial = '';
+
 if (typeof window !== 'undefined') {
 	supported = !!navigator.mediaDevices?.getUserMedia;
+}
+
+function updateText() {
+	const parts = [...commits];
+	if (partial) parts.push(partial);
+	text = parts.join(' ');
 }
 
 function float32ToPcm16Base64(float32: Float32Array): string {
@@ -48,7 +56,8 @@ function pollVolume() {
 function cleanup() {
 	cancelAnimationFrame(rafId);
 	volume = 0;
-	interim = '';
+	partial = '';
+	commits = [];
 
 	if (ws) {
 		ws.onmessage = null;
@@ -80,8 +89,9 @@ function cleanup() {
 async function start() {
 	if (connecting || active) return;
 	connecting = true;
-	committed = '';
-	interim = '';
+	commits = [];
+	partial = '';
+	text = '';
 
 	try {
 		const tokenRes = await fetch('/api/stt-token', { method: 'POST' });
@@ -129,13 +139,13 @@ async function start() {
 			try {
 				const msg = JSON.parse(e.data);
 				if (msg.message_type === 'partial_transcript') {
-					interim = msg.text || '';
-				} else if (msg.message_type === 'committed_transcript' || msg.message_type === 'committed_transcript_with_timestamps') {
+					partial = msg.text || '';
+					updateText();
+				} else if (msg.message_type === 'committed_transcript') {
 					const chunk = msg.text?.trim();
-					if (chunk) {
-						committed += (committed ? ' ' : '') + chunk;
-					}
-					interim = '';
+					if (chunk) commits.push(chunk);
+					partial = '';
+					updateText();
 				} else if (msg.message_type === 'auth_error' || msg.message_type === 'quota_exceeded' || msg.message_type === 'rate_limited') {
 					console.error('ElevenLabs STT error:', msg.message_type, msg.error);
 					stop();
@@ -165,10 +175,7 @@ export const dictation = {
 	get active() { return active; },
 	get supported() { return supported; },
 	get volume() { return volume; },
-	get text() {
-		if (!interim) return committed;
-		return committed ? committed + ' ' + interim : interim;
-	},
+	get text() { return text; },
 	toggle() {
 		if (active || connecting) stop();
 		else start();
