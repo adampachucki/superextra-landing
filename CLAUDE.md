@@ -63,6 +63,12 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 - `formState` singleton (`form-state.svelte.ts`) controls access form modal
 - `/api/intake` → Cloud Function → Resend email; dev proxy in vite.config.ts
 
+## Assume nothing — verify
+
+- Never rely on training knowledge for factual claims. Every time you explore a topic, hit a coding issue, or reason through a decision — stop and check the real source: docs, code, APIs, actual data.
+- If you can look it up, look it up. If you can't, say you don't know. Never fill a gap with a plausible guess.
+- This applies to everything: library APIs, platform behavior, syntax, error causes, configuration options. Read the source before you answer.
+
 ## Don'ts
 
 - No Svelte 4 syntax (`export let`, `$:`, `on:click`, `<slot>`)
