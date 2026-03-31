@@ -163,7 +163,10 @@ async function send(text: string) {
 	persist();
 
 	try {
-		const res = await fetch('/api/agent', {
+		const agentUrl = import.meta.env.DEV
+			? '/api/agent'
+			: 'https://us-central1-superextra-site.cloudfunctions.net/agent';
+		const res = await fetch(agentUrl, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
