@@ -306,15 +306,15 @@
 	<aside class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen ? '' : isDesktop ? '-ml-64' : '-translate-x-full'}">
 		<!-- Logo + toggle -->
 		<div class="flex items-center justify-between px-6 py-5">
-			<div class="group flex cursor-default items-center gap-0.5 text-black dark:text-white">
+			<a href="/agent" class="group flex items-center gap-0.5 text-black dark:text-white no-underline">
 				<svg class="h-[18px] w-[18px] -mt-2.5 md:-mt-2 transition-transform duration-500 ease-out group-hover:rotate-45" viewBox="0 0 12 12" fill="none">
 					<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5"/>
 					<line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="currentColor" stroke-width="1.5"/>
 					<line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="currentColor" stroke-width="1.5"/>
 				</svg>
 				<span class="text-[22px] font-light tracking-tight">Superextra</span>
-			</div>
-			<button onclick={toggleSidebar} aria-label="Close sidebar" class="cursor-pointer text-black/30 transition-colors hover:text-black/50 dark:text-white/30 dark:hover:text-white/50">
+			</a>
+			<button onclick={toggleSidebar} aria-label="Close sidebar" class="cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60">
 				<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
 					<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
 					<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
@@ -396,7 +396,7 @@
 				{#if chatState.active}
 					<!-- Active conversation: simple follow-up prompt -->
 					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-					<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.35] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.35]">
+					<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]">
 						<div class="px-5 pt-4">
 							<textarea
 								bind:this={inputEl}
@@ -423,7 +423,7 @@
 				{:else}
 					<!-- No conversation: full prompt with place/map/mic -->
 					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-					<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.35] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.35]">
+					<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]">
 						<div class="flex flex-col">
 							<div class="px-5 pt-5">
 								<textarea

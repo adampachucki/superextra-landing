@@ -290,7 +290,7 @@
 		<!-- Prompt card -->
 		<div class="prompt-fade relative z-20 mx-auto mt-10 md:mt-12" style="max-width: 650px; animation-delay: 280ms;">
 			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-			<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.06] bg-white transition-colors focus-within:border-black/[0.35] dark:border-white/[0.06] dark:bg-cream-50 dark:focus-within:border-white/[0.35]">
+			<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]">
 				<div class="flex flex-col">
 					<div class="px-5 pt-5">
 						<!-- svelte-ignore a11y_autofocus -->

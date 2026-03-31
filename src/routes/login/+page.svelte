@@ -107,7 +107,7 @@
 							bind:value={email}
 							placeholder="Email address"
 							autocomplete="email"
-							class="w-full rounded-full border border-black/[0.08] bg-white py-3 pl-4 pr-12 text-[15px] text-black placeholder:text-black/25 focus:border-black/20 focus:outline-none dark:border-white/[0.08] dark:bg-cream-50 dark:text-white dark:placeholder:text-white/25 dark:focus:border-white/20"
+							class="w-full rounded-full border border-black/[0.08] bg-white py-3 pl-4 pr-12 text-[15px] text-black placeholder:text-black/25 focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-cream-50 dark:text-white dark:placeholder:text-white/25 dark:focus:border-white/25"
 						/>
 						<button
 							type="submit"
@@ -133,12 +133,12 @@
 							value={digit}
 							oninput={(e) => handleCodeInput(i, e)}
 							onkeydown={(e) => handleCodeKeydown(i, e)}
-							class="h-14 w-full rounded-xl border border-black/[0.08] bg-white text-center text-[22px] font-medium text-black focus:border-black/20 focus:outline-none dark:border-white/[0.08] dark:bg-cream-50 dark:text-white dark:focus:border-white/20"
+							class="h-14 w-full rounded-xl border border-black/[0.08] bg-white text-center text-[22px] font-medium text-black focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-cream-50 dark:text-white dark:focus:border-white/25"
 						/>
 					{/each}
 				</div>
 
-				<p class="stagger-2 mt-6 text-center text-[13px] text-black/30 dark:text-white/30">
+				<p class="stagger-2 mt-6 text-center text-[13px] text-black/25 dark:text-white/25">
 					Code sent to <span class="text-black/50 dark:text-white/50">{email}</span>
 				</p>
 
