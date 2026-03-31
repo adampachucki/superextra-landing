@@ -1,63 +1,38 @@
+const WS_URL = 'wss://api.elevenlabs.io/v1/speech-to-text/realtime';
+const SAMPLE_RATE = 16000;
+const BUFFER_SIZE = 4096;
+
 let active = $state(false);
 let supported = $state(false);
+let connecting = $state(false);
 let volume = $state(0);
 let interim = $state('');
-let recognition: SpeechRecognition | null = null;
+
 let onResult: ((text: string) => void) | null = null;
+let ws: WebSocket | null = null;
 let audioCtx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
+let processor: ScriptProcessorNode | null = null;
 let mediaStream: MediaStream | null = null;
 let rafId = 0;
 
 if (typeof window !== 'undefined') {
-	const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-	supported = !!SR;
-	if (SR) {
-		recognition = new SR();
-		recognition.continuous = true;
-		recognition.interimResults = true;
-		recognition.onresult = (e) => {
-			let finalText = '';
-			let interimText = '';
-			for (let i = 0; i < e.results.length; i++) {
-				const result = e.results[i];
-				if (result.isFinal) {
-					finalText += result[0].transcript;
-				} else {
-					interimText += result[0].transcript;
-				}
-			}
-			if (finalText && onResult) {
-				onResult(finalText);
-				interim = '';
-			} else {
-				interim = interimText;
-			}
-		};
-		recognition.onend = () => {
-			active = false;
-			interim = '';
-			stopAudio();
-		};
-		recognition.onerror = () => {
-			active = false;
-			interim = '';
-			stopAudio();
-		};
-	}
+	supported = !!navigator.mediaDevices?.getUserMedia;
 }
 
-function startAudio() {
-	navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-		mediaStream = stream;
-		audioCtx = new AudioContext();
-		analyser = audioCtx.createAnalyser();
-		analyser.fftSize = 256;
-		analyser.smoothingTimeConstant = 0.5;
-		const source = audioCtx.createMediaStreamSource(stream);
-		source.connect(analyser);
-		pollVolume();
-	}).catch(() => {});
+function float32ToPcm16Base64(float32: Float32Array): string {
+	const buffer = new ArrayBuffer(float32.length * 2);
+	const view = new DataView(buffer);
+	for (let i = 0; i < float32.length; i++) {
+		const s = Math.max(-1, Math.min(1, float32[i]));
+		view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+	}
+	const bytes = new Uint8Array(buffer);
+	let binary = '';
+	for (let i = 0; i < bytes.length; i++) {
+		binary += String.fromCharCode(bytes[i]);
+	}
+	return btoa(binary);
 }
 
 function pollVolume() {
@@ -70,18 +45,128 @@ function pollVolume() {
 	rafId = requestAnimationFrame(pollVolume);
 }
 
-function stopAudio() {
+function cleanup() {
 	cancelAnimationFrame(rafId);
 	volume = 0;
+	interim = '';
+
+	if (ws) {
+		ws.onmessage = null;
+		ws.onerror = null;
+		ws.onclose = null;
+		if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+			ws.close();
+		}
+		ws = null;
+	}
+
+	if (processor) {
+		processor.disconnect();
+		processor = null;
+	}
+
 	if (audioCtx) {
 		audioCtx.close();
 		audioCtx = null;
 		analyser = null;
 	}
+
 	if (mediaStream) {
 		mediaStream.getTracks().forEach((t) => t.stop());
 		mediaStream = null;
 	}
+}
+
+async function start(callback: (text: string) => void) {
+	if (connecting || active) return;
+	connecting = true;
+	onResult = callback;
+
+	try {
+		// 1. Get single-use token
+		const tokenRes = await fetch('/api/stt-token', { method: 'POST' });
+		const tokenData = await tokenRes.json();
+		if (!tokenData.ok || !tokenData.token) {
+			throw new Error(tokenData.error || 'Failed to get speech token');
+		}
+
+		// 2. Get microphone access
+		mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+		// 3. Set up Web Audio: capture PCM + volume analysis
+		audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
+		analyser = audioCtx.createAnalyser();
+		analyser.fftSize = 256;
+		analyser.smoothingTimeConstant = 0.5;
+
+		const source = audioCtx.createMediaStreamSource(mediaStream);
+		source.connect(analyser);
+
+		// ScriptProcessorNode for PCM capture
+		processor = audioCtx.createScriptProcessor(BUFFER_SIZE, 1, 1);
+		processor.onaudioprocess = (e) => {
+			if (ws?.readyState === WebSocket.OPEN) {
+				const pcm = e.inputBuffer.getChannelData(0);
+				ws.send(JSON.stringify({
+					message_type: 'input_audio_chunk',
+					audio_base_64: float32ToPcm16Base64(pcm)
+				}));
+			}
+		};
+		source.connect(processor);
+		processor.connect(audioCtx.destination);
+
+		// 4. Start volume visualization
+		pollVolume();
+
+		// 5. Open WebSocket to ElevenLabs
+		const params = new URLSearchParams({
+			token: tokenData.token,
+			model_id: 'scribe_v2_realtime',
+			audio_format: `pcm_${SAMPLE_RATE}`,
+			commit_strategy: 'vad',
+			include_language_detection: 'true'
+		});
+
+		ws = new WebSocket(`${WS_URL}?${params}`);
+
+		ws.onmessage = (e) => {
+			try {
+				const msg = JSON.parse(e.data);
+				if (msg.message_type === 'partial_transcript') {
+					interim = msg.text || '';
+				} else if (msg.message_type === 'committed_transcript' || msg.message_type === 'committed_transcript_with_timestamps') {
+					const text = msg.text?.trim();
+					if (text && onResult) onResult(text);
+					interim = '';
+				} else if (msg.message_type === 'auth_error' || msg.message_type === 'quota_exceeded' || msg.message_type === 'rate_limited') {
+					console.error('ElevenLabs STT error:', msg.message_type, msg.error);
+					stop();
+				}
+			} catch {}
+		};
+
+		ws.onerror = () => {
+			stop();
+		};
+
+		ws.onclose = () => {
+			if (active) stop();
+		};
+
+		active = true;
+	} catch (err) {
+		console.error('Dictation start failed:', err);
+		cleanup();
+	} finally {
+		connecting = false;
+	}
+}
+
+function stop() {
+	active = false;
+	connecting = false;
+	cleanup();
 }
 
 export const dictation = {
@@ -98,25 +183,11 @@ export const dictation = {
 		return interim;
 	},
 	toggle(callback: (text: string) => void) {
-		if (!recognition) return;
-		if (active) {
-			recognition.stop();
-			active = false;
-			interim = '';
-			stopAudio();
+		if (active || connecting) {
+			stop();
 		} else {
-			onResult = callback;
-			recognition.start();
-			active = true;
-			startAudio();
+			start(callback);
 		}
 	},
-	stop() {
-		if (recognition && active) {
-			recognition.stop();
-			active = false;
-			interim = '';
-			stopAudio();
-		}
-	}
+	stop
 };

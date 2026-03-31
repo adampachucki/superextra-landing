@@ -2,6 +2,7 @@
 	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
 	import { goto } from '$app/navigation';
 	import { chatState } from '$lib/chat-state.svelte';
+	import { dictation } from '$lib/dictation.svelte';
 
 	const PREFIX = 'Ask Superextra ';
 	const PROMPTS = [
@@ -37,10 +38,10 @@
 	let userQuery = $state('');
 	let inputEl: HTMLTextAreaElement | undefined = $state();
 
-	let isAnimating = $derived(!userQuery && display.length > 0);
+	let isAnimating = $derived(!userQuery && !dictation.active && display.length > 0);
 
 	$effect(() => {
-		if (userQuery) return;
+		if (userQuery || dictation.active) return;
 
 		let timeout: ReturnType<typeof setTimeout>;
 		let cancelled = false;
@@ -131,6 +132,31 @@
 	$effect(() => {
 		userQuery;
 		resizeTextarea();
+	});
+
+	// --- Dictation ---
+	let dictationBase = '';
+
+	function handleDictation() {
+		if (dictation.active) {
+			dictation.stop();
+			return;
+		}
+		dictationBase = userQuery;
+		dictation.toggle((t: string) => {
+			dictationBase += (dictationBase && !dictationBase.endsWith(' ') ? ' ' : '') + t;
+		});
+	}
+
+	$effect(() => {
+		if (dictation.active) {
+			const space = dictationBase && !dictationBase.endsWith(' ') ? ' ' : '';
+			const interimText = dictation.interim;
+			userQuery = dictationBase + (interimText ? space + interimText : '');
+		} else if (dictationBase) {
+			userQuery = dictationBase;
+			dictationBase = '';
+		}
 	});
 
 	function selectTopic(query: string) {
@@ -276,7 +302,7 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<!-- Headline -->
 		<h1
-			class="hero-fade mx-auto md:max-w-none text-center font-semibold tracking-[-0.03em] text-black dark:text-white"
+			class="hero-fade mx-auto md:max-w-none text-center font-medium tracking-[-0.04em] text-black dark:text-white"
 			style="font-size: clamp(3rem, 6vw, 5.25rem); line-height: 1.02; animation-delay: 100ms;"
 		>
 			AI consultant <br class="max-md:hidden" />for every restaurant
@@ -292,7 +318,7 @@
 			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 			<div onclick={() => inputEl?.focus()} class="cursor-text prompt-card rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]">
 				<div class="flex flex-col">
-					<div class="px-5 pt-5">
+					<div class="relative px-5 pt-5">
 						<!-- svelte-ignore a11y_autofocus -->
 						<textarea
 							bind:this={inputEl}
@@ -300,7 +326,7 @@
 							bind:value={userQuery}
 							onkeydown={handleKeydown}
 							onfocus={() => {}}
-							placeholder={isAnimating ? display : 'What do you want to know about your market?'}
+							placeholder={dictation.active ? 'Start speaking...' : isAnimating ? display : 'What do you want to know about your market?'}
 							rows="3"
 							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating ? 'placeholder:text-black/70 dark:placeholder:text-white/70' : 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
 						></textarea>
@@ -340,13 +366,31 @@
 
 						<!-- Right icons: mic + send -->
 						<div class="flex items-center gap-1">
-							<!-- Microphone icon (disabled) -->
-							<button disabled aria-label="Voice input" class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15">
-								<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-									<path stroke-linecap="square" stroke-linejoin="miter" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
-									<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
-								</svg>
-							</button>
+							{#if dictation.supported}
+								<button
+									onclick={handleDictation}
+									aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
+									class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active ? 'text-red-500' : 'text-black/30 hover:text-black/60 dark:text-white/30 dark:hover:text-white/60'}"
+								>
+									{#if dictation.active}
+										<span
+											class="absolute inset-0 rounded-full bg-red-500/15"
+											style="transform: scale({1 + dictation.volume * 0.5}); opacity: {0.4 + dictation.volume * 0.6};"
+										></span>
+									{/if}
+									<svg class="relative h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+										<path stroke-linecap="square" stroke-linejoin="miter" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
+										<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
+									</svg>
+								</button>
+							{:else}
+								<button disabled aria-label="Voice input not supported" class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15">
+									<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+										<path stroke-linecap="square" stroke-linejoin="miter" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
+										<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
+									</svg>
+								</button>
+							{/if}
 							<!-- Send / Explore button -->
 							<button onclick={handleExplore} aria-label="Explore" class="cursor-pointer shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80">
 								<svg class="h-4 w-4 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">

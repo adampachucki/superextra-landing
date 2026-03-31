@@ -33,10 +33,10 @@
 	let mounted = $state(false);
 
 	let display = $state(PREFIX);
-	let isAnimating = $derived(!chatState.active && !query && display.length > 0);
+	let isAnimating = $derived(!chatState.active && !query && !dictation.active && display.length > 0);
 
 	$effect(() => {
-		if (chatState.active || query) return;
+		if (chatState.active || query || dictation.active) return;
 
 		let timeout: ReturnType<typeof setTimeout>;
 		let cancelled = false;
@@ -141,6 +141,31 @@
 			handleSend();
 		}
 	}
+
+	// --- Dictation ---
+	let dictationBase = '';
+
+	function handleDictation() {
+		if (dictation.active) {
+			dictation.stop();
+			return;
+		}
+		dictationBase = query;
+		dictation.toggle((t: string) => {
+			dictationBase += (dictationBase && !dictationBase.endsWith(' ') ? ' ' : '') + t;
+		});
+	}
+
+	$effect(() => {
+		if (dictation.active) {
+			const space = dictationBase && !dictationBase.endsWith(' ') ? ' ' : '';
+			const interimText = dictation.interim;
+			query = dictationBase + (interimText ? space + interimText : '');
+		} else if (dictationBase) {
+			query = dictationBase;
+			dictationBase = '';
+		}
+	});
 
 	function resizeTextarea() {
 		if (inputEl) {
@@ -470,13 +495,10 @@
 									bind:this={inputEl}
 									bind:value={query}
 									onkeydown={handleKeydown}
-									placeholder={isAnimating ? display : 'What do you want to know about your market?'}
+									placeholder={dictation.active ? 'Start speaking...' : isAnimating ? display : 'What do you want to know about your market?'}
 									rows="3"
 									class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating ? 'placeholder:text-black/70 dark:placeholder:text-white/70' : 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
 								></textarea>
-								{#if dictation.active && dictation.interim}
-									<div class="pointer-events-none absolute inset-x-5 bottom-0 text-[15px] leading-relaxed text-black/30 dark:text-white/30">{dictation.interim}</div>
-								{/if}
 							</div>
 
 							<div class="flex items-center justify-between px-4 pb-2">
@@ -512,7 +534,7 @@
 								<div class="flex items-center gap-1">
 									{#if dictation.supported}
 										<button
-											onclick={() => dictation.toggle((t) => { query += (query && !query.endsWith(' ') ? ' ' : '') + t; })}
+											onclick={handleDictation}
 											aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
 											class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active ? 'text-red-500' : 'text-black/30 hover:text-black/60 dark:text-white/30 dark:hover:text-white/60'}"
 										>

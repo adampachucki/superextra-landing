@@ -13,6 +13,11 @@ export default defineConfig({
 				target: 'https://us-central1-superextra-site.cloudfunctions.net',
 				changeOrigin: true,
 				rewrite: (path: string) => path.replace(/^\/api\/agent/, '/agent')
+			},
+			'/api/stt-token': {
+				target: 'https://us-central1-superextra-site.cloudfunctions.net',
+				changeOrigin: true,
+				rewrite: (path: string) => path.replace(/^\/api\/stt-token/, '/sttToken')
 			}
 		}
 	}
