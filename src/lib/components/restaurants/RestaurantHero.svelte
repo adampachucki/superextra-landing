@@ -297,7 +297,7 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<!-- Headline -->
 		<h1
-			class="hero-fade mx-auto md:max-w-none text-center font-medium tracking-[-0.04em] text-black dark:text-white"
+			class="hero-fade mx-auto md:max-w-none text-center font-semibold tracking-[-0.04em] text-black dark:text-white"
 			style="font-size: clamp(3rem, 6vw, 5.25rem); line-height: 1.02; animation-delay: 100ms;"
 		>
 			AI consultant <br class="max-md:hidden" />for every restaurant
