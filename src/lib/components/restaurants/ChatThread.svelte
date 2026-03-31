@@ -22,7 +22,7 @@
 	}
 
 	const SOURCES_LIMIT = 19;
-	let expandedSources = $state(new Set<number>());
+	let expandedSources: Record<number, boolean> = $state({});
 
 	function retryLast() {
 		const lastUser = [...chatState.messages].reverse().find((m) => m.role === 'user');
@@ -47,7 +47,7 @@
 						>
 							{@html renderMarkdown(msg.text)}
 						</div>
-						<div class="mt-2">
+						<div class="mt-2 flex justify-end">
 							<button
 								onclick={() => tts.play(i, msg.text)}
 								disabled={tts.loading === i}
@@ -96,7 +96,7 @@
 							</button>
 						</div>
 						{#if msg.sources?.length}
-							{@const showAll = expandedSources.has(i)}
+							{@const showAll = expandedSources[i]}
 							{@const visible = showAll ? msg.sources : msg.sources.slice(0, SOURCES_LIMIT)}
 							{@const remaining = msg.sources.length - SOURCES_LIMIT}
 							<div class="mt-5">
@@ -126,8 +126,7 @@
 									{#if remaining > 0 && !showAll}
 										<button
 											onclick={() => {
-												expandedSources.add(i);
-												expandedSources = expandedSources;
+												expandedSources[i] = true;
 											}}
 											class="inline-flex cursor-pointer items-center rounded-full border border-black/5 px-2.5 py-1 text-[12px] leading-snug text-black/40 transition-colors hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60"
 										>
