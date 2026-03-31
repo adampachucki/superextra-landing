@@ -401,7 +401,7 @@ export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (re
 			},
 			body: JSON.stringify({
 				text: plainText,
-				model_id: 'eleven_multilingual_v2',
+				model_id: 'eleven_flash_v2_5',
 				voice_settings: {
 					stability: 0.5,
 					similarity_boost: 0.75
@@ -422,6 +422,66 @@ export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (re
 	} catch (err) {
 		console.error('ElevenLabs TTS fetch failed:', err);
 		res.status(500).json({ ok: false, error: 'Speech service unreachable' });
+	}
+});
+
+// --- Agent check endpoint (recovers latest agent response if frontend missed it) ---
+
+export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
+	if (req.method !== 'GET') {
+		res.status(405).json({ ok: false, error: 'Method not allowed' });
+		return;
+	}
+
+	const sid = req.query.sid;
+	if (!sid) {
+		res.status(400).json({ ok: false, error: 'sid query parameter is required' });
+		return;
+	}
+
+	try {
+		const doc = await db.collection('sessions').doc(sid).get();
+		if (!doc.exists) {
+			res.json({ ok: true, reply: null });
+			return;
+		}
+
+		const { adkSessionId, userId } = doc.data();
+		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
+		const headers = await client.getRequestHeaders();
+
+		const adkRes = await fetch(
+			`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(adkSessionId)}`,
+			{ headers }
+		);
+
+		if (!adkRes.ok) {
+			res.json({ ok: true, reply: null });
+			return;
+		}
+
+		const session = await adkRes.json();
+		const reply = session.state?.final_report || session.state?.router_response || null;
+
+		// Extract sources from events' grounding metadata
+		const sources = [];
+		if (session.events) {
+			for (const event of session.events) {
+				const chunks = event.groundingMetadata?.groundingChunks;
+				if (chunks) {
+					for (const c of chunks) {
+						if (c.web && !sources.some(s => s.url === c.web.uri)) {
+							sources.push({ title: c.web.title, url: c.web.uri });
+						}
+					}
+				}
+			}
+		}
+
+		res.json({ ok: true, reply, sources: sources.length ? sources : undefined });
+	} catch (err) {
+		console.error('Agent check error:', err.message || err);
+		res.json({ ok: true, reply: null });
 	}
 });
 

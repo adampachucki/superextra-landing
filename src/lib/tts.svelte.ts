@@ -1,15 +1,14 @@
 let playingIndex = $state<number | null>(null);
 let loading = $state<number | null>(null);
-let audio: HTMLAudioElement | null = null;
+let ctx: AudioContext | null = null;
+let sourceNode: AudioBufferSourceNode | null = null;
 
 function stop() {
-	if (audio) {
-		audio.onended = null;
-		audio.onerror = null;
-		audio.pause();
-		audio.removeAttribute('src');
-		audio.load();
-		audio = null;
+	if (sourceNode) {
+		sourceNode.onended = null;
+		sourceNode.stop();
+		sourceNode.disconnect();
+		sourceNode = null;
 	}
 	playingIndex = null;
 	loading = null;
@@ -24,6 +23,10 @@ async function play(messageIndex: number, text: string) {
 	stop();
 	loading = messageIndex;
 
+	// Unlock audio on Safari: create/resume AudioContext synchronously in the click handler
+	if (!ctx) ctx = new AudioContext();
+	if (ctx.state === 'suspended') ctx.resume();
+
 	try {
 		const res = await fetch('/api/tts', {
 			method: 'POST',
@@ -37,24 +40,25 @@ async function play(messageIndex: number, text: string) {
 			return;
 		}
 
-		const blob = await res.blob();
-		const url = URL.createObjectURL(blob);
+		const arrayBuffer = await res.arrayBuffer();
+		const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
 
-		audio = new Audio(url);
-		audio.onended = () => {
-			URL.revokeObjectURL(url);
+		sourceNode = ctx.createBufferSource();
+		sourceNode.buffer = audioBuffer;
+		sourceNode.connect(ctx.destination);
+		sourceNode.onended = () => {
+			sourceNode = null;
 			playingIndex = null;
-			audio = null;
 		};
-
-		await audio.play();
+		sourceNode.start();
 		playingIndex = messageIndex;
 	} catch (err) {
 		console.error('TTS failed:', err);
-		if (audio) {
-			audio.onended = null;
-			audio.pause();
-			audio = null;
+		if (sourceNode) {
+			sourceNode.onended = null;
+			sourceNode.stop();
+			sourceNode.disconnect();
+			sourceNode = null;
 		}
 	} finally {
 		loading = null;
