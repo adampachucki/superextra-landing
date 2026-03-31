@@ -25,7 +25,7 @@
 				onclick={() => formState.open()}
 				class="inline-flex cursor-pointer items-center gap-2 btn-primary px-8 py-3.5 text-sm"
 			>
-				Get Started
+				Contact Us
 			</button>
 		</div>
 	</div>

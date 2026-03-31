@@ -53,15 +53,15 @@
 		{/if}
 
 		<div class="hidden items-center gap-3 md:flex">
-			<button onclick={() => formState.open()} class="cursor-pointer rounded-full border px-6 py-2.5 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Contact Us</button>
-			<a href="/login" class="btn-primary px-5 py-2 text-sm">Log in</a>
+			<a href="/login" class="cursor-pointer rounded-full border px-5 py-2 text-sm font-medium transition-all {over ? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90' : 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}">Log In</a>
+			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-5 py-2 text-sm">Contact Us</button>
 		</div>
 
 		<div class="flex items-center gap-3 md:hidden">
-			<button onclick={() => formState.open()} class="cursor-pointer rounded-full border p-2 {over ? 'border-white/15 text-white/40' : 'border-black/10 text-black/30 dark:border-white/10 dark:text-white/30'}" aria-label="Contact Us">
-				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linejoin="round" d="M2 4h20v16H2V4zm0 0l10 8 10-8" /></svg>
-			</button>
-			<a href="/login" class="btn-primary px-4 py-1.5 text-sm">Log in</a>
+			<a href="/login" class="cursor-pointer rounded-full border p-2 {over ? 'border-white/15 text-white/40' : 'border-black/10 text-black/30 dark:border-white/10 dark:text-white/30'}" aria-label="Log In">
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3-3h-9m9 0l-3-3m3 3l-3 3" /></svg>
+			</a>
+			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-4 py-1.5 text-sm">Contact Us</button>
 			{#if !minimal}
 				<button
 					class="{over ? 'text-white' : 'text-black dark:text-white'}"

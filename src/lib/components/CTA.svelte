@@ -8,8 +8,8 @@
 			Early access is now open. Limited spots available.
 		</p>
 		<div class="flex items-center gap-3">
-			<button onclick={() => formState.open()} class="cursor-pointer rounded-full border border-black/10 px-6 py-2.5 text-sm font-medium text-black/70 transition-all hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90">Contact Us</button>
-			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-6 py-2.5 text-sm">Get Started</button>
+			<a href="/login" class="cursor-pointer rounded-full border border-black/10 px-6 py-2.5 text-sm font-medium text-black/70 transition-all hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90">Log In</a>
+			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-6 py-2.5 text-sm">Contact Us</button>
 		</div>
 	</div>
 </section>
