@@ -335,7 +335,7 @@
 						<div class="group relative">
 							<button
 								onclick={() => chatState.switchTo(conv.id)}
-								class="w-full cursor-pointer rounded-lg px-2 py-2 text-left transition-colors {conv.id === chatState.activeId ? 'bg-cream-100 dark:bg-cream-100' : 'hover:bg-cream-100/50 dark:hover:bg-cream-50/50'}"
+								class="w-full cursor-pointer rounded-lg px-2 py-2 pr-8 text-left transition-colors {conv.id === chatState.activeId ? 'bg-cream-100 dark:bg-cream-100' : 'hover:bg-cream-100/50 dark:hover:bg-cream-50/50'}"
 							>
 								<p class="truncate text-[13px] {conv.id === chatState.activeId ? 'text-black dark:text-white' : 'text-black/70 dark:text-white/70'}">
 									{conv.title}

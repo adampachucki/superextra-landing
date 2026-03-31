@@ -230,7 +230,23 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 120 }, async (req, 
 			?.map(c => ({ title: c.web.title, url: c.web.uri }))
 			|| [];
 
-		res.json({ ok: true, reply, sources });
+		// Generate a short title for new conversations (no prior history)
+		let title = undefined;
+		const isFirstMessage = !prevHistory.length;
+		if (isFirstMessage) {
+			try {
+				const flashModel = vertexAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+				const titleResult = await flashModel.generateContent({
+					contents: [{ role: 'user', parts: [{ text: `Generate a short conversational title (max 5 words, no quotes) for a chat that starts with this question about restaurants: "${message}"` }] }]
+				});
+				const raw = titleResult.response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+				if (raw) title = raw.replace(/^["']|["']$/g, '').slice(0, 60);
+			} catch (e) {
+				console.error('Title generation failed:', e.message);
+			}
+		}
+
+		res.json({ ok: true, reply, sources, ...(title && { title }) });
 	} catch (err) {
 		console.error('Agent error:', err.message || err);
 		res.status(500).json({ ok: false, error: 'Agent unavailable. Please try again.' });

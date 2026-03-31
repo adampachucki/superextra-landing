@@ -98,7 +98,7 @@ function syncCurrentToList() {
 			messages: [...messages],
 			sessionId,
 			placeContext,
-			updatedAt: Date.now()
+			updatedAt: messages[messages.length - 1]?.timestamp || conversations[idx].updatedAt
 		};
 	}
 }
@@ -176,6 +176,14 @@ async function send(text: string) {
 			messages.push(reply);
 		} else if (sendingConvId) {
 			appendToConversation(sendingConvId, reply);
+		}
+
+		// Update title if AI-generated one came back
+		if (data.title && sendingConvId) {
+			const idx = conversations.findIndex((c) => c.id === sendingConvId);
+			if (idx >= 0) {
+				conversations[idx] = { ...conversations[idx], title: data.title };
+			}
 		}
 	} catch {
 		if (currentId === sendingConvId) {
