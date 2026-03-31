@@ -30,6 +30,7 @@
 	let isDesktop = $state(false);
 	let isMobile = $state(false);
 	let mounted = $state(false);
+	let sidebarContentVisible = $derived(sidebarOpen && mounted);
 
 	let display = $state(PREFIX);
 	let isAnimating = $derived(
@@ -385,16 +386,20 @@
 		onclick={() => (sidebarOpen = false)}
 	></div>
 	<aside
-		class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {isDesktop
-			? 'relative'
-			: 'fixed inset-y-0 left-0 z-50'} {sidebarOpen
+		class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {mounted
+			? 'animated'
+			: ''} {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen
 			? ''
 			: isDesktop
 				? '-ml-64'
 				: '-translate-x-full'}"
 	>
 		<!-- Logo + toggle -->
-		<div class="flex items-center justify-between px-6 py-5">
+		<div
+			class="sb-item flex items-center justify-between px-6 py-5"
+			style="--sb-delay: 0.15s"
+			class:visible={sidebarContentVisible}
+		>
 			<a
 				href="/agent"
 				class="group flex items-center gap-0.5 text-black no-underline dark:text-white"
@@ -434,7 +439,9 @@
 		<div class="flex-1 overflow-y-auto px-5 py-2">
 			<button
 				onclick={handleNewChat}
-				class="mb-6 flex w-full cursor-pointer items-center gap-2 rounded-lg bg-cream-100 px-2 py-1.5 text-[13px] text-black/70 transition-colors hover:bg-cream-200 hover:text-black dark:bg-cream-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
+				class="sb-item mb-6 flex w-full cursor-pointer items-center gap-2 rounded-lg bg-cream-100 px-2 py-1.5 text-[13px] text-black/70 transition-colors hover:bg-cream-200 hover:text-black dark:bg-cream-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
+				style="--sb-delay: 0.25s"
+				class:visible={sidebarContentVisible}
 			>
 				<svg
 					class="h-3.5 w-3.5"
@@ -450,12 +457,20 @@
 			</button>
 
 			{#if chatState.conversations.length > 0}
-				<p class="mb-2 text-[11px] font-medium tracking-wide text-black/40 dark:text-white/40">
+				<p
+					class="sb-item mb-2 text-[11px] font-medium tracking-wide text-black/40 dark:text-white/40"
+					style="--sb-delay: 0.32s"
+					class:visible={sidebarContentVisible}
+				>
 					CONVERSATIONS
 				</p>
 				<div class="flex flex-col gap-0.5">
-					{#each chatState.conversations as conv (conv.id)}
-						<div class="group relative">
+					{#each chatState.conversations as conv, i (conv.id)}
+						<div
+							class="sb-item group relative"
+							style="--sb-delay: {Math.min(0.38 + i * 0.05, 0.7)}s"
+							class:visible={sidebarContentVisible}
+						>
 							<button
 								onclick={() => chatState.switchTo(conv.id)}
 								class="w-full cursor-pointer rounded-lg px-2 py-2 pr-8 text-left transition-colors {conv.id ===
@@ -505,7 +520,11 @@
 		</div>
 
 		<!-- Footer -->
-		<div class="border-t border-black/[0.06] px-5 py-4 dark:border-white/[0.06]">
+		<div
+			class="sb-item border-t border-black/[0.06] px-5 py-4 dark:border-white/[0.06]"
+			style="--sb-delay: 0.45s"
+			class:visible={sidebarContentVisible}
+		>
 			<div class="flex items-center gap-4">
 				<a
 					href="/privacy-policy"
@@ -575,7 +594,8 @@
 		<button
 			onclick={toggleSidebar}
 			aria-label="Open sidebar"
-			class="toggle-float absolute top-4 left-4 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 text-white/90 backdrop-blur-md transition-all duration-200 hover:bg-black/60 hover:text-white dark:bg-white/20 dark:text-white/70 dark:backdrop-blur-md dark:hover:bg-white/30 dark:hover:text-white {sidebarOpen
+			class="toggle-float absolute top-4 left-4 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white dark:bg-white/20 dark:text-white/70 dark:backdrop-blur-md dark:hover:bg-white/30 dark:hover:text-white {sidebarOpen ||
+			!mounted
 				? 'pointer-events-none opacity-0'
 				: 'opacity-100'}"
 		>
@@ -1024,18 +1044,35 @@
 			0 8px 32px rgba(0, 0, 0, 0.3);
 	}
 
-	.sidebar {
+	.sb-item {
+		opacity: 0;
+		transform: translateY(6px);
 		transition:
-			translate 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-			margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+			opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1) var(--sb-delay, 0s),
+			transform 0.45s cubic-bezier(0.16, 1, 0.3, 1) var(--sb-delay, 0s);
+	}
+
+	.sb-item.visible {
+		opacity: 1;
+		transform: translateY(0);
+	}
+
+	.sidebar.animated {
+		transition:
+			translate 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+			margin-left 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 		will-change: translate, margin-left;
 	}
 
-	.sidebar-overlay {
+	.is-mounted .sidebar-overlay {
 		transition: opacity 0.3s ease;
 	}
 
 	.toggle-float {
+		transition: none;
+	}
+
+	.is-mounted .toggle-float {
 		transition:
 			opacity 0.2s ease,
 			background-color 0.2s ease,
