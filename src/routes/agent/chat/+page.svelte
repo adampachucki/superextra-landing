@@ -636,7 +636,7 @@
 										aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
 										class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active
 											? 'text-red-500'
-											: 'text-black/30 hover:text-black/60 dark:text-white/30 dark:hover:text-white/60'}"
+											: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
 									>
 										{#if dictation.active}
 											<span
@@ -836,7 +836,7 @@
 												aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
 												class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active
 													? 'text-red-500'
-													: 'text-black/30 hover:text-black/60 dark:text-white/30 dark:hover:text-white/60'}"
+													: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
 											>
 												{#if dictation.active}
 													<span
