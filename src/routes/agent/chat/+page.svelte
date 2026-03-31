@@ -90,6 +90,7 @@
 	}
 
 	onMount(() => {
+		sidebarOpen = window.matchMedia('(min-width: 1024px)').matches;
 		requestAnimationFrame(() => { mounted = true; });
 	});
 
@@ -284,7 +285,7 @@
 		const days = Math.floor(hours / 24);
 		if (days === 1) return 'yesterday';
 		if (days < 7) return `${days}d ago`;
-		return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+		return new Date(ts).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
 	}
 </script>
 
