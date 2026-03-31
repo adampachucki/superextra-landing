@@ -2,6 +2,11 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { VertexAI } from '@google-cloud/vertexai';
 import { GoogleAuth } from 'google-auth-library';
+import { initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+
+initializeApp();
+const db = getFirestore();
 
 const relayKey = defineSecret('RELAY_KEY');
 const elevenlabsKey = defineSecret('ELEVENLABS_API_KEY');
@@ -171,8 +176,15 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
 		const headers = await client.getRequestHeaders();
 
-		// Get or create ADK session (Agent Engine generates its own IDs)
+		// Get or create ADK session (check cache → Firestore → create new)
 		let adkSessionId = sessionMap.get(sessionId);
+		if (!adkSessionId) {
+			const doc = await db.collection('sessions').doc(sessionId).get();
+			if (doc.exists) {
+				adkSessionId = doc.data().adkSessionId;
+				sessionMap.set(sessionId, adkSessionId);
+			}
+		}
 		if (!adkSessionId) {
 			const createRes = await fetch(`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(ip)}/sessions`, {
 				method: 'POST',
@@ -187,6 +199,11 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 			const sessionData = await createRes.json();
 			adkSessionId = sessionData.id;
 			sessionMap.set(sessionId, adkSessionId);
+			await db.collection('sessions').doc(sessionId).set({
+				adkSessionId,
+				userId: ip,
+				createdAt: Date.now()
+			});
 		}
 
 		// Build the query text with date and optional place context
@@ -319,5 +336,50 @@ export const sttToken = onRequest({ cors: true, secrets: [elevenlabsKey] }, asyn
 	} catch (err) {
 		console.error('ElevenLabs token fetch failed:', err);
 		res.status(500).json({ ok: false, error: 'Speech service unreachable' });
+	}
+});
+
+// --- Agent debug endpoint (retrieves full ADK session by frontend sessionId) ---
+
+export const agentDebug = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
+	if (req.method !== 'GET') {
+		res.status(405).json({ ok: false, error: 'Method not allowed' });
+		return;
+	}
+
+	const sid = req.query.sid;
+	if (!sid) {
+		res.status(400).json({ ok: false, error: 'sid query parameter is required' });
+		return;
+	}
+
+	try {
+		const doc = await db.collection('sessions').doc(sid).get();
+		if (!doc.exists) {
+			res.status(404).json({ ok: false, error: 'Session not found' });
+			return;
+		}
+
+		const { adkSessionId, userId } = doc.data();
+		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
+		const headers = await client.getRequestHeaders();
+
+		const adkRes = await fetch(
+			`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(adkSessionId)}`,
+			{ headers }
+		);
+
+		if (!adkRes.ok) {
+			const errText = await adkRes.text().catch(() => '');
+			console.error('ADK session fetch failed:', adkRes.status, errText);
+			res.status(502).json({ ok: false, error: 'Could not retrieve session from agent' });
+			return;
+		}
+
+		const session = await adkRes.json();
+		res.json({ ok: true, session });
+	} catch (err) {
+		console.error('Debug endpoint error:', err.message || err);
+		res.status(500).json({ ok: false, error: 'Failed to retrieve session' });
 	}
 });
