@@ -6,7 +6,18 @@ AI-native market intelligence and competitor benchmarking for the restaurant ind
 
 - `npm run dev` — port 5199, exposed on local network (`host: true`) for mobile testing
 - `npm run build` / `npm run check`
+- `npm run lint` — Prettier check + ESLint
+- `npm run format` — auto-format all files
+- `npm run test` — run unit tests once
 - Deploy: push to `main` → GitHub Actions → Firebase (project: superextra-site)
+
+## Code Quality
+
+- **Prettier** formats on save (Cursor) and pre-commit (husky + lint-staged)
+- **ESLint** with `eslint-plugin-svelte` — Svelte 5 runes-aware, TypeScript-integrated
+- **Vitest** for unit tests — test files use `.spec.ts` or `.test.ts` extension
+- CI runs `format:check`, `eslint`, `svelte-check`, and `test` before every deploy
+- Run `npm run lint` before pushing if you bypass the pre-commit hook
 
 ## Branding
 
