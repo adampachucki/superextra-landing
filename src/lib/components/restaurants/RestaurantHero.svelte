@@ -143,19 +143,14 @@
 			return;
 		}
 		dictationBase = userQuery;
-		dictation.toggle((t: string) => {
-			dictationBase += (dictationBase && !dictationBase.endsWith(' ') ? ' ' : '') + t;
-		});
+		dictation.toggle();
 	}
 
 	$effect(() => {
 		if (dictation.active) {
-			const space = dictationBase && !dictationBase.endsWith(' ') ? ' ' : '';
-			const interimText = dictation.interim;
-			userQuery = dictationBase + (interimText ? space + interimText : '');
-		} else if (dictationBase) {
-			userQuery = dictationBase;
-			dictationBase = '';
+			const t = dictation.text;
+			const space = dictationBase && t && !dictationBase.endsWith(' ') ? ' ' : '';
+			userQuery = dictationBase + space + t;
 		}
 	});
 

@@ -151,19 +151,14 @@
 			return;
 		}
 		dictationBase = query;
-		dictation.toggle((t: string) => {
-			dictationBase += (dictationBase && !dictationBase.endsWith(' ') ? ' ' : '') + t;
-		});
+		dictation.toggle();
 	}
 
 	$effect(() => {
 		if (dictation.active) {
-			const space = dictationBase && !dictationBase.endsWith(' ') ? ' ' : '';
-			const interimText = dictation.interim;
-			query = dictationBase + (interimText ? space + interimText : '');
-		} else if (dictationBase) {
-			query = dictationBase;
-			dictationBase = '';
+			const t = dictation.text;
+			const space = dictationBase && t && !dictationBase.endsWith(' ') ? ' ' : '';
+			query = dictationBase + space + t;
 		}
 	});
 
@@ -467,12 +462,37 @@
 								bind:this={inputEl}
 								bind:value={query}
 								onkeydown={handleKeydown}
-								placeholder="Ask a follow-up..."
+								placeholder={dictation.active ? 'Start speaking...' : 'Ask a follow-up...'}
 								rows="1"
 								class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none dark:text-white dark:placeholder:text-white/45"
 							></textarea>
 						</div>
-						<div class="flex items-center justify-end px-4 pb-4">
+						<div class="flex items-center justify-end gap-1 px-4 pb-4">
+							{#if dictation.supported}
+								<button
+									onclick={handleDictation}
+									aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
+									class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active ? 'text-red-500' : 'text-black/30 hover:text-black/60 dark:text-white/30 dark:hover:text-white/60'}"
+								>
+									{#if dictation.active}
+										<span
+											class="absolute inset-0 rounded-full bg-red-500/15"
+											style="transform: scale({1 + dictation.volume * 0.5}); opacity: {0.4 + dictation.volume * 0.6};"
+										></span>
+									{/if}
+									<svg class="relative h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+										<path stroke-linecap="square" stroke-linejoin="miter" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
+										<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
+									</svg>
+								</button>
+							{:else}
+								<button disabled aria-label="Voice input not supported" class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15">
+									<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+										<path stroke-linecap="square" stroke-linejoin="miter" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z" />
+										<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
+									</svg>
+								</button>
+							{/if}
 							<button
 								onclick={handleSend}
 								disabled={!query.trim() || chatState.loading}

@@ -4,11 +4,11 @@ const BUFFER_SIZE = 4096;
 
 let active = $state(false);
 let supported = $state(false);
-let connecting = $state(false);
 let volume = $state(0);
+let committed = $state('');
 let interim = $state('');
 
-let onResult: ((text: string) => void) | null = null;
+let connecting = false;
 let ws: WebSocket | null = null;
 let audioCtx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
@@ -77,23 +77,21 @@ function cleanup() {
 	}
 }
 
-async function start(callback: (text: string) => void) {
+async function start() {
 	if (connecting || active) return;
 	connecting = true;
-	onResult = callback;
+	committed = '';
+	interim = '';
 
 	try {
-		// 1. Get single-use token
 		const tokenRes = await fetch('/api/stt-token', { method: 'POST' });
 		const tokenData = await tokenRes.json();
 		if (!tokenData.ok || !tokenData.token) {
 			throw new Error(tokenData.error || 'Failed to get speech token');
 		}
 
-		// 2. Get microphone access
 		mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-		// 3. Set up Web Audio: capture PCM + volume analysis
 		audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
 		analyser = audioCtx.createAnalyser();
 		analyser.fftSize = 256;
@@ -102,7 +100,6 @@ async function start(callback: (text: string) => void) {
 		const source = audioCtx.createMediaStreamSource(mediaStream);
 		source.connect(analyser);
 
-		// ScriptProcessorNode for PCM capture
 		processor = audioCtx.createScriptProcessor(BUFFER_SIZE, 1, 1);
 		processor.onaudioprocess = (e) => {
 			if (ws?.readyState === WebSocket.OPEN) {
@@ -116,10 +113,8 @@ async function start(callback: (text: string) => void) {
 		source.connect(processor);
 		processor.connect(audioCtx.destination);
 
-		// 4. Start volume visualization
 		pollVolume();
 
-		// 5. Open WebSocket to ElevenLabs
 		const params = new URLSearchParams({
 			token: tokenData.token,
 			model_id: 'scribe_v2_realtime',
@@ -136,8 +131,10 @@ async function start(callback: (text: string) => void) {
 				if (msg.message_type === 'partial_transcript') {
 					interim = msg.text || '';
 				} else if (msg.message_type === 'committed_transcript' || msg.message_type === 'committed_transcript_with_timestamps') {
-					const text = msg.text?.trim();
-					if (text && onResult) onResult(text);
+					const chunk = msg.text?.trim();
+					if (chunk) {
+						committed += (committed ? ' ' : '') + chunk;
+					}
 					interim = '';
 				} else if (msg.message_type === 'auth_error' || msg.message_type === 'quota_exceeded' || msg.message_type === 'rate_limited') {
 					console.error('ElevenLabs STT error:', msg.message_type, msg.error);
@@ -146,13 +143,8 @@ async function start(callback: (text: string) => void) {
 			} catch {}
 		};
 
-		ws.onerror = () => {
-			stop();
-		};
-
-		ws.onclose = () => {
-			if (active) stop();
-		};
+		ws.onerror = () => stop();
+		ws.onclose = () => { if (active) stop(); };
 
 		active = true;
 	} catch (err) {
@@ -170,24 +162,16 @@ function stop() {
 }
 
 export const dictation = {
-	get active() {
-		return active;
+	get active() { return active; },
+	get supported() { return supported; },
+	get volume() { return volume; },
+	get text() {
+		if (!interim) return committed;
+		return committed ? committed + ' ' + interim : interim;
 	},
-	get supported() {
-		return supported;
-	},
-	get volume() {
-		return volume;
-	},
-	get interim() {
-		return interim;
-	},
-	toggle(callback: (text: string) => void) {
-		if (active || connecting) {
-			stop();
-		} else {
-			start(callback);
-		}
+	toggle() {
+		if (active || connecting) stop();
+		else start();
 	},
 	stop
 };
