@@ -624,7 +624,6 @@
 									placeholder={dictation.active ? 'Start speaking...' : 'Ask a follow-up...'}
 									rows="1"
 									autocomplete="off"
-									autocorrect="off"
 									autocapitalize="off"
 									spellcheck="false"
 									class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none dark:text-white dark:placeholder:text-white/45"
@@ -736,7 +735,6 @@
 												: 'What do you want to know about your market?'}
 										rows="3"
 										autocomplete="off"
-										autocorrect="off"
 										autocapitalize="off"
 										spellcheck="false"
 										class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating
