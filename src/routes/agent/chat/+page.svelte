@@ -314,7 +314,7 @@
 				</svg>
 				<span class="text-[22px] font-light tracking-tight">Superextra</span>
 			</a>
-			<button onclick={toggleSidebar} aria-label="Close sidebar" class="cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60">
+			<button onclick={toggleSidebar} aria-label="Close sidebar" class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-black/40 transition-all duration-200 hover:bg-black/[0.06] hover:text-black/60 dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-white/60">
 				<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
 					<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
 					<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
@@ -370,7 +370,7 @@
 	<!-- Main area -->
 	<div class="relative flex min-w-0 flex-1 flex-col">
 		<!-- Floating sidebar toggle (when closed) -->
-		<button onclick={toggleSidebar} aria-label="Open sidebar" class="toggle-float absolute left-4 top-4 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 backdrop-blur-md text-white/90 transition-all hover:bg-black/60 hover:text-white dark:bg-white/20 dark:backdrop-blur-md dark:text-white/70 dark:hover:bg-white/30 dark:hover:text-white {sidebarOpen ? 'pointer-events-none opacity-0' : 'opacity-100'}">
+		<button onclick={toggleSidebar} aria-label="Open sidebar" class="toggle-float absolute left-4 top-4 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 backdrop-blur-md text-white/90 transition-all duration-200 hover:bg-black/60 hover:text-white dark:bg-white/20 dark:backdrop-blur-md dark:text-white/70 dark:hover:bg-white/30 dark:hover:text-white {sidebarOpen ? 'pointer-events-none opacity-0' : 'opacity-100'}">
 			<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
 				<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
 				<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
@@ -439,7 +439,7 @@
 							<div class="flex items-center justify-between px-4 pb-2">
 								<!-- Left icons + place chip -->
 								<div class="relative flex items-center gap-1">
-									<button onclick={toggleContext} aria-label="Add place" class="cursor-pointer flex h-8 w-8 items-center justify-center rounded-full transition-colors {contextOpen || selectedPlace ? 'text-black/60 dark:text-white/60' : 'text-black/30 hover:text-black/50 dark:text-white/30 dark:hover:text-white/50'}">
+									<button onclick={toggleContext} aria-label="Add place" class="cursor-pointer flex h-8 w-8 items-center justify-center rounded-full transition-colors {contextOpen || selectedPlace ? 'text-black/60 dark:text-white/60' : 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}">
 										<svg class="h-[18px] w-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
 											<path stroke-linecap="square" stroke-linejoin="miter" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
 											<path stroke-linecap="square" stroke-linejoin="miter" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
@@ -570,7 +570,7 @@
 	}
 
 	.toggle-float {
-		transition: opacity 0.2s ease;
+		transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease;
 	}
 
 	.context-slide {
