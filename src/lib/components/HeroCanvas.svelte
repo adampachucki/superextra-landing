@@ -1,7 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	let { animate = true, class: className = '', width = 680, height = 400, lineOffsetY = 0, lineSpacing = 0 }: { animate?: boolean; class?: string; width?: number; height?: number; lineOffsetY?: number; lineSpacing?: number } = $props();
+	let {
+		animate = true,
+		class: className = '',
+		width = 680,
+		height = 400,
+		lineOffsetY = 0,
+		lineSpacing = 0
+	}: {
+		animate?: boolean;
+		class?: string;
+		width?: number;
+		height?: number;
+		lineOffsetY?: number;
+		lineSpacing?: number;
+	} = $props();
 
 	let canvasEl: HTMLCanvasElement;
 
@@ -49,14 +63,48 @@
 
 		const rng = () => Math.random() * 100;
 		const lines = [
-			{ seed: rng(), baseY: 130 + lineOffsetY, width: 1.5, amp: 55, freq: 0.006 + Math.random() * 0.006, phaseSpeed: 0.12 + Math.random() * 0.08, baseOpacity: 0.18 },
-			{ seed: rng(), baseY: 220 + lineOffsetY + lineSpacing, width: 1.5, amp: 60, freq: 0.005 + Math.random() * 0.006, phaseSpeed: 0.1 + Math.random() * 0.08, baseOpacity: 0.1 },
-			{ seed: rng(), baseY: 300 + lineOffsetY + lineSpacing * 2, width: 1, amp: 50, freq: 0.007 + Math.random() * 0.006, phaseSpeed: 0.1 + Math.random() * 0.08, baseOpacity: 0.07 }
+			{
+				seed: rng(),
+				baseY: 130 + lineOffsetY,
+				width: 1.5,
+				amp: 55,
+				freq: 0.006 + Math.random() * 0.006,
+				phaseSpeed: 0.12 + Math.random() * 0.08,
+				baseOpacity: 0.18
+			},
+			{
+				seed: rng(),
+				baseY: 220 + lineOffsetY + lineSpacing,
+				width: 1.5,
+				amp: 60,
+				freq: 0.005 + Math.random() * 0.006,
+				phaseSpeed: 0.1 + Math.random() * 0.08,
+				baseOpacity: 0.1
+			},
+			{
+				seed: rng(),
+				baseY: 300 + lineOffsetY + lineSpacing * 2,
+				width: 1,
+				amp: 50,
+				freq: 0.007 + Math.random() * 0.006,
+				phaseSpeed: 0.1 + Math.random() * 0.08,
+				baseOpacity: 0.07
+			}
 		];
 
 		const circles = [
-			{ seed: rng(), baseX: W * (0.1 + Math.random() * 0.3), baseY: H * (0.15 + Math.random() * 0.4), baseR: 220 + Math.random() * 120 },
-			{ seed: rng(), baseX: W * (0.6 + Math.random() * 0.3), baseY: H * (0.45 + Math.random() * 0.4), baseR: 200 + Math.random() * 100 }
+			{
+				seed: rng(),
+				baseX: W * (0.1 + Math.random() * 0.3),
+				baseY: H * (0.15 + Math.random() * 0.4),
+				baseR: 220 + Math.random() * 120
+			},
+			{
+				seed: rng(),
+				baseX: W * (0.6 + Math.random() * 0.3),
+				baseY: H * (0.45 + Math.random() * 0.4),
+				baseR: 200 + Math.random() * 100
+			}
 		];
 
 		let frame: number;
@@ -86,7 +134,10 @@
 
 			const grad = ctx.createLinearGradient(x0, y0, x1, y1);
 			grad.addColorStop(0, `rgb(${bgC1[0]},${bgC1[1]},${bgC1[2]})`);
-			grad.addColorStop(0.5, `rgb(${lerp(bgC1[0], bgC2[0], 0.5)},${lerp(bgC1[1], bgC2[1], 0.5)},${lerp(bgC1[2], bgC2[2], 0.5)})`);
+			grad.addColorStop(
+				0.5,
+				`rgb(${lerp(bgC1[0], bgC2[0], 0.5)},${lerp(bgC1[1], bgC2[1], 0.5)},${lerp(bgC1[2], bgC2[2], 0.5)})`
+			);
 			grad.addColorStop(1, `rgb(${bgC2[0]},${bgC2[1]},${bgC2[2]})`);
 			ctx.fillStyle = grad;
 			ctx.fillRect(0, 0, W, H);
@@ -205,8 +256,4 @@
 	});
 </script>
 
-<canvas
-	bind:this={canvasEl}
-	class={className}
-	style="width:100%;height:100%"
-></canvas>
+<canvas bind:this={canvasEl} class={className} style="width:100%;height:100%"></canvas>

@@ -1,11 +1,41 @@
 <script lang="ts">
 	import MockupBar from './MockupBar.svelte';
 	const stats = [
-		{ label: 'Chicken Breast', sub: '€9,25/kg', change: '+8%', trend: [7.70, 8.60, 9.25], stroke: '#f472b6' },
-		{ label: 'Ground Beef', sub: '€12,90/kg', change: '+12%', trend: [10.55, 11.65, 12.90], stroke: '#f472b6' },
-		{ label: 'Romaine Lettuce', sub: '€1,90/hd', change: '−3%', trend: [2.1, 2.0, 1.9], stroke: '#06b6d4' },
-		{ label: 'Cooking Oil', sub: '€38,50/cs', change: '+15%', trend: [30, 34, 38.5], stroke: '#f472b6' },
-		{ label: 'Mozzarella', sub: '€7,50/kg', change: '+2%', trend: [7.25, 7.35, 7.50], stroke: '#f472b6' }
+		{
+			label: 'Chicken Breast',
+			sub: '€9,25/kg',
+			change: '+8%',
+			trend: [7.7, 8.6, 9.25],
+			stroke: '#f472b6'
+		},
+		{
+			label: 'Ground Beef',
+			sub: '€12,90/kg',
+			change: '+12%',
+			trend: [10.55, 11.65, 12.9],
+			stroke: '#f472b6'
+		},
+		{
+			label: 'Romaine Lettuce',
+			sub: '€1,90/hd',
+			change: '−3%',
+			trend: [2.1, 2.0, 1.9],
+			stroke: '#06b6d4'
+		},
+		{
+			label: 'Cooking Oil',
+			sub: '€38,50/cs',
+			change: '+15%',
+			trend: [30, 34, 38.5],
+			stroke: '#f472b6'
+		},
+		{
+			label: 'Mozzarella',
+			sub: '€7,50/kg',
+			change: '+2%',
+			trend: [7.25, 7.35, 7.5],
+			stroke: '#f472b6'
+		}
 	];
 
 	function sparklinePoints(trend: number[]): string {

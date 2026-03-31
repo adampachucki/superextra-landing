@@ -1,9 +1,9 @@
 <div class="wrapper">
 	<div class="top-bar">
 		<svg class="bar-svg" viewBox="0 0 12 12" fill="none">
-			<rect x="1" y="7" width="2" height="4" style="fill: rgba(var(--mockup-text), 0.2)"/>
-			<rect x="5" y="4" width="2" height="7" style="fill: rgba(var(--mockup-text), 0.25)"/>
-			<rect x="9" y="1" width="2" height="10" style="fill: rgba(var(--mockup-text), 0.3)"/>
+			<rect x="1" y="7" width="2" height="4" style="fill: rgba(var(--mockup-text), 0.2)" />
+			<rect x="5" y="4" width="2" height="7" style="fill: rgba(var(--mockup-text), 0.25)" />
+			<rect x="9" y="1" width="2" height="10" style="fill: rgba(var(--mockup-text), 0.3)" />
 		</svg>
 		<span class="bar-label">Review Insights</span>
 	</div>
@@ -19,20 +19,31 @@
 	<div class="narrative">
 		<div class="insight" style="border-left-color: #f472b6;">
 			<p class="narrative-text">
-				<span class="metric-badge" style="background: rgba(244,114,182,0.1); color: #f472b6;">14% → 23%</span>
-				Guest expectations around <strong>speed</strong> tightened considerably over the past year. Mentions of wait time in negative reviews rose from 14% to 23%, even as ticket times held steady — the benchmark moved, not the kitchen.
+				<span class="metric-badge" style="background: rgba(244,114,182,0.1); color: #f472b6;"
+					>14% → 23%</span
+				>
+				Guest expectations around <strong>speed</strong> tightened considerably over the past year. Mentions
+				of wait time in negative reviews rose from 14% to 23%, even as ticket times held steady — the
+				benchmark moved, not the kitchen.
 			</p>
 		</div>
 		<div class="insight" style="border-left-color: #6366f1;">
 			<p class="narrative-text">
-				<span class="metric-badge" style="background: rgba(99,102,241,0.1); color: #6366f1;">37% of ★★★★★</span>
-				<strong>Cocktail program</strong> emerged as the strongest differentiator, referenced in 37% of 5-star reviews compared to 18% a year ago. Guests treat it as a reason to visit rather than an add-on.
+				<span class="metric-badge" style="background: rgba(99,102,241,0.1); color: #6366f1;"
+					>37% of ★★★★★</span
+				>
+				<strong>Cocktail program</strong> emerged as the strongest differentiator, referenced in 37% of
+				5-star reviews compared to 18% a year ago. Guests treat it as a reason to visit rather than an
+				add-on.
 			</p>
 		</div>
 		<div class="insight" style="border-left-color: #fbbf24;">
 			<p class="narrative-text">
-				<span class="metric-badge" style="background: rgba(251,191,36,0.1); color: #fbbf24;">+9% pricing</span>
-				<strong>Portion perception</strong> softened since mid-2024. The shift correlates with a 9% entrée price increase across the competitive set — not with actual plate changes.
+				<span class="metric-badge" style="background: rgba(251,191,36,0.1); color: #fbbf24;"
+					>+9% pricing</span
+				>
+				<strong>Portion perception</strong> softened since mid-2024. The shift correlates with a 9% entrée
+				price increase across the competitive set — not with actual plate changes.
 			</p>
 		</div>
 	</div>

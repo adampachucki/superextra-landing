@@ -43,7 +43,7 @@
 		{
 			id: 'market-landscape',
 			title: 'Market Landscape',
-			desc: "Restaurant openings and closings, cuisine trends and top-performing venues continuously tracked and benchmarked.",
+			desc: 'Restaurant openings and closings, cuisine trends and top-performing venues continuously tracked and benchmarked.',
 			variants: [
 				{ label: 'V1 — Line Chart + Activity', component: MarketLandscapeV1 },
 				{ label: 'V2 — Category Trends', component: MarketLandscapeV2 },
@@ -127,20 +127,30 @@
 <div class="min-h-screen bg-cream py-12">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<header class="mb-12">
-			<a href="/" class="text-sm text-black/40 dark:text-white/40 hover:text-black/60 dark:hover:text-white/60 transition-colors">&larr; Back to site</a>
+			<a
+				href="/"
+				class="text-sm text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+				>&larr; Back to site</a
+			>
 			<h1 class="mt-4 text-3xl font-medium text-black dark:text-white">Card Mockup Variants</h1>
-			<p class="mt-2 text-base text-black/50 dark:text-white/50">Compare design directions for each platform card.</p>
+			<p class="mt-2 text-base text-black/50 dark:text-white/50">
+				Compare design directions for each platform card.
+			</p>
 		</header>
 
 		{#each cards as card}
 			<section class="mb-16">
-				<h2 class="text-xl font-medium text-black dark:text-white mb-2">{card.title}</h2>
-				<p class="text-sm text-black/50 dark:text-white/50 mb-8">{card.desc}</p>
+				<h2 class="mb-2 text-xl font-medium text-black dark:text-white">{card.title}</h2>
+				<p class="mb-8 text-sm text-black/50 dark:text-white/50">{card.desc}</p>
 
 				<div class="grid grid-cols-1 gap-5 md:grid-cols-3">
 					{#each card.variants as variant}
 						<div class="card-wrapper">
-							<p class="text-xs font-medium text-black/40 dark:text-white/40 mb-3 uppercase tracking-wide">{variant.label}</p>
+							<p
+								class="mb-3 text-xs font-medium tracking-wide text-black/40 uppercase dark:text-white/40"
+							>
+								{variant.label}
+							</p>
 							<PlatformCard title={card.title} desc={card.desc} mode={variantMode(card, variant)}>
 								<variant.component />
 							</PlatformCard>

@@ -10,15 +10,15 @@ Replace the single generic research agent with 7 specialist agents (one per inte
 
 Each agent covers one intelligence layer, has its own instructions, model, and tools.
 
-| # | Agent | Covers | Example question it handles |
-|---|-------|--------|-----------------------------|
-| 1 | Market Landscape | Openings, closings, competitor activity, cuisine trends, saturation | What new restaurants opened nearby recently? |
-| 2 | Menu & Pricing | Competitor menus, price positioning, delivery markups, promotions | How does our pricing compare to competitors within 1 km? |
-| 3 | Revenue & Sales | Market-wide performance, seasonality, channel splits, benchmarks | Was last month slow for everyone or just us? |
-| 4 | Guest Intelligence | Review sentiment, guest expectations, complaints/praise patterns | What are the recurring themes across competitor reviews? |
-| 5 | Location & Traffic | Foot traffic, demographics, purchasing power, trade area analysis | What does the foot traffic and competition look like in Mokotów? |
-| 6 | Operations | Labor availability, salary benchmarks, rent, supplier pricing | What are restaurants near us paying line cooks? |
-| 7 | Marketing & Digital | Social media activity, ad platforms, delivery platform performance | How are competitors marketing on Instagram and delivery apps? |
+| #   | Agent               | Covers                                                              | Example question it handles                                      |
+| --- | ------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1   | Market Landscape    | Openings, closings, competitor activity, cuisine trends, saturation | What new restaurants opened nearby recently?                     |
+| 2   | Menu & Pricing      | Competitor menus, price positioning, delivery markups, promotions   | How does our pricing compare to competitors within 1 km?         |
+| 3   | Revenue & Sales     | Market-wide performance, seasonality, channel splits, benchmarks    | Was last month slow for everyone or just us?                     |
+| 4   | Guest Intelligence  | Review sentiment, guest expectations, complaints/praise patterns    | What are the recurring themes across competitor reviews?         |
+| 5   | Location & Traffic  | Foot traffic, demographics, purchasing power, trade area analysis   | What does the foot traffic and competition look like in Mokotów? |
+| 6   | Operations          | Labor availability, salary benchmarks, rent, supplier pricing       | What are restaurants near us paying line cooks?                  |
+| 7   | Marketing & Digital | Social media activity, ad platforms, delivery platform performance  | How are competitors marketing on Instagram and delivery apps?    |
 
 ## How It Works
 
@@ -56,16 +56,16 @@ Not all 7 agents run every time. The orchestrator activates only the relevant 2-
 
 Most real questions span multiple layers. That's where the value is — combining different intelligence areas into one cohesive answer.
 
-| Use case (from /agent page) | Layers activated |
-|-----------------------------|-----------------|
-| Down month — us or everyone? | Revenue & Sales + Market Landscape |
-| Expansion gamble | Location & Traffic + Market Landscape + Operations |
-| New concept, no proof | Market Landscape + Guest Intelligence |
-| Staffing squeeze | Operations |
-| Pricing in the dark | Menu & Pricing + Market Landscape |
-| Review noise | Guest Intelligence |
-| Competitor blind spot / Slow to react | Market Landscape + Menu & Pricing |
-| Competitor marketing (new, not yet on page) | Marketing & Digital |
+| Use case (from /agent page)                 | Layers activated                                   |
+| ------------------------------------------- | -------------------------------------------------- |
+| Down month — us or everyone?                | Revenue & Sales + Market Landscape                 |
+| Expansion gamble                            | Location & Traffic + Market Landscape + Operations |
+| New concept, no proof                       | Market Landscape + Guest Intelligence              |
+| Staffing squeeze                            | Operations                                         |
+| Pricing in the dark                         | Menu & Pricing + Market Landscape                  |
+| Review noise                                | Guest Intelligence                                 |
+| Competitor blind spot / Slow to react       | Market Landscape + Menu & Pricing                  |
+| Competitor marketing (new, not yet on page) | Marketing & Digital                                |
 
 ## Implementation Options
 
@@ -74,12 +74,14 @@ Most real questions span multiple layers. That's where the value is — combinin
 Use the visual Agent Designer in Vertex AI Studio — the tool we already use. Create 7 sub-agents in the console, each with own instructions + Google Search + MCP tools.
 
 **What we know:**
+
 - Each sub-agent gets its own name, description, instructions, model, tools
 - Available tools: Google Search, URL context, Vertex AI Search data stores, MCP servers
 - "Get code" exports ADK Python code for further development
 - We already have the console set up with the existing agent
 
 **Now known (from docs research):**
+
 - Sub-agents execute **sequentially via LLM delegation** (coordinator pattern) — no parallel execution
 - Parent agent delegates based on **LLM reasoning** about sub-agent descriptions — not explicit rules
 - "Get code" exports **LlmAgent with sub_agents** (coordinator pattern), not ParallelAgent
@@ -92,6 +94,7 @@ Use the visual Agent Designer in Vertex AI Studio — the tool we already use. C
 Write the agent system in Python using ADK. Full control over orchestration.
 
 **What we know (verified from ADK docs):**
+
 - `ParallelAgent` runs sub-agents concurrently — each writes to a separate `output_key` in shared `session.state`
 - `SequentialAgent` chains steps — research phase then synthesis phase
 - Fan-out/gather pattern is explicitly supported:
@@ -105,6 +108,7 @@ Write the agent system in Python using ADK. Full control over orchestration.
 - 60+ pre-built tool integrations (BigQuery, Google Search, Google Maps MCP, etc.)
 
 **Now known (from docs research):**
+
 - Agent Engine **does support** ParallelAgent — no restrictions on workflow agent types in AdkApp
 - **No TypeScript ADK** — ADK supports Python, Java, Go only. Code samples in all three.
 - Latency still unknown — needs benchmarking
@@ -124,12 +128,14 @@ const report = await synthesizer.generateContent(...);  // combine results
 ```
 
 **What we know:**
+
 - Already have the Vertex AI SDK set up in the Cloud Function
 - `Promise.all` gives true parallel execution
 - No new framework, language, or deployment target
 - Each specialist is just a different system prompt + Google Search grounding
 
 **What we don't know:**
+
 - Whether this approach scales well beyond Google Search (when data stores come in Phase 2)
 - How to handle streaming with this pattern (SSE from Cloud Function)
 
@@ -183,18 +189,19 @@ No documented restrictions on deploying `ParallelAgent` to Agent Engine. Agent E
 
 Google Cloud docs define these relevant patterns:
 
-| Pattern | Orchestration | ADK class | Our fit |
-|---------|--------------|-----------|---------|
-| Coordinator | LLM decides which subagent | `LlmAgent` with sub_agents | Bad — sequential, LLM overhead |
-| Parallel | Deterministic fan-out | `ParallelAgent` | Good — all layers run at once |
-| Sequential | Deterministic chain | `SequentialAgent` | Good — research then synthesis |
-| Hierarchical | Multi-level LLM decomposition | Nested `LlmAgent` | Overkill for us |
+| Pattern      | Orchestration                 | ADK class                  | Our fit                        |
+| ------------ | ----------------------------- | -------------------------- | ------------------------------ |
+| Coordinator  | LLM decides which subagent    | `LlmAgent` with sub_agents | Bad — sequential, LLM overhead |
+| Parallel     | Deterministic fan-out         | `ParallelAgent`            | Good — all layers run at once  |
+| Sequential   | Deterministic chain           | `SequentialAgent`          | Good — research then synthesis |
+| Hierarchical | Multi-level LLM decomposition | Nested `LlmAgent`          | Overkill for us                |
 
-Our ideal pattern is **Sequential(Parallel(researchers), synthesizer)** — deterministic, no LLM orchestration overhead. The orchestrator deciding *which* layers to activate could be either an LLM step (smart routing) or hardcoded mapping (simpler).
+Our ideal pattern is **Sequential(Parallel(researchers), synthesizer)** — deterministic, no LLM orchestration overhead. The orchestrator deciding _which_ layers to activate could be either an LLM step (smart routing) or hardcoded mapping (simpler).
 
 ## Decision: Agent Designer → ADK Python
 
 **Phase 1: Agent Designer (prototyping)**
+
 - Build the 7 specialist sub-agents in Agent Designer console
 - Iterate on instructions, tools, and model selection visually
 - Test with multi-layer questions in Preview
@@ -202,12 +209,14 @@ Our ideal pattern is **Sequential(Parallel(researchers), synthesizer)** — dete
 - Focus: get the specialist instructions right, not the orchestration
 
 **Phase 2: ADK Python (production)**
+
 - "Get code" to export the agent definitions as ADK Python
 - Rewrite orchestration from coordinator → `ParallelAgent` + `SequentialAgent`
 - Deploy to Agent Engine (managed sessions, memory, tracing, streaming)
 - Python in the stack is fine
 
 **Why this path:**
+
 - Agent Designer is the fastest way to iterate on 7 sets of specialist instructions
 - The instructions, tools, and model choices transfer directly to ADK code
 - Only the orchestration layer needs rewriting (coordinator → parallel fan-out)

@@ -71,53 +71,79 @@ Add Paraglide plugin with `urlPatterns` that define which routes get locale pref
 import { paraglide } from '@inlang/paraglide-js';
 
 export default defineConfig({
-  plugins: [
-    tailwindcss(),
-    paraglide({
-      project: './project.inlang',
-      outdir: './src/lib/paraglide',
-      strategy: ['url', 'cookie', 'baseLocale'],
-      urlPatterns: [
-        // Homepage — explicit to avoid redirect loops
-        {
-          pattern: '/',
-          localized: [['en', '/en'], ['de', '/de'], ['pl', '/pl']]
-        },
-        // Marketing pages — locale-prefixed
-        {
-          pattern: '/agent',
-          localized: [['en', '/en/agent'], ['de', '/de/agent'], ['pl', '/pl/agent']]
-        },
-        {
-          pattern: '/memo',
-          localized: [['en', '/en/memo'], ['de', '/de/memo'], ['pl', '/pl/memo']]
-        },
-        {
-          pattern: '/privacy-policy',
-          localized: [['en', '/en/privacy-policy'], ['de', '/de/privacy-policy'], ['pl', '/pl/privacy-policy']]
-        },
-        {
-          pattern: '/terms',
-          localized: [['en', '/en/terms'], ['de', '/de/terms'], ['pl', '/pl/terms']]
-        },
-        // App routes — SAME URL for all locales (locale from cookie)
-        {
-          pattern: '/agent/chat/:path(.*)?',
-          localized: [
-            ['en', '/agent/chat/:path(.*)?'],
-            ['de', '/agent/chat/:path(.*)?'],
-            ['pl', '/agent/chat/:path(.*)?']
-          ]
-        },
-        {
-          pattern: '/login',
-          localized: [['en', '/login'], ['de', '/login'], ['pl', '/login']]
-        }
-      ]
-    }),
-    sveltekit()
-  ],
-  server: { /* existing proxy config unchanged */ }
+	plugins: [
+		tailwindcss(),
+		paraglide({
+			project: './project.inlang',
+			outdir: './src/lib/paraglide',
+			strategy: ['url', 'cookie', 'baseLocale'],
+			urlPatterns: [
+				// Homepage — explicit to avoid redirect loops
+				{
+					pattern: '/',
+					localized: [
+						['en', '/en'],
+						['de', '/de'],
+						['pl', '/pl']
+					]
+				},
+				// Marketing pages — locale-prefixed
+				{
+					pattern: '/agent',
+					localized: [
+						['en', '/en/agent'],
+						['de', '/de/agent'],
+						['pl', '/pl/agent']
+					]
+				},
+				{
+					pattern: '/memo',
+					localized: [
+						['en', '/en/memo'],
+						['de', '/de/memo'],
+						['pl', '/pl/memo']
+					]
+				},
+				{
+					pattern: '/privacy-policy',
+					localized: [
+						['en', '/en/privacy-policy'],
+						['de', '/de/privacy-policy'],
+						['pl', '/pl/privacy-policy']
+					]
+				},
+				{
+					pattern: '/terms',
+					localized: [
+						['en', '/en/terms'],
+						['de', '/de/terms'],
+						['pl', '/pl/terms']
+					]
+				},
+				// App routes — SAME URL for all locales (locale from cookie)
+				{
+					pattern: '/agent/chat/:path(.*)?',
+					localized: [
+						['en', '/agent/chat/:path(.*)?'],
+						['de', '/agent/chat/:path(.*)?'],
+						['pl', '/agent/chat/:path(.*)?']
+					]
+				},
+				{
+					pattern: '/login',
+					localized: [
+						['en', '/login'],
+						['de', '/login'],
+						['pl', '/login']
+					]
+				}
+			]
+		}),
+		sveltekit()
+	],
+	server: {
+		/* existing proxy config unchanged */
+	}
 });
 ```
 
@@ -139,13 +165,12 @@ import type { Handle } from '@sveltejs/kit';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 
 export const handle: Handle = ({ event, resolve }) =>
-  paraglideMiddleware(event.request, ({ request, locale }) => {
-    event.request = request;
-    return resolve(event, {
-      transformPageChunk: ({ html }) =>
-        html.replace('%lang%', locale).replace('%dir%', 'ltr')
-    });
-  });
+	paraglideMiddleware(event.request, ({ request, locale }) => {
+		event.request = request;
+		return resolve(event, {
+			transformPageChunk: ({ html }) => html.replace('%lang%', locale).replace('%dir%', 'ltr')
+		});
+	});
 ```
 
 ### 0.5 Update `app.html`
@@ -165,14 +190,12 @@ kit: {
 
 ```json
 {
-  "sourceLanguageTag": "en",
-  "languageTags": ["en", "de", "pl"],
-  "modules": [
-    "https://cdn.jsdelivr.net/npm/@inlang/plugin-message-format@latest/dist/index.js"
-  ],
-  "plugin.inlang.messageFormat": {
-    "pathPattern": "./messages/{locale}.json"
-  }
+	"sourceLanguageTag": "en",
+	"languageTags": ["en", "de", "pl"],
+	"modules": ["https://cdn.jsdelivr.net/npm/@inlang/plugin-message-format@latest/dist/index.js"],
+	"plugin.inlang.messageFormat": {
+		"pathPattern": "./messages/{locale}.json"
+	}
 }
 ```
 
@@ -199,6 +222,7 @@ Move files into layout groups. No text changes — site looks identical after.
 ### 1.1 Create `(marketing)` group
 
 Create `src/routes/(marketing)/`. Move into it:
+
 - `+page.svelte` (homepage)
 - `agent/+page.svelte` (agent landing — NOT agent/chat/)
 - `memo/+page.svelte`
@@ -206,11 +230,13 @@ Create `src/routes/(marketing)/`. Move into it:
 - `terms/+page.svelte`
 
 Create `src/routes/(marketing)/+layout.ts`:
+
 ```ts
 export const prerender = true;
 ```
 
 Create `src/routes/(marketing)/+layout.svelte` — extract from current root layout:
+
 - `<svelte:head>` meta tags (og:title, og:description, twitter)
 - PreviewBadge component
 - Wrap `{@render children()}` (Navbar/Footer stay in page components as they are now)
@@ -220,6 +246,7 @@ Create `src/routes/(marketing)/+layout.svelte` — extract from current root lay
 Create `src/routes/(app)/`. Move `agent/chat/+page.svelte` into `src/routes/(app)/agent/chat/+page.svelte`.
 
 Create `src/routes/(app)/+layout.ts`:
+
 ```ts
 export const prerender = false;
 export const ssr = false;
@@ -230,6 +257,7 @@ Create `src/routes/(app)/+layout.svelte` — minimal: just `{@render children()}
 ### 1.3 Slim root layout — `src/routes/+layout.svelte`
 
 Keep:
+
 - `import '../app.css'`
 - Scroll restoration logic (lines 9-30)
 - CookieBanner
@@ -237,6 +265,7 @@ Keep:
 - `{@render children()}`
 
 Move to `(marketing)/+layout.svelte`:
+
 - All `<svelte:head>` meta tags
 - PreviewBadge + pathname conditional
 
@@ -247,12 +276,13 @@ Remove `export const prerender = true` (each group now controls its own).
 ### 1.5 Create root redirect — `src/routes/+page.svelte` or `+page.ts`
 
 Redirect bare `/` to `/en/`:
+
 ```ts
 // src/routes/+page.ts
 import { redirect } from '@sveltejs/kit';
 export const prerender = true;
 export function load() {
-  redirect(307, '/en/');
+	redirect(307, '/en/');
 }
 ```
 
@@ -267,41 +297,42 @@ All existing functionality works. `npm run build` succeeds. Marketing pages prer
 Extract hardcoded English text into `messages/en.json`. Replace inline text with `m.key()` calls. Each component is an independent unit of work.
 
 Import pattern added to each component:
+
 ```svelte
 <script lang="ts">
-  import { m } from '$lib/paraglide/messages.js';
-  import { localizeHref } from '$lib/paraglide/runtime.js';
+	import { m } from '$lib/paraglide/messages.js';
+	import { localizeHref } from '$lib/paraglide/runtime.js';
 </script>
 ```
 
 ### Components to extract (in suggested order):
 
-| # | Component | File | Approx Keys | Notes |
-|---|-----------|------|-------------|-------|
-| 1 | Navbar | `src/lib/components/Navbar.svelte` | 8 | + localizeHref for all `href` attributes |
-| 2 | Footer | `src/lib/components/Footer.svelte` | 8 | + language switcher added here + localizeHref |
-| 3 | CookieBanner | `src/lib/components/CookieBanner.svelte` | 2 | + localizeHref for privacy link |
-| 4 | Hero | `src/lib/components/Hero.svelte` | 12 | Headline, tagline, 3 feature cards |
-| 5 | About | `src/lib/components/About.svelte` | 5 | Default prop values become m.() calls |
-| 6 | PlatformCards | `src/lib/components/PlatformCards.svelte` | 20 | Section strings + 7 cards + show more/less |
-| 7 | UseCases | `src/lib/components/UseCases.svelte` | 20 | Default items array + section strings |
-| 8 | GetOnboard | `src/lib/components/GetOnboard.svelte` | 8 | 3 steps + section header |
-| 9 | FAQ | `src/lib/components/FAQ.svelte` | 18 | 8 Q&A pairs + section header |
-| 10 | DataSources | `src/lib/components/DataSources.svelte` | 3 | Title, subtitle, "And more" |
-| 11 | CTA | `src/lib/components/CTA.svelte` | 3 | Message + 2 buttons |
-| 12 | AccessForm | `src/lib/components/AccessForm.svelte` | 55 | Largest: 3-step form, business types, countries, labels, placeholders, validation, success/error |
-| 13 | RestaurantHero | `src/lib/components/restaurants/RestaurantHero.svelte` | 25 | 6 prompts (desktop+mobile), headline, topic pills, placeholders |
-| 14 | HowItWorks | `src/lib/components/restaurants/HowItWorks.svelte` | 8 | 3 steps + section header |
-| 15 | RestaurantCTA | `src/lib/components/restaurants/RestaurantCTA.svelte` | 3 | Headline + subtitle + aria |
+| #   | Component      | File                                                   | Approx Keys | Notes                                                                                            |
+| --- | -------------- | ------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------ |
+| 1   | Navbar         | `src/lib/components/Navbar.svelte`                     | 8           | + localizeHref for all `href` attributes                                                         |
+| 2   | Footer         | `src/lib/components/Footer.svelte`                     | 8           | + language switcher added here + localizeHref                                                    |
+| 3   | CookieBanner   | `src/lib/components/CookieBanner.svelte`               | 2           | + localizeHref for privacy link                                                                  |
+| 4   | Hero           | `src/lib/components/Hero.svelte`                       | 12          | Headline, tagline, 3 feature cards                                                               |
+| 5   | About          | `src/lib/components/About.svelte`                      | 5           | Default prop values become m.() calls                                                            |
+| 6   | PlatformCards  | `src/lib/components/PlatformCards.svelte`              | 20          | Section strings + 7 cards + show more/less                                                       |
+| 7   | UseCases       | `src/lib/components/UseCases.svelte`                   | 20          | Default items array + section strings                                                            |
+| 8   | GetOnboard     | `src/lib/components/GetOnboard.svelte`                 | 8           | 3 steps + section header                                                                         |
+| 9   | FAQ            | `src/lib/components/FAQ.svelte`                        | 18          | 8 Q&A pairs + section header                                                                     |
+| 10  | DataSources    | `src/lib/components/DataSources.svelte`                | 3           | Title, subtitle, "And more"                                                                      |
+| 11  | CTA            | `src/lib/components/CTA.svelte`                        | 3           | Message + 2 buttons                                                                              |
+| 12  | AccessForm     | `src/lib/components/AccessForm.svelte`                 | 55          | Largest: 3-step form, business types, countries, labels, placeholders, validation, success/error |
+| 13  | RestaurantHero | `src/lib/components/restaurants/RestaurantHero.svelte` | 25          | 6 prompts (desktop+mobile), headline, topic pills, placeholders                                  |
+| 14  | HowItWorks     | `src/lib/components/restaurants/HowItWorks.svelte`     | 8           | 3 steps + section header                                                                         |
+| 15  | RestaurantCTA  | `src/lib/components/restaurants/RestaurantCTA.svelte`  | 3           | Headline + subtitle + aria                                                                       |
 
 ### Route pages with inline text:
 
-| # | Page | File | Approx Keys | Notes |
-|---|------|------|-------------|-------|
-| 16 | Agent landing | `src/routes/(marketing)/agent/+page.svelte` | 20 | 8 restaurant use cases defined inline + About/UseCases/DataSources prop overrides |
-| 17 | Chat page | `src/routes/(app)/agent/chat/+page.svelte` | 30 | Prompts, sidebar labels, placeholders, relative time strings |
-| 18 | Login page | `src/routes/login/+page.svelte` | 15 | Form labels, placeholders, footer links |
-| 19 | Marketing layout | `src/routes/(marketing)/+layout.svelte` | 5 | Meta tag content |
+| #   | Page             | File                                        | Approx Keys | Notes                                                                             |
+| --- | ---------------- | ------------------------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| 16  | Agent landing    | `src/routes/(marketing)/agent/+page.svelte` | 20          | 8 restaurant use cases defined inline + About/UseCases/DataSources prop overrides |
+| 17  | Chat page        | `src/routes/(app)/agent/chat/+page.svelte`  | 30          | Prompts, sidebar labels, placeholders, relative time strings                      |
+| 18  | Login page       | `src/routes/login/+page.svelte`             | 15          | Form labels, placeholders, footer links                                           |
+| 19  | Marketing layout | `src/routes/(marketing)/+layout.svelte`     | 5           | Meta tag content                                                                  |
 
 **Total: ~300 message keys**
 
@@ -310,35 +341,36 @@ Import pattern added to each component:
 ```
 {component}_{element}
 ```
+
 Examples: `navbar_link_intelligence`, `hero_headline`, `hero_tagline`, `faq_q1_question`, `faq_q1_answer`, `access_form_step1_title`, `access_form_business_single_venue`
 
 ### Link localization
 
 Every `href` pointing to a marketing page needs `localizeHref()`:
+
 - `href="/"` → `href={localizeHref('/')}`
 - `href="/privacy-policy"` → `href={localizeHref('/privacy-policy')}`
 - `href="/agent"` → `href={localizeHref('/agent')}`
 
 Links to app/standalone pages stay absolute:
+
 - `href="/agent/chat"` — unchanged
 - `href="/login"` — unchanged
 
 ### Language switcher in Footer
 
 Add after theme toggle in `Footer.svelte`:
+
 ```svelte
 <script>
-  import { locales, localizeHref, getLocale } from '$lib/paraglide/runtime.js';
-  import { page } from '$app/state';
+	import { locales, localizeHref, getLocale } from '$lib/paraglide/runtime.js';
+	import { page } from '$app/state';
 </script>
 
 {#each locales as locale}
-  <a
-    href={localizeHref(page.url.pathname, { locale })}
-    class:active={getLocale() === locale}
-  >
-    {locale.toUpperCase()}
-  </a>
+	<a href={localizeHref(page.url.pathname, { locale })} class:active={getLocale() === locale}>
+		{locale.toUpperCase()}
+	</a>
 {/each}
 ```
 
@@ -375,13 +407,13 @@ Each file contains the full HTML content in that language. The page components d
 ```svelte
 <!-- src/routes/(marketing)/privacy-policy/+page.svelte -->
 <script lang="ts">
-  import { getLocale } from '$lib/paraglide/runtime.js';
-  import En from '$lib/content/privacy-policy/en.svelte';
-  import De from '$lib/content/privacy-policy/de.svelte';
-  import Pl from '$lib/content/privacy-policy/pl.svelte';
+	import { getLocale } from '$lib/paraglide/runtime.js';
+	import En from '$lib/content/privacy-policy/en.svelte';
+	import De from '$lib/content/privacy-policy/de.svelte';
+	import Pl from '$lib/content/privacy-policy/pl.svelte';
 
-  const components = { en: En, de: De, pl: Pl } as const;
-  const Content = components[getLocale() as keyof typeof components];
+	const components = { en: En, de: De, pl: Pl } as const;
+	const Content = components[getLocale() as keyof typeof components];
 </script>
 
 <Content />
@@ -427,17 +459,23 @@ Add to `(marketing)/+layout.svelte`:
 
 ```svelte
 <script>
-  import { locales, localizeHref } from '$lib/paraglide/runtime.js';
-  import { page } from '$app/state';
+	import { locales, localizeHref } from '$lib/paraglide/runtime.js';
+	import { page } from '$app/state';
 </script>
 
 <svelte:head>
-  {#each locales as locale}
-    <link rel="alternate" hreflang={locale}
-      href="https://superextra.ai{localizeHref(page.url.pathname, { locale })}" />
-  {/each}
-  <link rel="alternate" hreflang="x-default"
-    href="https://superextra.ai{localizeHref(page.url.pathname, { locale: 'en' })}" />
+	{#each locales as locale}
+		<link
+			rel="alternate"
+			hreflang={locale}
+			href="https://superextra.ai{localizeHref(page.url.pathname, { locale })}"
+		/>
+	{/each}
+	<link
+		rel="alternate"
+		hreflang="x-default"
+		href="https://superextra.ai{localizeHref(page.url.pathname, { locale: 'en' })}"
+	/>
 </svelte:head>
 ```
 
@@ -445,23 +483,23 @@ Add to `(marketing)/+layout.svelte`:
 
 ```json
 {
-  "hosting": {
-    "site": "superextra-landing",
-    "public": "build",
-    "cleanUrls": true,
-    "redirects": [
-      { "source": "/", "destination": "/en/", "type": 302 },
-      { "source": "/agent", "destination": "/en/agent", "type": 302 },
-      { "source": "/privacy-policy", "destination": "/en/privacy-policy", "type": 302 },
-      { "source": "/terms", "destination": "/en/terms", "type": 302 },
-      { "source": "/memo", "destination": "/en/memo", "type": 302 }
-    ],
-    "rewrites": [
-      { "source": "/api/intake", "function": "intake" },
-      { "source": "/api/agent", "function": "agent" },
-      { "source": "**", "destination": "/200.html" }
-    ]
-  }
+	"hosting": {
+		"site": "superextra-landing",
+		"public": "build",
+		"cleanUrls": true,
+		"redirects": [
+			{ "source": "/", "destination": "/en/", "type": 302 },
+			{ "source": "/agent", "destination": "/en/agent", "type": 302 },
+			{ "source": "/privacy-policy", "destination": "/en/privacy-policy", "type": 302 },
+			{ "source": "/terms", "destination": "/en/terms", "type": 302 },
+			{ "source": "/memo", "destination": "/en/memo", "type": 302 }
+		],
+		"rewrites": [
+			{ "source": "/api/intake", "function": "intake" },
+			{ "source": "/api/agent", "function": "agent" },
+			{ "source": "**", "destination": "/200.html" }
+		]
+	}
 }
 ```
 
@@ -488,28 +526,28 @@ Generate sitemap with all locale variants. Either maintain manually or add a bui
 
 ## Key Files Modified
 
-| File | Change |
-|------|--------|
-| `vite.config.ts` | Add Paraglide plugin + urlPatterns |
-| `svelte.config.js` | fallback → 200.html, paths.relative: false |
-| `src/app.html` | lang="%lang%" dir="%dir%" |
-| `src/hooks.ts` | NEW — reroute hook |
-| `src/hooks.server.ts` | NEW — handle hook with paraglideMiddleware |
-| `src/routes/+layout.svelte` | Slim down (move meta + PreviewBadge to marketing) |
-| `src/routes/+layout.ts` | Remove prerender = true |
-| `src/routes/+page.svelte` or `+page.ts` | NEW — redirect / → /en/ |
-| `src/routes/(marketing)/+layout.svelte` | NEW — marketing shell |
-| `src/routes/(marketing)/+layout.ts` | NEW — prerender = true |
-| `src/routes/(app)/+layout.svelte` | NEW — app shell |
-| `src/routes/(app)/+layout.ts` | NEW — prerender = false, ssr = false |
-| All 15 components listed in Phase 2 | Extract strings → m.key() calls |
-| 4 route pages listed in Phase 2 | Extract inline text |
-| `firebase.json` | Add redirects for old URLs, SPA fallback |
-| `messages/en.json` | NEW — ~300 message keys |
-| `messages/de.json` | NEW — German translations |
-| `messages/pl.json` | NEW — Polish translations |
-| `src/lib/content/` | NEW — 9 per-locale content files (3 pages x 3 locales) |
-| `project.inlang/settings.json` | NEW — Inlang project config |
+| File                                    | Change                                                 |
+| --------------------------------------- | ------------------------------------------------------ |
+| `vite.config.ts`                        | Add Paraglide plugin + urlPatterns                     |
+| `svelte.config.js`                      | fallback → 200.html, paths.relative: false             |
+| `src/app.html`                          | lang="%lang%" dir="%dir%"                              |
+| `src/hooks.ts`                          | NEW — reroute hook                                     |
+| `src/hooks.server.ts`                   | NEW — handle hook with paraglideMiddleware             |
+| `src/routes/+layout.svelte`             | Slim down (move meta + PreviewBadge to marketing)      |
+| `src/routes/+layout.ts`                 | Remove prerender = true                                |
+| `src/routes/+page.svelte` or `+page.ts` | NEW — redirect / → /en/                                |
+| `src/routes/(marketing)/+layout.svelte` | NEW — marketing shell                                  |
+| `src/routes/(marketing)/+layout.ts`     | NEW — prerender = true                                 |
+| `src/routes/(app)/+layout.svelte`       | NEW — app shell                                        |
+| `src/routes/(app)/+layout.ts`           | NEW — prerender = false, ssr = false                   |
+| All 15 components listed in Phase 2     | Extract strings → m.key() calls                        |
+| 4 route pages listed in Phase 2         | Extract inline text                                    |
+| `firebase.json`                         | Add redirects for old URLs, SPA fallback               |
+| `messages/en.json`                      | NEW — ~300 message keys                                |
+| `messages/de.json`                      | NEW — German translations                              |
+| `messages/pl.json`                      | NEW — Polish translations                              |
+| `src/lib/content/`                      | NEW — 9 per-locale content files (3 pages x 3 locales) |
+| `project.inlang/settings.json`          | NEW — Inlang project config                            |
 
 ## Risks and Mitigations
 
@@ -528,6 +566,7 @@ Generate sitemap with all locale variants. Either maintain manually or add a bui
 ## Execution Order
 
 Phases 0+1 are foundational and must be done together. After that:
+
 - Phase 2 can be done component by component (each is independently shippable)
 - Phase 3 is independent of Phase 2
 - Phase 4 depends on Phase 2+3 being complete

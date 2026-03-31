@@ -2,7 +2,9 @@ import { browser } from '$app/environment';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
-let mode = $state<ThemeMode>(browser ? (localStorage.getItem('se_theme') as ThemeMode) || 'light' : 'light');
+let mode = $state<ThemeMode>(
+	browser ? (localStorage.getItem('se_theme') as ThemeMode) || 'light' : 'light'
+);
 
 function apply() {
 	if (!browser) return;

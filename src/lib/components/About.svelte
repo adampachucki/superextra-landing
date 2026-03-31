@@ -14,12 +14,14 @@
 
 <section class="py-24 md:py-32 {className}">
 	<div class="mx-auto max-w-[1200px] px-6">
-		<p class="mb-6 text-sm font-medium uppercase tracking-widest text-black/40 dark:text-white/40">
+		<p class="mb-6 text-sm font-medium tracking-widest text-black/40 uppercase dark:text-white/40">
 			About Superextra
 		</p>
 
 		<div class="grid grid-cols-1 gap-12 lg:grid-cols-2 lg:gap-20">
-			<h2 class="text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black dark:text-white">
+			<h2
+				class="text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black dark:text-white"
+			>
 				{headline}
 			</h2>
 
@@ -30,7 +32,7 @@
 				<p class="text-lg leading-snug text-black/60 dark:text-white/60">
 					{description}
 				</p>
-				<p class="text-lg font-medium leading-snug text-black dark:text-white">
+				<p class="text-lg leading-snug font-medium text-black dark:text-white">
 					Super intelligence. Extra advantage.
 				</p>
 			</div>

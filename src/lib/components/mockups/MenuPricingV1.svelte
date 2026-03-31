@@ -6,15 +6,25 @@
 
 		<div class="msg msg-ai">
 			<p class="bubble bubble-ai">
-				Average entrée sits at <strong>€27</strong>, about 12% below the local competitive set. Top performers price <strong>15–20%</strong> higher.
+				Average entrée sits at <strong>€27</strong>, about 12% below the local competitive set. Top
+				performers price <strong>15–20%</strong> higher.
 			</p>
 		</div>
 
 		<div class="status">
 			<svg class="status-sparkle" viewBox="0 0 16 16" fill="none">
-				<path d="M8 1.5L9.1 5.9L13.5 7L9.1 8.1L8 12.5L6.9 8.1L2.5 7L6.9 5.9L8 1.5Z" fill="currentColor" />
-				<path d="M12.5 1L13 2.5L14.5 3L13 3.5L12.5 5L12 3.5L10.5 3L12 2.5L12.5 1Z" fill="currentColor" />
-				<path d="M3.5 10L4 11.5L5.5 12L4 12.5L3.5 14L3 12.5L1.5 12L3 11.5L3.5 10Z" fill="currentColor" />
+				<path
+					d="M8 1.5L9.1 5.9L13.5 7L9.1 8.1L8 12.5L6.9 8.1L2.5 7L6.9 5.9L8 1.5Z"
+					fill="currentColor"
+				/>
+				<path
+					d="M12.5 1L13 2.5L14.5 3L13 3.5L12.5 5L12 3.5L10.5 3L12 2.5L12.5 1Z"
+					fill="currentColor"
+				/>
+				<path
+					d="M3.5 10L4 11.5L5.5 12L4 12.5L3.5 14L3 12.5L1.5 12L3 11.5L3.5 10Z"
+					fill="currentColor"
+				/>
 			</svg>
 			<span class="status-text shimmer">Generating charts...</span>
 		</div>
@@ -26,18 +36,36 @@
 			<div class="prompt-controls">
 				<div class="prompt-meta">
 					<svg class="meta-icon" viewBox="0 0 16 16" fill="none">
-						<path d="M4 6l4-3 4 3M4 10l4 3 4-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+						<path
+							d="M4 6l4-3 4 3M4 10l4 3 4-3"
+							stroke="currentColor"
+							stroke-width="1.2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
 					</svg>
 					<span class="meta-label">2</span>
 					<svg class="meta-icon" viewBox="0 0 16 16" fill="none">
 						<circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.1" />
-						<path d="M8 5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />
+						<path
+							d="M8 5v3.5l2.5 1.5"
+							stroke="currentColor"
+							stroke-width="1.1"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
 					</svg>
 					<span class="meta-label">Auto</span>
 				</div>
 				<div class="prompt-send">
 					<svg viewBox="0 0 16 16" fill="none">
-						<path d="M8 12V4M8 4L4.5 7.5M8 4L11.5 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+						<path
+							d="M8 12V4M8 4L4.5 7.5M8 4L11.5 7.5"
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
 					</svg>
 				</div>
 			</div>

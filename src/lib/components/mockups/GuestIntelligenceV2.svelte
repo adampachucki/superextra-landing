@@ -71,7 +71,9 @@
 			/>
 		{/each}
 
-		<text x={cx} y={cy - 4} text-anchor="middle" class="center-value">{total.toLocaleString('de-DE')}</text>
+		<text x={cx} y={cy - 4} text-anchor="middle" class="center-value"
+			>{total.toLocaleString('de-DE')}</text
+		>
 		<text x={cx} y={cy + 6} text-anchor="middle" class="center-label">reviewers</text>
 
 		<defs>

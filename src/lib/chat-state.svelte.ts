@@ -74,7 +74,9 @@ if (typeof localStorage !== 'undefined') {
 				persist();
 			}
 		}
-	} catch {}
+	} catch {
+		// localStorage parse failures are non-critical
+	}
 }
 
 function generateTitle(text: string): string {
@@ -112,16 +114,20 @@ function syncCurrentToList() {
 function persist() {
 	if (typeof localStorage === 'undefined') return;
 	syncCurrentToList();
-	localStorage.setItem(STORAGE_KEY, JSON.stringify({
-		activeId: currentId,
-		conversations
-	}));
+	localStorage.setItem(
+		STORAGE_KEY,
+		JSON.stringify({
+			activeId: currentId,
+			conversations
+		})
+	);
 }
 
 function getOrCreateSessionId(): string {
 	if (sessionId) return sessionId;
-	const id = globalThis.crypto?.randomUUID?.()
-		?? Array.from(crypto.getRandomValues(new Uint8Array(16)))
+	const id =
+		globalThis.crypto?.randomUUID?.() ??
+		Array.from(crypto.getRandomValues(new Uint8Array(16)))
 			.map((b, i) => ([4, 6, 8, 10].includes(i) ? '-' : '') + b.toString(16).padStart(2, '0'))
 			.join('');
 	sessionId = id;
@@ -278,15 +284,33 @@ function deleteConversation(id: string) {
 }
 
 export const chatState = {
-	get messages() { return messages; },
-	get loading() { return loading; },
-	get error() { return error; },
-	get active() { return active; },
-	get placeContext() { return placeContext; },
-	set placeContext(p: PlaceContext | null) { placeContext = p; },
-	get conversations() { return conversations; },
-	get activeId() { return currentId; },
-	get sessionId() { return sessionId; },
+	get messages() {
+		return messages;
+	},
+	get loading() {
+		return loading;
+	},
+	get error() {
+		return error;
+	},
+	get active() {
+		return active;
+	},
+	get placeContext() {
+		return placeContext;
+	},
+	set placeContext(p: PlaceContext | null) {
+		placeContext = p;
+	},
+	get conversations() {
+		return conversations;
+	},
+	get activeId() {
+		return currentId;
+	},
+	get sessionId() {
+		return sessionId;
+	},
 	send,
 	start,
 	reset,

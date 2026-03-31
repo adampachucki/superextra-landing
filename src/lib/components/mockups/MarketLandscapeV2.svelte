@@ -1,11 +1,41 @@
 <script lang="ts">
 	import MockupBar from './MockupBar.svelte';
 	const categories = [
-		{ name: 'Vegan', locations: 127, trend: [4, 7, 11], stroke: '#06b6d4', grad: 'from-[#6ee7b7] to-[#06b6d4]' },
-		{ name: 'Asian Fusion', locations: 203, trend: [5, 6, 8], stroke: '#6366f1', grad: 'from-[#06b6d4] to-[#6366f1]' },
-		{ name: 'Mexican', locations: 341, trend: [6, 7, 7], stroke: '#6366f1', grad: 'from-[#a78bfa] to-[#6366f1]' },
-		{ name: 'Italian', locations: 456, trend: [9, 7, 5], stroke: '#f472b6', grad: 'from-[#fbbf24] to-[#f472b6]' },
-		{ name: 'American', locations: 512, trend: [8, 7, 6], stroke: '#a78bfa', grad: 'from-[#f472b6] to-[#a78bfa]' }
+		{
+			name: 'Vegan',
+			locations: 127,
+			trend: [4, 7, 11],
+			stroke: '#06b6d4',
+			grad: 'from-[#6ee7b7] to-[#06b6d4]'
+		},
+		{
+			name: 'Asian Fusion',
+			locations: 203,
+			trend: [5, 6, 8],
+			stroke: '#6366f1',
+			grad: 'from-[#06b6d4] to-[#6366f1]'
+		},
+		{
+			name: 'Mexican',
+			locations: 341,
+			trend: [6, 7, 7],
+			stroke: '#6366f1',
+			grad: 'from-[#a78bfa] to-[#6366f1]'
+		},
+		{
+			name: 'Italian',
+			locations: 456,
+			trend: [9, 7, 5],
+			stroke: '#f472b6',
+			grad: 'from-[#fbbf24] to-[#f472b6]'
+		},
+		{
+			name: 'American',
+			locations: 512,
+			trend: [8, 7, 6],
+			stroke: '#a78bfa',
+			grad: 'from-[#f472b6] to-[#a78bfa]'
+		}
 	];
 
 	function sparklinePoints(trend: number[]): string {
@@ -31,7 +61,7 @@
 </MockupBar>
 
 <div class="body">
-	{#each categories as cat, i}
+	{#each categories as cat}
 		<div class="row">
 			<div class="circle bg-gradient-to-br {cat.grad}"></div>
 			<div class="name-group">
@@ -50,7 +80,6 @@
 		</div>
 	{/each}
 </div>
-
 
 <style>
 	.period-selector {
@@ -114,5 +143,4 @@
 		height: 1rem;
 		flex-shrink: 0;
 	}
-
 </style>

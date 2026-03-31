@@ -45,34 +45,52 @@
 	<div class="sidebar">
 		<div class="nav-icon active">
 			<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-				<rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor"/>
-				<rect x="8" y="1" width="5" height="5" rx="1" fill="currentColor"/>
-				<rect x="1" y="8" width="5" height="5" rx="1" fill="currentColor"/>
-				<rect x="8" y="8" width="5" height="5" rx="1" fill="currentColor"/>
+				<rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor" />
+				<rect x="8" y="1" width="5" height="5" rx="1" fill="currentColor" />
+				<rect x="1" y="8" width="5" height="5" rx="1" fill="currentColor" />
+				<rect x="8" y="8" width="5" height="5" rx="1" fill="currentColor" />
 			</svg>
 		</div>
 		<div class="nav-icon">
 			<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-				<circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.2"/>
-				<path d="M7 4v3.5L9.5 9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+				<circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.2" />
+				<path d="M7 4v3.5L9.5 9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
 			</svg>
 		</div>
 		<div class="nav-icon">
 			<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-				<rect x="1.5" y="2" width="11" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
-				<path d="M1.5 5.5h11" stroke="currentColor" stroke-width="1.2"/>
+				<rect
+					x="1.5"
+					y="2"
+					width="11"
+					height="10"
+					rx="1.5"
+					stroke="currentColor"
+					stroke-width="1.2"
+				/>
+				<path d="M1.5 5.5h11" stroke="currentColor" stroke-width="1.2" />
 			</svg>
 		</div>
 		<div class="nav-icon">
 			<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-				<path d="M2 3.5h10M2 7h10M2 10.5h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+				<path
+					d="M2 3.5h10M2 7h10M2 10.5h6"
+					stroke="currentColor"
+					stroke-width="1.2"
+					stroke-linecap="round"
+				/>
 			</svg>
 		</div>
 		<div class="nav-spacer"></div>
 		<div class="nav-icon">
 			<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-				<circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.2"/>
-				<path d="M7 1.5v1.5M7 11v1.5M1.5 7H3M11 7h1.5M3.1 3.1l1.1 1.1M9.8 9.8l1.1 1.1M3.1 10.9l1.1-1.1M9.8 4.2l1.1-1.1" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+				<circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.2" />
+				<path
+					d="M7 1.5v1.5M7 11v1.5M1.5 7H3M11 7h1.5M3.1 3.1l1.1 1.1M9.8 9.8l1.1 1.1M3.1 10.9l1.1-1.1M9.8 4.2l1.1-1.1"
+					stroke="currentColor"
+					stroke-width="1"
+					stroke-linecap="round"
+				/>
 			</svg>
 		</div>
 	</div>
@@ -84,8 +102,9 @@
 			Over the trailing twelve months, the Prenzlauer Berg district recorded
 			<span class="stat">48 restaurant openings</span>
 			against
-			<span class="stat decline">38 closings</span>,
-			yielding a net gain of ten venues. This marks the third consecutive year of positive net growth in the area, though the pace has moderated compared to the post-pandemic surge of 2023–24.
+			<span class="stat decline">38 closings</span>, yielding a net gain of ten venues. This marks
+			the third consecutive year of positive net growth in the area, though the pace has moderated
+			compared to the post-pandemic surge of 2023–24.
 		</p>
 
 		<div class="chart-activity">
@@ -108,26 +127,65 @@
 				<div class="chart-header">
 					<span class="section-label">MONTHLY OPENINGS VS CLOSINGS</span>
 					<div class="legend">
-						<span class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>Open</span>
-						<span class="legend-item"><span class="legend-dot" style="background:rgba(var(--mockup-text),0.15)"></span>Close</span>
+						<span class="legend-item"
+							><span class="legend-dot" style="background:#6366f1"></span>Open</span
+						>
+						<span class="legend-item"
+							><span class="legend-dot" style="background:rgba(var(--mockup-text),0.15)"
+							></span>Close</span
+						>
 					</div>
 				</div>
 				<svg class="line-chart" viewBox="0 0 {viewW} {viewH}">
 					<!-- horizontal grid + y-axis labels -->
 					{#each yTicks as tick}
 						{@const y = padT + (1 - (tick - minVal) / range) * plotH}
-						<line x1={padL} y1={y} x2={viewW - padR} y2={y} style="stroke: rgba(var(--mockup-text), 0.05)" stroke-width="0.4" stroke-dasharray="2,2" />
-						<text x={padL - 4} y={y + 1.2} text-anchor="end" style="fill: rgba(var(--mockup-text), 0.25)" font-size="3.5">{tick}</text>
+						<line
+							x1={padL}
+							y1={y}
+							x2={viewW - padR}
+							y2={y}
+							style="stroke: rgba(var(--mockup-text), 0.05)"
+							stroke-width="0.4"
+							stroke-dasharray="2,2"
+						/>
+						<text
+							x={padL - 4}
+							y={y + 1.2}
+							text-anchor="end"
+							style="fill: rgba(var(--mockup-text), 0.25)"
+							font-size="3.5">{tick}</text
+						>
 					{/each}
 
 					<!-- axes -->
-					<line x1={padL} y1={padT} x2={padL} y2={viewH - padB} style="stroke: rgba(var(--mockup-text), 0.08)" stroke-width="0.5" />
-					<line x1={padL} y1={viewH - padB} x2={viewW - padR} y2={viewH - padB} style="stroke: rgba(var(--mockup-text), 0.08)" stroke-width="0.5" />
+					<line
+						x1={padL}
+						y1={padT}
+						x2={padL}
+						y2={viewH - padB}
+						style="stroke: rgba(var(--mockup-text), 0.08)"
+						stroke-width="0.5"
+					/>
+					<line
+						x1={padL}
+						y1={viewH - padB}
+						x2={viewW - padR}
+						y2={viewH - padB}
+						style="stroke: rgba(var(--mockup-text), 0.08)"
+						stroke-width="0.5"
+					/>
 
 					<!-- x-axis labels -->
 					{#each xTickIndices as idx}
 						{@const x = padL + (idx / (months.length - 1)) * plotW}
-						<text x={x} y={viewH - padB + 7} text-anchor="middle" style="fill: rgba(var(--mockup-text), 0.25)" font-size="3.5">{months[idx]}</text>
+						<text
+							{x}
+							y={viewH - padB + 7}
+							text-anchor="middle"
+							style="fill: rgba(var(--mockup-text), 0.25)"
+							font-size="3.5">{months[idx]}</text
+						>
 					{/each}
 
 					<!-- lines -->

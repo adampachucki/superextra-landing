@@ -16,11 +16,11 @@ AI-native intelligence service for every player in the restaurant ecosystem.
 
 Where to open, how to price, what to serve, who to hire — most restaurant decisions are based on instinct or fragmented data. Large chains build internal analytics teams. Everyone else is left guessing.
 
-| Stat | Detail | Source |
-|------|--------|--------|
-| **42%** | of operators not profitable in 2025 — despite record industry sales | NRA State of the Industry 2026 |
-| **3–5%** | net margins in full-service. Every blind spot costs money. | NRA / Toast 2025 |
-| **1.97%** | of revenue on tech — a third of the cross-industry average | NRA Technology Study 2025 |
+| Stat      | Detail                                                              | Source                         |
+| --------- | ------------------------------------------------------------------- | ------------------------------ |
+| **42%**   | of operators not profitable in 2025 — despite record industry sales | NRA State of the Industry 2026 |
+| **3–5%**  | net margins in full-service. Every blind spot costs money.          | NRA / Toast 2025               |
+| **1.97%** | of revenue on tech — a third of the cross-industry average          | NRA Technology Study 2025      |
 
 ---
 
@@ -45,15 +45,15 @@ Superextra combines external market data, AI agents, and human expertise into a 
 
 ### Seven layers, combined
 
-| Layer | Covers |
-|-------|--------|
-| Market Landscape | Openings, closings, competitor benchmarking, cuisine trends, saturation, white space. |
-| Menu & Pricing | Price tracking, competitor menus, delivery markups, trending items, promotions. |
-| Revenue & Sales | Revenue estimates, check sizes, occupancy, channel splits, platform share. |
-| Marketing & Digital | Social media activity, ad spend estimates, web presence, digital ordering. |
-| Guest Intelligence | Review sentiment, guest expectations, tourist vs local mix. |
-| Location & Traffic | Foot traffic, demographics, purchasing power, rent trends, trade areas. |
-| Operations | Labor availability, salary benchmarks, turnover, supplier pricing. |
+| Layer               | Covers                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| Market Landscape    | Openings, closings, competitor benchmarking, cuisine trends, saturation, white space. |
+| Menu & Pricing      | Price tracking, competitor menus, delivery markups, trending items, promotions.       |
+| Revenue & Sales     | Revenue estimates, check sizes, occupancy, channel splits, platform share.            |
+| Marketing & Digital | Social media activity, ad spend estimates, web presence, digital ordering.            |
+| Guest Intelligence  | Review sentiment, guest expectations, tourist vs local mix.                           |
+| Location & Traffic  | Foot traffic, demographics, purchasing power, rent trends, trade areas.               |
+| Operations          | Labor availability, salary benchmarks, turnover, supplier pricing.                    |
 
 Cohort-based benchmarking by cuisine, price point, format, and location — not one-to-one competitor matching.
 
@@ -91,18 +91,18 @@ Full-stack across data infrastructure, AI/ML pipelines, and product. Building th
 
 82% of restaurant executives plan to increase AI investment, but the tools built so far are internal POS analytics — not external market intelligence. _(Deloitte Q4 2024, 375 execs, 11 countries)_
 
-| Metric | Value | Detail | Source |
-|--------|-------|--------|--------|
-| TAM | **$5.1B** | Restaurant analytics market by 2033 | Verified Market Reports, 8.7% CAGR |
-| SAM | **~1M** | Restaurants in Europe + suppliers, agencies, investors, tech platforms | IBISWorld / Eurostat 2025 |
-| SOM | **3 markets** | Poland, Germany, UK — 450K+ restaurants | Eurostat 2023 |
+| Metric | Value         | Detail                                                                 | Source                             |
+| ------ | ------------- | ---------------------------------------------------------------------- | ---------------------------------- |
+| TAM    | **$5.1B**     | Restaurant analytics market by 2033                                    | Verified Market Reports, 8.7% CAGR |
+| SAM    | **~1M**       | Restaurants in Europe + suppliers, agencies, investors, tech platforms | IBISWorld / Eurostat 2025          |
+| SOM    | **3 markets** | Poland, Germany, UK — 450K+ restaurants                                | Eurostat 2023                      |
 
-| Stat | Source |
-|------|--------|
-| **$4T** global foodservice | Fortune Business Insights |
-| **$1T+** Europe foodservice | Mordor Intelligence |
-| **15M** restaurants globally | Statista |
-| **64%** are independents | Fortune Business Insights |
+| Stat                         | Source                    |
+| ---------------------------- | ------------------------- |
+| **$4T** global foodservice   | Fortune Business Insights |
+| **$1T+** Europe foodservice  | Mordor Intelligence       |
+| **15M** restaurants globally | Statista                  |
+| **64%** are independents     | Fortune Business Insights |
 
 ---
 
@@ -112,10 +112,10 @@ Full-stack across data infrastructure, AI/ML pipelines, and product. Building th
 
 Start with high-touch research that builds trust and generates proprietary data. As AI takes over intelligence work, margins expand and delivery scales into subscriptions and API access.
 
-| Phase | Description |
-|-------|-------------|
-| **Now** | Expert-led research reports + AI agents. Engagement-based pricing by location count and depth. |
-| **Next** | Automated intelligence feeds and monitoring. Services graduate into recurring subscriptions. |
+| Phase        | Description                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------- |
+| **Now**      | Expert-led research reports + AI agents. Engagement-based pricing by location count and depth.      |
+| **Next**     | Automated intelligence feeds and monitoring. Services graduate into recurring subscriptions.        |
 | **At scale** | API-first intelligence infrastructure. Third parties embed Superextra data into their own products. |
 
 **Data flywheel:** every engagement adds proprietary market data → better models → lower delivery cost → new segments unlocked. The intelligence compounds.
@@ -126,15 +126,15 @@ Start with high-touch research that builds trust and generates proprietary data.
 
 ### An uncontested position
 
-| Competitor | No own data required | External intelligence | Multi-layer coverage | AI-native | Europe |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Black Box Intelligence | ○ | ○ | ○ | ○ | ○ |
-| Toast / Lightspeed | ○ | ○ | ○ | ○ | ○ |
-| Placer.ai | ● | ● | ○ | ○ | ○ |
-| Datassential | ● | ● | ○ | ○ | ○ |
-| Technomic | ● | ● | ○ | ○ | ○ |
-| Juicer / RMS | ○ | ○ | ○ | ○ | ○ |
-| **Superextra** | **●** | **●** | **●** | **●** | **●** |
+| Competitor             | No own data required | External intelligence | Multi-layer coverage | AI-native | Europe |
+| ---------------------- | :------------------: | :-------------------: | :------------------: | :-------: | :----: |
+| Black Box Intelligence |          ○           |           ○           |          ○           |     ○     |   ○    |
+| Toast / Lightspeed     |          ○           |           ○           |          ○           |     ○     |   ○    |
+| Placer.ai              |          ●           |           ●           |          ○           |     ○     |   ○    |
+| Datassential           |          ●           |           ●           |          ○           |     ○     |   ○    |
+| Technomic              |          ●           |           ●           |          ○           |     ○     |   ○    |
+| Juicer / RMS           |          ○           |           ○           |          ○           |     ○     |   ○    |
+| **Superextra**         |        **●**         |         **●**         |        **●**         |   **●**   | **●**  |
 
 ---
 
@@ -142,11 +142,11 @@ Start with high-touch research that builds trust and generates proprietary data.
 
 ### Europe first. Services as the wedge.
 
-| Phase | Description |
-|-------|-------------|
-| **Now** | Direct outreach to multi-unit operators in Poland, Germany, UK. Research reports + AI agent access. |
-| **Post-raise** | Expand to suppliers, agencies, tech platforms. Launch self-serve monitoring and benchmarking. |
-| **Scale** | API distribution to third-party platforms. Geographic expansion across Europe. Data licensing. |
+| Phase          | Description                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| **Now**        | Direct outreach to multi-unit operators in Poland, Germany, UK. Research reports + AI agent access. |
+| **Post-raise** | Expand to suppliers, agencies, tech platforms. Launch self-serve monitoring and benchmarking.       |
+| **Scale**      | API distribution to third-party platforms. Geographic expansion across Europe. Data licensing.      |
 
 ---
 
@@ -156,12 +156,12 @@ Start with high-touch research that builds trust and generates proprietary data.
 
 **Use of funds:**
 
-| Area | Allocation |
-|------|-----------|
-| Team | ~40% |
-| Data & infrastructure | ~30% |
-| Go-to-market | ~20% |
-| Operations | ~10% |
+| Area                  | Allocation |
+| --------------------- | ---------- |
+| Team                  | ~40%       |
+| Data & infrastructure | ~30%       |
+| Go-to-market          | ~20%       |
+| Operations            | ~10%       |
 
 **Milestones:**
 

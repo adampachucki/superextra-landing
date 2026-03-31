@@ -19,6 +19,7 @@
 		return 'rgba(244, 114, 182, 0.5)';
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	function textColor(_score: number): string {
 		return 'rgba(var(--mockup-text), 0.65)';
 	}

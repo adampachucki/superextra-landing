@@ -28,13 +28,13 @@
 			</div>
 			<div class="range-bar">
 				<div class="track"></div>
-				<div
-					class="avg-tick"
-					style="left: {pct(item.avg, item.min, item.max)}%"
-				></div>
+				<div class="avg-tick" style="left: {pct(item.avg, item.min, item.max)}%"></div>
 				<div
 					class="you-dot"
-					style="left: {pct(item.you, item.min, item.max)}%; background: {dotColor(item.you, item.avg)}"
+					style="left: {pct(item.you, item.min, item.max)}%; background: {dotColor(
+						item.you,
+						item.avg
+					)}"
 				></div>
 			</div>
 		</div>
@@ -43,7 +43,11 @@
 	<div class="narrative">
 		<div class="narrative-border"></div>
 		<div class="narrative-text">
-			<p>Negroni consistently underpriced relative to the local competitive set — the current gap suggests room for a 10–15% increase without impacting volume. Espresso Martini tracks just below the market median.</p>
+			<p>
+				Negroni consistently underpriced relative to the local competitive set — the current gap
+				suggests room for a 10–15% increase without impacting volume. Espresso Martini tracks just
+				below the market median.
+			</p>
 		</div>
 	</div>
 </div>
@@ -137,7 +141,12 @@
 	}
 
 	.narrative-text {
-		background: linear-gradient(to bottom, rgba(var(--mockup-text), 0.85) 0%, rgba(var(--mockup-text), 0.55) 40%, rgba(var(--mockup-text), 0.25) 75%);
+		background: linear-gradient(
+			to bottom,
+			rgba(var(--mockup-text), 0.85) 0%,
+			rgba(var(--mockup-text), 0.55) 40%,
+			rgba(var(--mockup-text), 0.25) 75%
+		);
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;

@@ -8,10 +8,21 @@
 	];
 
 	const markers: [number, number][] = [
-		[0, 3], [1, 2], [1, 3], [1, 4],
-		[2, 1], [2, 2], [2, 3], [2, 4], [2, 5],
-		[3, 2], [3, 3], [3, 4], [3, 6],
-		[4, 3], [4, 4]
+		[0, 3],
+		[1, 2],
+		[1, 3],
+		[1, 4],
+		[2, 1],
+		[2, 2],
+		[2, 3],
+		[2, 4],
+		[2, 5],
+		[3, 2],
+		[3, 3],
+		[3, 4],
+		[3, 6],
+		[4, 3],
+		[4, 4]
 	];
 
 	const markerSet = new Set(markers.map(([r, c]) => `${r}-${c}`));
@@ -32,32 +43,31 @@
 </script>
 
 <div class="outer">
-
-<div class="body">
-	<div class="grid-map">
-		{#each grid as row, rowIdx}
-			{#each row as level, colIdx}
-				<div class="cell" style="background: {cellBg(level)}">
-					{#if markerSet.has(`${rowIdx}-${colIdx}`)}
-						<span class="dot" style="background: {dotColor(level)}"></span>
-					{/if}
-				</div>
+	<div class="body">
+		<div class="grid-map">
+			{#each grid as row, rowIdx}
+				{#each row as level, colIdx}
+					<div class="cell" style="background: {cellBg(level)}">
+						{#if markerSet.has(`${rowIdx}-${colIdx}`)}
+							<span class="dot" style="background: {dotColor(level)}"></span>
+						{/if}
+					</div>
+				{/each}
 			{/each}
-		{/each}
-	</div>
+		</div>
 
-	<div class="summary">
-		<div class="summary-item">
-			<span class="summary-num">147</span>
-			<span class="summary-label">locations</span>
-		</div>
-		<div class="summary-sep"></div>
-		<div class="summary-item">
-			<span class="summary-num">12,4</span>
-			<span class="summary-label">per km²</span>
+		<div class="summary">
+			<div class="summary-item">
+				<span class="summary-num">147</span>
+				<span class="summary-label">locations</span>
+			</div>
+			<div class="summary-sep"></div>
+			<div class="summary-item">
+				<span class="summary-num">12,4</span>
+				<span class="summary-label">per km²</span>
+			</div>
 		</div>
 	</div>
-</div>
 </div>
 
 <style>

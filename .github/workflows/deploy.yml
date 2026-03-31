@@ -16,6 +16,10 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run format:check
+      - run: npx eslint .
+      - run: npm run check
+      - run: npm run test:unit -- --run
       - run: npm run build
         env:
           PUBLIC_GOOGLE_PLACES_KEY: ${{ secrets.PUBLIC_GOOGLE_PLACES_KEY }}

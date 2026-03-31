@@ -71,6 +71,6 @@
 | Revenue & Financials | revenue estimates, check size, RevPAS, occupancy, food/labor costs, margins                                      |
 | Delivery & Digital   | platform market share, dynamic pricing, digital ordering, social media, marketing spend                          |
 | Operations           | workforce availability & costs, real estate, supply chain pricing                                                |
-| Research & Delivery  | tailored research reports, AI agents for follow-up analysis and monitoring                                        |
+| Research & Delivery  | tailored research reports, AI agents for follow-up analysis and monitoring                                       |
 
 ---

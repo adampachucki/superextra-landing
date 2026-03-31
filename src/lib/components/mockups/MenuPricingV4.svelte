@@ -56,12 +56,7 @@
 
 		<!-- Y-axis labels -->
 		{#each yTicks as tick}
-			<text
-				x={padLeft - 5}
-				y={yTickY(tick) + 2}
-				text-anchor="end"
-				class="y-label"
-			>€{tick}</text>
+			<text x={padLeft - 5} y={yTickY(tick) + 2} text-anchor="end" class="y-label">€{tick}</text>
 		{/each}
 
 		<!-- Horizontal dotted grid lines -->
@@ -95,8 +90,8 @@
 					x={barX(i) + barWidth / 2}
 					y={barY(bar.value) - 4}
 					text-anchor="middle"
-					class="bar-value featured-value"
-				>€{bar.value.toFixed(2).replace('.', ',')}</text>
+					class="bar-value featured-value">€{bar.value.toFixed(2).replace('.', ',')}</text
+				>
 			{/if}
 
 			<!-- Quarter label below -->
@@ -105,8 +100,8 @@
 				y={padTop + plotH + 14}
 				text-anchor="middle"
 				class="bar-name"
-				class:bar-name-featured={bar.featured}
-			>{bar.label}</text>
+				class:bar-name-featured={bar.featured}>{bar.label}</text
+			>
 		{/each}
 	</svg>
 
@@ -116,21 +111,57 @@
 			<button class="filter-pill" type="button">
 				Burgers
 				<svg class="chevron" viewBox="0 0 12 12" fill="none">
-					<path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+					<path
+						d="M3 4.5L6 7.5L9 4.5"
+						stroke="currentColor"
+						stroke-width="1.25"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
 				</svg>
 			</button>
 			<button class="filter-pill" type="button">
 				Dine-in
 				<svg class="chevron" viewBox="0 0 12 12" fill="none">
-					<path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+					<path
+						d="M3 4.5L6 7.5L9 4.5"
+						stroke="currentColor"
+						stroke-width="1.25"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
 				</svg>
 			</button>
 			<button class="filter-pill" type="button">
 				<svg class="cal-icon" viewBox="0 0 12 12" fill="none">
-					<rect x="1.5" y="2.5" width="9" height="8" rx="1" stroke="currentColor" stroke-width="0.9" />
+					<rect
+						x="1.5"
+						y="2.5"
+						width="9"
+						height="8"
+						rx="1"
+						stroke="currentColor"
+						stroke-width="0.9"
+					/>
 					<line x1="1.5" y1="5" x2="10.5" y2="5" stroke="currentColor" stroke-width="0.9" />
-					<line x1="4" y1="1.5" x2="4" y2="3.5" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" />
-					<line x1="8" y1="1.5" x2="8" y2="3.5" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" />
+					<line
+						x1="4"
+						y1="1.5"
+						x2="4"
+						y2="3.5"
+						stroke="currentColor"
+						stroke-width="0.9"
+						stroke-linecap="round"
+					/>
+					<line
+						x1="8"
+						y1="1.5"
+						x2="8"
+						y2="3.5"
+						stroke="currentColor"
+						stroke-width="0.9"
+						stroke-linecap="round"
+					/>
 				</svg>
 				Q1'25 – Now
 			</button>

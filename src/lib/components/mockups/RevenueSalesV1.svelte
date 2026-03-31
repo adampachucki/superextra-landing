@@ -7,7 +7,8 @@
 		<div class="msg msg-ai">
 			<div class="avatar"></div>
 			<p class="bubble bubble-ai">
-				Monthly revenue averaging <strong>€142K</strong>, with consistent 12% year-over-year growth. Delivery channel growing at <strong>18%</strong>, now accounting for 28% of total revenue.
+				Monthly revenue averaging <strong>€142K</strong>, with consistent 12% year-over-year growth.
+				Delivery channel growing at <strong>18%</strong>, now accounting for 28% of total revenue.
 			</p>
 		</div>
 
@@ -19,22 +20,42 @@
 
 	<div class="prompt-float">
 		<div class="prompt-box">
-			<span class="prompt-text">Break down delivery revenue by weekday<span class="cursor"></span></span>
+			<span class="prompt-text"
+				>Break down delivery revenue by weekday<span class="cursor"></span></span
+			>
 			<div class="prompt-controls">
 				<div class="prompt-meta">
 					<svg class="meta-icon" viewBox="0 0 16 16" fill="none">
-						<path d="M4 6l4-3 4 3M4 10l4 3 4-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+						<path
+							d="M4 6l4-3 4 3M4 10l4 3 4-3"
+							stroke="currentColor"
+							stroke-width="1.2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
 					</svg>
 					<span class="meta-label">2</span>
 					<svg class="meta-icon" viewBox="0 0 16 16" fill="none">
 						<circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.1" />
-						<path d="M8 5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />
+						<path
+							d="M8 5v3.5l2.5 1.5"
+							stroke="currentColor"
+							stroke-width="1.1"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
 					</svg>
 					<span class="meta-label">Auto</span>
 				</div>
 				<div class="prompt-send">
 					<svg viewBox="0 0 16 16" fill="none">
-						<path d="M8 12V4M8 4L4.5 7.5M8 4L11.5 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+						<path
+							d="M8 12V4M8 4L4.5 7.5M8 4L11.5 7.5"
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
 					</svg>
 				</div>
 			</div>
@@ -123,7 +144,6 @@
 		opacity: 0.5;
 	}
 
-
 	.status-text {
 		font-size: 0.625rem;
 		color: rgba(var(--mockup-text), 0.3);
@@ -162,7 +182,6 @@
 		margin-left: 1px;
 		vertical-align: text-bottom;
 	}
-
 
 	.prompt-controls {
 		display: flex;

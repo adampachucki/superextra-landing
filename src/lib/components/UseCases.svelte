@@ -175,22 +175,29 @@
 			<div
 				data-card
 				class="w-[min(75vw,380px)] flex-shrink-0"
-				style="{i === 0 ? 'margin-left: var(--content-inset)' : ''}{i === useCases.length - 1 ? 'margin-right: var(--content-inset)' : ''}"
-				onmouseenter={() => hoveredIndex = i}
-				onmouseleave={() => hoveredIndex = -1}
+				style="{i === 0 ? 'margin-left: var(--content-inset)' : ''}{i === useCases.length - 1
+					? 'margin-right: var(--content-inset)'
+					: ''}"
+				onmouseenter={() => (hoveredIndex = i)}
+				onmouseleave={() => (hoveredIndex = -1)}
 			>
 				<div
-					class="relative mb-5 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl border-[0.5px] border-black/[0.03] dark:border-white/[0.03] bg-cream-100"
+					class="relative mb-5 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl border-[0.5px] border-black/[0.03] bg-cream-100 dark:border-white/[0.03]"
 				>
 					<CardCanvas
 						active={effectiveHovered === i}
 						seed={i}
-						class="absolute inset-0 h-full w-full transition-opacity duration-500 {effectiveHovered === i ? 'opacity-100' : 'opacity-0'}"
+						class="absolute inset-0 h-full w-full transition-opacity duration-500 {effectiveHovered ===
+						i
+							? 'opacity-100'
+							: 'opacity-0'}"
 					/>
 					<UseCaseGraphics index={i} hovered={effectiveHovered === i} />
 				</div>
 
-				{#if useCase.audience}<p class="mb-1 text-xs font-medium text-black/25 dark:text-white/25">{useCase.audience}</p>{/if}
+				{#if useCase.audience}<p class="mb-1 text-xs font-medium text-black/25 dark:text-white/25">
+						{useCase.audience}
+					</p>{/if}
 				<h3 class="mb-2 text-lg font-medium tracking-[-0.01em] text-black dark:text-white">
 					{useCase.title}
 				</h3>

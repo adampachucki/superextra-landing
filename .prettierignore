@@ -1,0 +1,17 @@
+# Package Managers
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
+
+# Build output
+.svelte-kit/
+build/
+
+# Firebase (separate codebase)
+functions/
+.firebase/
+
+# Miscellaneous
+/static/

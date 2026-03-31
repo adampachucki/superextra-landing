@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { marked } from 'marked';
 	import { chatState } from '$lib/chat-state.svelte';
+	import { tts } from '$lib/tts.svelte';
 
 	marked.setOptions({ breaks: true, gfm: true });
 
@@ -24,7 +25,7 @@
 	let expandedSources = $state(new Set<number>());
 
 	function retryLast() {
-		const lastUser = [...chatState.messages].reverse().find(m => m.role === 'user');
+		const lastUser = [...chatState.messages].reverse().find((m) => m.role === 'user');
 		if (lastUser) chatState.send(lastUser.text);
 	}
 </script>
@@ -34,46 +35,105 @@
 		{#each chatState.messages as msg, i}
 			<div class="msg-appear flex {msg.role === 'user' ? 'justify-end' : 'justify-start'}">
 				{#if msg.role === 'user'}
-					<div class="max-w-[85%] rounded-2xl rounded-br-md bg-cream-100 px-4 py-3 text-[15px] leading-relaxed text-black dark:text-white">
+					<div
+						class="max-w-[85%] rounded-2xl rounded-br-md bg-cream-100 px-4 py-3 text-[15px] leading-relaxed text-black dark:text-white"
+					>
 						{msg.text}
 					</div>
 				{:else}
 					<div class="max-w-[95%] px-1 py-1">
-						<div class="prose max-w-none text-[15px] leading-relaxed text-black/80 prose-headings:text-black prose-strong:text-black prose-a:text-black prose-a:underline dark:text-white/80 dark:prose-headings:text-white dark:prose-strong:text-white dark:prose-a:text-white">
+						<div
+							class="prose max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
+						>
 							{@html renderMarkdown(msg.text)}
+						</div>
+						<div class="mt-2">
+							<button
+								onclick={() => tts.play(i, msg.text)}
+								disabled={tts.loading === i}
+								class="group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-black/5 px-2.5 py-1 text-[12px] text-black/40 transition-colors hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 disabled:opacity-50 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60"
+							>
+								{#if tts.loading === i}
+									<svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+										<circle
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="2"
+											opacity="0.25"
+										/>
+										<path
+											d="M4 12a8 8 0 018-8"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+										/>
+									</svg>
+									<span>Loading…</span>
+								{:else if tts.playingIndex === i}
+									<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+										<rect x="6" y="5" width="4" height="14" rx="1" />
+										<rect x="14" y="5" width="4" height="14" rx="1" />
+									</svg>
+									<span>Stop</span>
+								{:else}
+									<svg
+										class="h-3.5 w-3.5"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+										<path d="M15.54 8.46a5 5 0 010 7.07" />
+										<path d="M19.07 4.93a10 10 0 010 14.14" />
+									</svg>
+									<span>Read aloud</span>
+								{/if}
+							</button>
 						</div>
 						{#if msg.sources?.length}
 							{@const showAll = expandedSources.has(i)}
 							{@const visible = showAll ? msg.sources : msg.sources.slice(0, SOURCES_LIMIT)}
 							{@const remaining = msg.sources.length - SOURCES_LIMIT}
 							<div class="mt-5">
-								<span class="mb-2 block text-[12px] font-medium text-black/40 dark:text-white/40">Sources ({msg.sources.length})</span>
+								<span class="mb-2 block text-[12px] font-medium text-black/40 dark:text-white/40"
+									>Sources ({msg.sources.length})</span
+								>
 								<div class="flex flex-wrap gap-1.5">
-								{#each visible as src}
-									<a
-										href={src.url}
-										target="_blank"
-										rel="noopener noreferrer"
-										class="group inline-flex items-center gap-1.5 rounded-full border border-black/5 px-2.5 py-1 no-underline transition-colors hover:border-black/10 hover:bg-black/[0.02] dark:border-white/5 dark:hover:border-white/10 dark:hover:bg-white/[0.02]"
-									>
-										<img
-											src="https://www.google.com/s2/favicons?sz=32&domain={src.title}"
-											alt=""
-											class="h-3.5 w-3.5 shrink-0 rounded-sm"
-										/>
-										<span class="text-[12px] leading-snug text-black/50 transition-colors group-hover:text-black/70 dark:text-white/50 dark:group-hover:text-white/70">
-											{src.title}
-										</span>
-									</a>
-								{/each}
-								{#if remaining > 0 && !showAll}
-									<button
-										onclick={() => { expandedSources.add(i); expandedSources = expandedSources; }}
-										class="inline-flex cursor-pointer items-center rounded-full border border-black/5 px-2.5 py-1 text-[12px] leading-snug text-black/40 transition-colors hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60"
-									>
-										+{remaining} more
-									</button>
-								{/if}
+									{#each visible as src}
+										<a
+											href={src.url}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="group inline-flex items-center gap-1.5 rounded-full border border-black/5 px-2.5 py-1 no-underline transition-colors hover:border-black/10 hover:bg-black/[0.02] dark:border-white/5 dark:hover:border-white/10 dark:hover:bg-white/[0.02]"
+										>
+											<img
+												src="https://www.google.com/s2/favicons?sz=32&domain={src.title}"
+												alt=""
+												class="h-3.5 w-3.5 shrink-0 rounded-sm"
+											/>
+											<span
+												class="text-[12px] leading-snug text-black/50 transition-colors group-hover:text-black/70 dark:text-white/50 dark:group-hover:text-white/70"
+											>
+												{src.title}
+											</span>
+										</a>
+									{/each}
+									{#if remaining > 0 && !showAll}
+										<button
+											onclick={() => {
+												expandedSources.add(i);
+												expandedSources = expandedSources;
+											}}
+											class="inline-flex cursor-pointer items-center rounded-full border border-black/5 px-2.5 py-1 text-[12px] leading-snug text-black/40 transition-colors hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60"
+										>
+											+{remaining} more
+										</button>
+									{/if}
 								</div>
 							</div>
 						{/if}
@@ -97,9 +157,14 @@
 
 		{#if chatState.error}
 			<div class="msg-appear flex justify-start">
-				<div class="flex items-center gap-3 rounded-2xl border border-red-200/50 bg-red-50/50 px-5 py-3 dark:border-red-400/20 dark:bg-red-900/10">
+				<div
+					class="flex items-center gap-3 rounded-2xl border border-red-200/50 bg-red-50/50 px-5 py-3 dark:border-red-400/20 dark:bg-red-900/10"
+				>
 					<span class="text-[13px] text-red-600/80 dark:text-red-400/80">{chatState.error}</span>
-					<button onclick={retryLast} class="cursor-pointer whitespace-nowrap rounded-full border border-red-200/50 px-3 py-1 text-[12px] text-red-600/60 transition-colors hover:bg-red-100/50 dark:border-red-400/20 dark:text-red-400/60 dark:hover:bg-red-900/20">
+					<button
+						onclick={retryLast}
+						class="cursor-pointer rounded-full border border-red-200/50 px-3 py-1 text-[12px] whitespace-nowrap text-red-600/60 transition-colors hover:bg-red-100/50 dark:border-red-400/20 dark:text-red-400/60 dark:hover:bg-red-900/20"
+					>
 						Try again
 					</button>
 				</div>
@@ -114,28 +179,46 @@
 	}
 
 	@keyframes msgIn {
-		from { opacity: 0; transform: translateY(6px); }
-		to { opacity: 1; transform: translateY(0); }
+		from {
+			opacity: 0;
+			transform: translateY(6px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
-.loading-dots span {
+	.loading-dots span {
 		animation: dotWave 1.4s ease-in-out infinite;
 	}
-	.loading-dots span:nth-child(2) { animation-delay: 0.15s; }
-	.loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+	.loading-dots span:nth-child(2) {
+		animation-delay: 0.15s;
+	}
+	.loading-dots span:nth-child(3) {
+		animation-delay: 0.3s;
+	}
 
 	@keyframes dotWave {
-		0%, 80%, 100% { opacity: 0.4; transform: translateY(0); }
-		40% { opacity: 1; transform: translateY(-3px); }
+		0%,
+		80%,
+		100% {
+			opacity: 0.4;
+			transform: translateY(0);
+		}
+		40% {
+			opacity: 1;
+			transform: translateY(-3px);
+		}
 	}
 
 	.shimmer-text {
 		color: transparent;
 		background: linear-gradient(
 			90deg,
-			rgba(0,0,0,0.35) 0%,
-			rgba(0,0,0,0.5) 40%,
-			rgba(0,0,0,0.35) 80%
+			rgba(0, 0, 0, 0.35) 0%,
+			rgba(0, 0, 0, 0.5) 40%,
+			rgba(0, 0, 0, 0.35) 80%
 		);
 		background-size: 200% 100%;
 		background-clip: text;
@@ -146,9 +229,9 @@
 	:global(.dark) .shimmer-text {
 		background: linear-gradient(
 			90deg,
-			rgba(255,255,255,0.35) 0%,
-			rgba(255,255,255,0.5) 40%,
-			rgba(255,255,255,0.35) 80%
+			rgba(255, 255, 255, 0.35) 0%,
+			rgba(255, 255, 255, 0.5) 40%,
+			rgba(255, 255, 255, 0.35) 80%
 		);
 		background-size: 200% 100%;
 		background-clip: text;
@@ -156,9 +239,14 @@
 	}
 
 	@keyframes shimmer {
-		0% { background-position: 200% 0; }
-		50% { background-position: -200% 0; }
-		100% { background-position: -200% 0; }
+		0% {
+			background-position: 200% 0;
+		}
+		50% {
+			background-position: -200% 0;
+		}
+		100% {
+			background-position: -200% 0;
+		}
 	}
-
 </style>

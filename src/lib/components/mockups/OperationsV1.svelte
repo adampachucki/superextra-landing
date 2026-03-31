@@ -1,10 +1,34 @@
 <script lang="ts">
 	import MockupBar from './MockupBar.svelte';
 	const stats = [
-		{ label: 'Avg. Salary (BOH)', sub: '€17,40/hr', trend: [15, 16, 17], change: '+6%', stroke: '#06b6d4' },
-		{ label: 'Avg. Salary (FOH)', sub: '€14,20/hr', trend: [13, 14, 14], change: '+3%', stroke: '#06b6d4' },
-		{ label: 'Open Positions', sub: '1.240 listed', trend: [800, 1050, 1240], change: '+18%', stroke: '#06b6d4' },
-		{ label: 'Workers in Area', sub: '8,4K available', trend: [9, 8.7, 8.4], change: '−2%', stroke: '#f472b6' }
+		{
+			label: 'Avg. Salary (BOH)',
+			sub: '€17,40/hr',
+			trend: [15, 16, 17],
+			change: '+6%',
+			stroke: '#06b6d4'
+		},
+		{
+			label: 'Avg. Salary (FOH)',
+			sub: '€14,20/hr',
+			trend: [13, 14, 14],
+			change: '+3%',
+			stroke: '#06b6d4'
+		},
+		{
+			label: 'Open Positions',
+			sub: '1.240 listed',
+			trend: [800, 1050, 1240],
+			change: '+18%',
+			stroke: '#06b6d4'
+		},
+		{
+			label: 'Workers in Area',
+			sub: '8,4K available',
+			trend: [9, 8.7, 8.4],
+			change: '−2%',
+			stroke: '#f472b6'
+		}
 	];
 
 	function sparklinePoints(trend: number[]): string {

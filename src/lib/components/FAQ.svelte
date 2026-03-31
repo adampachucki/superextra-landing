@@ -10,35 +10,43 @@
 	const defaultFaqs = [
 		{
 			question: 'What types of restaurants is Superextra built for?',
-			answer: "Superextra is built for every segment of the restaurant industry — from independent operators and fast-casual concepts to fine dining groups and growing multi-unit brands. It's also used by suppliers, tech platforms, agencies, and investors who need restaurant market intelligence."
+			answer:
+				"Superextra is built for every segment of the restaurant industry — from independent operators and fast-casual concepts to fine dining groups and growing multi-unit brands. It's also used by suppliers, tech platforms, agencies, and investors who need restaurant market intelligence."
 		},
 		{
 			question: 'How is the data collected and how accurate is it?',
-			answer: 'Superextra aggregates data from dozens of public and proprietary sources including review platforms, delivery apps, foot traffic providers, real estate databases, public filings, and more. AI models cross-reference and validate data continuously to deliver the most accurate picture of the market.'
+			answer:
+				'Superextra aggregates data from dozens of public and proprietary sources including review platforms, delivery apps, foot traffic providers, real estate databases, public filings, and more. AI models cross-reference and validate data continuously to deliver the most accurate picture of the market.'
 		},
 		{
 			question: 'How reliable are the AI agents? Do they hallucinate?',
-			answer: "Superextra agents are built to report facts, not generate them. Every insight is grounded in real data. When information isn't available, the agent flags it as missing rather than inventing an answer."
+			answer:
+				"Superextra agents are built to report facts, not generate them. Every insight is grounded in real data. When information isn't available, the agent flags it as missing rather than inventing an answer."
 		},
 		{
 			question: 'Does Superextra connect to my POS or internal systems?',
-			answer: "No — and that's by design. Superextra brings the market data to you, so there's no integration required. Think of it as an external intelligence layer: all the competitive, location, and industry data you need without sharing any of your own."
+			answer:
+				"No — and that's by design. Superextra brings the market data to you, so there's no integration required. Think of it as an external intelligence layer: all the competitive, location, and industry data you need without sharing any of your own."
 		},
 		{
 			question: 'What markets and geographies are covered?',
-			answer: 'Superextra is launching with deep coverage in select European markets and expanding rapidly. If you want to check availability for a specific region, reach out to the team.'
+			answer:
+				'Superextra is launching with deep coverage in select European markets and expanding rapidly. If you want to check availability for a specific region, reach out to the team.'
 		},
 		{
 			question: 'How hyper-local is the intelligence?',
-			answer: 'Extremely. Intelligence is mapped down to precise trade areas, so you can understand the competitive dynamics of your exact neighborhood — not just a city or zip code. That granularity is what makes Superextra different.'
+			answer:
+				'Extremely. Intelligence is mapped down to precise trade areas, so you can understand the competitive dynamics of your exact neighborhood — not just a city or zip code. That granularity is what makes Superextra different.'
 		},
 		{
 			question: 'Can I benchmark against specific competitors?',
-			answer: 'Superextra uses cohort-based benchmarking rather than direct competitor comparisons. Performance is measured against relevant peer groups based on cuisine, price point, format, and location — giving a more reliable and statistically meaningful picture than one-to-one comparisons.'
+			answer:
+				'Superextra uses cohort-based benchmarking rather than direct competitor comparisons. Performance is measured against relevant peer groups based on cuisine, price point, format, and location — giving a more reliable and statistically meaningful picture than one-to-one comparisons.'
 		},
 		{
 			question: 'What does pricing look like?',
-			answer: "Engagement-based pricing tied to the number of locations and depth of intelligence needed. Early access customers get preferential pricing. Reach out to learn more."
+			answer:
+				'Engagement-based pricing tied to the number of locations and depth of intelligence needed. Early access customers get preferential pricing. Reach out to learn more.'
 		}
 	];
 
@@ -62,13 +70,23 @@
 							aria-controls="faq-answer-{i}"
 							onclick={() => (openIndex = openIndex === i ? -1 : i)}
 						>
-							<h3 class="pr-8 text-base font-medium transition-colors {openIndex === i ? 'text-black dark:text-white' : 'text-black/60 group-hover:text-black dark:text-white/60 dark:group-hover:text-white'}">
+							<h3
+								class="pr-8 text-base font-medium transition-colors {openIndex === i
+									? 'text-black dark:text-white'
+									: 'text-black/60 group-hover:text-black dark:text-white/60 dark:group-hover:text-white'}"
+							>
 								{faq.question}
 							</h3>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
-								class="h-5 w-5 shrink-0 text-black/25 dark:text-white/25 transition-transform duration-300 {openIndex === i ? 'rotate-45' : ''}"
-								fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
+								class="h-5 w-5 shrink-0 text-black/25 transition-transform duration-300 dark:text-white/25 {openIndex ===
+								i
+									? 'rotate-45'
+									: ''}"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="1.5"
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
 							</svg>
@@ -76,7 +94,9 @@
 						<div
 							id="faq-answer-{i}"
 							role="region"
-							class="grid transition-[grid-template-rows] duration-300 {openIndex === i ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}"
+							class="grid transition-[grid-template-rows] duration-300 {openIndex === i
+								? 'grid-rows-[1fr]'
+								: 'grid-rows-[0fr]'}"
 						>
 							<div class="overflow-hidden">
 								<p class="pb-6 text-sm leading-snug text-black/60 dark:text-white/60">

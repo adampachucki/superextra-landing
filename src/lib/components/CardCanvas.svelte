@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	let { active = false, seed = 0, class: className = '' }: { active?: boolean; seed?: number; class?: string } = $props();
+	let {
+		active = false,
+		seed = 0,
+		class: className = ''
+	}: { active?: boolean; seed?: number; class?: string } = $props();
 
 	let canvasEl: HTMLCanvasElement;
 	let ctx: CanvasRenderingContext2D;
@@ -74,7 +78,10 @@
 
 		const grad = ctx.createLinearGradient(x0, y0, x1, y1);
 		grad.addColorStop(0, `rgb(${bgC1[0]},${bgC1[1]},${bgC1[2]})`);
-		grad.addColorStop(0.5, `rgb(${lerp(bgC1[0], bgC2[0], 0.5)},${lerp(bgC1[1], bgC2[1], 0.5)},${lerp(bgC1[2], bgC2[2], 0.5)})`);
+		grad.addColorStop(
+			0.5,
+			`rgb(${lerp(bgC1[0], bgC2[0], 0.5)},${lerp(bgC1[1], bgC2[1], 0.5)},${lerp(bgC1[2], bgC2[2], 0.5)})`
+		);
 		grad.addColorStop(1, `rgb(${bgC2[0]},${bgC2[1]},${bgC2[2]})`);
 		ctx.fillStyle = grad;
 		ctx.fillRect(0, 0, W, H);

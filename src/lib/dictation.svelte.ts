@@ -49,7 +49,7 @@ function pollVolume() {
 	analyser.getByteFrequencyData(data);
 	let sum = 0;
 	for (let i = 0; i < data.length; i++) sum += data[i];
-	volume = Math.min(1, (sum / data.length) / 80);
+	volume = Math.min(1, sum / data.length / 80);
 	rafId = requestAnimationFrame(pollVolume);
 }
 
@@ -114,10 +114,12 @@ async function start() {
 		processor.onaudioprocess = (e) => {
 			if (ws?.readyState === WebSocket.OPEN) {
 				const pcm = e.inputBuffer.getChannelData(0);
-				ws.send(JSON.stringify({
-					message_type: 'input_audio_chunk',
-					audio_base_64: float32ToPcm16Base64(pcm)
-				}));
+				ws.send(
+					JSON.stringify({
+						message_type: 'input_audio_chunk',
+						audio_base_64: float32ToPcm16Base64(pcm)
+					})
+				);
 			}
 		};
 		source.connect(processor);
@@ -146,15 +148,23 @@ async function start() {
 					if (chunk) commits.push(chunk);
 					partial = '';
 					updateText();
-				} else if (msg.message_type === 'auth_error' || msg.message_type === 'quota_exceeded' || msg.message_type === 'rate_limited') {
+				} else if (
+					msg.message_type === 'auth_error' ||
+					msg.message_type === 'quota_exceeded' ||
+					msg.message_type === 'rate_limited'
+				) {
 					console.error('ElevenLabs STT error:', msg.message_type, msg.error);
 					stop();
 				}
-			} catch {}
+			} catch {
+				// ignore malformed WebSocket messages
+			}
 		};
 
 		ws.onerror = () => stop();
-		ws.onclose = () => { if (active) stop(); };
+		ws.onclose = () => {
+			if (active) stop();
+		};
 
 		active = true;
 	} catch (err) {
@@ -172,10 +182,18 @@ function stop() {
 }
 
 export const dictation = {
-	get active() { return active; },
-	get supported() { return supported; },
-	get volume() { return volume; },
-	get text() { return text; },
+	get active() {
+		return active;
+	},
+	get supported() {
+		return supported;
+	},
+	get volume() {
+		return volume;
+	},
+	get text() {
+		return text;
+	},
 	toggle() {
 		if (active || connecting) stop();
 		else start();

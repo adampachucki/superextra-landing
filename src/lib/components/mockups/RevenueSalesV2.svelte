@@ -1,6 +1,19 @@
 <script lang="ts">
 	import MockupBar from './MockupBar.svelte';
-	const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+	const months = [
+		'Jan',
+		'Feb',
+		'Mar',
+		'Apr',
+		'May',
+		'Jun',
+		'Jul',
+		'Aug',
+		'Sep',
+		'Oct',
+		'Nov',
+		'Dec'
+	];
 	const values = [90, 105, 130, 115, 150, 170, 160, 185, 155, 200, 215, 230];
 
 	const viewW = 220;
@@ -40,9 +53,7 @@
 	}));
 
 	// X-axis labels (show every other month)
-	const xLabels = months
-		.map((m, i) => ({ label: m, x: toX(i) }))
-		.filter((_, i) => i % 2 === 0);
+	const xLabels = months.map((m, i) => ({ label: m, x: toX(i) })).filter((_, i) => i % 2 === 0);
 
 	// Highlighted data point (Jun)
 	const dotIndex = 5;
@@ -83,12 +94,7 @@
 				stroke-width="0.4"
 				stroke-dasharray="2,2"
 			/>
-			<text
-				x={padL - 3}
-				y={line.y + 1.5}
-				text-anchor="end"
-				class="axis-label"
-			>{line.label}</text>
+			<text x={padL - 3} y={line.y + 1.5} text-anchor="end" class="axis-label">{line.label}</text>
 		{/each}
 
 		<polygon points={areaPoints} fill="url(#revAreaGrad)" />
@@ -103,15 +109,18 @@
 		/>
 
 		<circle cx={dotPointX} cy={dotPointY} r="2.5" fill="#6366f1" />
-		<circle cx={dotPointX} cy={dotPointY} r="4.5" fill="none" stroke="#6366f1" stroke-opacity="0.25" stroke-width="1" />
+		<circle
+			cx={dotPointX}
+			cy={dotPointY}
+			r="4.5"
+			fill="none"
+			stroke="#6366f1"
+			stroke-opacity="0.25"
+			stroke-width="1"
+		/>
 
 		{#each xLabels as tick}
-			<text
-				x={tick.x}
-				y={viewH - 2}
-				text-anchor="middle"
-				class="axis-label"
-			>{tick.label}</text>
+			<text x={tick.x} y={viewH - 2} text-anchor="middle" class="axis-label">{tick.label}</text>
 		{/each}
 	</svg>
 

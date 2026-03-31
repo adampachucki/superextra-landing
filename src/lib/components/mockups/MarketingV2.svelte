@@ -4,8 +4,8 @@
 		<div class="post-header">
 			<div class="avatar avatar-ig">
 				<svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-					<circle cx="12" cy="12" r="5" stroke="white" stroke-width="1.5" fill="none"/>
-					<circle cx="17.5" cy="6.5" r="1.5" fill="white"/>
+					<circle cx="12" cy="12" r="5" stroke="white" stroke-width="1.5" fill="none" />
+					<circle cx="17.5" cy="6.5" r="1.5" fill="white" />
 				</svg>
 			</div>
 			<span class="post-name">@theburgerbar</span>
@@ -15,16 +15,37 @@
 			<div class="ig-actions">
 				<!-- Heart (outline) -->
 				<svg class="action-icon" viewBox="0 0 24 24" fill="none">
-					<path d="M16.792 3.904A4.989 4.989 0 0121.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-1.834-1.527-4.303-3.752C5.152 14.08 2.5 12.194 2.5 9.122a4.989 4.989 0 014.708-5.218 4.21 4.21 0 013.675 1.941c.84 1.175.616 1.175 1.455 0a4.21 4.21 0 013.675-1.941z" fill="#ed4956"/>
+					<path
+						d="M16.792 3.904A4.989 4.989 0 0121.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-1.834-1.527-4.303-3.752C5.152 14.08 2.5 12.194 2.5 9.122a4.989 4.989 0 014.708-5.218 4.21 4.21 0 013.675 1.941c.84 1.175.616 1.175 1.455 0a4.21 4.21 0 013.675-1.941z"
+						fill="#ed4956"
+					/>
 				</svg>
 				<!-- Comment (speech bubble) -->
 				<svg class="action-icon" viewBox="0 0 24 24" fill="none">
-					<path d="M20.656 17.008a9.993 9.993 0 10-3.59 3.615L22 22z" style="stroke: rgba(var(--mockup-text), 0.7)" stroke-width="1.8" stroke-linejoin="round"/>
+					<path
+						d="M20.656 17.008a9.993 9.993 0 10-3.59 3.615L22 22z"
+						style="stroke: rgba(var(--mockup-text), 0.7)"
+						stroke-width="1.8"
+						stroke-linejoin="round"
+					/>
 				</svg>
 				<!-- Share (paper plane) -->
 				<svg class="action-icon" viewBox="0 0 24 24" fill="none">
-					<line x1="22" y1="3" x2="9.218" y2="10.083" style="stroke: rgba(var(--mockup-text), 0.7)" stroke-width="1.8"/>
-					<polygon points="22,3 15,22 9.218,10.083 2,9" fill="none" style="stroke: rgba(var(--mockup-text), 0.7)" stroke-width="1.8" stroke-linejoin="round"/>
+					<line
+						x1="22"
+						y1="3"
+						x2="9.218"
+						y2="10.083"
+						style="stroke: rgba(var(--mockup-text), 0.7)"
+						stroke-width="1.8"
+					/>
+					<polygon
+						points="22,3 15,22 9.218,10.083 2,9"
+						fill="none"
+						style="stroke: rgba(var(--mockup-text), 0.7)"
+						stroke-width="1.8"
+						stroke-linejoin="round"
+					/>
 				</svg>
 			</div>
 			<span class="likes-count">2.847 likes</span>
@@ -33,27 +54,32 @@
 
 	<!-- Center card: TikTok — centered, highest -->
 	<div class="post-card card-center">
-		<div class="post-image post-image-tt" style="background: linear-gradient(180deg, #4f46e5 0%, #a78bfa 100%);">
+		<div
+			class="post-image post-image-tt"
+			style="background: linear-gradient(180deg, #4f46e5 0%, #a78bfa 100%);"
+		>
 			<svg class="play-btn" viewBox="0 0 24 24" fill="none">
-				<path d="M8 5l13 7-13 7V5z" fill="white" opacity="0.9"/>
+				<path d="M8 5l13 7-13 7V5z" fill="white" opacity="0.9" />
 			</svg>
 			<div class="tt-side">
 				<div class="tt-action">
 					<svg viewBox="0 0 24 24" fill="white" stroke="none">
-						<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+						<path
+							d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+						/>
 					</svg>
 					<span>4,2K</span>
 				</div>
 				<div class="tt-action">
 					<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-						<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+						<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
 					</svg>
 					<span>318</span>
 				</div>
 				<div class="tt-action">
 					<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-						<line x1="22" y1="2" x2="11" y2="13"/>
-						<polygon points="22 2 15 22 11 13 2 9 22 2"/>
+						<line x1="22" y1="2" x2="11" y2="13" />
+						<polygon points="22 2 15 22 11 13 2 9 22 2" />
 					</svg>
 					<span>89</span>
 				</div>
@@ -70,7 +96,10 @@
 		<div class="post-header">
 			<div class="avatar avatar-fb">
 				<svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-					<path d="M13.5 8H16V5.5h-2.5C11.5 5.5 10 7 10 9v1.5H8V13h2v8h3v-8h2l.5-2.5H13V9c0-.6.2-1 .5-1z" fill="white"/>
+					<path
+						d="M13.5 8H16V5.5h-2.5C11.5 5.5 10 7 10 9v1.5H8V13h2v8h3v-8h2l.5-2.5H13V9c0-.6.2-1 .5-1z"
+						fill="white"
+					/>
 				</svg>
 			</div>
 			<div class="post-meta">
@@ -240,7 +269,12 @@
 		left: 0;
 		right: 0;
 		padding: 0.375rem 0.5rem;
-		background: linear-gradient(to top, rgba(var(--mockup-text), 0.35) 0%, rgba(var(--mockup-text), 0.12) 40%, transparent 100%);
+		background: linear-gradient(
+			to top,
+			rgba(var(--mockup-text), 0.35) 0%,
+			rgba(var(--mockup-text), 0.12) 40%,
+			transparent 100%
+		);
 		display: flex;
 		flex-direction: column;
 		gap: 0.1rem;

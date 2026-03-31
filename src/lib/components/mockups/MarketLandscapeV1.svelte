@@ -45,14 +45,24 @@
 <MockupBar label="Market Activity" icon="barchart">
 	<div class="header-legend">
 		<span class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>Open</span>
-		<span class="legend-item"><span class="legend-dot" style="background:rgba(var(--mockup-text),0.15)"></span>Close</span>
+		<span class="legend-item"
+			><span class="legend-dot" style="background:rgba(var(--mockup-text),0.15)"></span>Close</span
+		>
 	</div>
 </MockupBar>
 
 <div class="body">
 	<svg class="chart" viewBox="0 0 {viewW} {viewH}" preserveAspectRatio="none">
 		{#each gridLines as line}
-			<line x1={padX} y1={line.y} x2={viewW - padX} y2={line.y} style="stroke: rgba(var(--mockup-text), 0.06)" stroke-width="0.5" stroke-dasharray="3,3" />
+			<line
+				x1={padX}
+				y1={line.y}
+				x2={viewW - padX}
+				y2={line.y}
+				style="stroke: rgba(var(--mockup-text), 0.06)"
+				stroke-width="0.5"
+				stroke-dasharray="3,3"
+			/>
 		{/each}
 		<polyline
 			points={openingsPoints}
@@ -85,7 +95,6 @@
 			</div>
 		{/each}
 	</div>
-
 </div>
 
 <style>
@@ -169,5 +178,4 @@
 	.pair-close {
 		color: rgba(var(--mockup-text), 0.2);
 	}
-
 </style>
