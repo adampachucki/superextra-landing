@@ -339,6 +339,92 @@ export const sttToken = onRequest({ cors: true, secrets: [elevenlabsKey] }, asyn
 	}
 });
 
+// --- TTS endpoint (converts agent text to speech via ElevenLabs) ---
+
+const TTS_VOICE_ID = 'SAz9YHcvj6GT2YYXdXww'; // River – Relaxed, Neutral, Informative
+const ttsRateLimitMap = new Map();
+
+function stripMarkdown(text) {
+	return text
+		.replace(/^#{1,6}\s+/gm, '')          // headings
+		.replace(/\*\*(.+?)\*\*/g, '$1')       // bold
+		.replace(/\*(.+?)\*/g, '$1')           // italic
+		.replace(/~~(.+?)~~/g, '$1')           // strikethrough
+		.replace(/`{1,3}[^`]*`{1,3}/g, '')    // inline/block code
+		.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links → text only
+		.replace(/^[-*+]\s+/gm, '')            // unordered list markers
+		.replace(/^\d+\.\s+/gm, '')            // ordered list markers
+		.replace(/^>\s+/gm, '')                // blockquotes
+		.replace(/\n{3,}/g, '\n\n')            // collapse excess newlines
+		.trim();
+}
+
+export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (req, res) => {
+	if (req.method !== 'POST') {
+		res.status(405).json({ ok: false, error: 'Method not allowed' });
+		return;
+	}
+
+	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+	const now = Date.now();
+	const window = 10 * 60 * 1000;
+	const entry = ttsRateLimitMap.get(ip);
+	if (entry && now - entry.start < window) {
+		if (entry.count >= 20) {
+			res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+			return;
+		}
+		entry.count++;
+	} else {
+		ttsRateLimitMap.set(ip, { start: now, count: 1 });
+	}
+
+	const { text } = req.body || {};
+	if (!text || typeof text !== 'string') {
+		res.status(400).json({ ok: false, error: 'text is required' });
+		return;
+	}
+
+	const plainText = stripMarkdown(text);
+	if (plainText.length > 5000) {
+		res.status(400).json({ ok: false, error: 'Text too long for speech synthesis' });
+		return;
+	}
+
+	try {
+		const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${TTS_VOICE_ID}`, {
+			method: 'POST',
+			headers: {
+				'xi-api-key': elevenlabsKey.value(),
+				'Content-Type': 'application/json',
+				'Accept': 'audio/mpeg'
+			},
+			body: JSON.stringify({
+				text: plainText,
+				model_id: 'eleven_multilingual_v2',
+				voice_settings: {
+					stability: 0.5,
+					similarity_boost: 0.75
+				}
+			})
+		});
+
+		if (!response.ok) {
+			const body = await response.text().catch(() => '');
+			console.error('ElevenLabs TTS error:', response.status, body);
+			res.status(502).json({ ok: false, error: 'Speech synthesis failed' });
+			return;
+		}
+
+		const arrayBuffer = await response.arrayBuffer();
+		res.set('Content-Type', 'audio/mpeg');
+		res.send(Buffer.from(arrayBuffer));
+	} catch (err) {
+		console.error('ElevenLabs TTS fetch failed:', err);
+		res.status(500).json({ ok: false, error: 'Speech service unreachable' });
+	}
+});
+
 // --- Agent debug endpoint (retrieves full ADK session by frontend sessionId) ---
 
 export const agentDebug = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {

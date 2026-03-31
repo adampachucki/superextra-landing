@@ -19,6 +19,8 @@ jobs:
       - run: npm run format:check
       - run: npx eslint .
       - run: npm run check
+        env:
+          PUBLIC_GOOGLE_PLACES_KEY: ${{ secrets.PUBLIC_GOOGLE_PLACES_KEY }}
       - run: npm run test:unit -- --run
       - run: npm run build
         env:

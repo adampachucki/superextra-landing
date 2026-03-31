@@ -9,6 +9,11 @@ export default defineConfig({
 		port: 5199,
 		proxy: {
 			'/api/intake': 'https://superextra-landing.web.app',
+			'/api/agent/debug': {
+				target: 'https://us-central1-superextra-site.cloudfunctions.net',
+				changeOrigin: true,
+				rewrite: (path: string) => path.replace(/^\/api\/agent\/debug/, '/agentDebug')
+			},
 			'/api/agent': {
 				target: 'https://us-central1-superextra-site.cloudfunctions.net',
 				changeOrigin: true,
