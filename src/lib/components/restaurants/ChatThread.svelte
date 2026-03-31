@@ -48,10 +48,10 @@
 			<div class="msg-appear flex justify-start">
 				<div class="flex items-center gap-2 px-1 py-1">
 					<span class="text-[13px] text-black/40 dark:text-white/40">Researching</span>
-					<span class="loading-dots flex gap-0.5">
-						<span class="h-1 w-1 rounded-full bg-black/30 dark:bg-white/30"></span>
-						<span class="h-1 w-1 rounded-full bg-black/30 dark:bg-white/30"></span>
-						<span class="h-1 w-1 rounded-full bg-black/30 dark:bg-white/30"></span>
+					<span class="loading-dots flex gap-1">
+						<span class="h-1 w-1 rounded-full bg-[#6ee7b3]"></span>
+						<span class="h-1 w-1 rounded-full bg-[#a78bfa]"></span>
+						<span class="h-1 w-1 rounded-full bg-[#f472b6]"></span>
 					</span>
 				</div>
 			</div>
@@ -87,7 +87,7 @@
 	.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
 	@keyframes dotPulse {
-		0%, 80%, 100% { opacity: 0.3; transform: scale(1); }
-		40% { opacity: 1; transform: scale(1.3); }
+		0%, 80%, 100% { opacity: 0.4; }
+		40% { opacity: 1; }
 	}
 </style>
