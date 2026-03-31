@@ -4,6 +4,7 @@ import { VertexAI } from '@google-cloud/vertexai';
 import { GoogleAuth } from 'google-auth-library';
 
 const relayKey = defineSecret('RELAY_KEY');
+const elevenlabsKey = defineSecret('ELEVENLABS_API_KEY');
 const DEST = 'hello@superextra.ai';
 
 // --- Vertex AI config ---
@@ -273,5 +274,50 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 	} catch (err) {
 		console.error('Agent error:', err.message || err);
 		res.status(500).json({ ok: false, error: 'Agent unavailable. Please try again.' });
+	}
+});
+
+// --- STT token endpoint (mints single-use ElevenLabs Scribe tokens) ---
+
+const sttRateLimitMap = new Map();
+
+export const sttToken = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (req, res) => {
+	if (req.method !== 'POST') {
+		res.status(405).json({ ok: false, error: 'Method not allowed' });
+		return;
+	}
+
+	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+	const now = Date.now();
+	const window = 10 * 60 * 1000;
+	const entry = sttRateLimitMap.get(ip);
+	if (entry && now - entry.start < window) {
+		if (entry.count >= 10) {
+			res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+			return;
+		}
+		entry.count++;
+	} else {
+		sttRateLimitMap.set(ip, { start: now, count: 1 });
+	}
+
+	try {
+		const response = await fetch('https://api.elevenlabs.io/v1/single-use-token/realtime_scribe', {
+			method: 'POST',
+			headers: { 'xi-api-key': elevenlabsKey.value() }
+		});
+
+		if (!response.ok) {
+			const body = await response.text().catch(() => '');
+			console.error('ElevenLabs token error:', response.status, body);
+			res.status(502).json({ ok: false, error: 'Speech service unavailable' });
+			return;
+		}
+
+		const data = await response.json();
+		res.json({ ok: true, token: data.token });
+	} catch (err) {
+		console.error('ElevenLabs token fetch failed:', err);
+		res.status(500).json({ ok: false, error: 'Speech service unreachable' });
 	}
 });
