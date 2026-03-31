@@ -125,22 +125,22 @@
 		color: transparent;
 		background: linear-gradient(
 			90deg,
-			rgba(0,0,0,0.3) 0%,
-			rgba(0,0,0,0.6) 40%,
-			rgba(0,0,0,0.3) 80%
+			rgba(0,0,0,0.35) 0%,
+			rgba(0,0,0,0.5) 40%,
+			rgba(0,0,0,0.35) 80%
 		);
 		background-size: 200% 100%;
 		background-clip: text;
 		-webkit-background-clip: text;
-		animation: shimmer 2.5s ease-in-out infinite;
+		animation: shimmer 5s ease-in-out infinite;
 	}
 
 	:global(.dark) .shimmer-text {
 		background: linear-gradient(
 			90deg,
-			rgba(255,255,255,0.3) 0%,
-			rgba(255,255,255,0.6) 40%,
-			rgba(255,255,255,0.3) 80%
+			rgba(255,255,255,0.35) 0%,
+			rgba(255,255,255,0.5) 40%,
+			rgba(255,255,255,0.35) 80%
 		);
 		background-size: 200% 100%;
 		background-clip: text;
@@ -149,6 +149,7 @@
 
 	@keyframes shimmer {
 		0% { background-position: 200% 0; }
+		50% { background-position: -200% 0; }
 		100% { background-position: -200% 0; }
 	}
 
