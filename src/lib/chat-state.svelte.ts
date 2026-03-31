@@ -1,7 +1,13 @@
+interface ChatSource {
+	title: string;
+	url: string;
+}
+
 interface ChatMessage {
 	role: 'user' | 'agent';
 	text: string;
 	timestamp: number;
+	sources?: ChatSource[];
 }
 
 interface PlaceContext {
@@ -171,7 +177,8 @@ async function send(text: string) {
 			return;
 		}
 
-		const reply: ChatMessage = { role: 'agent', text: data.reply, timestamp: Date.now() };
+		const sources: ChatSource[] | undefined = data.sources?.length ? data.sources : undefined;
+		const reply: ChatMessage = { role: 'agent', text: data.reply, timestamp: Date.now(), sources };
 		if (currentId === sendingConvId) {
 			messages.push(reply);
 		} else if (sendingConvId) {

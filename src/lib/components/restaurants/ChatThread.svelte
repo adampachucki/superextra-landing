@@ -39,6 +39,36 @@
 						<div class="prose max-w-none text-[15px] leading-relaxed text-black/80 prose-headings:text-black prose-strong:text-black prose-a:text-black prose-a:underline dark:text-white/80 dark:prose-headings:text-white dark:prose-strong:text-white dark:prose-a:text-white">
 							{@html renderMarkdown(msg.text)}
 						</div>
+						{#if msg.sources?.length}
+							<details class="sources-toggle mt-3">
+								<summary class="inline-flex cursor-pointer items-center gap-1.5 text-[12px] text-black/40 transition-colors select-none hover:text-black/60 dark:text-white/40 dark:hover:text-white/60">
+									<svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+										<path d="M6 3h7a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6" />
+										<path d="M1 4v8a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1z" />
+									</svg>
+									{msg.sources.length} source{msg.sources.length === 1 ? '' : 's'}
+								</summary>
+								<div class="mt-2 flex flex-col gap-1.5">
+									{#each msg.sources as src}
+										<a
+											href={src.url}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="group flex items-start gap-2 rounded-lg border border-black/5 px-3 py-2 no-underline transition-colors hover:border-black/10 hover:bg-black/[0.02] dark:border-white/5 dark:hover:border-white/10 dark:hover:bg-white/[0.02]"
+										>
+											<img
+												src="https://www.google.com/s2/favicons?sz=32&domain={new URL(src.url).hostname}"
+												alt=""
+												class="mt-0.5 h-4 w-4 shrink-0 rounded-sm"
+											/>
+											<span class="line-clamp-1 text-[13px] leading-snug text-black/60 transition-colors group-hover:text-black/80 dark:text-white/60 dark:group-hover:text-white/80">
+												{src.title || new URL(src.url).hostname}
+											</span>
+										</a>
+									{/each}
+								</div>
+							</details>
+						{/if}
 					</div>
 				{/if}
 			</div>
@@ -120,5 +150,11 @@
 	@keyframes shimmer {
 		0% { background-position: 200% 0; }
 		100% { background-position: -200% 0; }
+	}
+
+	.sources-toggle summary::-webkit-details-marker,
+	.sources-toggle summary::marker {
+		display: none;
+		content: '';
 	}
 </style>

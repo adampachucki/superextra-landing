@@ -1,6 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { VertexAI } from '@google-cloud/vertexai';
+import { GoogleAuth } from 'google-auth-library';
 
 const relayKey = defineSecret('RELAY_KEY');
 const DEST = 'hello@superextra.ai';
@@ -121,35 +122,17 @@ function confirmationHtml(name) {
 </div>`;
 }
 
-// --- Agent chat endpoint ---
+// --- Agent chat endpoint (proxies to ADK Cloud Run) ---
 
-const SYSTEM_INSTRUCTION = `You are a restaurant market analyst working for Superextra, an AI-native market intelligence service for the restaurant industry. Your job is to answer questions about the competitive landscape, pricing, guest sentiment, foot traffic, operations, and market trends relevant to a specific restaurant or area.
-
-Every conversation should be grounded in a specific restaurant or area. User messages may include a [Context: ...] prefix containing the restaurant name, location, and Google Place ID. Use this to focus your research on the relevant neighborhood, city, and competitive set.
-
-If no context is provided and the user has not mentioned a specific restaurant or area, your first response must ask them to specify one. Do not research or answer market questions without knowing the location.
-
-You cover seven layers of restaurant market intelligence:
-1. Market landscape — openings/closings, competitor activity, cuisine trends, saturation, white space
-2. Menu and pricing — competitor menus, price positioning, delivery markups, trending dishes
-3. Revenue and sales — revenue estimates, check size, occupancy, channel splits, platform share
-4. Marketing and digital — social media activity, ad spend, web presence, digital ordering
-5. Guest intelligence — review sentiment, guest expectations, complaints/praise, tourist vs local
-6. Location and traffic — foot traffic, demographics, purchasing power, rent, trade areas
-7. Operations — labor availability, salary benchmarks, staffing trends, supplier pricing
-
-Research thoroughly using web search before responding. Always cite sources. Structure answers with headings, lists, or tables. Lead with the most actionable insight. Be specific to the location. Acknowledge gaps honestly — never fabricate data. Keep responses concise but complete.
-
-Tone: knowledgeable, data-driven, direct, professional but approachable. You do not have access to internal data (POS, financials). Do not provide legal, tax, or medical advice.
-
-Always respond in the language of the user's question — not the language of the place name, address, or data sources. If the user writes their question in English, respond in English even if the restaurant is in Poland. If the user writes in Polish, respond in Polish even if the restaurant is in Germany. Only the language of the user's actual question determines your response language.`;
+const ADK_SERVICE_URL = 'https://superextra-agent-907466498524.us-central1.run.app';
+const auth = new GoogleAuth();
 
 const rateLimitMap = new Map();
 
-// Conversation history per session (in-memory, resets on cold start)
-const sessionHistory = new Map();
+// Maps frontend sessionId → ADK session ID (resets on cold start)
+const sessionMap = new Map();
 
-export const agent = onRequest({ cors: true, timeoutSeconds: 120 }, async (req, res) => {
+export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, res) => {
 	if (req.method !== 'POST') {
 		res.status(405).json({ ok: false, error: 'Method not allowed' });
 		return;
@@ -182,59 +165,99 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 120 }, async (req, 
 		return;
 	}
 
-	// Build the query text with optional place context (only on first message)
-	let queryText = message;
-	if (placeContext && placeContext.name) {
-		const hasHistory = (history && history.length > 0) || sessionHistory.has(sessionId);
-		if (!hasHistory) {
-			queryText = `[Context: asking about ${placeContext.name}, ${placeContext.secondary || ''} (Place ID: ${placeContext.placeId || 'unknown'})] ${message}`;
-		}
-	}
-
-	// Build conversation history for multi-turn
-	const prevHistory = history || sessionHistory.get(sessionId) || [];
-	const contents = [
-		...prevHistory,
-		{ role: 'user', parts: [{ text: queryText }] }
-	];
-
 	try {
-		const vertexAI = new VertexAI({ project: PROJECT, location: LOCATION });
-		const model = vertexAI.getGenerativeModel({
-			model: 'gemini-2.5-pro',
-			systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-			tools: [{ googleSearch: {} }]
+		// Get IAM identity token for Cloud Run
+		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
+		const headers = await client.getRequestHeaders();
+
+		// Get or create ADK session (Agent Engine generates its own IDs)
+		let adkSessionId = sessionMap.get(sessionId);
+		if (!adkSessionId) {
+			const createRes = await fetch(`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(ip)}/sessions`, {
+				method: 'POST',
+				headers: { ...headers, 'Content-Type': 'application/json' },
+				body: JSON.stringify({})
+			});
+			if (!createRes.ok) {
+				console.error('Session creation failed:', createRes.status);
+				res.status(502).json({ ok: false, error: 'Agent unavailable. Please try again.' });
+				return;
+			}
+			const sessionData = await createRes.json();
+			adkSessionId = sessionData.id;
+			sessionMap.set(sessionId, adkSessionId);
+		}
+
+		// Build the query text with date and optional place context
+		const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+		let queryText = `[Date: ${today}] ${message}`;
+		if (placeContext && placeContext.name) {
+			const isFirstMessage = !history || history.length === 0;
+			if (isFirstMessage) {
+				queryText = `[Context: asking about ${placeContext.name}, ${placeContext.secondary || ''} (Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
+			}
+		}
+
+		// Call ADK Cloud Run service
+		const adkResponse = await fetch(`${ADK_SERVICE_URL}/run_sse`, {
+			method: 'POST',
+			headers: { ...headers, 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				app_name: 'superextra_agent',
+				user_id: ip,
+				session_id: adkSessionId,
+				new_message: { role: 'user', parts: [{ text: queryText }] },
+				streaming: false
+			})
 		});
 
-		const result = await model.generateContent({ contents });
-		const response = result.response;
+		if (!adkResponse.ok) {
+			const errText = await adkResponse.text().catch(() => '');
+			console.error('ADK error:', adkResponse.status, errText);
+			res.status(502).json({ ok: false, error: 'Agent unavailable. Please try again.' });
+			return;
+		}
 
-		// Extract text from response
-		const reply = response.candidates?.[0]?.content?.parts
-			?.filter(p => p.text)
-			?.map(p => p.text)
-			?.join('\n\n')
-			|| 'I wasn\'t able to generate a response. Please try rephrasing your question.';
+		// Parse SSE events to extract the response
+		// Priority: final_report (full pipeline) > router_response (clarifying question)
+		const sseText = await adkResponse.text();
+		let reply = '';
+		const sources = [];
 
-		// Store conversation history for this session
-		const updatedHistory = [
-			...contents,
-			{ role: 'model', parts: [{ text: reply }] }
-		];
-		sessionHistory.set(sessionId, updatedHistory);
+		for (const line of sseText.split('\n')) {
+			if (!line.startsWith('data: ')) continue;
+			try {
+				const event = JSON.parse(line.slice(6));
+				const stateDelta = event.actions?.stateDelta;
+				if (stateDelta?.final_report) {
+					reply = stateDelta.final_report;
+				} else if (stateDelta?.router_response && !reply) {
+					reply = stateDelta.router_response;
+				}
+				// Collect grounding sources from specialist events
+				const chunks = event.groundingMetadata?.groundingChunks;
+				if (chunks) {
+					for (const c of chunks) {
+						if (c.web && !sources.some(s => s.url === c.web.uri)) {
+							sources.push({ title: c.web.title, url: c.web.uri });
+						}
+					}
+				}
+			} catch {
+				// skip malformed events
+			}
+		}
 
-		// Extract grounding sources if available
-		const grounding = response.candidates?.[0]?.groundingMetadata;
-		const sources = grounding?.groundingChunks
-			?.filter(c => c.web)
-			?.map(c => ({ title: c.web.title, url: c.web.uri }))
-			|| [];
+		if (!reply) {
+			reply = 'I wasn\'t able to generate a response. Please try rephrasing your question.';
+		}
 
-		// Generate a short title for new conversations (no prior history)
+		// Generate a short title for new conversations
 		let title = undefined;
-		const isFirstMessage = !prevHistory.length;
+		const isFirstMessage = !history || history.length === 0;
 		if (isFirstMessage) {
 			try {
+				const vertexAI = new VertexAI({ project: PROJECT, location: LOCATION });
 				const flashModel = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 				const titleResult = await flashModel.generateContent({
 					contents: [{ role: 'user', parts: [{ text: `Generate a short conversational title (max 5 words, no quotes) for a chat that starts with this question about restaurants: "${message}"` }] }]

@@ -26,3 +26,7 @@ vite.config.ts.timestamp-*
 
 # Playwright MCP
 .playwright-mcp
+
+# ADK
+agent/.venv
+agent/.adk
