@@ -1,7 +1,7 @@
 from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.agents import LlmAgent
-from .specialists import ALL_SPECIALISTS, MODEL
+from .specialists import ALL_SPECIALISTS, MODEL, THINKING_CONFIG
 from pathlib import Path
 
 INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
@@ -18,6 +18,7 @@ synthesizer = LlmAgent(
     instruction=(INSTRUCTIONS_DIR / "synthesizer.md").read_text(),
     description="Synthesizes findings from all specialist agents into a cohesive report.",
     output_key="final_report",
+    generate_content_config=THINKING_CONFIG,
 )
 
 research_pipeline = SequentialAgent(
@@ -33,4 +34,5 @@ root_agent = LlmAgent(
     description="Routes user questions to research or asks for clarification.",
     sub_agents=[research_pipeline],
     output_key="router_response",
+    generate_content_config=THINKING_CONFIG,
 )
