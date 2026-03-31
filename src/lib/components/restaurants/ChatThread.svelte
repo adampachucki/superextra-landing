@@ -46,7 +46,9 @@
 							{@const showAll = expandedSources.has(i)}
 							{@const visible = showAll ? msg.sources : msg.sources.slice(0, SOURCES_LIMIT)}
 							{@const remaining = msg.sources.length - SOURCES_LIMIT}
-							<div class="mt-3 flex flex-wrap gap-1.5">
+							<div class="mt-5">
+								<span class="mb-2 block text-[12px] font-medium text-black/40 dark:text-white/40">Sources ({msg.sources.length})</span>
+								<div class="flex flex-wrap gap-1.5">
 								{#each visible as src}
 									<a
 										href={src.url}
@@ -72,6 +74,7 @@
 										+{remaining} more
 									</button>
 								{/if}
+								</div>
 							</div>
 						{/if}
 					</div>
