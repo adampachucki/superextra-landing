@@ -235,7 +235,7 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 120 }, async (req, 
 		const isFirstMessage = !prevHistory.length;
 		if (isFirstMessage) {
 			try {
-				const flashModel = vertexAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+				const flashModel = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 				const titleResult = await flashModel.generateContent({
 					contents: [{ role: 'user', parts: [{ text: `Generate a short conversational title (max 5 words, no quotes) for a chat that starts with this question about restaurants: "${message}"` }] }]
 				});
