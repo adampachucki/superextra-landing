@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
-	import { goto, beforeNavigate } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import ChatThread from '$lib/components/restaurants/ChatThread.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
@@ -89,24 +89,8 @@
 		sidebarOpen = !sidebarOpen;
 	}
 
-	beforeNavigate(({ cancel }) => {
-		if (chatState.active && chatState.messages.length > 0) {
-			if (!confirm('Leave this conversation? Your chat history will be lost.')) {
-				cancel();
-			}
-		}
-	});
-
 	onMount(() => {
 		requestAnimationFrame(() => { mounted = true; });
-
-		const onBeforeUnload = (e: BeforeUnloadEvent) => {
-			if (chatState.active && chatState.messages.length > 0) {
-				e.preventDefault();
-			}
-		};
-		addEventListener('beforeunload', onBeforeUnload);
-		return () => removeEventListener('beforeunload', onBeforeUnload);
 	});
 
 	function handleSend() {
@@ -289,6 +273,19 @@
 			requestAnimationFrame(() => placeInputEl?.focus());
 		}
 	}
+
+	function formatRelativeTime(ts: number): string {
+		const diff = Date.now() - ts;
+		const minutes = Math.floor(diff / 60000);
+		if (minutes < 1) return 'just now';
+		if (minutes < 60) return `${minutes}m ago`;
+		const hours = Math.floor(minutes / 60);
+		if (hours < 24) return `${hours}h ago`;
+		const days = Math.floor(hours / 24);
+		if (days === 1) return 'yesterday';
+		if (days < 7) return `${days}d ago`;
+		return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+	}
 </script>
 
 <svelte:head>
@@ -331,15 +328,37 @@
 				New chat
 			</button>
 
-			{#if chatState.placeContext}
-				<div class="mb-4">
-					<p class="mb-2 text-[11px] font-medium tracking-wide text-black/50 dark:text-white/50">CONTEXT</p>
-					<div class="min-w-0">
-						<p class="truncate text-[14px] text-black/80 dark:text-white/80">{chatState.placeContext.name}</p>
-						{#if chatState.placeContext.secondary}
-							<p class="truncate text-[12px] text-black/50 dark:text-white/50">{chatState.placeContext.secondary}</p>
-						{/if}
-					</div>
+			{#if chatState.conversations.length > 0}
+				<p class="mb-2 text-[11px] font-medium tracking-wide text-black/40 dark:text-white/40">CONVERSATIONS</p>
+				<div class="flex flex-col gap-0.5">
+					{#each chatState.conversations as conv (conv.id)}
+						<div class="group relative">
+							<button
+								onclick={() => chatState.switchTo(conv.id)}
+								class="w-full cursor-pointer rounded-lg px-2 py-2 text-left transition-colors {conv.id === chatState.activeId ? 'bg-cream-100 dark:bg-cream-100' : 'hover:bg-cream-100/50 dark:hover:bg-cream-50/50'}"
+							>
+								<p class="truncate text-[13px] {conv.id === chatState.activeId ? 'text-black dark:text-white' : 'text-black/70 dark:text-white/70'}">
+									{conv.title}
+								</p>
+								<div class="mt-0.5 flex items-center gap-1.5">
+									{#if conv.placeContext}
+										<span class="truncate text-[11px] text-black/40 dark:text-white/40">{conv.placeContext.name}</span>
+										<span class="text-[11px] text-black/20 dark:text-white/20">&middot;</span>
+									{/if}
+									<span class="shrink-0 text-[11px] text-black/30 dark:text-white/30">{formatRelativeTime(conv.updatedAt)}</span>
+								</div>
+							</button>
+							<button
+								onclick={() => chatState.deleteConversation(conv.id)}
+								aria-label="Delete conversation"
+								class="absolute right-1 top-1/2 -translate-y-1/2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
+							>
+								<svg class="h-3 w-3 text-black/30 dark:text-white/30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							</button>
+						</div>
+					{/each}
 				</div>
 			{/if}
 		</div>
