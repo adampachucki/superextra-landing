@@ -8,7 +8,7 @@ import os
 
 INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
-_version = os.environ.get("GEMINI_VERSION", "3.1")
+_version = os.environ.get("GEMINI_VERSION", "2.5")
 
 RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=60.0)
 
