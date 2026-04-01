@@ -49,7 +49,20 @@ if (typeof localStorage !== 'undefined') {
 		if (stored) {
 			const data = JSON.parse(stored);
 			conversations = data.conversations || [];
-			if (data.activeId) {
+			// URL ?sid= takes precedence over stored activeId so refreshes
+			// always restore the conversation matching the URL, not the last-active one
+			let restored = false;
+			if (typeof window !== 'undefined') {
+				const urlSid = new URL(window.location.href).searchParams.get('sid');
+				if (urlSid) {
+					const conv = conversations.find((c: Conversation) => c.sessionId === urlSid);
+					if (conv) {
+						loadConversation(conv);
+						restored = true;
+					}
+				}
+			}
+			if (!restored && data.activeId) {
 				const conv = conversations.find((c: Conversation) => c.id === data.activeId);
 				if (conv) loadConversation(conv);
 			}
@@ -217,7 +230,7 @@ function start(query: string, place: PlaceContext | null) {
 	syncCurrentToList();
 
 	const id = crypto.randomUUID();
-	const sid = getOrCreateSessionId();
+	const sid = crypto.randomUUID(); // Always fresh — never reuse from previous conversation
 	const conv: Conversation = {
 		id,
 		title: generateTitle(query),
