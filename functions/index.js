@@ -177,12 +177,17 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 		const headers = await client.getRequestHeaders();
 
 		// Get or create ADK session (check cache → Firestore → create new)
-		let adkSessionId = sessionMap.get(sessionId);
+		// userId must match the one used when the session was created — use stored value for existing sessions
+		// (IP can change on mobile networks, wifi switches, etc.)
+		let cached = sessionMap.get(sessionId);
+		let adkSessionId = cached?.adkSessionId;
+		let userId = cached?.userId || ip;
 		if (!adkSessionId) {
 			const doc = await db.collection('sessions').doc(sessionId).get();
 			if (doc.exists) {
 				adkSessionId = doc.data().adkSessionId;
-				sessionMap.set(sessionId, adkSessionId);
+				userId = doc.data().userId || ip;
+				sessionMap.set(sessionId, { adkSessionId, userId });
 			}
 		}
 		if (!adkSessionId) {
@@ -198,7 +203,8 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 			}
 			const sessionData = await createRes.json();
 			adkSessionId = sessionData.id;
-			sessionMap.set(sessionId, adkSessionId);
+			userId = ip;
+			sessionMap.set(sessionId, { adkSessionId, userId });
 			await db.collection('sessions').doc(sessionId).set({
 				adkSessionId,
 				userId: ip,
@@ -222,7 +228,7 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 			headers: { ...headers, 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				app_name: 'superextra_agent',
-				user_id: ip,
+				user_id: userId,
 				session_id: adkSessionId,
 				new_message: { role: 'user', parts: [{ text: queryText }] },
 				streaming: false
