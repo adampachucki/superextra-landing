@@ -122,15 +122,22 @@
 											rel="noopener noreferrer"
 											class="group inline-flex items-center gap-1.5 rounded-full border border-black/5 px-2.5 py-1 no-underline transition-colors hover:border-black/10 hover:bg-black/[0.02] dark:border-white/5 dark:hover:border-white/10 dark:hover:bg-white/[0.02]"
 										>
+											{@const domain = (() => {
+												try {
+													return new URL(src.url).hostname;
+												} catch {
+													return '';
+												}
+											})()}
 											<img
-												src="https://www.google.com/s2/favicons?sz=32&domain={src.title}"
+												src="https://www.google.com/s2/favicons?sz=32&domain={domain}"
 												alt=""
 												class="h-3.5 w-3.5 shrink-0 rounded-sm"
 											/>
 											<span
 												class="text-[12px] leading-snug text-black/50 transition-colors group-hover:text-black/70 dark:text-white/50 dark:group-hover:text-white/70"
 											>
-												{src.title}
+												{domain || src.title}
 											</span>
 										</a>
 									{/each}

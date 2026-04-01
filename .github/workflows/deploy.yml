@@ -51,7 +51,8 @@ jobs:
           set -euo pipefail
           pip install google-adk
           cd agent
-          adk deploy cloud_run \
+          # Capture output — adk deploy returns exit 0 even when gcloud fails
+          OUTPUT=$(adk deploy cloud_run \
             --project=superextra-site \
             --region=us-central1 \
             --service_name=superextra-agent \
@@ -59,4 +60,9 @@ jobs:
             --trace_to_cloud \
             superextra_agent \
             -- --no-allow-unauthenticated \
-            --update-env-vars=GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }}
+            --update-env-vars=GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }} 2>&1) || true
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -q "Deploy failed"; then
+            echo "::error::ADK Cloud Run deploy failed"
+            exit 1
+          fi

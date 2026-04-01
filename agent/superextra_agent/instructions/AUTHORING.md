@@ -30,8 +30,6 @@ These exist because we hit each problem at least once.
 
 8. **Domain boundaries live in the planner.** When a topic could go to multiple specialists (rent, delivery platforms, reviews), add explicit ownership rules to the planner's "Domain boundaries" section.
 
-9. **Specialists must cite source URLs explicitly.** Gemini 3.1 dropped `groundingChunks` from grounding metadata. The only way to surface source URLs to the user is through the specialist's text output. Every specialist instruction must include the "## Sources" requirement.
-
 ## Instruction structure
 
 Every specialist instruction follows this structure:
