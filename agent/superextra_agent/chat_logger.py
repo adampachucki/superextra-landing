@@ -211,6 +211,21 @@ class ChatLoggerPlugin(BasePlugin):
                 if part.function_call:
                     entry.setdefault("function_calls", []).append(part.function_call.name)
 
+        # Capture grounding sources from google_search into session state
+        gm = llm_response.grounding_metadata
+        if gm and gm.grounding_chunks:
+            existing = list(callback_context.state.get("_sources", []))
+            seen = {s["url"] for s in existing}
+            added = 0
+            for chunk in gm.grounding_chunks:
+                if chunk.web and chunk.web.uri and chunk.web.uri not in seen:
+                    existing.append({"title": chunk.web.title or "", "url": chunk.web.uri})
+                    seen.add(chunk.web.uri)
+                    added += 1
+            if added:
+                callback_context.state["_sources"] = existing
+                entry["sources_added"] = added
+
         self._write(sid, entry)
         return None
 

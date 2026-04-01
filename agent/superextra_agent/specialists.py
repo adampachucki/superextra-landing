@@ -13,21 +13,6 @@ _version = os.environ.get("GEMINI_VERSION", "3.1")
 RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=60.0)
 
 
-def _capture_sources(ctx, response):
-    """after_model_callback: accumulate grounding sources in session state."""
-    gm = response.grounding_metadata
-    if not gm or not gm.grounding_chunks:
-        return response
-    existing = ctx.state.get("_sources", [])
-    seen = {s["url"] for s in existing}
-    for chunk in gm.grounding_chunks:
-        if chunk.web and chunk.web.uri and chunk.web.uri not in seen:
-            existing.append({"title": chunk.web.title or "", "url": chunk.web.uri})
-            seen.add(chunk.web.uri)
-    ctx.state["_sources"] = existing
-    return response
-
-
 def _make_gemini(model: str) -> Gemini:
     """Create a Gemini instance, routing to the global endpoint for 3.1 models."""
     g = Gemini(model=model, retry_options=RETRY)
@@ -80,7 +65,7 @@ market_landscape = LlmAgent(
     tools=[google_search],
     output_key="market_result",
     generate_content_config=THINKING_CONFIG,
-    after_model_callback=_capture_sources,
+
 )
 
 menu_pricing = LlmAgent(
@@ -91,7 +76,7 @@ menu_pricing = LlmAgent(
     tools=[google_search],
     output_key="pricing_result",
     generate_content_config=THINKING_CONFIG,
-    after_model_callback=_capture_sources,
+
 )
 
 revenue_sales = LlmAgent(
@@ -102,7 +87,7 @@ revenue_sales = LlmAgent(
     tools=[google_search],
     output_key="revenue_result",
     generate_content_config=THINKING_CONFIG,
-    after_model_callback=_capture_sources,
+
 )
 
 guest_intelligence = LlmAgent(
@@ -113,7 +98,7 @@ guest_intelligence = LlmAgent(
     tools=[google_search],
     output_key="guest_result",
     generate_content_config=THINKING_CONFIG,
-    after_model_callback=_capture_sources,
+
 )
 
 location_traffic = LlmAgent(
@@ -124,7 +109,7 @@ location_traffic = LlmAgent(
     tools=[google_search],
     output_key="location_result",
     generate_content_config=THINKING_CONFIG,
-    after_model_callback=_capture_sources,
+
 )
 
 operations = LlmAgent(
@@ -135,7 +120,7 @@ operations = LlmAgent(
     tools=[google_search],
     output_key="ops_result",
     generate_content_config=THINKING_CONFIG,
-    after_model_callback=_capture_sources,
+
 )
 
 marketing_digital = LlmAgent(
@@ -146,7 +131,7 @@ marketing_digital = LlmAgent(
     tools=[google_search],
     output_key="marketing_result",
     generate_content_config=THINKING_CONFIG,
-    after_model_callback=_capture_sources,
+
 )
 
 dynamic_researcher_1 = LlmAgent(
@@ -157,7 +142,7 @@ dynamic_researcher_1 = LlmAgent(
     tools=[google_search],
     output_key="dynamic_result_1",
     generate_content_config=THINKING_CONFIG,
-    after_model_callback=_capture_sources,
+
 )
 
 dynamic_researcher_2 = LlmAgent(
@@ -168,7 +153,7 @@ dynamic_researcher_2 = LlmAgent(
     tools=[google_search],
     output_key="dynamic_result_2",
     generate_content_config=THINKING_CONFIG,
-    after_model_callback=_capture_sources,
+
 )
 
 SPECIALIST_TOOLS = [
