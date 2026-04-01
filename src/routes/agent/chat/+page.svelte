@@ -111,6 +111,12 @@
 		requestAnimationFrame(() => {
 			mounted = true;
 		});
+
+		// Auto-recover if last message was from user (interrupted fetch)
+		const msgs = chatState.messages;
+		if (chatState.sessionId && msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
+			chatState.recover();
+		}
 	});
 
 	// Keep URL in sync with active session

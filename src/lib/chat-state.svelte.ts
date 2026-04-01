@@ -217,11 +217,12 @@ function start(query: string, place: PlaceContext | null) {
 	syncCurrentToList();
 
 	const id = crypto.randomUUID();
+	const sid = getOrCreateSessionId();
 	const conv: Conversation = {
 		id,
 		title: generateTitle(query),
 		messages: [],
-		sessionId: '',
+		sessionId: sid,
 		placeContext: place,
 		createdAt: Date.now(),
 		updatedAt: Date.now()
@@ -235,7 +236,7 @@ function start(query: string, place: PlaceContext | null) {
 	currentId = id;
 	messages = [];
 	loading = false;
-	sessionId = '';
+	sessionId = sid;
 	placeContext = place;
 	active = true;
 	error = '';
