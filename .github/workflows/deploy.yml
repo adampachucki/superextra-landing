@@ -58,4 +58,5 @@ jobs:
             --session_service_uri=agentengine://2746721333428617216 \
             --trace_to_cloud \
             superextra_agent \
-            -- --no-allow-unauthenticated
+            -- --no-allow-unauthenticated \
+               --set-env-vars="GOOGLE_CLOUD_LOCATION=global,GOOGLE_GENAI_USE_VERTEXAI=TRUE,GEMINI_VERSION=3.1"
