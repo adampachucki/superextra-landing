@@ -214,10 +214,9 @@ class ChatLoggerPlugin(BasePlugin):
         # Capture grounding sources from google_search into session state
         gm = llm_response.grounding_metadata
         if gm:
-            logger.info("GROUNDING_DEBUG agent=%s has_chunks=%s keys=%s",
-                        callback_context.agent_name,
-                        bool(gm.grounding_chunks),
-                        [k for k in dir(gm) if not k.startswith('_') and getattr(gm, k, None) is not None])
+            print(f"GROUNDING_DEBUG agent={callback_context.agent_name} has_chunks={bool(gm.grounding_chunks)} chunks_count={len(gm.grounding_chunks) if gm.grounding_chunks else 0}", flush=True)
+        else:
+            print(f"GROUNDING_DEBUG agent={callback_context.agent_name} grounding_metadata=None", flush=True)
         if gm and gm.grounding_chunks:
             existing = list(callback_context.state.get("_sources", []))
             seen = {s["url"] for s in existing}
