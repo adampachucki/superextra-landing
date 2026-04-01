@@ -288,29 +288,47 @@ function switchToBySessionId(sid: string) {
 
 async function recover(): Promise<boolean> {
 	if (!sessionId || loading) return false;
+	const recoveringConvId = currentId;
 	loading = true;
 	error = '';
-	try {
-		const checkUrl = import.meta.env.DEV
-			? `/api/agent/check?sid=${sessionId}`
-			: `https://us-central1-superextra-site.cloudfunctions.net/agentCheck?sid=${sessionId}`;
-		const res = await fetch(checkUrl);
-		const data = await res.json();
-		if (
-			data.ok &&
-			data.reply &&
-			!messages.some((m) => m.role === 'agent' && m.text === data.reply)
-		) {
-			const sources: ChatSource[] | undefined = data.sources?.length ? data.sources : undefined;
-			messages.push({ role: 'agent', text: data.reply, timestamp: Date.now(), sources });
-			persist();
-			return true;
+
+	const checkUrl = import.meta.env.DEV
+		? `/api/agent/check?sid=${sessionId}`
+		: `https://us-central1-superextra-site.cloudfunctions.net/agentCheck?sid=${sessionId}`;
+
+	// Agent may still be processing — poll until we get a reply or give up
+	const MAX_ATTEMPTS = 60;
+	const INTERVAL_MS = 3000;
+
+	for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+		if (currentId !== recoveringConvId) {
+			loading = false;
+			return false;
 		}
-	} catch {
-		// recovery failed silently — caller will fall back to resend
-	} finally {
-		loading = false;
+		try {
+			const res = await fetch(checkUrl);
+			const data = await res.json();
+			if (
+				data.ok &&
+				data.reply &&
+				!messages.some((m) => m.role === 'agent' && m.text === data.reply)
+			) {
+				const sources: ChatSource[] | undefined = data.sources?.length ? data.sources : undefined;
+				messages.push({ role: 'agent', text: data.reply, timestamp: Date.now(), sources });
+				persist();
+				loading = false;
+				return true;
+			}
+			// No reply yet — wait before retrying
+			if (attempt < MAX_ATTEMPTS - 1) {
+				await new Promise((r) => setTimeout(r, INTERVAL_MS));
+			}
+		} catch {
+			break;
+		}
 	}
+
+	loading = false;
 	return false;
 }
 
