@@ -30,6 +30,8 @@ These exist because we hit each problem at least once.
 
 8. **Domain boundaries live in the planner.** When a topic could go to multiple specialists (rent, delivery platforms, reviews), add explicit ownership rules to the planner's "Domain boundaries" section.
 
+9. **Agents are sycophantic by default.** LLMs agree with the user's framing unless explicitly told not to. Every layer must have permission to challenge premises: the planner identifies assumptions and tests them in reconnaissance, specialists report what data shows even when it contradicts the brief's framing, and the synthesizer leads with corrections when findings warrant it. Without this, the system confirms whatever the user already believes.
+
 ## Instruction structure
 
 Every specialist instruction follows this structure:
