@@ -2,7 +2,7 @@ from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.tools import google_search
 from google.adk.tools import AgentTool
-from google.genai import types
+from google.genai import Client, types
 from pathlib import Path
 import os
 
@@ -12,23 +12,38 @@ _version = os.environ.get("GEMINI_VERSION", "3.1")
 
 RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=60.0)
 
+
+def _make_gemini(model: str) -> Gemini:
+    """Create a Gemini instance, routing to the global endpoint for 3.1 models."""
+    g = Gemini(model=model, retry_options=RETRY)
+    if _version == "3.1":
+        # Gemini 3.1 is only available via the global Vertex AI endpoint.
+        # ADK bakes GOOGLE_CLOUD_LOCATION=us-central1 into the container
+        # (matching the Cloud Run region), but that location doesn't serve
+        # 3.1 yet. Override the api_client to use location='global' so model
+        # calls route to https://aiplatform.googleapis.com/ while the rest of
+        # ADK (sessions, Agent Engine) keeps using us-central1.
+        g.api_client = Client(
+            vertexai=True,
+            location="global",
+            http_options=types.HttpOptions(retry_options=RETRY),
+        )
+    return g
+
+
 if _version == "3.1":
     MODEL = "gemini-3.1-pro-preview"
     SPECIALIST_MODEL = "gemini-3.1-pro-preview-customtools"
-    # Gemini 3.1 is only available via the global Vertex AI endpoint,
-    # not regional ones like us-central1 (which ADK bakes into the container).
-    _GLOBAL_BASE_URL = "https://aiplatform.googleapis.com/"
     THINKING_CONFIG = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
     )
 else:
     MODEL = "gemini-2.5-pro"
     SPECIALIST_MODEL = MODEL
-    _GLOBAL_BASE_URL = None
     THINKING_CONFIG = None
 
-MODEL_GEMINI = Gemini(model=MODEL, retry_options=RETRY, base_url=_GLOBAL_BASE_URL)
-SPECIALIST_GEMINI = Gemini(model=SPECIALIST_MODEL, retry_options=RETRY, base_url=_GLOBAL_BASE_URL)
+MODEL_GEMINI = _make_gemini(MODEL)
+SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 
 
 def _make_instruction(name: str):
