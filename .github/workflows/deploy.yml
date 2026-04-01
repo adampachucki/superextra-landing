@@ -50,8 +50,17 @@ jobs:
         run: |
           set -euo pipefail
           pip install google-adk
+
+          # Snapshot current revision before deploy
+          BEFORE=$(gcloud run revisions list \
+            --service=superextra-agent \
+            --region=us-central1 \
+            --project=superextra-site \
+            --limit=1 \
+            --format="value(metadata.name)" 2>/dev/null || echo "none")
+
           cd agent
-          # Capture output — adk deploy returns exit 0 even when gcloud fails
+          # adk deploy returns exit 0 even when gcloud fails — capture output
           OUTPUT=$(adk deploy cloud_run \
             --project=superextra-site \
             --region=us-central1 \
@@ -62,7 +71,17 @@ jobs:
             -- --no-allow-unauthenticated \
             --update-env-vars=GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }} 2>&1) || true
           echo "$OUTPUT"
-          if echo "$OUTPUT" | grep -q "Deploy failed"; then
-            echo "::error::ADK Cloud Run deploy failed"
+
+          # Verify a new revision was actually created
+          AFTER=$(gcloud run revisions list \
+            --service=superextra-agent \
+            --region=us-central1 \
+            --project=superextra-site \
+            --limit=1 \
+            --format="value(metadata.name)" 2>/dev/null || echo "none")
+
+          if [ "$BEFORE" = "$AFTER" ]; then
+            echo "::error::ADK Cloud Run deploy failed — no new revision created (stuck on $BEFORE)"
             exit 1
           fi
+          echo "✓ New revision deployed: $AFTER (was $BEFORE)"
