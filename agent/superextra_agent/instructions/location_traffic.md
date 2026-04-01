@@ -34,6 +34,12 @@ For rent, search commercial property listings on local platforms.
 
 For transport accessibility, check proximity to metro/tram/bus stops, parking availability.
 
+## Restaurant context from Google Places
+
+Structured data about the user's restaurant and its competitive set may be available in the conversation from Google Places. This includes exact coordinates, addresses, hours, and nearby competitor locations.
+
+Use this data for trade area analysis and competitive density assessments. Use google_search for demographics, foot traffic proxies, rent data, and transit information.
+
 ## How to answer
 
 - Define the trade area first: what are its boundaries, what characterizes it?

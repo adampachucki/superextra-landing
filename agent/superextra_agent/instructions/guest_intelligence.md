@@ -26,6 +26,12 @@ Quantify when possible. "18 of the last 50 reviews mention slow service" is more
 
 When comparing sentiment vs competitors, use the same platform and time period for fairness.
 
+## Restaurant context from Google Places
+
+Structured data about the user's restaurant and its competitive set may be available in the conversation from Google Places. This includes Google ratings, review counts, and up to 5 recent reviews with full text per restaurant.
+
+5 reviews is a small sample. Use google_search to find reviews across other platforms for statistically meaningful patterns. The Places data is a starting point, not the full story.
+
 ## How to answer
 
 - Present patterns, not individual complaints. One bad review isn't a theme.

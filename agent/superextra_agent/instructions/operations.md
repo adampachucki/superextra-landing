@@ -31,6 +31,10 @@ Note the posted salary ranges from multiple listings to establish the market rat
 
 For cost benchmarks, search for industry reports from NRA, DEHOGA (Germany), UK Hospitality, Toast, or Deloitte.
 
+## Restaurant context from Google Places
+
+Structured data about the user's restaurant and its competitive set may be available in the conversation from Google Places. This data is less relevant for labor market, salary, and supplier research. Focus on google_search to find the most relevant sources for the specific market.
+
 ## How to answer
 
 - Salary data from job postings is the offered range, not necessarily what's being paid. Note this distinction.

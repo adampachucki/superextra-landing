@@ -28,6 +28,12 @@ For delivery platforms, search for the restaurant and its competitors on each pl
 
 For Google presence, search the restaurant name and assess what comes up: own website? Google Maps? TripAdvisor? Delivery platforms? The SERP composition reveals their digital footprint.
 
+## Restaurant context from Google Places
+
+Structured data about the user's restaurant and its competitive set may be available in the conversation from Google Places. This includes Google Business Profile data: rating, review count, website URL, phone, hours, and editorial summary.
+
+Use this to assess Google Business Profile completeness vs competitors. Use google_search for social media presence, advertising activity, and delivery platform visibility.
+
 ## How to answer
 
 - Benchmark against 3-5 competitors on each platform. Raw numbers without comparison aren't useful.
