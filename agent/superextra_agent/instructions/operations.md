@@ -35,7 +35,7 @@ For cost benchmarks, search for industry reports from NRA, DEHOGA (Germany), UK 
 
 You may have structured Google Places data about the target restaurant and competitors — hours, service modes, and location details. Treat this as background context, not a primary source for your work.
 
-For operations research — labor market, salaries, supplier pricing, cost benchmarks — the Places data is less directly useful. Your job is to do thorough research via google_search: job platforms, salary surveys, industry reports, and any other relevant sources you can find for the specific market.
+For operations research — labor market, salaries, supplier pricing, cost benchmarks — the Places data is less directly useful. Your job is to do thorough research via google_search: job platforms, salary surveys, industry reports, and any other relevant sources you can find for the specific market. If you do reference any data from Google Places, cite "Google Places" as the source.
 
 ## How to answer
 

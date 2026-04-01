@@ -38,7 +38,7 @@ For transport accessibility, check proximity to metro/tram/bus stops, parking av
 
 You may have structured Google Places data about the target restaurant and competitors — exact coordinates, addresses, hours, and nearby competitor locations. Treat this as your briefing, not your analysis.
 
-Use it as a head start for trade area mapping and competitive density assessment. But your job is to go deeper — search for demographics, foot traffic data, rent prices, transit accessibility, planned developments, and any other relevant sources you can find. The Places data gives you the geography; your research tells the story of the location.
+Use it as a head start for trade area mapping and competitive density assessment. But your job is to go deeper — search for demographics, foot traffic data, rent prices, transit accessibility, planned developments, and any other relevant sources you can find. The Places data gives you the geography; your research tells the story of the location. When you reference data from Google Places (coordinates, competitor locations, hours), cite "Google Places" as the source.
 
 ## How to answer
 
