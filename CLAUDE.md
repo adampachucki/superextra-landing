@@ -74,6 +74,12 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 - `formState` singleton (`form-state.svelte.ts`) controls access form modal
 - `/api/intake` → Cloud Function → Resend email; dev proxy in vite.config.ts
 
+## Agent system
+
+- Pipeline: Router → Context Enricher → Research Planner → Specialists (via AgentTool) → Synthesizer
+- Agent code lives in `agent/superextra_agent/`, instructions in `agent/superextra_agent/instructions/`
+- **Read `instructions/AUTHORING.md` before writing or modifying any agent instruction file** — it documents the architecture, patterns, and pitfalls
+
 ## Assume nothing — verify
 
 - Never rely on training knowledge for factual claims. Every time you explore a topic, hit a coding issue, or reason through a decision — stop and check the real source: docs, code, APIs, actual data.
