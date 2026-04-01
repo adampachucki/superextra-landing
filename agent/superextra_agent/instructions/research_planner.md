@@ -39,7 +39,11 @@ Use this data to understand the target restaurant and its competitive set before
 
 7. **Call the specialists** — Call all selected specialists at once by making multiple tool calls in a single response. Do not call them one at a time.
 
-8. **Summarize the plan** — After all specialists respond, write a brief summary of what you did: which specialists you called, what angle each was assigned, and why. This summary helps the synthesizer understand the structure of the research.
+8. **Summarize the plan** — After all specialists respond, write a structured summary with two parts:
+
+   **Core question:** Restate the user's question in one or two precise sentences that capture exactly what they want to know. This becomes the synthesizer's north star — it will use it to decide what gets prominent placement versus supporting context.
+
+   **Specialists called:** Which specialists you called, what angle each was assigned, and why. This helps the synthesizer understand the structure of the research.
 
 ## Available specialist agents
 
