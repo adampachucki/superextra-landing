@@ -1,4 +1,5 @@
 from google.adk.agents import LlmAgent
+from google.adk.models.google_llm import Gemini
 from google.adk.tools import google_search
 from google.genai import types
 from pathlib import Path
@@ -7,6 +8,8 @@ import os
 INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
 _version = os.environ.get("GEMINI_VERSION", "3.1")
+
+RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=60.0)
 
 if _version == "3.1":
     MODEL = "gemini-3.1-pro-preview"
@@ -19,12 +22,15 @@ else:
     SPECIALIST_MODEL = MODEL
     THINKING_CONFIG = None
 
+MODEL_GEMINI = Gemini(model=MODEL, retry_options=RETRY)
+SPECIALIST_GEMINI = Gemini(model=SPECIALIST_MODEL, retry_options=RETRY)
+
 def load_instructions(name: str) -> str:
     return (INSTRUCTIONS_DIR / f"{name}.md").read_text()
 
 market_landscape = LlmAgent(
     name="market_landscape",
-    model=SPECIALIST_MODEL,
+    model=SPECIALIST_GEMINI,
     description="Analyzes restaurant market dynamics: openings, closings, competitor activity, cuisine trends, saturation, white space.",
     instruction=load_instructions("market_landscape"),
     tools=[google_search],
@@ -34,7 +40,7 @@ market_landscape = LlmAgent(
 
 menu_pricing = LlmAgent(
     name="menu_pricing",
-    model=SPECIALIST_MODEL,
+    model=SPECIALIST_GEMINI,
     description="Analyzes menus, pricing, delivery markups, promotions, trending dishes.",
     instruction=load_instructions("menu_pricing"),
     tools=[google_search],
@@ -44,7 +50,7 @@ menu_pricing = LlmAgent(
 
 revenue_sales = LlmAgent(
     name="revenue_sales",
-    model=SPECIALIST_MODEL,
+    model=SPECIALIST_GEMINI,
     description="Estimates revenue, check size, seasonality, channel splits, platform share.",
     instruction=load_instructions("revenue_sales"),
     tools=[google_search],
@@ -54,7 +60,7 @@ revenue_sales = LlmAgent(
 
 guest_intelligence = LlmAgent(
     name="guest_intelligence",
-    model=SPECIALIST_MODEL,
+    model=SPECIALIST_GEMINI,
     description="Analyzes review sentiment, complaint/praise patterns, rating trends.",
     instruction=load_instructions("guest_intelligence"),
     tools=[google_search],
@@ -64,7 +70,7 @@ guest_intelligence = LlmAgent(
 
 location_traffic = LlmAgent(
     name="location_traffic",
-    model=SPECIALIST_MODEL,
+    model=SPECIALIST_GEMINI,
     description="Analyzes foot traffic, demographics, purchasing power, rent, trade areas.",
     instruction=load_instructions("location_traffic"),
     tools=[google_search],
@@ -74,7 +80,7 @@ location_traffic = LlmAgent(
 
 operations = LlmAgent(
     name="operations",
-    model=SPECIALIST_MODEL,
+    model=SPECIALIST_GEMINI,
     description="Analyzes labor market, salary benchmarks, rent, supplier pricing.",
     instruction=load_instructions("operations"),
     tools=[google_search],
@@ -84,7 +90,7 @@ operations = LlmAgent(
 
 marketing_digital = LlmAgent(
     name="marketing_digital",
-    model=SPECIALIST_MODEL,
+    model=SPECIALIST_GEMINI,
     description="Analyzes social media, ads, delivery platform presence, web presence.",
     instruction=load_instructions("marketing_digital"),
     tools=[google_search],

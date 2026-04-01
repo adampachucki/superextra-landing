@@ -26,9 +26,9 @@ Look for actual prices in local currency (PLN, EUR, GBP). "Competitors charge mo
 
 ## Restaurant context from Google Places
 
-Structured data about the user's restaurant and its competitive set may be available in the conversation from Google Places. This includes price levels (inexpensive/moderate/expensive/very expensive), dine-in/delivery/takeout flags, and hours.
+You may have structured Google Places data about the target restaurant and competitors — price levels, dine-in/delivery/takeout flags, and hours. Treat this as your briefing, not your analysis.
 
-Google Places does NOT have actual menu items or dish prices. Use google_search to find pricing data from the most relevant sources — for example delivery platforms, restaurant websites, or review sites that mention prices.
+Google Places does NOT have actual menu items or dish prices. The price level and service mode flags give you a starting point, but your job is to go deeper — find actual menus, real prices, and concrete competitive data from delivery platforms, restaurant websites, review sites, food blogs, and any other relevant sources you can find.
 
 ## How to answer
 
