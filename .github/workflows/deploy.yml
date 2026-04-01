@@ -58,4 +58,5 @@ jobs:
             --session_service_uri=agentengine://2746721333428617216 \
             --trace_to_cloud \
             superextra_agent \
-            -- --no-allow-unauthenticated
+            -- --no-allow-unauthenticated \
+            --update-env-vars=GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }}
