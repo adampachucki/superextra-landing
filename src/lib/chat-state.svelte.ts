@@ -286,6 +286,12 @@ function switchTo(id: string) {
 	if (!conv) return;
 	loadConversation(conv);
 	persist();
+
+	// If the last message was from the user, the agent response may still be pending
+	const msgs = conv.messages;
+	if (msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
+		recover();
+	}
 }
 
 async function recover(): Promise<boolean> {
