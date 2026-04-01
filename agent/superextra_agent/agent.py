@@ -1,11 +1,10 @@
-from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.agents import LlmAgent
 from google.adk.apps import App
+from google.adk.tools import google_search
 from .specialists import (
     MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG,
-    market_landscape, menu_pricing, revenue_sales, guest_intelligence,
-    location_traffic, operations, marketing_digital,
+    SPECIALIST_TOOLS,
 )
 from .places_tools import get_restaurant_details, find_nearby_restaurants, search_restaurants
 from .chat_logger import ChatLoggerPlugin
@@ -15,8 +14,10 @@ INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
 _SYNTHESIZER_TEMPLATE = (INSTRUCTIONS_DIR / "synthesizer.md").read_text()
 _SYNTHESIZER_KEYS = [
-    "places_context", "market_result", "pricing_result", "revenue_result",
+    "places_context", "research_plan",
+    "market_result", "pricing_result", "revenue_result",
     "guest_result", "location_result", "ops_result", "marketing_result",
+    "dynamic_result_1", "dynamic_result_2",
 ]
 
 def _synthesizer_instruction(ctx):
@@ -34,16 +35,14 @@ context_enricher = LlmAgent(
     generate_content_config=THINKING_CONFIG,
 )
 
-wave_1 = ParallelAgent(
-    name="wave_1",
-    sub_agents=[market_landscape, menu_pricing, revenue_sales, guest_intelligence],
-    description="First wave of specialist research agents.",
-)
-
-wave_2 = ParallelAgent(
-    name="wave_2",
-    sub_agents=[location_traffic, operations, marketing_digital],
-    description="Second wave of specialist research agents.",
+research_planner = LlmAgent(
+    name="research_planner",
+    model=MODEL_GEMINI,
+    instruction=(INSTRUCTIONS_DIR / "research_planner.md").read_text(),
+    description="Analyzes the user question, identifies distinct research angles, and delegates to specialist agents.",
+    tools=[google_search] + SPECIALIST_TOOLS,
+    output_key="research_plan",
+    generate_content_config=THINKING_CONFIG,
 )
 
 synthesizer = LlmAgent(
@@ -57,8 +56,8 @@ synthesizer = LlmAgent(
 
 research_pipeline = SequentialAgent(
     name="research_pipeline",
-    sub_agents=[context_enricher, wave_1, wave_2, synthesizer],
-    description="Full research pipeline: enriches context with Google Places data, runs specialist agents in two waves, then synthesizes findings into a cohesive market intelligence report. Use this when the question has enough context (restaurant, location, or area) to research.",
+    sub_agents=[context_enricher, research_planner, synthesizer],
+    description="Full research pipeline: enriches context with Google Places data, plans and executes targeted research, then synthesizes findings into a cohesive market intelligence report. Use this when the question has enough context (restaurant, location, or area) to research.",
 )
 
 _router = LlmAgent(
