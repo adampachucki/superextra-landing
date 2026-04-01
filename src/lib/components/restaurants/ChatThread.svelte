@@ -116,19 +116,19 @@
 								>
 								<div class="flex flex-wrap gap-1.5">
 									{#each visible as src}
+										{@const domain = (() => {
+											try {
+												return new URL(src.url).hostname;
+											} catch {
+												return '';
+											}
+										})()}
 										<a
 											href={src.url}
 											target="_blank"
 											rel="noopener noreferrer"
 											class="group inline-flex items-center gap-1.5 rounded-full border border-black/5 px-2.5 py-1 no-underline transition-colors hover:border-black/10 hover:bg-black/[0.02] dark:border-white/5 dark:hover:border-white/10 dark:hover:bg-white/[0.02]"
 										>
-											{@const domain = (() => {
-												try {
-													return new URL(src.url).hostname;
-												} catch {
-													return '';
-												}
-											})()}
 											<img
 												src="https://www.google.com/s2/favicons?sz=32&domain={domain}"
 												alt=""
