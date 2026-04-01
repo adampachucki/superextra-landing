@@ -13,16 +13,16 @@ _version = os.environ.get("GEMINI_VERSION", "3.1")
 RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=60.0)
 
 
-def _append_sources(ctx, response):
+def _append_sources(*, callback_context, llm_response):
     """Append grounding source URLs to the model response text.
 
     AgentTool only propagates the text output — grounding metadata is lost.
     By appending sources to the text, they travel through to session state
     where the Cloud Function can extract them.
     """
-    gm = response.grounding_metadata
+    gm = llm_response.grounding_metadata
     if not gm or not gm.grounding_chunks:
-        return response
+        return llm_response
     urls = []
     seen = set()
     for chunk in gm.grounding_chunks:
@@ -30,17 +30,17 @@ def _append_sources(ctx, response):
             urls.append((chunk.web.title or chunk.web.uri, chunk.web.uri))
             seen.add(chunk.web.uri)
     if not urls:
-        return response
+        return llm_response
     # Append a Sources section to the last text part
-    if response.content and response.content.parts:
-        for part in reversed(response.content.parts):
+    if llm_response.content and llm_response.content.parts:
+        for part in reversed(llm_response.content.parts):
             if part.text:
                 sources_md = "\n\n## Sources\n" + "\n".join(
                     f"- [{title}]({url})" for title, url in urls
                 )
                 part.text += sources_md
                 break
-    return response
+    return llm_response
 
 
 def _make_gemini(model: str) -> Gemini:
