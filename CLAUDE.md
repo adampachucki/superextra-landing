@@ -86,10 +86,13 @@ Push to `main` → `.github/workflows/deploy.yml` deploys: Firebase Hosting (sta
 
 ### ADK Cloud Run gotchas
 
+- **`adk deploy cloud_run` returns exit 0 even when gcloud fails.** The deploy step in `deploy.yml` greps output for "Deploy failed" to detect this. If the ADK deploy "succeeds" but changes don't appear, check the deploy step output — it may have silently failed. **Always verify** after agent changes: `gcloud run revisions list --service=superextra-agent --region=us-central1 --project=superextra-site --limit=3` — check the latest revision timestamp matches your deploy.
 - **Auto-generated Dockerfile** bakes `GOOGLE_CLOUD_LOCATION=us-central1` into the image from `--region`. Do not override this env var — Agent Engine sessions require `us-central1`.
 - **Model routing is separate from session routing.** Some models (Gemini 3.1) only work via the global Vertex AI endpoint. `specialists.py` handles this by overriding `api_client` with `location='global'` on Gemini instances. If adding new models, check regional availability first.
 - **`agent/.env` is NOT read at runtime in the container.** The file gets copied into the image but ADK's server ignores it. Any env var the agent code needs (e.g. `GOOGLE_PLACES_API_KEY`) must be set as a Cloud Run service-level env var. The deploy pipeline passes these via `--update-env-vars` in the gcloud passthrough after `--` in `deploy.yml`. **When adding a new env var:** add it as a GitHub secret, then append it to the `--update-env-vars` flag in `deploy.yml`. Use `--update-env-vars` (merges) not `--set-env-vars` (replaces all). Service-level env vars persist across deploys.
 - **Filesystem is read-only** except `/tmp`. Detect Cloud Run via `K_SERVICE` env var.
+- **AgentTool discards sub-agent grounding metadata.** Specialist agents called via `AgentTool` produce `grounding_metadata.grounding_chunks` with source URLs, but AgentTool only propagates text output back to the parent. The `_append_sources` callback in `specialists.py` works around this by appending a `## Sources` markdown section to the specialist's response text before AgentTool captures it.
+- **ADK callbacks use keyword arguments.** Agent-level callbacks like `after_model_callback` receive `(*, callback_context, llm_response)` — not positional args. Wrong signatures cause silent TypeErrors.
 - **Local deploy**: `cd agent && .venv/bin/adk deploy cloud_run --project=superextra-site --region=us-central1 --service_name=superextra-agent --session_service_uri=agentengine://2746721333428617216 --trace_to_cloud superextra_agent -- --no-allow-unauthenticated`
 
 ### Debugging agent issues
