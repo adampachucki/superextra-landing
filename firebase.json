@@ -18,6 +18,10 @@
 				"function": "agentDebug"
 			},
 			{
+				"source": "/api/agent/stream",
+				"function": "agentStream"
+			},
+			{
 				"source": "/api/agent",
 				"function": "agent"
 			},

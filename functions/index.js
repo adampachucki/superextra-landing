@@ -252,28 +252,17 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 			if (!line.startsWith('data: ')) continue;
 			try {
 				const event = JSON.parse(line.slice(6));
-					// TEMP: Log event structure for streaming verification
-					console.log('ADK_EVENT:', JSON.stringify({
-						author: event.author,
-						partial: event.partial,
-						hasContent: !!event.content,
-						partTypes: event.content?.parts?.map(p => p.text ? 'text' : p.functionCall ? 'fc:' + p.functionCall.name : p.functionResponse ? 'fr' : 'other'),
-						stateDeltaKeys: Object.keys(event.actions?.stateDelta || {}),
-						groundingChunks: (event.grounding_metadata?.grounding_chunks || event.groundingMetadata?.groundingChunks)?.length || 0,
-						branch: event.branch || '',
-					}));
-				const stateDelta = event.actions?.stateDelta;
+				const stateDelta = event.actions?.stateDelta || event.actions?.state_delta;
 				if (stateDelta?.final_report) {
 					reply = stateDelta.final_report;
 				} else if (stateDelta?.router_response && !reply) {
 					reply = stateDelta.router_response;
 				}
-				// Collect grounding sources from specialist events
-				const chunks = event.groundingMetadata?.groundingChunks;
-				if (chunks) {
-					for (const c of chunks) {
-						if (c.web && !sources.some(s => s.url === c.web.uri)) {
-							sources.push({ title: c.web.title, url: c.web.uri });
+				// Sources are accumulated in _sources state by specialist callbacks
+				if (stateDelta?._sources) {
+					for (const s of stateDelta._sources) {
+						if (s.url && !sources.some(x => x.url === s.url)) {
+							sources.push({ title: s.title || '', url: s.url });
 						}
 					}
 				}
@@ -325,6 +314,322 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 	} catch (err) {
 		console.error('Agent error:', err.message || err);
 		res.status(500).json({ ok: false, error: 'Agent unavailable. Please try again.' });
+	}
+});
+
+// --- Streaming agent endpoint (SSE progress + token streaming) ---
+
+const TOOL_LABELS = {
+	market_landscape: 'market landscape',
+	menu_pricing: 'pricing',
+	revenue_sales: 'revenue',
+	guest_intelligence: 'reviews',
+	location_traffic: 'location',
+	operations: 'operations',
+	marketing_digital: 'marketing',
+	dynamic_researcher_1: 'trends',
+	dynamic_researcher_2: 'trends',
+};
+
+const SPECIALIST_KEYS = new Set([
+	'guest_result', 'pricing_result', 'revenue_result', 'market_result',
+	'location_result', 'ops_result', 'marketing_result',
+	'dynamic_result_1', 'dynamic_result_2',
+]);
+
+function sendSSE(res, event, data) {
+	res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+async function generateTitle(message) {
+	try {
+		const vertexAI = new VertexAI({ project: PROJECT, location: LOCATION });
+		const flashModel = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+		const titleResult = await flashModel.generateContent({
+			contents: [{ role: 'user', parts: [{ text:
+				`Summarize this message into a short title, max 4 words.\n` +
+				`Rules:\n` +
+				`- Use the SAME LANGUAGE as the message\n` +
+				`- No markdown, no quotes, no punctuation, no numbering\n` +
+				`- Do not answer the question — just label the topic\n` +
+				`- Reply with ONLY the title, nothing else\n\n` +
+				`Message: "${message}"`
+			}] }]
+		});
+		const raw = titleResult.response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+		if (raw) {
+			const cleaned = raw
+				.replace(/^["']|["']$/g, '')
+				.replace(/[*#_`~>\-]/g, '')
+				.replace(/^\d+\.\s*/, '')
+				.trim();
+			const words = cleaned.split(/\s+/);
+			if (words.length <= 8 && cleaned.length > 0) {
+				return words.slice(0, 4).join(' ');
+			}
+		}
+	} catch (e) {
+		console.error('Title generation failed:', e.message);
+	}
+	return undefined;
+}
+
+export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, res) => {
+	if (req.method !== 'POST') {
+		res.status(405).json({ ok: false, error: 'Method not allowed' });
+		return;
+	}
+
+	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+	const now = Date.now();
+	const window = 10 * 60 * 1000;
+	const entry = rateLimitMap.get(ip);
+	if (entry && now - entry.start < window) {
+		if (entry.count >= 20) {
+			res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+			return;
+		}
+		entry.count++;
+	} else {
+		rateLimitMap.set(ip, { start: now, count: 1 });
+	}
+
+	const { message, sessionId, placeContext, history } = req.body || {};
+
+	if (!message || typeof message !== 'string' || !sessionId) {
+		res.status(400).json({ ok: false, error: 'message and sessionId are required' });
+		return;
+	}
+
+	if (message.length > 2000) {
+		res.status(400).json({ ok: false, error: 'Message too long' });
+		return;
+	}
+
+	// SSE headers
+	res.writeHead(200, {
+		'Content-Type': 'text/event-stream',
+		'Cache-Control': 'no-cache',
+		'X-Accel-Buffering': 'no',
+	});
+
+	const keepalive = setInterval(() => res.write(': keepalive\n\n'), 15000);
+	const ac = new AbortController();
+	req.on('close', () => { ac.abort(); clearInterval(keepalive); });
+
+	try {
+		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
+		const headers = await client.getRequestHeaders();
+
+		// Session management (same as agent endpoint)
+		let cached = sessionMap.get(sessionId);
+		let adkSessionId = cached?.adkSessionId;
+		let userId = cached?.userId || ip;
+		if (!adkSessionId) {
+			const doc = await db.collection('sessions').doc(sessionId).get();
+			if (doc.exists) {
+				adkSessionId = doc.data().adkSessionId;
+				userId = doc.data().userId || ip;
+				sessionMap.set(sessionId, { adkSessionId, userId });
+			}
+		}
+		if (!adkSessionId) {
+			const createRes = await fetch(`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(ip)}/sessions`, {
+				method: 'POST',
+				headers: { ...headers, 'Content-Type': 'application/json' },
+				body: JSON.stringify({})
+			});
+			if (!createRes.ok) {
+				sendSSE(res, 'error', { error: 'Agent unavailable. Please try again.' });
+				res.end();
+				clearInterval(keepalive);
+				return;
+			}
+			const sessionData = await createRes.json();
+			adkSessionId = sessionData.id;
+			userId = ip;
+			sessionMap.set(sessionId, { adkSessionId, userId });
+			await db.collection('sessions').doc(sessionId).set({
+				adkSessionId,
+				userId: ip,
+				createdAt: Date.now()
+			});
+		}
+
+		// Build query
+		const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+		let queryText = `[Date: ${today}] ${message}`;
+		const isFirstMessage = !history || history.length === 0;
+		if (placeContext && placeContext.name && isFirstMessage) {
+			queryText = `[Context: asking about ${placeContext.name}, ${placeContext.secondary || ''} (Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
+		}
+
+		// Title generation in parallel (first message only)
+		const titlePromise = isFirstMessage ? generateTitle(message) : null;
+
+		// Call ADK with streaming
+		const adkResponse = await fetch(`${ADK_SERVICE_URL}/run_sse`, {
+			method: 'POST',
+			headers: { ...headers, 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				app_name: 'superextra_agent',
+				user_id: userId,
+				session_id: adkSessionId,
+				new_message: { role: 'user', parts: [{ text: queryText }] },
+				streaming: true
+			}),
+			signal: ac.signal
+		});
+
+		if (!adkResponse.ok) {
+			sendSSE(res, 'error', { error: 'Agent unavailable. Please try again.' });
+			res.end();
+			clearInterval(keepalive);
+			return;
+		}
+
+		// Stream-parse ADK SSE events
+		const reader = adkResponse.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = '';
+		let reply = '';
+		let routerResponse = '';
+		const sources = [];
+		const specialistNames = [];
+		let synthesisStarted = false;
+		let contextDone = false;
+		let planningDone = false;
+		let specialistsDone = false;
+
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+
+			buffer += decoder.decode(value, { stream: true });
+
+			// Process complete data lines (each event ends with \n\n)
+			let boundary;
+			while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+				const block = buffer.slice(0, boundary);
+				buffer = buffer.slice(boundary + 2);
+
+				for (const line of block.split('\n')) {
+					if (!line.startsWith('data: ')) continue;
+					try {
+						const evt = JSON.parse(line.slice(6));
+						const delta = evt.actions?.stateDelta || {};
+						const deltaKeys = Object.keys(delta);
+						const parts = evt.content?.parts || [];
+
+						// 1. Context enricher complete
+						if (delta.places_context && !contextDone) {
+							contextDone = true;
+							sendSSE(res, 'progress', { stage: 'context', status: 'complete', label: 'Place data gathered' });
+						}
+
+						// 2. Research planner dispatching specialists (function_call events)
+						if (!specialistsDone) {
+							for (const p of parts) {
+								if (p.functionCall && TOOL_LABELS[p.functionCall.name]) {
+									if (!specialistNames.includes(p.functionCall.name)) {
+										specialistNames.push(p.functionCall.name);
+									}
+								}
+							}
+							// Emit "specialists running" on the final (non-partial) function_call event
+							if (evt.partial === false && specialistNames.length > 0 && !parts.some(p => p.functionResponse)) {
+								const labels = [...new Set(specialistNames.map(n => TOOL_LABELS[n]))].join(', ');
+								sendSSE(res, 'progress', { stage: 'specialists', status: 'running', label: `Analyzing ${labels}...` });
+							}
+						}
+
+						// 3. Specialist results arrived (function_response with specialist state keys)
+						if (!specialistsDone && deltaKeys.some(k => SPECIALIST_KEYS.has(k))) {
+							specialistsDone = true;
+							sendSSE(res, 'progress', { stage: 'specialists', status: 'complete', label: 'Research complete' });
+						}
+
+						// 4. Research plan complete
+						if (delta.research_plan && !planningDone) {
+							planningDone = true;
+							sendSSE(res, 'progress', { stage: 'planning', status: 'complete', label: 'Research planned' });
+						}
+
+						// 5. Synthesizer streaming tokens
+						if (evt.author === 'synthesizer' && evt.partial === true) {
+							if (!synthesisStarted) {
+								synthesisStarted = true;
+								sendSSE(res, 'progress', { stage: 'synthesis', status: 'running', label: 'Synthesizing findings' });
+							}
+							const text = parts.find(p => p.text)?.text;
+							if (text) {
+								sendSSE(res, 'token', { text });
+							}
+						}
+
+						// 6. Final report
+						if (delta.final_report) {
+							reply = delta.final_report;
+						}
+
+						// 7. Router response (clarifying question)
+						if (delta.router_response && !reply) {
+							routerResponse = delta.router_response;
+						}
+
+						// 8. Sources accumulated in _sources state by specialist callbacks
+						if (delta._sources) {
+							for (const s of delta._sources) {
+								if (s.url && !sources.some(x => x.url === s.url)) {
+									sources.push({ title: s.title || '', url: s.url });
+								}
+							}
+						}
+					} catch {
+						// skip malformed events
+					}
+				}
+			}
+		}
+
+		// Fallback: fetch sources from session state if none came through the SSE stream
+		if (sources.length === 0 && (reply || routerResponse)) {
+			try {
+				const sessionRes = await fetch(
+					`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(adkSessionId)}`,
+					{ headers }
+				);
+				if (sessionRes.ok) {
+					const session = await sessionRes.json();
+					const stateSources = session.state?._sources;
+					if (stateSources?.length) {
+						for (const s of stateSources) {
+							if (s.url && !sources.some(x => x.url === s.url)) {
+								sources.push({ title: s.title || '', url: s.url });
+							}
+						}
+					}
+				}
+			} catch {
+				// sources unavailable — not critical
+			}
+		}
+
+		const title = titlePromise ? await titlePromise : undefined;
+		const finalReply = reply || routerResponse || 'I wasn\'t able to generate a response. Please try rephrasing your question.';
+		sendSSE(res, 'complete', {
+			reply: finalReply,
+			sources,
+			...(title && { title }),
+		});
+	} catch (err) {
+		if (err.name !== 'AbortError') {
+			console.error('Agent stream error:', err.message || err);
+			sendSSE(res, 'error', { error: 'Agent unavailable. Please try again.' });
+		}
+	} finally {
+		clearInterval(keepalive);
+		res.end();
 	}
 });
 
@@ -497,22 +802,11 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		const session = await adkRes.json();
 		const reply = session.state?.final_report || session.state?.router_response || null;
 
-		// Extract sources from events' grounding metadata
-		const sources = [];
-		if (session.events) {
-			for (const event of session.events) {
-				const chunks = event.groundingMetadata?.groundingChunks;
-				if (chunks) {
-					for (const c of chunks) {
-						if (c.web && !sources.some(s => s.url === c.web.uri)) {
-							sources.push({ title: c.web.title, url: c.web.uri });
-						}
-					}
-				}
-			}
-		}
+		// Read sources from session state (accumulated by specialist callbacks)
+		const stateSources = session.state?._sources;
+		const sources = stateSources?.length ? stateSources : undefined;
 
-		res.json({ ok: true, reply, sources: sources.length ? sources : undefined });
+		res.json({ ok: true, reply, sources });
 	} catch (err) {
 		console.error('Agent check error:', err.message || err);
 		res.json({ ok: true, reply: null });

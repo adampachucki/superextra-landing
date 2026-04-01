@@ -10,6 +10,8 @@
 	$effect(() => {
 		chatState.messages.length;
 		chatState.loading;
+		chatState.streamingText;
+		chatState.streamingProgress;
 		if (scrollEl) {
 			requestAnimationFrame(() => {
 				scrollEl!.scrollTop = scrollEl!.scrollHeight;
@@ -20,6 +22,10 @@
 	function renderMarkdown(text: string): string {
 		return marked.parse(text) as string;
 	}
+
+	let hasStreamingContent = $derived(
+		chatState.streamingProgress.length > 0 || chatState.streamingText.length > 0
+	);
 
 	const SOURCES_LIMIT = 19;
 	let expandedSources: Record<number, boolean> = $state({});
@@ -148,13 +154,39 @@
 
 		{#if chatState.loading}
 			<div class="msg-appear flex justify-start">
-				<div class="flex items-center gap-2 px-1 py-1">
-					<span class="shimmer-text text-[13px]">Researching</span>
-					<span class="loading-dots flex gap-1">
-						<span class="h-1 w-1 rounded-full bg-[#6ee7b3]"></span>
-						<span class="h-1 w-1 rounded-full bg-[#a78bfa]"></span>
-						<span class="h-1 w-1 rounded-full bg-[#f472b6]"></span>
-					</span>
+				<div class="max-w-[95%] px-1 py-1">
+					{#if hasStreamingContent}
+						<div class="flex flex-col gap-1.5">
+							{#each chatState.streamingProgress as step}
+								<div class="flex items-center gap-2 text-[13px]">
+									{#if step.status === 'complete'}
+										<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
+										<span class="text-black/40 dark:text-white/40">{step.label}</span>
+									{:else}
+										<span class="stage-pulse h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"></span>
+										<span class="text-black/60 dark:text-white/60">{step.label}</span>
+									{/if}
+								</div>
+							{/each}
+						</div>
+						{#if chatState.streamingText}
+							<div
+								class="prose mt-4 max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
+							>
+								{@html renderMarkdown(chatState.streamingText)}
+								<span class="cursor-blink">|</span>
+							</div>
+						{/if}
+					{:else}
+						<div class="flex items-center gap-2">
+							<span class="shimmer-text text-[13px]">Researching</span>
+							<span class="loading-dots flex gap-1">
+								<span class="h-1 w-1 rounded-full bg-[#6ee7b3]"></span>
+								<span class="h-1 w-1 rounded-full bg-[#a78bfa]"></span>
+								<span class="h-1 w-1 rounded-full bg-[#f472b6]"></span>
+							</span>
+						</div>
+					{/if}
 				</div>
 			</div>
 		{/if}
@@ -240,6 +272,36 @@
 		background-size: 200% 100%;
 		background-clip: text;
 		-webkit-background-clip: text;
+	}
+
+	.stage-pulse {
+		animation: stagePulse 1.5s ease-in-out infinite;
+	}
+
+	@keyframes stagePulse {
+		0%,
+		100% {
+			opacity: 0.4;
+		}
+		50% {
+			opacity: 1;
+		}
+	}
+
+	.cursor-blink {
+		animation: cursorBlink 1s step-end infinite;
+		font-weight: 300;
+		opacity: 0.6;
+	}
+
+	@keyframes cursorBlink {
+		0%,
+		100% {
+			opacity: 0.6;
+		}
+		50% {
+			opacity: 0;
+		}
 	}
 
 	@keyframes shimmer {

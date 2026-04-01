@@ -360,6 +360,9 @@
 		}
 	}
 
+	 
+	let confirmDeleteId = $state<string | null>(null);
+
 	function formatRelativeTime(ts: number): string {
 		const diff = Date.now() - ts;
 		const minutes = Math.floor(diff / 60000);
@@ -477,48 +480,97 @@
 							style="--sb-delay: {Math.min(0.38 + i * 0.05, 0.7)}s"
 							class:visible={sidebarContentVisible}
 						>
-							<button
-								onclick={() => chatState.switchTo(conv.id)}
-								class="w-full cursor-pointer rounded-lg px-2 py-2 pr-8 text-left transition-colors {conv.id ===
-								chatState.activeId
-									? 'bg-cream-100 dark:bg-cream-100'
-									: 'hover:bg-cream-100/50 dark:hover:bg-cream-50/50'}"
-							>
-								<p
-									class="truncate text-[13px] {conv.id === chatState.activeId
-										? 'text-black dark:text-white'
-										: 'text-black/70 dark:text-white/70'}"
+							{#if confirmDeleteId === conv.id}
+								<div
+									class="flex w-full items-center justify-between rounded-lg bg-red-50 px-3 py-2 dark:bg-red-950/30"
 								>
-									{conv.title}
-								</p>
-								<div class="mt-0.5 flex items-center gap-1.5">
-									{#if conv.placeContext}
-										<span class="truncate text-[11px] text-black/40 dark:text-white/40"
-											>{conv.placeContext.name}</span
+									<span class="text-[13px] text-red-600 dark:text-red-400">Delete?</span>
+									<div class="flex items-center gap-1">
+										<button
+											onclick={() => (confirmDeleteId = null)}
+											aria-label="Cancel delete"
+											class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-black/40 transition-colors hover:bg-black/[0.06] dark:text-white/40 dark:hover:bg-white/[0.06]"
 										>
-										<span class="text-[11px] text-black/20 dark:text-white/20">&middot;</span>
-									{/if}
-									<span class="shrink-0 text-[11px] text-black/30 dark:text-white/30"
-										>{formatRelativeTime(conv.updatedAt)}</span
-									>
+											<svg
+												class="h-3.5 w-3.5"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M6 18L18 6M6 6l12 12"
+												/>
+											</svg>
+										</button>
+										<button
+											onclick={() => {
+												chatState.deleteConversation(conv.id);
+												confirmDeleteId = null;
+											}}
+											aria-label="Confirm delete"
+											class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-100 dark:hover:bg-red-900/30"
+										>
+											<svg
+												class="h-3.5 w-3.5"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2.5"
+											>
+												<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+											</svg>
+										</button>
+									</div>
 								</div>
-							</button>
-							<button
-								onclick={() => chatState.deleteConversation(conv.id)}
-								aria-label="Delete conversation"
-								class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
-							>
-								<svg
-									class="h-3 w-3 text-black/30 dark:text-white/30"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2"
+							{:else}
+								<button
+									onclick={() => chatState.switchTo(conv.id)}
+									class="w-full cursor-pointer rounded-lg px-2 py-2 pr-8 text-left transition-colors {conv.id ===
+									chatState.activeId
+										? 'bg-cream-100 dark:bg-cream-100'
+										: 'hover:bg-cream-100/50 dark:hover:bg-cream-50/50'}"
 								>
-									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-								</svg>
-							</button>
+									<p
+										class="truncate text-[13px] {conv.id === chatState.activeId
+											? 'text-black dark:text-white'
+											: 'text-black/70 dark:text-white/70'}"
+									>
+										{conv.title}
+									</p>
+									<div class="mt-0.5 flex items-center gap-1.5">
+										{#if conv.placeContext}
+											<span class="truncate text-[11px] text-black/40 dark:text-white/40"
+												>{conv.placeContext.name}</span
+											>
+											<span class="text-[11px] text-black/20 dark:text-white/20">&middot;</span>
+										{/if}
+										<span class="shrink-0 text-[11px] text-black/30 dark:text-white/30"
+											>{formatRelativeTime(conv.updatedAt)}</span
+										>
+									</div>
+								</button>
+								<button
+									onclick={() => (confirmDeleteId = conv.id)}
+									aria-label="Delete conversation"
+									class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] lg:opacity-0 lg:group-hover:opacity-100 dark:hover:bg-white/[0.06]"
+								>
+									<svg
+										class="h-3 w-3 text-black/30 dark:text-white/30"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+									</svg>
+								</button>
+							{/if}
 						</div>
 					{/each}
 				</div>

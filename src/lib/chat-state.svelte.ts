@@ -1,6 +1,14 @@
+import { streamAgent } from '$lib/sse-client';
+
 interface ChatSource {
 	title: string;
 	url: string;
+}
+
+interface StreamingStep {
+	stage: string;
+	status: string;
+	label: string;
 }
 
 interface ChatMessage {
@@ -36,6 +44,11 @@ let error = $state('');
 let active = $state(false);
 let placeContext = $state<PlaceContext | null>(null);
 let currentId = $state<string | null>(null);
+
+// Streaming state (ephemeral — never persisted to localStorage)
+let streamingText = $state('');
+let streamingProgress = $state<StreamingStep[]>([]);
+let abortController: AbortController | null = null;
 
 // All conversations
 let conversations = $state<Conversation[]>([]);
@@ -187,55 +200,75 @@ async function send(text: string) {
 	messages.push({ role: 'user', text: trimmed, timestamp: Date.now() });
 	loading = true;
 	error = '';
+	streamingText = '';
+	streamingProgress = [];
 	persist();
 
+	abortController = new AbortController();
+
+	const agentUrl = import.meta.env.DEV
+		? '/api/agent/stream'
+		: 'https://us-central1-superextra-site.cloudfunctions.net/agentStream';
+
 	try {
-		const agentUrl = import.meta.env.DEV
-			? '/api/agent'
-			: 'https://us-central1-superextra-site.cloudfunctions.net/agent';
-		const res = await fetch(agentUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
+		await streamAgent(
+			agentUrl,
+			{
 				message: trimmed,
 				sessionId: currentId,
 				placeContext,
 				history
-			})
-		});
-
-		const data = await res.json();
-
-		if (!res.ok || !data.ok) {
-			if (currentId === sendingConvId) {
-				error = data.error || 'Something went wrong. Please try again.';
-			}
-			return;
-		}
-
-		const sources: ChatSource[] | undefined = data.sources?.length ? data.sources : undefined;
-		const reply: ChatMessage = { role: 'agent', text: data.reply, timestamp: Date.now(), sources };
-		if (currentId === sendingConvId) {
-			messages.push(reply);
-		} else if (sendingConvId) {
-			appendToConversation(sendingConvId, reply);
-		}
-
-		// Update title if AI-generated one came back
-		if (data.title && sendingConvId) {
-			const idx = conversations.findIndex((c) => c.id === sendingConvId);
-			if (idx >= 0) {
-				conversations[idx] = { ...conversations[idx], title: data.title };
-			}
-		}
-	} catch {
-		if (currentId === sendingConvId) {
+			},
+			{
+				onProgress(stage, status, label) {
+					const idx = streamingProgress.findIndex((p) => p.stage === stage);
+					if (idx >= 0) {
+						streamingProgress[idx] = { stage, status, label };
+					} else {
+						streamingProgress = [...streamingProgress, { stage, status, label }];
+					}
+				},
+				onToken(text) {
+					streamingText += text;
+				},
+				onComplete(reply, sources, title) {
+					const msg: ChatMessage = {
+						role: 'agent',
+						text: reply,
+						timestamp: Date.now(),
+						sources: sources?.length ? sources : undefined
+					};
+					if (currentId === sendingConvId) {
+						messages.push(msg);
+					} else if (sendingConvId) {
+						appendToConversation(sendingConvId, msg);
+					}
+					if (title && sendingConvId) {
+						const idx = conversations.findIndex((c) => c.id === sendingConvId);
+						if (idx >= 0) {
+							conversations[idx] = { ...conversations[idx], title };
+						}
+					}
+				},
+				onError(err) {
+					if (currentId === sendingConvId) {
+						error = err;
+					}
+				}
+			},
+			abortController.signal
+		);
+	} catch (e: unknown) {
+		if (e instanceof Error && e.name !== 'AbortError' && currentId === sendingConvId) {
 			error = 'Could not reach the server. Please check your connection.';
 		}
 	} finally {
 		if (currentId === sendingConvId) {
 			loading = false;
+			streamingText = '';
+			streamingProgress = [];
 		}
+		abortController = null;
 		persist();
 	}
 }
@@ -377,6 +410,18 @@ export const chatState = {
 	},
 	get activeId() {
 		return currentId;
+	},
+	get streamingText() {
+		return streamingText;
+	},
+	get streamingProgress() {
+		return streamingProgress;
+	},
+	get isStreaming() {
+		return streamingText.length > 0 || streamingProgress.length > 0;
+	},
+	abort() {
+		abortController?.abort();
 	},
 	send,
 	start,
