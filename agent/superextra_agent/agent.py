@@ -12,6 +12,13 @@ from pathlib import Path
 
 INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
+_PLANNER_TEMPLATE = (INSTRUCTIONS_DIR / "research_planner.md").read_text()
+
+def _planner_instruction(ctx):
+    """Inject places_context into the planner's instructions."""
+    places_context = ctx.state.get("places_context", "No Google Places data available.")
+    return _PLANNER_TEMPLATE.format(places_context=places_context)
+
 _SYNTHESIZER_TEMPLATE = (INSTRUCTIONS_DIR / "synthesizer.md").read_text()
 _SYNTHESIZER_KEYS = [
     "places_context", "research_plan",
@@ -38,7 +45,7 @@ context_enricher = LlmAgent(
 research_planner = LlmAgent(
     name="research_planner",
     model=MODEL_GEMINI,
-    instruction=(INSTRUCTIONS_DIR / "research_planner.md").read_text(),
+    instruction=_planner_instruction,
     description="Analyzes the user question, identifies distinct research angles, and delegates to specialist agents.",
     tools=[google_search] + SPECIALIST_TOOLS,
     output_key="research_plan",

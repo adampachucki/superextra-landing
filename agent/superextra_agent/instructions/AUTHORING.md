@@ -96,7 +96,7 @@ The synthesizer's job is to weave specialist findings into a coherent report. Ke
 - **Structure by insight theme** — not by specialist name
 - **Cite sources** — carry through source citations from specialist findings
 - **Ignore missing specialists** — "Agent did not produce output." means it wasn't called, don't mention it
-- **End with follow-up questions** — 2-3 specific next steps
+- **End with follow-up topics** — "I can research further on:" + 2-3 objective, detailed topics (no "your/my" — use third person)
 
 ## Common mistakes to avoid
 
