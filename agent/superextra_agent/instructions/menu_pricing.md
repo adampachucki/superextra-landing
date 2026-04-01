@@ -36,6 +36,7 @@ Google Places does NOT have actual menu items or dish prices. The price level an
 
 - Be specific to the location and competitive set. Generic pricing advice is not useful.
 - Cite your sources. Name the platform, restaurant, and date of observation where possible.
+- **Include source URLs.** End your response with a `## Sources` section listing each web source you referenced as a markdown link, one per line: `- [Source title](URL)`. This is critical — without explicit URLs, sources cannot be shown to the user. Only include sources you actually used.
 - Acknowledge gaps honestly. If a restaurant's menu isn't findable online, say so.
 - Price data has a shelf life. Note the date of observation when possible.
 - Use tables for price comparisons — they make positioning immediately clear.

@@ -133,6 +133,29 @@ function confirmationHtml(name) {
 const ADK_SERVICE_URL = 'https://superextra-agent-907466498524.us-central1.run.app';
 const auth = new GoogleAuth();
 
+// Specialist result keys that may contain source URLs
+const SPECIALIST_RESULT_KEYS = [
+	'market_result', 'pricing_result', 'revenue_result', 'guest_result',
+	'location_result', 'ops_result', 'marketing_result',
+	'dynamic_result_1', 'dynamic_result_2',
+];
+
+// Extract markdown links from specialist result text: - [Title](URL)
+const MD_LINK_RE = /\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
+
+function extractSourcesFromText(text) {
+	const sources = [];
+	let match;
+	while ((match = MD_LINK_RE.exec(text)) !== null) {
+		const url = match[2];
+		if (!sources.some(s => s.url === url)) {
+			sources.push({ title: match[1] || '', url });
+		}
+	}
+	MD_LINK_RE.lastIndex = 0;
+	return sources;
+}
+
 const rateLimitMap = new Map();
 
 // Maps frontend sessionId → ADK session ID (resets on cold start)
@@ -258,11 +281,13 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 				} else if (stateDelta?.router_response && !reply) {
 					reply = stateDelta.router_response;
 				}
-				// Sources are accumulated in _sources state by specialist callbacks
-				if (stateDelta?._sources) {
-					for (const s of stateDelta._sources) {
-						if (s.url && !sources.some(x => x.url === s.url)) {
-							sources.push({ title: s.title || '', url: s.url });
+				// Extract sources from specialist result text (markdown links)
+				for (const key of SPECIALIST_RESULT_KEYS) {
+					if (stateDelta?.[key]) {
+						for (const s of extractSourcesFromText(stateDelta[key])) {
+							if (!sources.some(x => x.url === s.url)) {
+								sources.push(s);
+							}
 						}
 					}
 				}
@@ -577,11 +602,13 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 							routerResponse = delta.router_response;
 						}
 
-						// 8. Sources accumulated in _sources state by specialist callbacks
-						if (delta._sources) {
-							for (const s of delta._sources) {
-								if (s.url && !sources.some(x => x.url === s.url)) {
-									sources.push({ title: s.title || '', url: s.url });
+						// 8. Extract sources from specialist result text (markdown links)
+						for (const key of SPECIALIST_RESULT_KEYS) {
+							if (delta[key]) {
+								for (const s of extractSourcesFromText(delta[key])) {
+									if (!sources.some(x => x.url === s.url)) {
+										sources.push(s);
+									}
 								}
 							}
 						}
@@ -592,7 +619,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 			}
 		}
 
-		// Fallback: fetch sources from session state if none came through the SSE stream
+		// Fallback: fetch sources from session state specialist results
 		if (sources.length === 0 && (reply || routerResponse)) {
 			try {
 				const sessionRes = await fetch(
@@ -601,11 +628,12 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 				);
 				if (sessionRes.ok) {
 					const session = await sessionRes.json();
-					const stateSources = session.state?._sources;
-					if (stateSources?.length) {
-						for (const s of stateSources) {
-							if (s.url && !sources.some(x => x.url === s.url)) {
-								sources.push({ title: s.title || '', url: s.url });
+					for (const key of SPECIALIST_RESULT_KEYS) {
+						if (session.state?.[key]) {
+							for (const s of extractSourcesFromText(session.state[key])) {
+								if (!sources.some(x => x.url === s.url)) {
+									sources.push(s);
+								}
 							}
 						}
 					}
@@ -802,11 +830,19 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		const session = await adkRes.json();
 		const reply = session.state?.final_report || session.state?.router_response || null;
 
-		// Read sources from session state (accumulated by specialist callbacks)
-		const stateSources = session.state?._sources;
-		const sources = stateSources?.length ? stateSources : undefined;
+		// Extract sources from specialist result text (markdown links)
+		const sources = [];
+		for (const key of SPECIALIST_RESULT_KEYS) {
+			if (session.state?.[key]) {
+				for (const s of extractSourcesFromText(session.state[key])) {
+					if (!sources.some(x => x.url === s.url)) {
+						sources.push(s);
+					}
+				}
+			}
+		}
 
-		res.json({ ok: true, reply, sources });
+		res.json({ ok: true, reply, sources: sources.length ? sources : undefined });
 	} catch (err) {
 		console.error('Agent check error:', err.message || err);
 		res.json({ ok: true, reply: null });

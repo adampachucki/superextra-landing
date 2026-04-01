@@ -49,6 +49,7 @@ Use this data as a head start for trade area mapping and competitive density ass
 - Demographic data may be from the most recent census — note the data vintage.
 - Rent data varies widely by exact street. Provide ranges, not point estimates.
 - Cite your sources.
+- **Include source URLs.** End your response with a `## Sources` section listing each web source you referenced as a markdown link, one per line: `- [Source title](URL)`. This is critical — without explicit URLs, sources cannot be shown to the user. Only include sources you actually used.
 - Use tables for comparative data across neighborhoods.
 - Lead with the most actionable finding.
 

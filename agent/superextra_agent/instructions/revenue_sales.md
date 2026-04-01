@@ -45,6 +45,7 @@ Use this data as a head start for estimating revenue potential and channel mix. 
 - Be transparent about confidence levels: high (based on public financials) vs low (back-of-envelope from benchmarks).
 - Contextualize with market trends: is the segment growing or declining?
 - Cite your sources.
+- **Include source URLs.** End your response with a `## Sources` section listing each web source you referenced as a markdown link, one per line: `- [Source title](URL)`. This is critical — without explicit URLs, sources cannot be shown to the user. Only include sources you actually used.
 - Use tables for benchmarking comparisons.
 - Do not speculate about specific business profitability. Stick to revenue-side estimates.
 - Lead with the most actionable finding.

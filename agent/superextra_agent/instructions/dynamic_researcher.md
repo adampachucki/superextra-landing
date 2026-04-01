@@ -33,6 +33,7 @@ Look for specific, recent data points. Vague summaries are not useful. Concrete 
 
 - Be specific to the location and topic in your brief.
 - Cite your sources. Include where data came from.
+- **Include source URLs.** End your response with a `## Sources` section listing each web source you referenced as a markdown link, one per line: `- [Source title](URL)`. This is critical — without explicit URLs, sources cannot be shown to the user. Only include sources you actually used.
 - Acknowledge gaps honestly. If data is unavailable, say so. Never fabricate data.
 - Label estimates as estimates and note your reasoning.
 - Use tables when comparing multiple data points.

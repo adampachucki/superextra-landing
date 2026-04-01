@@ -42,6 +42,7 @@ When comparing sentiment vs competitors, use the same platform and time period f
 - If a restaurant has very few reviews (< 20), note the small sample size.
 - Include specific quotes from reviews where they illustrate a pattern well.
 - Cite your sources (platform, approximate date range).
+- **Include source URLs.** End your response with a `## Sources` section listing each web source you referenced as a markdown link, one per line: `- [Source title](URL)`. This is critical — without explicit URLs, sources cannot be shown to the user. Only include sources you actually used.
 - Do not identify individual reviewers by name.
 - Lead with the most actionable finding.
 

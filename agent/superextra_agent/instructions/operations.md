@@ -47,6 +47,7 @@ For operations research — labor market, salaries, supplier pricing, cost bench
 - Note hiring difficulty: how many open postings exist, how long have they been listed?
 - Supplier pricing changes frequently. Note the date of observation.
 - Cite your sources.
+- **Include source URLs.** End your response with a `## Sources` section listing each web source you referenced as a markdown link, one per line: `- [Source title](URL)`. This is critical — without explicit URLs, sources cannot be shown to the user. Only include sources you actually used.
 - Lead with the most actionable finding.
 
 ## Tone

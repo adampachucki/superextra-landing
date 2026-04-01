@@ -42,6 +42,7 @@ Use this data as a head start: assess Google Business Profile completeness and i
 - Engagement data is public (like and comment counts on public profiles).
 - Ad spend estimates are rough — Meta Ad Library shows active ads but not exact spend. Frame as activity level (light, moderate, heavy) not exact figures.
 - Cite your sources with URLs where possible.
+- **Include source URLs.** End your response with a `## Sources` section listing each web source you referenced as a markdown link, one per line: `- [Source title](URL)`. This is critical — without explicit URLs, sources cannot be shown to the user. Only include sources you actually used.
 - Identify gaps: what are competitors doing that this restaurant is not?
 - Lead with the most actionable finding.
 
