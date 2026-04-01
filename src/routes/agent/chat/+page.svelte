@@ -105,7 +105,7 @@
 		const params = new URL(window.location.href).searchParams;
 		const sid = params.get('sid');
 		if (sid) {
-			chatState.switchToBySessionId(sid);
+			chatState.switchTo(sid);
 		}
 		sidebarOpen = window.matchMedia('(min-width: 1024px)').matches;
 		requestAnimationFrame(() => {
@@ -114,7 +114,7 @@
 
 		// Auto-recover if last message was from user (interrupted fetch)
 		const msgs = chatState.messages;
-		if (chatState.sessionId && msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
+		if (chatState.activeId && msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
 			chatState.recover();
 		}
 	});
@@ -123,8 +123,8 @@
 	$effect(() => {
 		if (!mounted) return;
 		const url = new URL(window.location.href);
-		if (chatState.sessionId) {
-			url.searchParams.set('sid', chatState.sessionId);
+		if (chatState.activeId) {
+			url.searchParams.set('sid', chatState.activeId);
 		} else {
 			url.searchParams.delete('sid');
 		}

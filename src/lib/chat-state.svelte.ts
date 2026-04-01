@@ -20,7 +20,6 @@ interface Conversation {
 	id: string;
 	title: string;
 	messages: ChatMessage[];
-	sessionId: string;
 	placeContext: PlaceContext | null;
 	createdAt: number;
 	updatedAt: number;
@@ -35,7 +34,6 @@ let messages = $state<ChatMessage[]>([]);
 let loading = $state(false);
 let error = $state('');
 let active = $state(false);
-let sessionId = $state('');
 let placeContext = $state<PlaceContext | null>(null);
 let currentId = $state<string | null>(null);
 
@@ -49,13 +47,43 @@ if (typeof localStorage !== 'undefined') {
 		if (stored) {
 			const data = JSON.parse(stored);
 			conversations = data.conversations || [];
-			// URL ?sid= takes precedence over stored activeId so refreshes
-			// always restore the conversation matching the URL, not the last-active one
+
+			// One-time migration: merge old separate sessionId into id
+			// sessionId is the Firestore-known value, so it becomes the canonical id
+			let migrated = false;
+			const oldIdToNewId: Record<string, string> = {};
+			const claimedIds: Record<string, true> = {};
+			for (const c of conversations) {
+				const oldId = c.id;
+				const oldSid = (c as unknown as Record<string, unknown>).sessionId as string | undefined;
+				if (oldSid) {
+					if (!claimedIds[oldSid]) {
+						c.id = oldSid;
+						claimedIds[oldSid] = true;
+					}
+					// else: duplicate sessionId from old reuse bug — keep existing c.id
+				}
+				claimedIds[c.id] = true;
+				oldIdToNewId[oldId] = c.id;
+				if ('sessionId' in c) {
+					delete (c as unknown as Record<string, unknown>).sessionId;
+					migrated = true;
+				}
+			}
+			if (migrated) {
+				data.activeId = data.activeId ? (oldIdToNewId[data.activeId] ?? null) : null;
+				localStorage.setItem(
+					STORAGE_KEY,
+					JSON.stringify({ activeId: data.activeId, conversations })
+				);
+			}
+
+			// URL ?sid= takes precedence over stored activeId on refresh
 			let restored = false;
 			if (typeof window !== 'undefined') {
 				const urlSid = new URL(window.location.href).searchParams.get('sid');
 				if (urlSid) {
-					const conv = conversations.find((c: Conversation) => c.sessionId === urlSid);
+					const conv = conversations.find((c: Conversation) => c.id === urlSid);
 					if (conv) {
 						loadConversation(conv);
 						restored = true;
@@ -75,7 +103,6 @@ if (typeof localStorage !== 'undefined') {
 						id: s.sessionId || crypto.randomUUID(),
 						title: generateTitle(s.messages[0]?.text || 'Untitled'),
 						messages: s.messages,
-						sessionId: s.sessionId || '',
 						placeContext: s.placeContext || null,
 						createdAt: s.messages[0]?.timestamp || Date.now(),
 						updatedAt: s.messages[s.messages.length - 1]?.timestamp || Date.now()
@@ -102,7 +129,6 @@ function generateTitle(text: string): string {
 
 function loadConversation(conv: Conversation) {
 	messages = [...conv.messages];
-	sessionId = conv.sessionId;
 	placeContext = conv.placeContext;
 	currentId = conv.id;
 	active = conv.messages.length > 0;
@@ -117,7 +143,6 @@ function syncCurrentToList() {
 		conversations[idx] = {
 			...conversations[idx],
 			messages: [...messages],
-			sessionId,
 			placeContext,
 			updatedAt: messages[messages.length - 1]?.timestamp || conversations[idx].updatedAt
 		};
@@ -134,17 +159,6 @@ function persist() {
 			conversations
 		})
 	);
-}
-
-function getOrCreateSessionId(): string {
-	if (sessionId) return sessionId;
-	const id =
-		globalThis.crypto?.randomUUID?.() ??
-		Array.from(crypto.getRandomValues(new Uint8Array(16)))
-			.map((b, i) => ([4, 6, 8, 10].includes(i) ? '-' : '') + b.toString(16).padStart(2, '0'))
-			.join('');
-	sessionId = id;
-	return id;
 }
 
 function buildHistory(): Array<{ role: string; parts: Array<{ text: string }> }> {
@@ -184,7 +198,7 @@ async function send(text: string) {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				message: trimmed,
-				sessionId: getOrCreateSessionId(),
+				sessionId: currentId,
 				placeContext,
 				history
 			})
@@ -230,12 +244,10 @@ function start(query: string, place: PlaceContext | null) {
 	syncCurrentToList();
 
 	const id = crypto.randomUUID();
-	const sid = crypto.randomUUID(); // Always fresh — never reuse from previous conversation
 	const conv: Conversation = {
 		id,
 		title: generateTitle(query),
 		messages: [],
-		sessionId: sid,
 		placeContext: place,
 		createdAt: Date.now(),
 		updatedAt: Date.now()
@@ -249,7 +261,6 @@ function start(query: string, place: PlaceContext | null) {
 	currentId = id;
 	messages = [];
 	loading = false;
-	sessionId = sid;
 	placeContext = place;
 	active = true;
 	error = '';
@@ -263,7 +274,6 @@ function reset() {
 	loading = false;
 	error = '';
 	active = false;
-	sessionId = '';
 	placeContext = null;
 	currentId = null;
 	persist();
@@ -278,23 +288,15 @@ function switchTo(id: string) {
 	persist();
 }
 
-function switchToBySessionId(sid: string) {
-	const conv = conversations.find((c) => c.sessionId === sid);
-	if (!conv || conv.id === currentId) return;
-	syncCurrentToList();
-	loadConversation(conv);
-	persist();
-}
-
 async function recover(): Promise<boolean> {
-	if (!sessionId || loading) return false;
+	if (!currentId || loading) return false;
 	const recoveringConvId = currentId;
 	loading = true;
 	error = '';
 
 	const checkUrl = import.meta.env.DEV
-		? `/api/agent/check?sid=${sessionId}`
-		: `https://us-central1-superextra-site.cloudfunctions.net/agentCheck?sid=${sessionId}`;
+		? `/api/agent/check?sid=${currentId}`
+		: `https://us-central1-superextra-site.cloudfunctions.net/agentCheck?sid=${currentId}`;
 
 	// Agent may still be processing — poll until we get a reply or give up
 	const MAX_ATTEMPTS = 60;
@@ -339,7 +341,6 @@ function deleteConversation(id: string) {
 		loading = false;
 		error = '';
 		active = false;
-		sessionId = '';
 		placeContext = null;
 		currentId = null;
 	}
@@ -371,14 +372,10 @@ export const chatState = {
 	get activeId() {
 		return currentId;
 	},
-	get sessionId() {
-		return sessionId;
-	},
 	send,
 	start,
 	reset,
 	recover,
 	switchTo,
-	switchToBySessionId,
 	deleteConversation
 };
