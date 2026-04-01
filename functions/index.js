@@ -231,7 +231,7 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 				user_id: userId,
 				session_id: adkSessionId,
 				new_message: { role: 'user', parts: [{ text: queryText }] },
-				streaming: false
+				streaming: true
 			})
 		});
 
@@ -252,6 +252,16 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 			if (!line.startsWith('data: ')) continue;
 			try {
 				const event = JSON.parse(line.slice(6));
+					// TEMP: Log event structure for streaming verification
+					console.log('ADK_EVENT:', JSON.stringify({
+						author: event.author,
+						partial: event.partial,
+						hasContent: !!event.content,
+						partTypes: event.content?.parts?.map(p => p.text ? 'text' : p.functionCall ? 'fc:' + p.functionCall.name : p.functionResponse ? 'fr' : 'other'),
+						stateDeltaKeys: Object.keys(event.actions?.stateDelta || {}),
+						groundingChunks: (event.grounding_metadata?.grounding_chunks || event.groundingMetadata?.groundingChunks)?.length || 0,
+						branch: event.branch || '',
+					}));
 				const stateDelta = event.actions?.stateDelta;
 				if (stateDelta?.final_report) {
 					reply = stateDelta.final_report;
