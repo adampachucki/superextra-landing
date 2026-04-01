@@ -360,7 +360,6 @@
 		}
 	}
 
-	 
 	let confirmDeleteId = $state<string | null>(null);
 
 	function formatRelativeTime(ts: number): string {
