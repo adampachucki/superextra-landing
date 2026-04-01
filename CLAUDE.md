@@ -80,6 +80,25 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 - Agent code lives in `agent/superextra_agent/`, instructions in `agent/superextra_agent/instructions/`
 - **Read `instructions/AUTHORING.md` before writing or modifying any agent instruction file** — it documents the architecture, patterns, and pitfalls
 
+## Deployment
+
+Push to `main` → `.github/workflows/deploy.yml` deploys: Firebase Hosting (static SvelteKit), Cloud Functions (`functions/index.js` — proxies to agent), ADK agent on Cloud Run (`superextra-agent` in `us-central1`).
+
+### ADK Cloud Run gotchas
+
+- **Auto-generated Dockerfile** bakes `GOOGLE_CLOUD_LOCATION=us-central1` into the image from `--region`. Do not override this env var — Agent Engine sessions require `us-central1`.
+- **Model routing is separate from session routing.** Some models (Gemini 3.1) only work via the global Vertex AI endpoint. `specialists.py` handles this by overriding `api_client` with `location='global'` on Gemini instances. If adding new models, check regional availability first.
+- **`agent/.env` is NOT copied into the container.** It works locally but ADK in the container can't find it. Use `--set-env-vars` for Cloud Run, and note that **service-level env vars persist across deploys** — use `--remove-env-vars` to clean up.
+- **Filesystem is read-only** except `/tmp`. Detect Cloud Run via `K_SERVICE` env var.
+- **Local deploy**: `cd agent && .venv/bin/adk deploy cloud_run --project=superextra-site --region=us-central1 --service_name=superextra-agent --session_service_uri=agentengine://2746721333428617216 --trace_to_cloud superextra_agent -- --no-allow-unauthenticated`
+
+### Debugging agent issues
+
+- **Always read Cloud Run logs first**: `gcloud run services logs read superextra-agent --region=us-central1 --project=superextra-site --limit=30`
+- **Check env vars**: `gcloud run services describe superextra-agent --region=us-central1 --project=superextra-site --format="yaml(spec.template.spec.containers[0].env)"`
+- **Test end-to-end via Cloud Function**: `curl -X POST https://us-central1-superextra-site.cloudfunctions.net/agent -H 'Content-Type: application/json' -d '{"message":"hello","sessionId":"test"}'`
+- **IAM**: Cloud Function SA `907466498524-compute@developer.gserviceaccount.com` needs `roles/run.invoker` on the Cloud Run service
+
 ## Assume nothing — verify
 
 - Never rely on training knowledge for factual claims. Every time you explore a topic, hit a coding issue, or reason through a decision — stop and check the real source: docs, code, APIs, actual data.
