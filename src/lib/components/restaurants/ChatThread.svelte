@@ -27,6 +27,57 @@
 		chatState.streamingProgress.length > 0 || chatState.streamingText.length > 0
 	);
 
+	// Elapsed timer — ticks while any step is "running"
+	let elapsedMs = $state(0);
+	let elapsedInterval: ReturnType<typeof setInterval> | null = null;
+
+	$effect(() => {
+		const hasRunning = chatState.streamingProgress.some((s) => s.status === 'running');
+		if (hasRunning && !elapsedInterval) {
+			elapsedMs = 0;
+			elapsedInterval = setInterval(() => {
+				elapsedMs += 1000;
+			}, 1000);
+		} else if (!hasRunning && elapsedInterval) {
+			clearInterval(elapsedInterval);
+			elapsedInterval = null;
+		}
+		return () => {
+			if (elapsedInterval) clearInterval(elapsedInterval);
+			elapsedInterval = null;
+		};
+	});
+
+	// Typewriter — drains streamingText at a steady rate
+	let displayText = $state('');
+	let typewriterRaf: number | null = null;
+
+	function drain() {
+		const target = chatState.streamingText;
+		if (displayText.length >= target.length) {
+			typewriterRaf = null;
+			return;
+		}
+		const nextLen = Math.min(displayText.length + 3, target.length);
+		displayText = target.slice(0, nextLen);
+		typewriterRaf = requestAnimationFrame(drain);
+	}
+
+	$effect(() => {
+		const target = chatState.streamingText;
+		if (!target) {
+			displayText = '';
+			if (typewriterRaf) {
+				cancelAnimationFrame(typewriterRaf);
+				typewriterRaf = null;
+			}
+			return;
+		}
+		if (displayText.length < target.length && !typewriterRaf) {
+			drain();
+		}
+	});
+
 	const SOURCES_LIMIT = 19;
 	let expandedSources: Record<number, boolean> = $state({});
 
@@ -116,13 +167,15 @@
 								>
 								<div class="flex flex-wrap gap-1.5">
 									{#each visible as src}
-										{@const domain = (() => {
-											try {
-												return new URL(src.url).hostname;
-											} catch {
-												return '';
-											}
-										})()}
+										{@const domain =
+											src.domain ||
+											(() => {
+												try {
+													return new URL(src.url).hostname;
+												} catch {
+													return '';
+												}
+											})()}
 										<a
 											href={src.url}
 											target="_blank"
@@ -171,16 +224,33 @@
 										<span class="text-black/40 dark:text-white/40">{step.label}</span>
 									{:else}
 										<span class="stage-pulse h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"></span>
-										<span class="text-black/60 dark:text-white/60">{step.label}</span>
+										<span class="text-black/60 dark:text-white/60"
+											>{step.label}{#if elapsedMs > 0}
+												<span class="ml-1 text-black/25 dark:text-white/25"
+													>{Math.floor(elapsedMs / 1000)}s</span
+												>{/if}</span
+										>
 									{/if}
 								</div>
+								{#if step.previews?.length}
+									<div class="ml-3.5 flex flex-col gap-1">
+										{#each step.previews as p, i}
+											<p
+												class="preview-stagger text-[12px] leading-snug text-black/40 dark:text-white/40"
+												style="animation-delay: {i * 150}ms"
+											>
+												{p.preview}
+											</p>
+										{/each}
+									</div>
+								{/if}
 							{/each}
 						</div>
-						{#if chatState.streamingText}
+						{#if displayText}
 							<div
 								class="prose mt-4 max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
 							>
-								{@html renderMarkdown(chatState.streamingText)}
+								{@html renderMarkdown(displayText)}
 								<span class="cursor-blink">|</span>
 							</div>
 						{/if}
@@ -279,6 +349,21 @@
 		background-size: 200% 100%;
 		background-clip: text;
 		-webkit-background-clip: text;
+	}
+
+	.preview-stagger {
+		animation: previewIn 0.4s ease-out both;
+	}
+
+	@keyframes previewIn {
+		from {
+			opacity: 0;
+			transform: translateY(4px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.stage-pulse {

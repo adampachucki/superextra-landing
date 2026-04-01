@@ -27,17 +27,26 @@ def _append_sources(*, callback_context, llm_response):
     seen = set()
     for chunk in gm.grounding_chunks:
         if chunk.web and chunk.web.uri and chunk.web.uri not in seen:
-            urls.append((chunk.web.title or chunk.web.uri, chunk.web.uri))
+            title = chunk.web.title or chunk.web.uri
+            uri = chunk.web.uri
+            domain = chunk.web.domain or ""
+            urls.append((title, uri, domain))
             seen.add(chunk.web.uri)
     if not urls:
         return llm_response
-    # Append a Sources section to the last text part
+    # Append a Sources section to the last text part.
+    # Format: - [title](uri){domain} — domain suffix lets the frontend
+    # display the real source host even when uri is a redirect URL.
     if llm_response.content and llm_response.content.parts:
         for part in reversed(llm_response.content.parts):
             if part.text:
-                sources_md = "\n\n## Sources\n" + "\n".join(
-                    f"- [{title}]({url})" for title, url in urls
-                )
+                lines = []
+                for title, uri, domain in urls:
+                    entry = f"- [{title}]({uri})"
+                    if domain:
+                        entry += "{" + domain + "}"
+                    lines.append(entry)
+                sources_md = "\n\n## Sources\n" + "\n".join(lines)
                 part.text += sources_md
                 break
     return llm_response

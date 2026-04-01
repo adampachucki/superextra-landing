@@ -140,8 +140,10 @@ const SPECIALIST_RESULT_KEYS = [
 	'dynamic_result_1', 'dynamic_result_2',
 ];
 
-// Extract markdown links from specialist result text: - [Title](URL)
-const MD_LINK_RE = /\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
+// Extract markdown links from specialist result text: - [Title](URL){domain}
+// The {domain} suffix is optional — when present it carries the real source domain
+// (the URL itself may be a vertexaisearch.cloud.google.com redirect).
+const MD_LINK_RE = /\[([^\]]*)\]\((https?:\/\/[^)]+)\)(?:\{([^}]*)\})?/g;
 
 function extractSourcesFromText(text) {
 	const sources = [];
@@ -149,7 +151,7 @@ function extractSourcesFromText(text) {
 	while ((match = MD_LINK_RE.exec(text)) !== null) {
 		const url = match[2];
 		if (!sources.some(s => s.url === url)) {
-			sources.push({ title: match[1] || '', url });
+			sources.push({ title: match[1] || '', url, ...(match[3] && { domain: match[3] }) });
 		}
 	}
 	MD_LINK_RE.lastIndex = 0;
@@ -546,10 +548,20 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 						const deltaKeys = Object.keys(delta);
 						const parts = evt.content?.parts || [];
 
-						// 1. Context enricher complete
+						// 1. Context enricher complete — extract name/rating from places_context
 						if (delta.places_context && !contextDone) {
 							contextDone = true;
-							sendSSE(res, 'progress', { stage: 'context', status: 'complete', label: 'Place data gathered' });
+							let label = 'Place data gathered';
+							const ctx = typeof delta.places_context === 'string' ? delta.places_context : '';
+							const nameMatch = ctx.match(/(?:Name|Display\s*Name):\s*(.+?)(?:\n|$)/i);
+							const ratingMatch = ctx.match(/Rating:\s*([\d.]+)/i);
+							const reviewMatch = ctx.match(/([\d,]+)\s*review/i);
+							if (nameMatch) {
+								label = nameMatch[1].trim();
+								if (ratingMatch) label += ` — ${ratingMatch[1]}★`;
+								if (reviewMatch) label += ` · ${reviewMatch[1]} reviews`;
+							}
+							sendSSE(res, 'progress', { stage: 'context', status: 'complete', label });
 						}
 
 						// 2. Research planner dispatching specialists (function_call events)
@@ -571,7 +583,16 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 						// 3. Specialist results arrived (function_response with specialist state keys)
 						if (!specialistsDone && deltaKeys.some(k => SPECIALIST_KEYS.has(k))) {
 							specialistsDone = true;
-							sendSSE(res, 'progress', { stage: 'specialists', status: 'complete', label: 'Research complete' });
+							const previews = [];
+							for (const key of deltaKeys) {
+								if (SPECIALIST_KEYS.has(key) && typeof delta[key] === 'string' && delta[key] !== 'NOT_RELEVANT') {
+									const text = delta[key].replace(/[#*_\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+									const preview = text.slice(0, 120) + (text.length > 120 ? '...' : '');
+									const name = TOOL_LABELS[key.replace('_result', '').replace('dynamic_result_', 'dynamic_researcher_')] || key;
+									previews.push({ name, preview });
+								}
+							}
+							sendSSE(res, 'progress', { stage: 'specialists', status: 'complete', label: 'Research complete', previews });
 						}
 
 						// 4. Research plan complete

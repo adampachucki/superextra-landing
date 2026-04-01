@@ -3,12 +3,14 @@ import { streamAgent } from '$lib/sse-client';
 interface ChatSource {
 	title: string;
 	url: string;
+	domain?: string;
 }
 
 interface StreamingStep {
 	stage: string;
 	status: string;
 	label: string;
+	previews?: Array<{ name: string; preview: string }>;
 }
 
 interface ChatMessage {
@@ -220,12 +222,13 @@ async function send(text: string) {
 				history
 			},
 			{
-				onProgress(stage, status, label) {
+				onProgress(stage, status, label, previews) {
+					const step: StreamingStep = { stage, status, label, previews };
 					const idx = streamingProgress.findIndex((p) => p.stage === stage);
 					if (idx >= 0) {
-						streamingProgress[idx] = { stage, status, label };
+						streamingProgress[idx] = step;
 					} else {
-						streamingProgress = [...streamingProgress, { stage, status, label }];
+						streamingProgress = [...streamingProgress, step];
 					}
 				},
 				onToken(text) {

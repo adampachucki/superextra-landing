@@ -4,7 +4,12 @@ interface ChatSource {
 }
 
 export interface SSECallbacks {
-	onProgress: (stage: string, status: string, label: string) => void;
+	onProgress: (
+		stage: string,
+		status: string,
+		label: string,
+		previews?: Array<{ name: string; preview: string }>
+	) => void;
 	onToken: (text: string) => void;
 	onComplete: (reply: string, sources: ChatSource[], title?: string) => void;
 	onError: (error: string) => void;
@@ -133,7 +138,7 @@ function dispatchEvent(event: string, data: string, callbacks: SSECallbacks) {
 		const parsed = JSON.parse(data);
 		switch (event) {
 			case 'progress':
-				callbacks.onProgress(parsed.stage, parsed.status, parsed.label);
+				callbacks.onProgress(parsed.stage, parsed.status, parsed.label, parsed.previews);
 				break;
 			case 'token':
 				callbacks.onToken(parsed.text);
