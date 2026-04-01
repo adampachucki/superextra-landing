@@ -15,16 +15,20 @@ RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=60.0)
 if _version == "3.1":
     MODEL = "gemini-3.1-pro-preview"
     SPECIALIST_MODEL = "gemini-3.1-pro-preview-customtools"
+    # Gemini 3.1 is only available via the global Vertex AI endpoint,
+    # not regional ones like us-central1 (which ADK bakes into the container).
+    _GLOBAL_BASE_URL = "https://aiplatform.googleapis.com/"
     THINKING_CONFIG = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
     )
 else:
     MODEL = "gemini-2.5-pro"
     SPECIALIST_MODEL = MODEL
+    _GLOBAL_BASE_URL = None
     THINKING_CONFIG = None
 
-MODEL_GEMINI = Gemini(model=MODEL, retry_options=RETRY)
-SPECIALIST_GEMINI = Gemini(model=SPECIALIST_MODEL, retry_options=RETRY)
+MODEL_GEMINI = Gemini(model=MODEL, retry_options=RETRY, base_url=_GLOBAL_BASE_URL)
+SPECIALIST_GEMINI = Gemini(model=SPECIALIST_MODEL, retry_options=RETRY, base_url=_GLOBAL_BASE_URL)
 
 
 def _make_instruction(name: str):
@@ -127,16 +131,6 @@ dynamic_researcher_2 = LlmAgent(
     output_key="dynamic_result_2",
     generate_content_config=THINKING_CONFIG,
 )
-
-ALL_SPECIALISTS = [
-    market_landscape,
-    menu_pricing,
-    revenue_sales,
-    guest_intelligence,
-    location_traffic,
-    operations,
-    marketing_digital,
-]
 
 SPECIALIST_TOOLS = [
     AgentTool(agent=market_landscape, skip_summarization=True),
