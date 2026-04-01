@@ -20,6 +20,16 @@ export async function streamAgent(
 	callbacks: SSECallbacks,
 	signal?: AbortSignal
 ): Promise<void> {
+	return streamAgentOnce(url, body, callbacks, signal, true);
+}
+
+async function streamAgentOnce(
+	url: string,
+	body: Record<string, unknown>,
+	callbacks: SSECallbacks,
+	signal: AbortSignal | undefined,
+	canRetry: boolean
+): Promise<void> {
 	const res = await fetch(url, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
@@ -44,6 +54,8 @@ export async function streamAgent(
 	let currentEvent = '';
 	let currentData = '';
 	let completed = false;
+	let receivedAnyEvent = false;
+	const startTime = Date.now();
 
 	// Inactivity timeout — reset on any data or keepalive
 	let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
@@ -78,6 +90,7 @@ export async function streamAgent(
 				if (line === '') {
 					// Empty line = end of SSE event
 					if (currentData) {
+						receivedAnyEvent = true;
 						dispatchEvent(currentEvent, currentData, callbacks);
 						if (currentEvent === 'complete' || currentEvent === 'error') {
 							completed = true;
@@ -96,6 +109,7 @@ export async function streamAgent(
 
 		// Handle any remaining buffered event
 		if (currentData && !completed) {
+			receivedAnyEvent = true;
 			dispatchEvent(currentEvent, currentData, callbacks);
 			if (currentEvent === 'complete' || currentEvent === 'error') {
 				completed = true;
@@ -103,6 +117,10 @@ export async function streamAgent(
 		}
 
 		if (!completed) {
+			// Stream closed with zero events within 5s — transient infra failure, retry once
+			if (canRetry && !receivedAnyEvent && Date.now() - startTime < 5_000) {
+				return streamAgentOnce(url, body, callbacks, signal, false);
+			}
 			callbacks.onError('Connection closed before response completed.');
 		}
 	} finally {
