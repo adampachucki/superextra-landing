@@ -26,7 +26,11 @@ if TYPE_CHECKING:
     from google.adk.agents.invocation_context import InvocationContext
     from google.adk.tools.tool_context import ToolContext
 
-LOGS_DIR = Path(__file__).parent.parent / "logs"
+import os as _os
+
+# Cloud Run containers have a read-only filesystem except /tmp
+_default_logs = Path(__file__).parent.parent / "logs"
+LOGS_DIR = Path("/tmp/agent_logs") if _os.environ.get("K_SERVICE") else _default_logs
 
 logger = logging.getLogger(__name__)
 
