@@ -82,7 +82,7 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 
 ## Deployment
 
-Push to `main` → `.github/workflows/deploy.yml` deploys: Firebase Hosting (static SvelteKit), Cloud Functions (`functions/index.js` — proxies to agent), ADK agent on Cloud Run (`superextra-agent` in `us-central1`).
+Push to `main` → `.github/workflows/deploy.yml` deploys: Firebase Hosting (static SvelteKit), Cloud Functions (`functions/index.js` — proxies to agent), ADK agent on Cloud Run (`superextra-agent` in `us-central1`). The `agentStream` SSE endpoint is called directly via its Cloud Run URL (not `cloudfunctions.net`) — see "Cloud Functions streaming gotchas" below.
 
 ### ADK Cloud Run gotchas
 
@@ -94,6 +94,12 @@ Push to `main` → `.github/workflows/deploy.yml` deploys: Firebase Hosting (sta
 - **AgentTool discards sub-agent grounding metadata.** Specialist agents called via `AgentTool` produce `grounding_metadata.grounding_chunks` with source URLs, but AgentTool only propagates text output back to the parent. The `_append_sources` callback in `specialists.py` works around this by appending a `## Sources` markdown section to the specialist's response text before AgentTool captures it.
 - **ADK callbacks use keyword arguments.** Agent-level callbacks like `after_model_callback` receive `(*, callback_context, llm_response)` — not positional args. Wrong signatures cause silent TypeErrors.
 - **Local deploy**: `cd agent && .venv/bin/adk deploy cloud_run --project=superextra-site --region=us-central1 --service_name=superextra-agent --session_service_uri=agentengine://2746721333428617216 --trace_to_cloud superextra_agent -- --no-allow-unauthenticated`
+
+### Cloud Functions streaming gotchas
+
+- **`cloudfunctions.net` GFE proxy kills SSE streams.** The Google Frontend proxy for Cloud Functions v2 terminates SSE/streaming responses after the first `res.write()`. The `agentStream` function bypasses this by having the frontend call the Cloud Run `run.app` URL directly (`agentstream-907466498524.us-central1.run.app`), not the `cloudfunctions.net` URL. Non-streaming endpoints (`agentCheck`, `agent`) can stay on `cloudfunctions.net`.
+- **Use `res.on('close')`, never `req.on('close')` for SSE disconnect detection.** On Cloud Run with HTTP/2, `req.on('close')` fires when the request body stream ends — immediately for a POST request — not when the client disconnects. Using `req.on('close')` will abort the SSE stream at +0.0s. The `res.on('close')` event correctly fires only when the response connection is actually closed by the client.
+- **The `agentStream` Cloud Run service must allow unauthenticated access** (`allUsers` with `roles/run.invoker`) since the frontend calls it directly without a Firebase auth layer.
 
 ### Debugging agent issues
 
