@@ -53,6 +53,12 @@ jobs:
       - run: cd functions && npm ci
       - run: cd functions && npm test
 
+      - name: Authenticate to Google Cloud (for agent tests)
+        if: needs.detect-changes.outputs.agent == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SUPEREXTRA_SITE }}
+
       - uses: actions/setup-python@v5
         if: needs.detect-changes.outputs.agent == 'true'
         with:
