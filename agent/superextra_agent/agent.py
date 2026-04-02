@@ -86,10 +86,8 @@ research_scoper = LlmAgent(
     name="research_scoper",
     model=MODEL_GEMINI,
     instruction=_scoper_instruction,
-    description="Analyzes the user question, runs reconnaissance, and presents a research plan for user approval.",
-    tools=[google_search],
+    description="Analyzes the user question and presents a concise research plan for user approval.",
     output_key="scope_plan",
-    generate_content_config=THINKING_CONFIG,
 )
 
 research_executor = LlmAgent(
