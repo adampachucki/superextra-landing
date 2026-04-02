@@ -2,6 +2,12 @@
 
 AI-native market intelligence and competitor benchmarking for the restaurant industry. Four layers: data sources → platform → AI agents → human experts. Prerendered static SvelteKit site deployed to Firebase Hosting.
 
+## Domains & hosting sites
+
+- **This repo** (`superextra-landing` hosting site) → **`landing.superextra.ai`** — NOT `superextra.ai`
+- `superextra-site` is a separate hosting site serving `superextra.ai` (main marketing page) — not part of this repo
+- Agent UI routes: `/agent` (landing.superextra.ai/agent) and `/agent/chat`
+
 ## Commands
 
 - `npm run dev` — port 5199, exposed on local network (`host: true`) for mobile testing
@@ -39,6 +45,7 @@ When modifying:
 - **`agent/superextra_agent/specialists.py`** → run agent pytest (covers `_append_sources`)
 - **`agent/superextra_agent/places_tools.py`** → run agent pytest
 - **`agent/superextra_agent/agent.py`** (instruction providers) → run agent pytest
+- **`agent/superextra_agent/instructions/router.md`** → run `npm run test:evals` (live Gemini calls, not in CI)
 
 ## Branding
 
@@ -103,11 +110,20 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 
 ## Deployment
 
-Push to `main` → `.github/workflows/deploy.yml` deploys: Firebase Hosting (static SvelteKit), Cloud Functions (`functions/index.js` — proxies to agent), ADK agent on Cloud Run (`superextra-agent` in `us-central1`). The `agentStream` SSE endpoint is called directly via its Cloud Run URL (not `cloudfunctions.net`) — see "Cloud Functions streaming gotchas" below.
+Push to `main` → `.github/workflows/deploy.yml` runs 4 parallel jobs:
+
+1. **detect-changes** — `dorny/paths-filter` checks if `agent/superextra_agent/**`, `agent/requirements.txt`, or `deploy.yml` changed
+2. **test** — lint, format check, svelte-check, Vitest, functions tests, agent tests (only if agent changed)
+3. **deploy-hosting** — Firebase Hosting + Cloud Functions (always runs after tests pass)
+4. **deploy-agent** — ADK Cloud Run deploy + smoke test (skipped if agent code unchanged)
+
+`deploy-hosting` and `deploy-agent` run in parallel after `test` passes. Agent deploy is the slowest step (~4-5 min) and is skipped on frontend-only pushes. Agent deps are pinned in `agent/requirements.txt` and cached via `actions/setup-python` pip cache.
+
+The `agentStream` SSE endpoint is called directly via its Cloud Run URL (not `cloudfunctions.net`) — see "Cloud Functions streaming gotchas" below.
 
 ### ADK Cloud Run gotchas
 
-- **`adk deploy cloud_run` returns exit 0 even when gcloud fails.** The deploy step in `deploy.yml` greps output for "Deploy failed" to detect this. If the ADK deploy "succeeds" but changes don't appear, check the deploy step output — it may have silently failed. **Always verify** after agent changes: `gcloud run revisions list --service=superextra-agent --region=us-central1 --project=superextra-site --limit=3` — check the latest revision timestamp matches your deploy.
+- **`adk deploy cloud_run` returns exit 0 even when gcloud fails.** The `deploy-agent` job in `deploy.yml` snapshots the revision before/after and fails if no new revision was created. If the ADK deploy "succeeds" but changes don't appear, check the deploy step output — it may have silently failed. **Always verify** after agent changes: `gcloud run revisions list --service=superextra-agent --region=us-central1 --project=superextra-site --limit=3` — check the latest revision timestamp matches your deploy.
 - **Auto-generated Dockerfile** bakes `GOOGLE_CLOUD_LOCATION=us-central1` into the image from `--region`. Do not override this env var — Agent Engine sessions require `us-central1`.
 - **Model routing is separate from session routing.** Some models (Gemini 3.1) only work via the global Vertex AI endpoint. `specialists.py` handles this by overriding `api_client` with `location='global'` on Gemini instances. If adding new models, check regional availability first.
 - **`agent/.env` is NOT read at runtime in the container.** The file gets copied into the image but ADK's server ignores it. Any env var the agent code needs (e.g. `GOOGLE_PLACES_API_KEY`) must be set as a Cloud Run service-level env var. The deploy pipeline passes these via `--update-env-vars` in the gcloud passthrough after `--` in `deploy.yml`. **When adding a new env var:** add it as a GitHub secret, then append it to the `--update-env-vars` flag in `deploy.yml`. Use `--update-env-vars` (merges) not `--set-env-vars` (replaces all). Service-level env vars persist across deploys.
