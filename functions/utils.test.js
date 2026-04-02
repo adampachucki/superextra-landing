@@ -227,9 +227,9 @@ describe('constants', () => {
 	});
 
 	it('TOOL_LABELS maps all specialist agent names', () => {
-		assert.equal(TOOL_LABELS.market_landscape, 'market landscape');
-		assert.equal(TOOL_LABELS.guest_intelligence, 'reviews');
-		assert.equal(TOOL_LABELS.dynamic_researcher_1, 'trends');
+		assert.equal(TOOL_LABELS.market_landscape, 'Market Landscape');
+		assert.equal(TOOL_LABELS.guest_intelligence, 'Guest Intelligence');
+		assert.equal(TOOL_LABELS.dynamic_researcher_1, 'Research');
 	});
 });
 
@@ -310,11 +310,12 @@ describe('parseADKStream', () => {
 		assert.equal(planning.d.status, 'complete');
 	});
 
-	it('emits specialists running on function calls', async () => {
+	it('emits specialists running on set_specialist_briefs call', async () => {
 		const reader = mockReader([
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
-				content: { parts: [{ functionCall: { name: 'market_landscape' } }] },
+				content: { parts: [{ functionCall: { name: 'set_specialist_briefs', args: { briefs: { market_landscape: 'Investigate...', guest_intelligence: 'Analyze...' } } } }] },
+				author: 'research_orchestrator',
 				partial: false,
 			})}\n\n`
 		]);
@@ -322,18 +323,24 @@ describe('parseADKStream', () => {
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
 		const running = events.find(ev => ev.d.stage === 'specialists' && ev.d.status === 'running');
 		assert.ok(running);
-		assert.ok(running.d.label.includes('market landscape'));
+		assert.ok(running.d.label.includes('Market Landscape'));
+		assert.ok(running.d.label.includes('Guest Intelligence'));
 	});
 
-	it('emits specialists complete with previews', async () => {
+	it('emits individual specialist completion with preview', async () => {
 		const reader = mockReader([
-			`data: ${adkEvent({ actions: { stateDelta: { market_result: '## Market\nThe market is growing rapidly with new entrants.' } } })}\n\n`
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { market_result: '## Market\nThe market is growing rapidly with new entrants.' } },
+				content: { parts: [] },
+				author: 'market_landscape',
+				partial: false,
+			})}\n\n`
 		]);
 		const events = [];
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const complete = events.find(ev => ev.d.stage === 'specialists' && ev.d.status === 'complete');
+		const complete = events.find(ev => ev.d.stage === 'market_landscape' && ev.d.status === 'complete');
 		assert.ok(complete);
-		assert.ok(complete.d.previews.length > 0);
+		assert.ok(complete.d.preview.includes('market is growing'));
 	});
 
 	it('emits synthesis progress and tokens for synthesizer', async () => {

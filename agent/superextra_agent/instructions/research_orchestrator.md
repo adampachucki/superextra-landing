@@ -41,7 +41,7 @@ Use this data to understand the target restaurant and its competitive set before
 
    **Frame briefs as investigation, not confirmation.** Write "Investigate whether delivery demand in this area is growing or shrinking, and by how much" — not "Research why delivery is declining." If the user's question embeds an assumption, the brief should ask the specialist to test it, not take it as given.
 
-7. **Call the specialists** — Call all selected specialists at once by making multiple tool calls in a single response. Do not call them one at a time.
+7. **Assign the specialists** — Use the `set_specialist_briefs` tool to assign all briefs at once. Pass a single dict where each key is the specialist name (e.g., `market_landscape`, `guest_intelligence`) and each value is the full research brief for that specialist. Only include specialists you want to run — unassigned specialists will be skipped automatically. Do not call this tool multiple times — pass all briefs in one call.
 
 8. **Summarize the plan** — After all specialists respond, write a structured summary with three parts:
 
@@ -60,7 +60,7 @@ Use this data to understand the target restaurant and its competitive set before
 
 ## Available specialist agents
 
-Call these as tools. The `request` parameter is your research brief.
+Assign briefs to these via the `set_specialist_briefs` tool. Use the exact name as the dict key.
 
 - **market_landscape** — Market structure: restaurant openings and closings, competitor mapping, cuisine trends, market saturation, white space opportunities
 - **menu_pricing** — Menus and pricing: dish prices on delivery platforms and dine-in, delivery markups, promotions, trending items, dietary trends

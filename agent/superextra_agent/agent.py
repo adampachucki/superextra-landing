@@ -1,4 +1,5 @@
 from google.adk.agents.sequential_agent import SequentialAgent
+from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.apps import App
@@ -6,7 +7,7 @@ from google.adk.tools import google_search
 from google.genai import Client, types
 from .specialists import (
     MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG,
-    SPECIALIST_TOOLS, RETRY,
+    ALL_SPECIALISTS, set_specialist_briefs_tool, RETRY,
 )
 from .places_tools import get_restaurant_details, find_nearby_restaurants, search_restaurants
 from .chat_logger import ChatLoggerPlugin
@@ -81,18 +82,24 @@ research_orchestrator = LlmAgent(
     name="research_orchestrator",
     model=MODEL_GEMINI,
     instruction=_orchestrator_instruction,
-    description="Plans and executes research: reconnaissance, specialist dispatch, and structured summary.",
-    tools=[google_search] + SPECIALIST_TOOLS,
+    description="Plans research: reconnaissance, premise audit, and specialist brief assignment.",
+    tools=[google_search, set_specialist_briefs_tool],
     output_key="research_plan",
     generate_content_config=THINKING_CONFIG,
+)
+
+specialist_pool = ParallelAgent(
+    name="specialist_pool",
+    sub_agents=ALL_SPECIALISTS,
+    description="Runs assigned specialists in parallel. Specialists without briefs skip instantly.",
 )
 
 # --- Pipeline ---
 
 research_pipeline = SequentialAgent(
     name="research_pipeline",
-    sub_agents=[_make_enricher(), research_orchestrator, _make_synthesizer()],
-    description="Enriches context, plans and executes research, then synthesizes findings into a report.",
+    sub_agents=[_make_enricher(), research_orchestrator, specialist_pool, _make_synthesizer()],
+    description="Enriches context, plans research, runs specialists in parallel, then synthesizes findings.",
 )
 
 # --- Router (root agent) ---

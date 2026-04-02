@@ -104,15 +104,27 @@ export const SPECIALIST_KEYS = new Set([
 ]);
 
 export const TOOL_LABELS = {
-	market_landscape: 'market landscape',
-	menu_pricing: 'pricing',
-	revenue_sales: 'revenue',
-	guest_intelligence: 'reviews',
-	location_traffic: 'location',
-	operations: 'operations',
-	marketing_digital: 'marketing',
-	dynamic_researcher_1: 'trends',
-	dynamic_researcher_2: 'trends',
+	market_landscape: 'Market Landscape',
+	menu_pricing: 'Menu & Pricing',
+	revenue_sales: 'Revenue & Sales',
+	guest_intelligence: 'Guest Intelligence',
+	location_traffic: 'Location & Traffic',
+	operations: 'Operations',
+	marketing_digital: 'Marketing & Digital',
+	dynamic_researcher_1: 'Research',
+	dynamic_researcher_2: 'Research',
+};
+
+export const SPECIALIST_OUTPUT_KEYS = {
+	market_landscape: 'market_result',
+	menu_pricing: 'pricing_result',
+	revenue_sales: 'revenue_result',
+	guest_intelligence: 'guest_result',
+	location_traffic: 'location_result',
+	operations: 'ops_result',
+	marketing_digital: 'marketing_result',
+	dynamic_researcher_1: 'dynamic_result_1',
+	dynamic_researcher_2: 'dynamic_result_2',
 };
 
 // --- ADK stream parser ---
@@ -130,11 +142,9 @@ export async function parseADKStream(reader, emit) {
 	let reply = '';
 	let routerResponse = '';
 	const sources = [];
-	const specialistNames = [];
 	let synthesisStarted = false;
 	let contextDone = false;
 	let planningDone = false;
-	let specialistsDone = false;
 
 	while (true) {
 		const { done, value } = await reader.read();
@@ -154,6 +164,7 @@ export async function parseADKStream(reader, emit) {
 					const delta = evt.actions?.stateDelta || {};
 					const deltaKeys = Object.keys(delta);
 					const parts = evt.content?.parts || [];
+					const author = evt.author || '';
 
 					// 1. Context enricher complete
 					if (delta.places_context && !contextDone) {
@@ -164,50 +175,61 @@ export async function parseADKStream(reader, emit) {
 						const ratingMatch = ctx.match(/Rating:\s*([\d.]+)/i);
 						const reviewMatch = ctx.match(/([\d,]+)\s*review/i);
 						if (nameMatch) {
-							label = nameMatch[1].trim();
+							label = nameMatch[1].replace(/[*#_]/g, '').trim();
 							if (ratingMatch) label += ` — ${ratingMatch[1]}★`;
 							if (reviewMatch) label += ` · ${reviewMatch[1]} reviews`;
 						}
 						emit('progress', { stage: 'context', status: 'complete', label });
 					}
 
-					// 2. Specialist function calls
-					if (!specialistsDone) {
-						for (const p of parts) {
-							if (p.functionCall && TOOL_LABELS[p.functionCall.name]) {
-								if (!specialistNames.includes(p.functionCall.name)) {
-									specialistNames.push(p.functionCall.name);
-								}
-							}
-						}
-						if (evt.partial === false && specialistNames.length > 0 && !parts.some(p => p.functionResponse)) {
-							const labels = [...new Set(specialistNames.map(n => TOOL_LABELS[n]))].join(', ');
-							emit('progress', { stage: 'specialists', status: 'running', label: `Analyzing ${labels}...` });
-						}
-					}
-
-					// 3. Specialist results arrived
-					if (!specialistsDone && deltaKeys.some(k => SPECIALIST_KEYS.has(k))) {
-						specialistsDone = true;
-						const previews = [];
-						for (const key of deltaKeys) {
-							if (SPECIALIST_KEYS.has(key) && typeof delta[key] === 'string' && delta[key] !== 'NOT_RELEVANT') {
-								const text = delta[key].replace(/[#*_\n]+/g, ' ').replace(/\s+/g, ' ').trim();
-								const preview = text.slice(0, 120) + (text.length > 120 ? '...' : '');
-								const name = TOOL_LABELS[key.replace('_result', '').replace('dynamic_result_', 'dynamic_researcher_')] || key;
-								previews.push({ name, preview });
-							}
-						}
-						emit('progress', { stage: 'specialists', status: 'complete', label: 'Research complete', previews });
-					}
-
-					// 4. Research plan / scope plan complete
+					// 2. Research plan complete (orchestrator set_specialist_briefs or output)
 					if (delta.research_plan && !planningDone) {
 						planningDone = true;
 						emit('progress', { stage: 'planning', status: 'complete', label: 'Research planned' });
 					}
-					// 5. Synthesizer streaming tokens
-					if (evt.author === 'synthesizer' && evt.partial === true) {
+
+					// 3. Orchestrator assigned specialists via set_specialist_briefs
+					const briefsCall = parts.find(p => p.functionCall?.name === 'set_specialist_briefs');
+					if (briefsCall) {
+						const briefKeys = Object.keys(briefsCall.functionCall.args?.briefs || {});
+						const labels = briefKeys.map(k => TOOL_LABELS[k]).filter(Boolean);
+						if (labels.length) {
+							emit('progress', { stage: 'specialists', status: 'running', label: `Researching: ${labels.join(', ')}` });
+						}
+					}
+
+					// 4. Individual specialist google_search calls
+					if (TOOL_LABELS[author]) {
+						const searchCall = parts.find(p => p.functionCall?.name === 'google_search');
+						if (searchCall) {
+							const query = searchCall.functionCall.args?.query;
+							if (query) {
+								emit('progress', {
+									stage: author,
+									status: 'searching',
+									label: `Searching: "${query.length > 80 ? query.slice(0, 77) + '...' : query}"`,
+								});
+							}
+						}
+					}
+
+					// 5. Individual specialist completion (output_key in stateDelta)
+					if (TOOL_LABELS[author]) {
+						const outputKey = SPECIALIST_OUTPUT_KEYS[author];
+						if (outputKey && delta[outputKey] && typeof delta[outputKey] === 'string' && delta[outputKey] !== 'NOT_RELEVANT') {
+							const text = delta[outputKey].replace(/[#*_\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+							const preview = text.slice(0, 120) + (text.length > 120 ? '...' : '');
+							emit('progress', {
+								stage: author,
+								status: 'complete',
+								label: TOOL_LABELS[author],
+								preview,
+							});
+						}
+					}
+
+					// 6. Synthesizer streaming tokens
+					if (author === 'synthesizer' && evt.partial === true) {
 						if (!synthesisStarted) {
 							synthesisStarted = true;
 							emit('progress', { stage: 'synthesis', status: 'running', label: 'Synthesizing findings' });
@@ -216,13 +238,13 @@ export async function parseADKStream(reader, emit) {
 						if (text) emit('token', { text });
 					}
 
-					// 6. Final report as reply
+					// 7. Final report
 					if (delta.final_report) reply = delta.final_report;
 
-					// 7. Router response
+					// 8. Router response
 					if (delta.router_response && !reply) routerResponse = delta.router_response;
 
-					// 8. Extract sources from specialist results
+					// 9. Extract sources from specialist results
 					for (const key of SPECIALIST_RESULT_KEYS) {
 						if (delta[key]) {
 							for (const s of extractSourcesFromText(delta[key])) {

@@ -1,7 +1,6 @@
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
-from google.adk.tools import google_search
-from google.adk.tools import AgentTool
+from google.adk.tools import google_search, FunctionTool
 from google.genai import Client, types
 from pathlib import Path
 import os
@@ -86,14 +85,45 @@ SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 
 
 def _make_instruction(name: str):
-    """Create an InstructionProvider that injects places_context into the template."""
+    """Create an InstructionProvider that injects places_context and brief into the template."""
     template = (INSTRUCTIONS_DIR / f"{name}.md").read_text()
 
     def provider(ctx):
         places_context = ctx.state.get("places_context", "No Google Places data available.")
-        return template.format(places_context=places_context)
+        instruction = template.format(places_context=places_context)
+        briefs = ctx.state.get("specialist_briefs", {})
+        brief = briefs.get(name, "")
+        if brief:
+            instruction += f"\n\n## Your research brief\n\n{brief}"
+        return instruction
 
     return provider
+
+
+def _make_skip_callback(name: str):
+    """Skip the specialist if the orchestrator didn't assign it a brief."""
+    def callback(callback_context):
+        briefs = callback_context.state.get("specialist_briefs", {})
+        if name not in briefs:
+            return types.Content(role="model", parts=[types.Part(text="NOT_RELEVANT")])
+        return None
+    return callback
+
+
+async def set_specialist_briefs(briefs: dict, tool_context) -> str:
+    """Assign research briefs to specialist agents.
+
+    Args:
+        briefs: Dict mapping specialist name to brief text.
+               Valid names: market_landscape, menu_pricing, revenue_sales,
+               guest_intelligence, location_traffic, operations,
+               marketing_digital, dynamic_researcher_1, dynamic_researcher_2
+    """
+    tool_context.state["specialist_briefs"] = briefs
+    return f"Briefs set for: {', '.join(briefs.keys())}"
+
+
+set_specialist_briefs_tool = FunctionTool(set_specialist_briefs)
 
 
 market_landscape = LlmAgent(
@@ -104,6 +134,7 @@ market_landscape = LlmAgent(
     tools=[google_search],
     output_key="market_result",
     generate_content_config=THINKING_CONFIG,
+    before_agent_callback=_make_skip_callback("market_landscape"),
     after_model_callback=_append_sources,
 )
 
@@ -115,6 +146,7 @@ menu_pricing = LlmAgent(
     tools=[google_search],
     output_key="pricing_result",
     generate_content_config=THINKING_CONFIG,
+    before_agent_callback=_make_skip_callback("menu_pricing"),
     after_model_callback=_append_sources,
 )
 
@@ -126,6 +158,7 @@ revenue_sales = LlmAgent(
     tools=[google_search],
     output_key="revenue_result",
     generate_content_config=THINKING_CONFIG,
+    before_agent_callback=_make_skip_callback("revenue_sales"),
     after_model_callback=_append_sources,
 )
 
@@ -137,6 +170,7 @@ guest_intelligence = LlmAgent(
     tools=[google_search],
     output_key="guest_result",
     generate_content_config=THINKING_CONFIG,
+    before_agent_callback=_make_skip_callback("guest_intelligence"),
     after_model_callback=_append_sources,
 )
 
@@ -148,6 +182,7 @@ location_traffic = LlmAgent(
     tools=[google_search],
     output_key="location_result",
     generate_content_config=THINKING_CONFIG,
+    before_agent_callback=_make_skip_callback("location_traffic"),
     after_model_callback=_append_sources,
 )
 
@@ -159,6 +194,7 @@ operations = LlmAgent(
     tools=[google_search],
     output_key="ops_result",
     generate_content_config=THINKING_CONFIG,
+    before_agent_callback=_make_skip_callback("operations"),
     after_model_callback=_append_sources,
 )
 
@@ -170,6 +206,7 @@ marketing_digital = LlmAgent(
     tools=[google_search],
     output_key="marketing_result",
     generate_content_config=THINKING_CONFIG,
+    before_agent_callback=_make_skip_callback("marketing_digital"),
     after_model_callback=_append_sources,
 )
 
@@ -181,6 +218,7 @@ dynamic_researcher_1 = LlmAgent(
     tools=[google_search],
     output_key="dynamic_result_1",
     generate_content_config=THINKING_CONFIG,
+    before_agent_callback=_make_skip_callback("dynamic_researcher_1"),
     after_model_callback=_append_sources,
 )
 
@@ -192,17 +230,12 @@ dynamic_researcher_2 = LlmAgent(
     tools=[google_search],
     output_key="dynamic_result_2",
     generate_content_config=THINKING_CONFIG,
+    before_agent_callback=_make_skip_callback("dynamic_researcher_2"),
     after_model_callback=_append_sources,
 )
 
-SPECIALIST_TOOLS = [
-    AgentTool(agent=market_landscape, skip_summarization=True),
-    AgentTool(agent=menu_pricing, skip_summarization=True),
-    AgentTool(agent=revenue_sales, skip_summarization=True),
-    AgentTool(agent=guest_intelligence, skip_summarization=True),
-    AgentTool(agent=location_traffic, skip_summarization=True),
-    AgentTool(agent=operations, skip_summarization=True),
-    AgentTool(agent=marketing_digital, skip_summarization=True),
-    AgentTool(agent=dynamic_researcher_1, skip_summarization=True),
-    AgentTool(agent=dynamic_researcher_2, skip_summarization=True),
+ALL_SPECIALISTS = [
+    market_landscape, menu_pricing, revenue_sales,
+    guest_intelligence, location_traffic, operations,
+    marketing_digital, dynamic_researcher_1, dynamic_researcher_2,
 ]
