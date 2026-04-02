@@ -463,7 +463,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 	const t0 = Date.now();
 	const keepalive = setInterval(() => res.write(': keepalive\n\n'), 15000);
 	const ac = new AbortController();
-	req.on('close', () => {
+	res.on('close', () => {
 		const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 		if (!res.writableEnded) console.warn(`Client disconnected at +${elapsed}s (before stream completed)`);
 		ac.abort();
