@@ -1,9 +1,8 @@
 """Tests for instruction provider functions in agent.py."""
 
 from superextra_agent.agent import (
-    _planner_instruction,
+    _orchestrator_instruction,
     _synthesizer_instruction,
-    _executor_instruction,
     _SYNTHESIZER_KEYS,
 )
 from superextra_agent.specialists import _make_instruction
@@ -14,12 +13,12 @@ class MockCtx:
         self.state = state or {}
 
 
-class TestPlannerInstruction:
+class TestOrchestratorInstruction:
     def test_injects_places_context(self):
         """places_context from state is injected into the template."""
         ctx = MockCtx(state={"places_context": "Restaurant XYZ data here"})
 
-        result = _planner_instruction(ctx)
+        result = _orchestrator_instruction(ctx)
 
         assert "Restaurant XYZ data here" in result
 
@@ -27,7 +26,7 @@ class TestPlannerInstruction:
         """Uses default text when places_context is not in state."""
         ctx = MockCtx(state={})
 
-        result = _planner_instruction(ctx)
+        result = _orchestrator_instruction(ctx)
 
         assert "No Google Places data available." in result
 
@@ -50,29 +49,6 @@ class TestSynthesizerInstruction:
         result = _synthesizer_instruction(ctx)
 
         assert "Agent did not produce output." in result
-
-
-class TestExecutorInstruction:
-    def test_injects_scope_plan_and_places_context(self):
-        """Both scope_plan and places_context are injected."""
-        ctx = MockCtx(state={
-            "scope_plan": "Research plan: analyze market",
-            "places_context": "Places data for Sushi Bar"
-        })
-
-        result = _executor_instruction(ctx)
-
-        assert "Research plan: analyze market" in result
-        assert "Places data for Sushi Bar" in result
-
-    def test_defaults_when_missing(self):
-        """Uses defaults when state keys are missing."""
-        ctx = MockCtx(state={})
-
-        result = _executor_instruction(ctx)
-
-        assert "No research plan available." in result
-        assert "No Google Places data available." in result
 
 
 class TestMakeInstruction:

@@ -239,8 +239,6 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 				const stateDelta = event.actions?.stateDelta || event.actions?.state_delta;
 				if (stateDelta?.final_report) {
 					reply = stateDelta.final_report;
-				} else if (stateDelta?.scope_plan) {
-					reply = stateDelta.scope_plan;
 				} else if (stateDelta?.router_response && !reply) {
 					reply = stateDelta.router_response;
 				}
@@ -649,7 +647,7 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		}
 
 		const session = await adkRes.json();
-		const reply = session.state?.final_report || session.state?.scope_plan || session.state?.router_response || null;
+		const reply = session.state?.final_report || session.state?.router_response || null;
 
 		if (!reply) {
 			res.json({ ok: true, reply: null, status: 'processing' });

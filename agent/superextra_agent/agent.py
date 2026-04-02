@@ -12,7 +12,7 @@ from .places_tools import get_restaurant_details, find_nearby_restaurants, searc
 from .chat_logger import ChatLoggerPlugin
 from pathlib import Path
 
-# Fast model for simple tasks (routing, scoping) — no thinking needed.
+# Fast model for simple tasks (routing) — no thinking needed.
 # Route via global endpoint (same as 3.1 models).
 _FAST_MODEL = Gemini(model="gemini-2.5-flash", retry_options=RETRY)
 _FAST_MODEL.api_client = Client(
@@ -24,22 +24,12 @@ INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
 # --- Instruction providers (inject session state into templates) ---
 
-_SCOPER_INSTRUCTION = (INSTRUCTIONS_DIR / "research_scoper.md").read_text()
+_ORCHESTRATOR_TEMPLATE = (INSTRUCTIONS_DIR / "research_orchestrator.md").read_text()
 
-_EXECUTOR_TEMPLATE = (INSTRUCTIONS_DIR / "research_executor.md").read_text()
-
-def _executor_instruction(ctx):
-    """Inject scope_plan and places_context into the executor's instructions."""
-    scope_plan = ctx.state.get("scope_plan", "No research plan available.")
+def _orchestrator_instruction(ctx):
+    """Inject places_context into the orchestrator's instructions."""
     places_context = ctx.state.get("places_context", "No Google Places data available.")
-    return _EXECUTOR_TEMPLATE.format(scope_plan=scope_plan, places_context=places_context)
-
-_PLANNER_TEMPLATE = (INSTRUCTIONS_DIR / "research_planner.md").read_text()
-
-def _planner_instruction(ctx):
-    """Inject places_context into the planner's instructions."""
-    places_context = ctx.state.get("places_context", "No Google Places data available.")
-    return _PLANNER_TEMPLATE.format(places_context=places_context)
+    return _ORCHESTRATOR_TEMPLATE.format(places_context=places_context)
 
 _SYNTHESIZER_TEMPLATE = (INSTRUCTIONS_DIR / "synthesizer.md").read_text()
 _SYNTHESIZER_KEYS = [
@@ -61,7 +51,7 @@ _ENRICHER_TOOLS = [get_restaurant_details, find_nearby_restaurants, search_resta
 
 
 def _make_enricher(name="context_enricher"):
-    """Create a context enricher instance (ADK requires unique instances per pipeline)."""
+    """Create a context enricher instance."""
     return LlmAgent(
         name=name,
         model=SPECIALIST_GEMINI,
@@ -74,7 +64,7 @@ def _make_enricher(name="context_enricher"):
 
 
 def _make_synthesizer(name="synthesizer"):
-    """Create a synthesizer instance (ADK requires unique instances per pipeline)."""
+    """Create a synthesizer instance."""
     return LlmAgent(
         name=name,
         model=MODEL_GEMINI,
@@ -87,49 +77,22 @@ def _make_synthesizer(name="synthesizer"):
 
 # --- Agent definitions ---
 
-research_scoper = LlmAgent(
-    name="research_scoper",
-    model=_FAST_MODEL,
-    instruction=_SCOPER_INSTRUCTION,
-    description="Analyzes the user question and presents a concise research plan for user approval.",
-    output_key="scope_plan",
-)
-
-research_executor = LlmAgent(
-    name="research_executor",
+research_orchestrator = LlmAgent(
+    name="research_orchestrator",
     model=MODEL_GEMINI,
-    instruction=_executor_instruction,
-    description="Executes an approved research plan by dispatching specialist agents.",
-    tools=SPECIALIST_TOOLS,
-    output_key="research_plan",
-    generate_content_config=THINKING_CONFIG,
-)
-
-research_planner = LlmAgent(
-    name="research_planner",
-    model=MODEL_GEMINI,
-    instruction=_planner_instruction,
-    description="Analyzes the user question, identifies distinct research angles, and delegates to specialist agents.",
+    instruction=_orchestrator_instruction,
+    description="Plans and executes research: reconnaissance, specialist dispatch, and structured summary.",
     tools=[google_search] + SPECIALIST_TOOLS,
     output_key="research_plan",
     generate_content_config=THINKING_CONFIG,
 )
 
-# --- Pipelines ---
-# Each pipeline needs its own agent instances (ADK doesn't allow sharing).
+# --- Pipeline ---
 
-# Phase 2: Execute — enriches context, runs specialists, and synthesizes (after confirmation)
-execution_pipeline = SequentialAgent(
-    name="execution_pipeline",
-    sub_agents=[_make_enricher(), research_executor, _make_synthesizer()],
-    description="Fetches Google Places data, dispatches specialists per the approved plan, and synthesizes findings. Use this after the user has confirmed a research plan.",
-)
-
-# Full pipeline — used for follow-up questions after research is complete
 research_pipeline = SequentialAgent(
     name="research_pipeline",
-    sub_agents=[_make_enricher(), research_planner, _make_synthesizer()],
-    description="Full research pipeline: enriches context, plans and executes research, then synthesizes findings. Use this for follow-up questions after a research report has already been delivered.",
+    sub_agents=[_make_enricher(), research_orchestrator, _make_synthesizer()],
+    description="Enriches context, plans and executes research, then synthesizes findings into a report.",
 )
 
 # --- Router (root agent) ---
@@ -138,8 +101,8 @@ _router = LlmAgent(
     name="router",
     model=_FAST_MODEL,
     instruction=(INSTRUCTIONS_DIR / "router.md").read_text(),
-    description="Routes user questions to scoping, execution, or full research pipeline.",
-    sub_agents=[research_scoper, execution_pipeline, research_pipeline],
+    description="Routes user questions to research or asks for clarification.",
+    sub_agents=[research_pipeline],
     output_key="router_response",
 )
 

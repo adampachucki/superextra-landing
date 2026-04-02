@@ -97,7 +97,7 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 
 ## Agent system
 
-- Pipeline: Router → Context Enricher → Research Planner → Specialists (via AgentTool) → Synthesizer
+- Pipeline: Router → Context Enricher → Research Orchestrator → Specialists (via AgentTool) → Synthesizer
 - Agent code lives in `agent/superextra_agent/`, instructions in `agent/superextra_agent/instructions/`
 - **Read `instructions/AUTHORING.md` before writing or modifying any agent instruction file** — it documents the architecture, patterns, and pitfalls
 

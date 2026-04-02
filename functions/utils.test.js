@@ -275,13 +275,13 @@ describe('parseADKStream', () => {
 		assert.equal(result.reply, '');
 	});
 
-	it('scope_plan used as reply when no final_report', async () => {
+	it('scope_plan in stream is ignored (not used as reply)', async () => {
 		const reader = mockReader([
 			`data: ${adkEvent({ actions: { stateDelta: { scope_plan: 'Here is the plan.' } } })}\n\n`
 		]);
 		const events = [];
 		const result = await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		assert.equal(result.reply, 'Here is the plan.');
+		assert.equal(result.reply, '');
 	});
 
 	it('emits context progress with name/rating/reviews', async () => {
@@ -308,17 +308,6 @@ describe('parseADKStream', () => {
 		const planning = events.find(ev => ev.d.stage === 'planning');
 		assert.ok(planning);
 		assert.equal(planning.d.status, 'complete');
-	});
-
-	it('emits scoping progress on scope_plan', async () => {
-		const reader = mockReader([
-			`data: ${adkEvent({ actions: { stateDelta: { scope_plan: 'scope text' } } })}\n\n`
-		]);
-		const events = [];
-		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const scoping = events.find(ev => ev.d.stage === 'scoping');
-		assert.ok(scoping);
-		assert.equal(scoping.d.status, 'complete');
 	});
 
 	it('emits specialists running on function calls', async () => {
@@ -365,25 +354,6 @@ describe('parseADKStream', () => {
 		assert.equal(token.d.text, 'Analyzing');
 	});
 
-	it('emits scoping progress and tokens for research_scoper', async () => {
-		const reader = mockReader([
-			`data: ${JSON.stringify({
-				actions: { stateDelta: {} },
-				content: { parts: [{ text: 'Planning' }] },
-				author: 'research_scoper',
-				partial: true,
-			})}\n\n`
-		]);
-		const events = [];
-		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const progress = events.find(ev => ev.e === 'progress' && ev.d.stage === 'scoping');
-		assert.ok(progress);
-		assert.equal(progress.d.status, 'running');
-		const token = events.find(ev => ev.e === 'token');
-		assert.ok(token);
-		assert.equal(token.d.text, 'Planning');
-	});
-
 	it('extracts sources from specialist result text', async () => {
 		const result = 'Analysis here.\n\n## Sources\n- [NYT](https://nyt.com){nyt.com}\n- [CNN](https://cnn.com)';
 		const reader = mockReader([
@@ -425,7 +395,7 @@ describe('parseADKStream', () => {
 		assert.equal(events.length, 0);
 	});
 
-	it('final_report takes precedence over scope_plan', async () => {
+	it('final_report is used as reply even when scope_plan present', async () => {
 		const reader = mockReader([
 			`data: ${adkEvent({ actions: { stateDelta: { scope_plan: 'plan' } } })}\n\n`,
 			`data: ${adkEvent({ actions: { stateDelta: { final_report: 'report' } } })}\n\n`,

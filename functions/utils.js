@@ -132,7 +132,6 @@ export async function parseADKStream(reader, emit) {
 	const sources = [];
 	const specialistNames = [];
 	let synthesisStarted = false;
-	let scopeStarted = false;
 	let contextDone = false;
 	let planningDone = false;
 	let specialistsDone = false;
@@ -207,22 +206,7 @@ export async function parseADKStream(reader, emit) {
 						planningDone = true;
 						emit('progress', { stage: 'planning', status: 'complete', label: 'Research planned' });
 					}
-					if (delta.scope_plan && !planningDone) {
-						planningDone = true;
-						emit('progress', { stage: 'scoping', status: 'complete', label: 'Research planned' });
-					}
-
-					// 5a. Scoper streaming tokens
-					if (evt.author === 'research_scoper' && evt.partial === true) {
-						if (!scopeStarted) {
-							scopeStarted = true;
-							emit('progress', { stage: 'scoping', status: 'running', label: 'Planning research' });
-						}
-						const text = parts.find(p => p.text)?.text;
-						if (text) emit('token', { text });
-					}
-
-					// 5b. Synthesizer streaming tokens
+					// 5. Synthesizer streaming tokens
 					if (evt.author === 'synthesizer' && evt.partial === true) {
 						if (!synthesisStarted) {
 							synthesisStarted = true;
@@ -232,9 +216,8 @@ export async function parseADKStream(reader, emit) {
 						if (text) emit('token', { text });
 					}
 
-					// 6. Final report / scope plan as reply
+					// 6. Final report as reply
 					if (delta.final_report) reply = delta.final_report;
-					if (delta.scope_plan && !reply) reply = delta.scope_plan;
 
 					// 7. Router response
 					if (delta.router_response && !reply) routerResponse = delta.router_response;
