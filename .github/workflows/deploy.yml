@@ -103,11 +103,11 @@ jobs:
 
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $TOKEN" \
-            "https://superextra-agent-907466498524.us-central1.run.app/list_apps" \
+            "https://superextra-agent-907466498524.us-central1.run.app/health" \
             --max-time 15)
 
           if [ "$STATUS" != "200" ]; then
-            echo "::error::Smoke test failed — /list_apps returned HTTP $STATUS"
+            echo "::error::Smoke test failed — /health returned HTTP $STATUS"
             exit 1
           fi
           echo "Smoke test passed (HTTP $STATUS)"
