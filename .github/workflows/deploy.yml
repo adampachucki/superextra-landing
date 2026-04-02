@@ -85,3 +85,26 @@ jobs:
             exit 1
           fi
           echo "✓ New revision deployed: $AFTER (was $BEFORE)"
+
+      - name: Smoke test agent
+        run: |
+          set -euo pipefail
+          ADK_SERVICE_URL="https://superextra-agent-907466498524.us-central1.run.app"
+
+          # Wait for new revision to become ready
+          sleep 10
+
+          # Get auth token for Cloud Run
+          TOKEN=$(gcloud auth print-identity-token --audiences="$ADK_SERVICE_URL")
+
+          # Verify the ADK server is responsive
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            "$ADK_SERVICE_URL/list_apps" \
+            --max-time 15)
+
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Post-deploy smoke test failed — /list_apps returned HTTP $STATUS"
+            exit 1
+          fi
+          echo "✓ Smoke test passed (HTTP $STATUS)"

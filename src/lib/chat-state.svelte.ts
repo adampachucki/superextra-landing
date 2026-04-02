@@ -167,13 +167,17 @@ function syncCurrentToList() {
 function persist() {
 	if (typeof localStorage === 'undefined') return;
 	syncCurrentToList();
-	localStorage.setItem(
-		STORAGE_KEY,
-		JSON.stringify({
-			activeId: currentId,
-			conversations
-		})
-	);
+	try {
+		localStorage.setItem(
+			STORAGE_KEY,
+			JSON.stringify({
+				activeId: currentId,
+				conversations
+			})
+		);
+	} catch {
+		// Storage full or unavailable — non-critical
+	}
 }
 
 function buildHistory(): Array<{ role: string; parts: Array<{ text: string }> }> {
@@ -210,7 +214,7 @@ async function send(text: string) {
 
 	const agentUrl = import.meta.env.DEV
 		? '/api/agent/stream'
-		: 'https://us-central1-superextra-site.cloudfunctions.net/agentStream';
+		: 'https://agentstream-907466498524.us-central1.run.app';
 
 	try {
 		await streamAgent(
@@ -350,8 +354,22 @@ async function recover(): Promise<boolean> {
 			return false;
 		}
 		try {
-			const res = await fetch(checkUrl);
+			const res = await fetch(checkUrl, { signal: AbortSignal.timeout(10_000) });
 			const data = await res.json();
+
+			// Terminal failures — stop polling immediately
+			if (!data.ok && data.reason === 'session_not_found') {
+				error = 'Session not found. Please start a new conversation.';
+				loading = false;
+				return false;
+			}
+			if (!data.ok && data.reason === 'agent_unavailable') {
+				error = 'Agent unavailable. Please try again.';
+				loading = false;
+				return false;
+			}
+
+			// Reply received
 			if (
 				data.ok &&
 				data.reply &&
@@ -363,7 +381,7 @@ async function recover(): Promise<boolean> {
 				loading = false;
 				return true;
 			}
-			// No reply yet — wait before retrying
+			// Still processing — wait before retrying
 			if (attempt < MAX_ATTEMPTS - 1) {
 				await new Promise((r) => setTimeout(r, INTERVAL_MS));
 			}

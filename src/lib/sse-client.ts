@@ -173,7 +173,10 @@ function dispatchEvent(event: string, data: string, callbacks: SSECallbacks) {
 				callbacks.onError(parsed.error || 'Unknown error');
 				break;
 		}
-	} catch {
-		// Skip malformed events
+	} catch (e) {
+		console.warn('[sse] Failed to parse event:', event, data, e);
+		if (event === 'complete') {
+			callbacks.onError('Received malformed response. Please try again.');
+		}
 	}
 }

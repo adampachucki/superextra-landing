@@ -1,5 +1,6 @@
 let playingIndex = $state<number | null>(null);
 let loading = $state<number | null>(null);
+let error = $state('');
 let ctx: AudioContext | null = null;
 let sourceNode: AudioBufferSourceNode | null = null;
 
@@ -22,6 +23,7 @@ async function play(messageIndex: number, text: string) {
 
 	stop();
 	loading = messageIndex;
+	error = '';
 
 	// Unlock audio on Safari: create/resume AudioContext synchronously in the click handler
 	if (!ctx) ctx = new AudioContext();
@@ -37,6 +39,8 @@ async function play(messageIndex: number, text: string) {
 		if (!res.ok) {
 			const err = await res.json().catch(() => ({ error: 'Speech synthesis failed' }));
 			console.error('TTS error:', err.error);
+			error = 'Speech synthesis failed';
+			loading = null;
 			return;
 		}
 
@@ -54,6 +58,7 @@ async function play(messageIndex: number, text: string) {
 		playingIndex = messageIndex;
 	} catch (err) {
 		console.error('TTS failed:', err);
+		error = 'Speech synthesis failed';
 		if (sourceNode) {
 			sourceNode.onended = null;
 			sourceNode.stop();
@@ -71,6 +76,9 @@ export const tts = {
 	},
 	get loading() {
 		return loading;
+	},
+	get error() {
+		return error;
 	},
 	play,
 	stop

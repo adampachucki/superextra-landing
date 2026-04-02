@@ -295,7 +295,10 @@
 			script.src = `https://maps.googleapis.com/maps/api/js?key=${PUBLIC_GOOGLE_PLACES_KEY}&libraries=places`;
 			script.async = true;
 			script.onload = () => resolve();
-			script.onerror = reject;
+			script.onerror = () => {
+				mapsPromise = null; // Allow retry on next call
+				reject(new Error('Failed to load Google Maps'));
+			};
 			document.head.appendChild(script);
 		});
 		return mapsPromise;

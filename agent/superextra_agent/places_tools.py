@@ -1,5 +1,8 @@
+import logging
 import os
 import httpx
+
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://places.googleapis.com/v1"
 
@@ -44,6 +47,10 @@ DETAIL_FIELDS = ",".join([
     "servesDinner",
     "outdoorSeating",
 ])
+
+# Warn early if API key is missing (actual RuntimeError raised on first call)
+if not os.environ.get("GOOGLE_PLACES_API_KEY"):
+    logger.warning("GOOGLE_PLACES_API_KEY not set — Places API calls will fail")
 
 # Lazy-initialized client and API key
 _client: httpx.AsyncClient | None = None

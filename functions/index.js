@@ -163,6 +163,23 @@ const rateLimitMap = new Map();
 // Maps frontend sessionId → ADK session ID (resets on cold start)
 const sessionMap = new Map();
 
+async function persistSession(sessionId, adkSessionId, userId) {
+	try {
+		await db.collection('sessions').doc(sessionId).set({
+			adkSessionId, userId, createdAt: Date.now()
+		});
+	} catch (e) {
+		console.warn('Firestore session write failed, retrying:', e.message);
+		try {
+			await db.collection('sessions').doc(sessionId).set({
+				adkSessionId, userId, createdAt: Date.now()
+			});
+		} catch (e2) {
+			console.error('Firestore session write failed permanently:', e2.message);
+		}
+	}
+}
+
 export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, res) => {
 	if (req.method !== 'POST') {
 		res.status(405).json({ ok: false, error: 'Method not allowed' });
@@ -230,11 +247,7 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 			adkSessionId = sessionData.id;
 			userId = ip;
 			sessionMap.set(sessionId, { adkSessionId, userId });
-			await db.collection('sessions').doc(sessionId).set({
-				adkSessionId,
-				userId: ip,
-				createdAt: Date.now()
-			});
+			await persistSession(sessionId, adkSessionId, ip);
 		}
 
 		// Build the query text with date and optional place context
@@ -293,8 +306,8 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 						}
 					}
 				}
-			} catch {
-				// skip malformed events
+			} catch (e) {
+				console.warn('[agent] Malformed SSE event, skipping:', line.slice(0, 200), e.message);
 			}
 		}
 
@@ -372,17 +385,20 @@ async function generateTitle(message) {
 	try {
 		const vertexAI = new VertexAI({ project: PROJECT, location: LOCATION });
 		const flashModel = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-		const titleResult = await flashModel.generateContent({
-			contents: [{ role: 'user', parts: [{ text:
-				`Summarize this message into a short title, max 4 words.\n` +
-				`Rules:\n` +
-				`- Use the SAME LANGUAGE as the message\n` +
-				`- No markdown, no quotes, no punctuation, no numbering\n` +
-				`- Do not answer the question — just label the topic\n` +
-				`- Reply with ONLY the title, nothing else\n\n` +
-				`Message: "${message}"`
-			}] }]
-		});
+		const titleResult = await Promise.race([
+			flashModel.generateContent({
+				contents: [{ role: 'user', parts: [{ text:
+					`Summarize this message into a short title, max 4 words.\n` +
+					`Rules:\n` +
+					`- Use the SAME LANGUAGE as the message\n` +
+					`- No markdown, no quotes, no punctuation, no numbering\n` +
+					`- Do not answer the question — just label the topic\n` +
+					`- Reply with ONLY the title, nothing else\n\n` +
+					`Message: "${message}"`
+				}] }]
+			}),
+			new Promise((_, reject) => setTimeout(() => reject(new Error('Title generation timed out')), 8000))
+		]);
 		const raw = titleResult.response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 		if (raw) {
 			const cleaned = raw
@@ -396,7 +412,7 @@ async function generateTitle(message) {
 			}
 		}
 	} catch (e) {
-		console.error('Title generation failed:', e.message);
+		console.warn('Title generation failed:', e.message);
 	}
 	return undefined;
 }
@@ -489,11 +505,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 			adkSessionId = sessionData.id;
 			userId = ip;
 			sessionMap.set(sessionId, { adkSessionId, userId });
-			await db.collection('sessions').doc(sessionId).set({
-				adkSessionId,
-				userId: ip,
-				createdAt: Date.now()
-			});
+			await persistSession(sessionId, adkSessionId, ip);
 			console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] session created: ${adkSessionId}`);
 		}
 
@@ -649,8 +661,8 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 								}
 							}
 						}
-					} catch {
-						// skip malformed events
+					} catch (e) {
+						console.warn('[stream] Malformed SSE event, skipping:', line.slice(0, 200), e.message);
 					}
 				}
 			}
@@ -848,7 +860,7 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 	try {
 		const doc = await db.collection('sessions').doc(sid).get();
 		if (!doc.exists) {
-			res.json({ ok: true, reply: null });
+			res.json({ ok: false, reason: 'session_not_found' });
 			return;
 		}
 
@@ -862,12 +874,17 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		);
 
 		if (!adkRes.ok) {
-			res.json({ ok: true, reply: null });
+			res.json({ ok: false, reason: 'agent_unavailable' });
 			return;
 		}
 
 		const session = await adkRes.json();
 		const reply = session.state?.final_report || session.state?.router_response || null;
+
+		if (!reply) {
+			res.json({ ok: true, reply: null, status: 'processing' });
+			return;
+		}
 
 		// Extract sources from specialist result text (markdown links)
 		const sources = [];
@@ -881,10 +898,10 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 			}
 		}
 
-		res.json({ ok: true, reply, sources: sources.length ? sources : undefined });
+		res.json({ ok: true, reply, sources: sources.length ? sources : undefined, status: 'complete' });
 	} catch (err) {
 		console.error('Agent check error:', err.message || err);
-		res.json({ ok: true, reply: null });
+		res.json({ ok: false, reason: 'agent_unavailable' });
 	}
 });
 
