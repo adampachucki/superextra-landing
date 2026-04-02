@@ -8,7 +8,9 @@ AI-native market intelligence and competitor benchmarking for the restaurant ind
 - `npm run build` / `npm run check`
 - `npm run lint` — Prettier check + ESLint
 - `npm run format` — auto-format all files
-- `npm run test` — run unit tests once
+- `npm run test` — run Vitest unit tests (SSE client, chat state)
+- `cd functions && npm test` — run Cloud Function tests (utils, stream parser)
+- `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — run agent Python tests
 - Deploy: push to `main` → GitHub Actions → Firebase (project: superextra-site)
 
 ## Code Quality
@@ -18,6 +20,25 @@ AI-native market intelligence and competitor benchmarking for the restaurant ind
 - **Vitest** for unit tests — test files use `.spec.ts` or `.test.ts` extension
 - CI runs `format:check`, `eslint`, `svelte-check`, and `test` before every deploy
 - Run `npm run lint` before pushing if you bypass the pre-commit hook
+
+## Testing
+
+Three test suites — **run all before pushing changes to chat, SSE, Cloud Functions, or agent code**:
+
+- `npm run test` — Vitest: SSE client (`src/lib/sse-client.spec.ts`), chat state machine (`src/lib/chat-state.spec.ts`), plus any `.spec.ts`/`.test.ts` files
+- `cd functions && npm test` — Node test runner: Cloud Function utilities and ADK stream parser (`functions/utils.test.js`)
+- `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — pytest: source extraction callback, Places tools, instruction providers
+
+CI runs all three suites automatically. After ADK deploy, a smoke test hits `/health` on the Cloud Run service to verify the container started.
+
+When modifying:
+
+- **`functions/index.js` or `functions/utils.js`** → run `cd functions && npm test`
+- **`src/lib/sse-client.ts`** → run `npx vitest run src/lib/sse-client.spec.ts`
+- **`src/lib/chat-state.svelte.ts`** → run `npx vitest run src/lib/chat-state.spec.ts`
+- **`agent/superextra_agent/specialists.py`** → run agent pytest (covers `_append_sources`)
+- **`agent/superextra_agent/places_tools.py`** → run agent pytest
+- **`agent/superextra_agent/agent.py`** (instruction providers) → run agent pytest
 
 ## Branding
 
