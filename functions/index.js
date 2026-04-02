@@ -433,16 +433,24 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 		return;
 	}
 
-	// SSE headers
+	// SSE headers — write() immediately to flush headers to the client.
+	// writeHead() alone does NOT flush in Node.js; without an early write(),
+	// the client's fetch() stays pending and Cloud Run infrastructure may
+	// close the idle connection before the first keepalive at t+15s.
 	res.writeHead(200, {
 		'Content-Type': 'text/event-stream',
 		'Cache-Control': 'no-cache',
 		'X-Accel-Buffering': 'no',
 	});
+	res.write(': ok\n\n');
 
 	const keepalive = setInterval(() => res.write(': keepalive\n\n'), 15000);
 	const ac = new AbortController();
-	req.on('close', () => { ac.abort(); clearInterval(keepalive); });
+	req.on('close', () => {
+		if (!res.writableEnded) console.warn('Client disconnected before stream completed');
+		ac.abort();
+		clearInterval(keepalive);
+	});
 
 	try {
 		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
@@ -672,7 +680,9 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 			...(title && { title }),
 		});
 	} catch (err) {
-		if (err.name !== 'AbortError') {
+		if (err.name === 'AbortError') {
+			console.warn('Agent stream aborted (client disconnect or timeout)');
+		} else {
 			console.error('Agent stream error:', err.message || err);
 			sendSSE(res, 'error', { error: 'Agent unavailable. Please try again.' });
 		}
