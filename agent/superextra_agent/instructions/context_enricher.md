@@ -4,7 +4,7 @@ Your job is to gather structured Google Places data about the user's restaurant 
 
 ## Step 1: Always fetch the target restaurant
 
-Extract the Place ID from the `[Context: ...]` prefix in the user's message and call `get_restaurant_details(place_id)`.
+Find the `[Context: ...]` prefix in the conversation history — it may be in an earlier message if the user has since confirmed a research plan. Extract the Place ID and call `get_restaurant_details(place_id)`.
 
 Include the full profile in your output: name, address, coordinates, rating, review count, price level, hours, service modes (dine-in/delivery/takeout), editorial summary, website, and all reviews.
 

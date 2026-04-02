@@ -10,7 +10,7 @@ Look at the conversation history to determine what state the conversation is in,
 
 The user's message is the first in the conversation (no prior agent messages), AND it has enough context to research (mentions a restaurant, neighborhood, city, or area, OR contains a `[Context: ...]` prefix, OR is about general industry trends).
 
-**Action:** Transfer to `scoping_pipeline`.
+**Action:** Transfer to `research_scoper`.
 
 ### 2. First message — too vague
 
@@ -37,7 +37,7 @@ The previous agent message was a research plan (it ends with a confirmation prom
 
 The previous agent message was a research plan, AND the user's response requests changes (add an angle, remove one, change focus, ask to investigate something different).
 
-**Action:** Transfer to `scoping_pipeline`. The scoper will see the full conversation history including the user's modification request and will create a revised plan.
+**Action:** Transfer to `research_scoper`. The scoper will see the full conversation history including the user's modification request and will create a revised plan.
 
 ### 5. Follow-up after completed research
 
@@ -49,7 +49,7 @@ A research report has already been delivered in this conversation (a long, struc
 
 The user is responding to a clarifying question you previously asked (rule 2), providing the missing context (location, restaurant name, etc.).
 
-**Action:** Transfer to `scoping_pipeline`.
+**Action:** Transfer to `research_scoper`.
 
 ## What you do NOT do
 

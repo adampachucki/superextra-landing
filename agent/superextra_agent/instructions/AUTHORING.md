@@ -9,11 +9,10 @@ The agent uses a two-turn flow for the first message in a conversation, then a s
 **First message (two turns):**
 
 ```
-Turn 1: Router → scoping_pipeline
-           ├── Context Enricher (fetches Google Places data)
-           └── Research Scoper (plans research, presents plan to user)
+Turn 1: Router → Research Scoper (proposes plan from question context alone — fast)
 Turn 2: Router → execution_pipeline
-           ├── Research Executor (dispatches specialists per approved plan)
+           ├── Context Enricher (fetches Google Places data)
+           ├── Research Executor (writes briefs, dispatches specialists)
            └── Synthesizer (produces final report)
 ```
 
@@ -29,7 +28,7 @@ Router → research_pipeline
 
 - `scope_plan` — scoper's user-facing plan (turn 1 reply). Read by executor in turn 2.
 - `research_plan` — executor's summary (turn 2) OR planner's summary (follow-ups). Read by synthesizer.
-- `places_context` — Google Places data. Persists across turns in session state.
+- `places_context` — Google Places data. Written by enricher in execution turn (turn 2) or follow-up turn. Not available during scoping turn 1.
 
 **Agent roles:**
 

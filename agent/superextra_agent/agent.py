@@ -14,12 +14,7 @@ INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
 # --- Instruction providers (inject session state into templates) ---
 
-_SCOPER_TEMPLATE = (INSTRUCTIONS_DIR / "research_scoper.md").read_text()
-
-def _scoper_instruction(ctx):
-    """Inject places_context into the scoper's instructions."""
-    places_context = ctx.state.get("places_context", "No Google Places data available.")
-    return _SCOPER_TEMPLATE.format(places_context=places_context)
+_SCOPER_INSTRUCTION = (INSTRUCTIONS_DIR / "research_scoper.md").read_text()
 
 _EXECUTOR_TEMPLATE = (INSTRUCTIONS_DIR / "research_executor.md").read_text()
 
@@ -85,7 +80,7 @@ def _make_synthesizer(name="synthesizer"):
 research_scoper = LlmAgent(
     name="research_scoper",
     model=MODEL_GEMINI,
-    instruction=_scoper_instruction,
+    instruction=_SCOPER_INSTRUCTION,
     description="Analyzes the user question and presents a concise research plan for user approval.",
     output_key="scope_plan",
 )
@@ -113,18 +108,11 @@ research_planner = LlmAgent(
 # --- Pipelines ---
 # Each pipeline needs its own agent instances (ADK doesn't allow sharing).
 
-# Phase 1: Scope — gathers context and presents plan for user approval (first message)
-scoping_pipeline = SequentialAgent(
-    name="scoping_pipeline",
-    sub_agents=[_make_enricher(), research_scoper],
-    description="Gathers Google Places data and presents a research plan for user approval. Use this for the first message in a conversation when the question has enough context to research.",
-)
-
-# Phase 2: Execute — runs approved plan through specialists and synthesizer (after confirmation)
+# Phase 2: Execute — enriches context, runs specialists, and synthesizes (after confirmation)
 execution_pipeline = SequentialAgent(
     name="execution_pipeline",
-    sub_agents=[research_executor, _make_synthesizer()],
-    description="Executes an approved research plan by dispatching specialists and synthesizing findings. Use this after the user has confirmed a research plan.",
+    sub_agents=[_make_enricher(), research_executor, _make_synthesizer()],
+    description="Fetches Google Places data, dispatches specialists per the approved plan, and synthesizes findings. Use this after the user has confirmed a research plan.",
 )
 
 # Full pipeline — used for follow-up questions after research is complete
@@ -141,9 +129,8 @@ _router = LlmAgent(
     model=MODEL_GEMINI,
     instruction=(INSTRUCTIONS_DIR / "router.md").read_text(),
     description="Routes user questions to scoping, execution, or full research pipeline.",
-    sub_agents=[scoping_pipeline, execution_pipeline, research_pipeline],
+    sub_agents=[research_scoper, execution_pipeline, research_pipeline],
     output_key="router_response",
-    generate_content_config=THINKING_CONFIG,
 )
 
 app = App(
