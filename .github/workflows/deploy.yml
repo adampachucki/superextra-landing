@@ -5,7 +5,24 @@ on:
     branches: [main]
 
 jobs:
-  deploy:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      agent: ${{ steps.filter.outputs.agent }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            agent:
+              - 'agent/superextra_agent/**'
+              - 'agent/requirements.txt'
+              - '.github/workflows/deploy.yml'
+
+  test:
+    needs: detect-changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,8 +42,49 @@ jobs:
       - run: npm run build
         env:
           PUBLIC_GOOGLE_PLACES_KEY: ${{ secrets.PUBLIC_GOOGLE_PLACES_KEY }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sveltekit-build
+          path: build/
+          retention-days: 1
+
       - run: cd functions && npm ci
       - run: cd functions && npm test
+
+      - uses: actions/setup-python@v5
+        if: needs.detect-changes.outputs.agent == 'true'
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: agent/requirements-dev.txt
+
+      - name: Run agent tests
+        if: needs.detect-changes.outputs.agent == 'true'
+        run: |
+          cd agent
+          pip install -r requirements-dev.txt
+          PYTHONPATH=. pytest tests/ -v
+
+  deploy-hosting:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sveltekit-build
+          path: build/
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -43,20 +101,30 @@ jobs:
       - name: Deploy Cloud Functions
         run: npx firebase-tools deploy --only functions --project superextra-site
 
+  deploy-agent:
+    needs: [detect-changes, test]
+    if: needs.detect-changes.outputs.agent == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SUPEREXTRA_SITE }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: agent/requirements.txt
 
-      - name: Run agent tests
-        run: |
-          cd agent
-          pip install pytest pytest-asyncio respx google-adk
-          PYTHONPATH=. pytest tests/ -v
+      - name: Install ADK
+        run: pip install -r agent/requirements.txt
 
       - name: Deploy ADK agent to Cloud Run
         run: |
           set -euo pipefail
-          pip install google-adk
 
           # Snapshot current revision before deploy
           BEFORE=$(gcloud run revisions list \
