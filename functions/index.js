@@ -4,6 +4,11 @@ import { VertexAI } from '@google-cloud/vertexai';
 import { GoogleAuth } from 'google-auth-library';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import {
+	esc, row, confirmationHtml, stripMarkdown, extractSourcesFromText,
+	sendSSE, checkRateLimit, parseADKStream,
+	SPECIALIST_RESULT_KEYS, SPECIALIST_KEYS, TOOL_LABELS,
+} from './utils.js';
 
 initializeApp();
 const db = getFirestore();
@@ -99,64 +104,14 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 	res.json({ ok: true });
 });
 
-function row(label, value, raw = false) {
-	return `<tr>
-		<td style="padding:6px 12px 6px 0;color:#888;font-size:13px;white-space:nowrap">${esc(label)}</td>
-		<td style="padding:6px 0;font-size:13px">${raw ? value : esc(value)}</td>
-	</tr>`;
-}
-
-function esc(s) {
-	return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function confirmationHtml(name) {
-	const firstName = esc(name.split(' ')[0] || 'there');
-	return `<div style="font-family:sans-serif;max-width:520px;color:#1a1a1a;font-size:14px;line-height:1.6">
-<p>Hey ${firstName},</p>
-<p>I'm Adam, co-founder of Superextra.</p>
-<p>We believe the restaurant industry deserves better access to reliable information, and we're building Superextra to make that happen.</p>
-<p>This is an automated message, but I'll follow up personally soon.</p>
-<p>In the meantime, it would help to know:</p>
-<ol>
-<li>What challenges can we help you solve?</li>
-<li>What information would make the biggest difference?</li>
-<li>How did you find us?</li>
-</ol>
-<p>Just hit reply and let me know.</p>
-<p>Best,<br>Adam</p>
-</div>`;
-}
+// row, esc, confirmationHtml imported from ./utils.js
 
 // --- Agent chat endpoint (proxies to ADK Cloud Run) ---
 
 const ADK_SERVICE_URL = 'https://superextra-agent-907466498524.us-central1.run.app';
 const auth = new GoogleAuth();
 
-// Specialist result keys that may contain source URLs
-const SPECIALIST_RESULT_KEYS = [
-	'market_result', 'pricing_result', 'revenue_result', 'guest_result',
-	'location_result', 'ops_result', 'marketing_result',
-	'dynamic_result_1', 'dynamic_result_2',
-];
-
-// Extract markdown links from specialist result text: - [Title](URL){domain}
-// The {domain} suffix is optional — when present it carries the real source domain
-// (the URL itself may be a vertexaisearch.cloud.google.com redirect).
-const MD_LINK_RE = /\[([^\]]*)\]\((https?:\/\/[^)]+)\)(?:\{([^}]*)\})?/g;
-
-function extractSourcesFromText(text) {
-	const sources = [];
-	let match;
-	while ((match = MD_LINK_RE.exec(text)) !== null) {
-		const url = match[2];
-		if (!sources.some(s => s.url === url)) {
-			sources.push({ title: match[1] || '', url, ...(match[3] && { domain: match[3] }) });
-		}
-	}
-	MD_LINK_RE.lastIndex = 0;
-	return sources;
-}
+// SPECIALIST_RESULT_KEYS, extractSourcesFromText imported from ./utils.js
 
 const rateLimitMap = new Map();
 
@@ -186,19 +141,10 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 		return;
 	}
 
-	// Basic rate limiting (20 requests per 10 min per IP)
 	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-	const now = Date.now();
-	const window = 10 * 60 * 1000;
-	const entry = rateLimitMap.get(ip);
-	if (entry && now - entry.start < window) {
-		if (entry.count >= 20) {
-			res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
-			return;
-		}
-		entry.count++;
-	} else {
-		rateLimitMap.set(ip, { start: now, count: 1 });
+	if (!checkRateLimit(rateLimitMap, ip, Date.now(), 10 * 60 * 1000, 20)) {
+		res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+		return;
 	}
 
 	const { message, sessionId, placeContext, history } = req.body || {};
@@ -361,27 +307,7 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 
 // --- Streaming agent endpoint (SSE progress + token streaming) ---
 
-const TOOL_LABELS = {
-	market_landscape: 'market landscape',
-	menu_pricing: 'pricing',
-	revenue_sales: 'revenue',
-	guest_intelligence: 'reviews',
-	location_traffic: 'location',
-	operations: 'operations',
-	marketing_digital: 'marketing',
-	dynamic_researcher_1: 'trends',
-	dynamic_researcher_2: 'trends',
-};
-
-const SPECIALIST_KEYS = new Set([
-	'guest_result', 'pricing_result', 'revenue_result', 'market_result',
-	'location_result', 'ops_result', 'marketing_result',
-	'dynamic_result_1', 'dynamic_result_2',
-]);
-
-function sendSSE(res, event, data) {
-	res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-}
+// TOOL_LABELS, SPECIALIST_KEYS, sendSSE imported from ./utils.js
 
 async function generateTitle(message) {
 	try {
@@ -426,17 +352,9 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 	}
 
 	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-	const now = Date.now();
-	const window = 10 * 60 * 1000;
-	const entry = rateLimitMap.get(ip);
-	if (entry && now - entry.start < window) {
-		if (entry.count >= 20) {
-			res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
-			return;
-		}
-		entry.count++;
-	} else {
-		rateLimitMap.set(ip, { start: now, count: 1 });
+	if (!checkRateLimit(rateLimitMap, ip, Date.now(), 10 * 60 * 1000, 20)) {
+		res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+		return;
 	}
 
 	const { message, sessionId, placeContext, history } = req.body || {};
@@ -544,151 +462,10 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 			return;
 		}
 
-		// Stream-parse ADK SSE events
+		// Stream-parse ADK SSE events and emit frontend SSE events
 		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] run_sse connected`);
 		const reader = adkResponse.body.getReader();
-		const decoder = new TextDecoder();
-		let buffer = '';
-		let reply = '';
-		let routerResponse = '';
-		const sources = [];
-		const specialistNames = [];
-		let synthesisStarted = false;
-		let scopeStarted = false;
-		let contextDone = false;
-		let planningDone = false;
-		let specialistsDone = false;
-
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-
-			buffer += decoder.decode(value, { stream: true });
-
-			// Process complete data lines (each event ends with \n\n)
-			let boundary;
-			while ((boundary = buffer.indexOf('\n\n')) !== -1) {
-				const block = buffer.slice(0, boundary);
-				buffer = buffer.slice(boundary + 2);
-
-				for (const line of block.split('\n')) {
-					if (!line.startsWith('data: ')) continue;
-					try {
-						const evt = JSON.parse(line.slice(6));
-						const delta = evt.actions?.stateDelta || {};
-						const deltaKeys = Object.keys(delta);
-						const parts = evt.content?.parts || [];
-
-						// 1. Context enricher complete — extract name/rating from places_context
-						if (delta.places_context && !contextDone) {
-							contextDone = true;
-							let label = 'Place data gathered';
-							const ctx = typeof delta.places_context === 'string' ? delta.places_context : '';
-							const nameMatch = ctx.match(/(?:Name|Display\s*Name):\s*(.+?)(?:\n|$)/i);
-							const ratingMatch = ctx.match(/Rating:\s*([\d.]+)/i);
-							const reviewMatch = ctx.match(/([\d,]+)\s*review/i);
-							if (nameMatch) {
-								label = nameMatch[1].trim();
-								if (ratingMatch) label += ` — ${ratingMatch[1]}★`;
-								if (reviewMatch) label += ` · ${reviewMatch[1]} reviews`;
-							}
-							sendSSE(res, 'progress', { stage: 'context', status: 'complete', label });
-						}
-
-						// 2. Research planner dispatching specialists (function_call events)
-						if (!specialistsDone) {
-							for (const p of parts) {
-								if (p.functionCall && TOOL_LABELS[p.functionCall.name]) {
-									if (!specialistNames.includes(p.functionCall.name)) {
-										specialistNames.push(p.functionCall.name);
-									}
-								}
-							}
-							// Emit "specialists running" on the final (non-partial) function_call event
-							if (evt.partial === false && specialistNames.length > 0 && !parts.some(p => p.functionResponse)) {
-								const labels = [...new Set(specialistNames.map(n => TOOL_LABELS[n]))].join(', ');
-								sendSSE(res, 'progress', { stage: 'specialists', status: 'running', label: `Analyzing ${labels}...` });
-							}
-						}
-
-						// 3. Specialist results arrived (function_response with specialist state keys)
-						if (!specialistsDone && deltaKeys.some(k => SPECIALIST_KEYS.has(k))) {
-							specialistsDone = true;
-							const previews = [];
-							for (const key of deltaKeys) {
-								if (SPECIALIST_KEYS.has(key) && typeof delta[key] === 'string' && delta[key] !== 'NOT_RELEVANT') {
-									const text = delta[key].replace(/[#*_\n]+/g, ' ').replace(/\s+/g, ' ').trim();
-									const preview = text.slice(0, 120) + (text.length > 120 ? '...' : '');
-									const name = TOOL_LABELS[key.replace('_result', '').replace('dynamic_result_', 'dynamic_researcher_')] || key;
-									previews.push({ name, preview });
-								}
-							}
-							sendSSE(res, 'progress', { stage: 'specialists', status: 'complete', label: 'Research complete', previews });
-						}
-
-						// 4. Research plan / scope plan complete
-						if (delta.research_plan && !planningDone) {
-							planningDone = true;
-							sendSSE(res, 'progress', { stage: 'planning', status: 'complete', label: 'Research planned' });
-						}
-						if (delta.scope_plan && !planningDone) {
-							planningDone = true;
-							sendSSE(res, 'progress', { stage: 'scoping', status: 'complete', label: 'Research planned' });
-						}
-
-						// 5a. Scoper streaming tokens (scoping turn)
-						if (evt.author === 'research_scoper' && evt.partial === true) {
-							if (!scopeStarted) {
-								scopeStarted = true;
-								sendSSE(res, 'progress', { stage: 'scoping', status: 'running', label: 'Planning research' });
-							}
-							const text = parts.find(p => p.text)?.text;
-							if (text) {
-								sendSSE(res, 'token', { text });
-							}
-						}
-
-						// 5b. Synthesizer streaming tokens (execution/follow-up turn)
-						if (evt.author === 'synthesizer' && evt.partial === true) {
-							if (!synthesisStarted) {
-								synthesisStarted = true;
-								sendSSE(res, 'progress', { stage: 'synthesis', status: 'running', label: 'Synthesizing findings' });
-							}
-							const text = parts.find(p => p.text)?.text;
-							if (text) {
-								sendSSE(res, 'token', { text });
-							}
-						}
-
-						// 6. Final report / scope plan as reply
-						if (delta.final_report) {
-							reply = delta.final_report;
-						}
-						if (delta.scope_plan && !reply) {
-							reply = delta.scope_plan;
-						}
-
-						// 7. Router response (clarifying question)
-						if (delta.router_response && !reply) {
-							routerResponse = delta.router_response;
-						}
-
-						// 8. Extract sources from specialist result text (markdown links)
-						for (const key of SPECIALIST_RESULT_KEYS) {
-							if (delta[key]) {
-								for (const s of extractSourcesFromText(delta[key])) {
-									if (!sources.some(x => x.url === s.url)) {
-										sources.push(s);
-									}
-								}
-							}
-						}
-					} catch (e) {
-						console.warn('[stream] Malformed SSE event, skipping:', line.slice(0, 200), e.message);
-					}
-				}
-			}
-		}
+		const { reply, routerResponse, sources } = await parseADKStream(reader, (event, data) => sendSSE(res, event, data));
 
 		// Fallback: fetch sources from session state specialist results
 		if (sources.length === 0 && (reply || routerResponse)) {
@@ -745,17 +522,9 @@ export const sttToken = onRequest({ cors: true, secrets: [elevenlabsKey] }, asyn
 	}
 
 	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-	const now = Date.now();
-	const window = 10 * 60 * 1000;
-	const entry = sttRateLimitMap.get(ip);
-	if (entry && now - entry.start < window) {
-		if (entry.count >= 10) {
-			res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
-			return;
-		}
-		entry.count++;
-	} else {
-		sttRateLimitMap.set(ip, { start: now, count: 1 });
+	if (!checkRateLimit(sttRateLimitMap, ip, Date.now(), 10 * 60 * 1000, 10)) {
+		res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+		return;
 	}
 
 	try {
@@ -784,20 +553,7 @@ export const sttToken = onRequest({ cors: true, secrets: [elevenlabsKey] }, asyn
 const TTS_VOICE_ID = 'SAz9YHcvj6GT2YYXdXww'; // River – Relaxed, Neutral, Informative
 const ttsRateLimitMap = new Map();
 
-function stripMarkdown(text) {
-	return text
-		.replace(/^#{1,6}\s+/gm, '')          // headings
-		.replace(/\*\*(.+?)\*\*/g, '$1')       // bold
-		.replace(/\*(.+?)\*/g, '$1')           // italic
-		.replace(/~~(.+?)~~/g, '$1')           // strikethrough
-		.replace(/`{1,3}[^`]*`{1,3}/g, '')    // inline/block code
-		.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links → text only
-		.replace(/^[-*+]\s+/gm, '')            // unordered list markers
-		.replace(/^\d+\.\s+/gm, '')            // ordered list markers
-		.replace(/^>\s+/gm, '')                // blockquotes
-		.replace(/\n{3,}/g, '\n\n')            // collapse excess newlines
-		.trim();
-}
+// stripMarkdown imported from ./utils.js
 
 export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (req, res) => {
 	if (req.method !== 'POST') {
@@ -806,17 +562,9 @@ export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (re
 	}
 
 	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-	const now = Date.now();
-	const window = 10 * 60 * 1000;
-	const entry = ttsRateLimitMap.get(ip);
-	if (entry && now - entry.start < window) {
-		if (entry.count >= 20) {
-			res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
-			return;
-		}
-		entry.count++;
-	} else {
-		ttsRateLimitMap.set(ip, { start: now, count: 1 });
+	if (!checkRateLimit(ttsRateLimitMap, ip, Date.now(), 10 * 60 * 1000, 20)) {
+		res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+		return;
 	}
 
 	const { text } = req.body || {};

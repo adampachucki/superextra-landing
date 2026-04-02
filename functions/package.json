@@ -5,6 +5,9 @@
 		"node": "22"
 	},
 	"main": "index.js",
+	"scripts": {
+		"test": "node --test *.test.js"
+	},
 	"dependencies": {
 		"@google-cloud/vertexai": "^1.9.0",
 		"firebase-admin": "^13.0.0",
