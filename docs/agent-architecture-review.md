@@ -27,6 +27,7 @@ The most actionable recommendation from the literature is **single-step trajecto
 Beyond routing, there's no way to know whether the Planner calls the right specialists for a given question, whether brief quality degrades as instructions evolve, or whether the Synthesizer is actually preserving depth. AUTHORING rule 3 documents that the Synthesizer once compressed 91% of content — how would we know if it started doing that again? These don't all need to be automated immediately, but there should be a process of manually reviewing real traces and building an error taxonomy, which then feeds into what automated evals to write. Without this, instruction changes are pure hope.
 
 **Priority actions:**
+
 1. Start reviewing real traces manually — even 10–15 traces would surface a failure taxonomy. This is the foundation that makes all other improvements targeted instead of speculative.
 2. Write routing evals first. Six rules with real edge cases, most critical decision in the pipeline, easiest place to write deterministic tests.
 
@@ -91,17 +92,13 @@ ADK's `before_tool_callback` + `after_tool_callback` pattern handles this cleanl
 ## Summary: priority order
 
 **Highest impact — do these first:**
+
 1. Review real traces manually. 10–15 traces will surface a failure taxonomy that makes all other improvements targeted. No substitute for this.
 2. Write routing evals. Fast to write, fast to run, cover the most critical decision in the pipeline.
 
-**Medium impact:**
-3. Close the first-message / follow-up quality asymmetry — consider giving the Executor a reconnaissance budget before dispatching specialists.
-4. Create a single source of truth for the specialist registry — eliminate the three-file duplication.
+**Medium impact:** 3. Close the first-message / follow-up quality asymmetry — consider giving the Executor a reconnaissance budget before dispatching specialists. 4. Create a single source of truth for the specialist registry — eliminate the three-file duplication.
 
-**Worth planning for:**
-5. Differentiate `target_context` from `competitor_context` in state; give specialists only what they need.
-6. Explore `output_schema` on specialist agents once evals are in place.
-7. Implement Places API caching via `before_tool_callback`.
+**Worth planning for:** 5. Differentiate `target_context` from `competitor_context` in state; give specialists only what they need. 6. Explore `output_schema` on specialist agents once evals are in place. 7. Implement Places API caching via `before_tool_callback`.
 
 ---
 
