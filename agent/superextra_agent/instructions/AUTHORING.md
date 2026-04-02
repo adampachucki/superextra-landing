@@ -4,10 +4,40 @@ Read this before writing or modifying any instruction file in this directory.
 
 ## Architecture
 
-**Router → Context Enricher → Research Planner → Specialists (via AgentTool) → Synthesizer**
+The agent uses a two-turn flow for the first message in a conversation, then a single-turn flow for follow-ups:
 
-- The **planner** decides what to research and writes a specific brief for each specialist. It's the only communication channel to specialists — anything they need to know (language, date, constraints, what NOT to research) must be in the brief.
-- **Specialists** are directed researchers. They only see the planner's brief, not the user's question, the session state, or each other's output.
+**First message (two turns):**
+
+```
+Turn 1: Router → scoping_pipeline
+           ├── Context Enricher (fetches Google Places data)
+           └── Research Scoper (plans research, presents plan to user)
+Turn 2: Router → execution_pipeline
+           ├── Research Executor (dispatches specialists per approved plan)
+           └── Synthesizer (produces final report)
+```
+
+**Follow-up questions:**
+
+```
+Router → research_pipeline
+           ├── Context Enricher → Research Planner → Synthesizer
+           (original single-turn flow — planner plans AND executes)
+```
+
+**Key state keys:**
+
+- `scope_plan` — scoper's user-facing plan (turn 1 reply). Read by executor in turn 2.
+- `research_plan` — executor's summary (turn 2) OR planner's summary (follow-ups). Read by synthesizer.
+- `places_context` — Google Places data. Persists across turns in session state.
+
+**Agent roles:**
+
+- The **router** detects conversation state and routes: first message → scoping, confirmation → execution, follow-up → full pipeline, vague → clarify.
+- The **scoper** plans research (reconnaissance + brief crafting) and presents a user-friendly plan. It does NOT call specialists.
+- The **executor** reads the approved plan from state and dispatches specialists. It does NOT plan or search.
+- The **planner** (used only for follow-ups) both plans AND calls specialists in one step.
+- **Specialists** are directed researchers. They only see their brief, not the user's question, the session state, or each other's output.
 - The **synthesizer** reads all specialist outputs from state and produces the user-facing answer. It does not research.
 
 ## Rules
@@ -65,9 +95,10 @@ Templates use Python's `str.format()`. Never add literal curly braces to `.md` f
 1. Create/delete the instruction `.md` file
 2. Add/remove the `LlmAgent` in `specialists.py`
 3. Add/remove the `AgentTool` wrapper in `SPECIALIST_TOOLS`
-4. Update "Available specialist agents" in `research_planner.md`
-5. Add/remove `output_key` from `_SYNTHESIZER_KEYS` in `agent.py`
-6. Add/remove `{result_key}` in `synthesizer.md`
+4. Update "Available specialist agents" in `research_planner.md`, `research_scoper.md`, AND `research_executor.md`
+5. Update display name → tool name mapping in `research_scoper.md`
+6. Add/remove `output_key` from `_SYNTHESIZER_KEYS` in `agent.py`
+7. Add/remove `{result_key}` in `synthesizer.md`
 
 **Adding a new template variable:**
 
@@ -77,5 +108,5 @@ Templates use Python's `str.format()`. Never add literal curly braces to `.md` f
 
 **Adding an ambiguous domain topic:**
 
-1. Add ownership rules to "Domain boundaries" in `research_planner.md`
+1. Add ownership rules to "Domain boundaries" in `research_planner.md` AND `research_scoper.md`
 2. Clarify scope in relevant specialist `.md` files if needed

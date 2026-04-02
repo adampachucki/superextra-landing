@@ -293,6 +293,8 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 				const stateDelta = event.actions?.stateDelta || event.actions?.state_delta;
 				if (stateDelta?.final_report) {
 					reply = stateDelta.final_report;
+				} else if (stateDelta?.scope_plan) {
+					reply = stateDelta.scope_plan;
 				} else if (stateDelta?.router_response && !reply) {
 					reply = stateDelta.router_response;
 				}
@@ -552,6 +554,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 		const sources = [];
 		const specialistNames = [];
 		let synthesisStarted = false;
+		let scopeStarted = false;
 		let contextDone = false;
 		let planningDone = false;
 		let specialistsDone = false;
@@ -623,13 +626,29 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 							sendSSE(res, 'progress', { stage: 'specialists', status: 'complete', label: 'Research complete', previews });
 						}
 
-						// 4. Research plan complete
+						// 4. Research plan / scope plan complete
 						if (delta.research_plan && !planningDone) {
 							planningDone = true;
 							sendSSE(res, 'progress', { stage: 'planning', status: 'complete', label: 'Research planned' });
 						}
+						if (delta.scope_plan && !planningDone) {
+							planningDone = true;
+							sendSSE(res, 'progress', { stage: 'scoping', status: 'complete', label: 'Research planned' });
+						}
 
-						// 5. Synthesizer streaming tokens
+						// 5a. Scoper streaming tokens (scoping turn)
+						if (evt.author === 'research_scoper' && evt.partial === true) {
+							if (!scopeStarted) {
+								scopeStarted = true;
+								sendSSE(res, 'progress', { stage: 'scoping', status: 'running', label: 'Planning research' });
+							}
+							const text = parts.find(p => p.text)?.text;
+							if (text) {
+								sendSSE(res, 'token', { text });
+							}
+						}
+
+						// 5b. Synthesizer streaming tokens (execution/follow-up turn)
 						if (evt.author === 'synthesizer' && evt.partial === true) {
 							if (!synthesisStarted) {
 								synthesisStarted = true;
@@ -641,9 +660,12 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 							}
 						}
 
-						// 6. Final report
+						// 6. Final report / scope plan as reply
 						if (delta.final_report) {
 							reply = delta.final_report;
+						}
+						if (delta.scope_plan && !reply) {
+							reply = delta.scope_plan;
 						}
 
 						// 7. Router response (clarifying question)
@@ -879,7 +901,7 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		}
 
 		const session = await adkRes.json();
-		const reply = session.state?.final_report || session.state?.router_response || null;
+		const reply = session.state?.final_report || session.state?.scope_plan || session.state?.router_response || null;
 
 		if (!reply) {
 			res.json({ ok: true, reply: null, status: 'processing' });
