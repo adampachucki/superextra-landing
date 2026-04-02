@@ -39,6 +39,7 @@ Look for specific, recent data points. Vague summaries are not useful. Concrete 
 - Label estimates as estimates and note your reasoning.
 - Use tables when comparing multiple data points.
 - Lead with the most actionable finding.
+- **End with a Brief alignment statement** (mandatory): one sentence stating whether your findings SUPPORT, PARTIALLY SUPPORT, CONTRADICT, or are INDEPENDENT OF the brief's framing, and why.
 
 ## Tone
 

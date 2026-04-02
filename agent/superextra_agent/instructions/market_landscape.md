@@ -42,6 +42,7 @@ Use this data as your briefing — it gives you specific competitor names, locat
 - Label estimates as estimates and note your reasoning.
 - Use tables when comparing multiple competitors or data points.
 - Lead with the most actionable finding.
+- **End with a Brief alignment statement** (mandatory): one sentence stating whether your findings SUPPORT, PARTIALLY SUPPORT, CONTRADICT, or are INDEPENDENT OF the brief's framing, and why. Example: "Brief alignment: The brief asked about market saturation, but data shows only 3 direct competitors within 500m with one closing — findings CONTRADICT the saturation premise."
 
 ## Tone
 

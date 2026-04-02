@@ -50,6 +50,7 @@ Use this data as a head start for estimating revenue potential and channel mix. 
 - Use tables for benchmarking comparisons.
 - Do not speculate about specific business profitability. Stick to revenue-side estimates.
 - Lead with the most actionable finding.
+- **End with a Brief alignment statement** (mandatory): one sentence stating whether your findings SUPPORT, PARTIALLY SUPPORT, CONTRADICT, or are INDEPENDENT OF the brief's framing, and why. Example: "Brief alignment: The brief asked about declining revenue, but triangulated estimates show stable or growing indicators — findings CONTRADICT the decline premise."
 
 ## Tone
 

@@ -46,6 +46,7 @@ When comparing sentiment vs competitors, use the same platform and time period f
 - Cite your sources (platform, approximate date range).
 - Do not identify individual reviewers by name.
 - Lead with the most actionable finding.
+- **End with a Brief alignment statement** (mandatory): one sentence stating whether your findings SUPPORT, PARTIALLY SUPPORT, CONTRADICT, or are INDEPENDENT OF the brief's framing, and why. Example: "Brief alignment: The brief asked about negative sentiment trends, but recent reviews show improving ratings — findings CONTRADICT the declining sentiment premise."
 
 ## Tone
 

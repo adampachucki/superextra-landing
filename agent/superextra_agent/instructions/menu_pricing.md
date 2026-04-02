@@ -42,6 +42,7 @@ Google Places does NOT have actual menu items or dish prices. The price level an
 - Price data has a shelf life. Note the date of observation when possible.
 - Use tables for price comparisons — they make positioning immediately clear.
 - Lead with the most actionable finding.
+- **End with a Brief alignment statement** (mandatory): one sentence stating whether your findings SUPPORT, PARTIALLY SUPPORT, CONTRADICT, or are INDEPENDENT OF the brief's framing, and why. Example: "Brief alignment: The brief asked about price undercutting, but competitor prices are comparable — findings CONTRADICT the undercutting premise."
 
 ## Tone
 

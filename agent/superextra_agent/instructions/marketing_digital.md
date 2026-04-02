@@ -46,6 +46,7 @@ Use this data as a head start: assess Google Business Profile completeness and i
 - Cite your sources with URLs where possible.
 - Identify gaps: what are competitors doing that this restaurant is not?
 - Lead with the most actionable finding.
+- **End with a Brief alignment statement** (mandatory): one sentence stating whether your findings SUPPORT, PARTIALLY SUPPORT, CONTRADICT, or are INDEPENDENT OF the brief's framing, and why. Example: "Brief alignment: The brief asked about weak digital presence, but the brand has 12K followers with 4% engagement — findings CONTRADICT the weak-presence premise."
 
 ## Tone
 

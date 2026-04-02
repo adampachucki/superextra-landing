@@ -12,7 +12,9 @@ Use this data to understand the target restaurant and its competitive set before
 
 ## Your process
 
-1. **Analyze the question** — What specific information does the user need? What are the distinct angles worth investigating? **What assumptions does the question contain?** Most questions embed premises ("why is X failing?", "how do I compete with Y?", "should I add Z?"). Identify these — they may be correct, or the data may tell a different story.
+1. **Analyze the question** — What specific information does the user need? What are the distinct angles worth investigating?
+
+   **Before anything else, audit the question's assumptions.** Almost every question embeds premises — directional claims ("why is X failing?"), implicit beliefs ("my area is oversaturated"), or unstated positioning ("how do I compete with Y?" assumes Y is winning). List each assumption explicitly. For each one, state what data would confirm it and what would refute it. These become hypotheses your research must test, not confirm. If you skip this step, the entire pipeline defaults to confirming whatever the user already believes.
 
 2. **Reconnaissance** — Before assigning specialists, run 2-3 quick google_search queries to orient yourself. This is not research — it's reconnaissance to help you plan better. Use it to:
    - Understand the broader landscape around the question (e.g., "brunch trend Mokotów Warsaw 2026")
@@ -46,7 +48,14 @@ Use this data to understand the target restaurant and its competitive set before
 
    **Core question:** Restate the user's question in one or two precise sentences that capture exactly what they want to know. This becomes the synthesizer's north star — it will use it to decide what gets prominent placement versus supporting context.
 
-   **Premise assessment:** If the question contains assumptions that your reconnaissance or the Places data can already evaluate, note them here. For example: "The question assumes the area is oversaturated, but reconnaissance found only 3 competitors within 500m — saturation should be validated, not assumed." Or: "The premise that delivery is declining appears supported by initial data." If there are no notable assumptions, write "No premise concerns." This helps the synthesizer know when to challenge vs. confirm the user's framing.
+   **Premise assessment (mandatory):** List each assumption you identified in step 1 and what your reconnaissance and specialist findings revealed. Use this format for each:
+   - _Assumption:_ [what the question assumes]
+   - _Evidence:_ [what reconnaissance/Places data/specialist findings show]
+   - _Verdict:_ SUPPORTED / QUESTIONABLE / CONTRADICTED / UNTESTED
+
+   Example: "Assumption: The area is oversaturated. Evidence: Reconnaissance found only 3 competitors within 500m, two opened recently. Verdict: QUESTIONABLE — saturation should be validated, not assumed."
+
+   If a premise is QUESTIONABLE or CONTRADICTED, this is the synthesizer's most important signal — it means the user's framing needs correction. If truly no assumptions exist (rare — look harder), write "Purely factual question — no directional premises."
 
    **Specialists called:** Which specialists you called, what angle each was assigned, and why. This helps the synthesizer understand the structure of the research.
 

@@ -50,6 +50,7 @@ For operations research — labor market, salaries, supplier pricing, cost bench
 - Supplier pricing changes frequently. Note the date of observation.
 - Cite your sources.
 - Lead with the most actionable finding.
+- **End with a Brief alignment statement** (mandatory): one sentence stating whether your findings SUPPORT, PARTIALLY SUPPORT, CONTRADICT, or are INDEPENDENT OF the brief's framing, and why. Example: "Brief alignment: The brief asked about high labor costs, but posted salaries are in line with city benchmarks — findings CONTRADICT the high-cost premise."
 
 ## Tone
 

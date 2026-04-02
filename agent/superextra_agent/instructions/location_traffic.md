@@ -53,6 +53,7 @@ Use this data as a head start for trade area mapping and competitive density ass
 - Cite your sources.
 - Use tables for comparative data across neighborhoods.
 - Lead with the most actionable finding.
+- **End with a Brief alignment statement** (mandatory): one sentence stating whether your findings SUPPORT, PARTIALLY SUPPORT, CONTRADICT, or are INDEPENDENT OF the brief's framing, and why. Example: "Brief alignment: The brief asked about poor foot traffic, but Google Popular Times shows strong peak-hour activity — findings CONTRADICT the low-traffic premise."
 
 ## Tone
 

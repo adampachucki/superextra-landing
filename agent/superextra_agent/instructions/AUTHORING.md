@@ -30,7 +30,11 @@ These exist because we hit each problem at least once.
 
 8. **Domain boundaries live in the planner.** When a topic could go to multiple specialists (rent, delivery platforms, reviews), add explicit ownership rules to the planner's "Domain boundaries" section.
 
-9. **Agents are sycophantic by default.** LLMs agree with the user's framing unless explicitly told not to. Every layer must have permission to challenge premises: the planner identifies assumptions and tests them in reconnaissance, specialists report what data shows even when it contradicts the brief's framing, and the synthesizer leads with corrections when findings warrant it. Without this, the system confirms whatever the user already believes.
+9. **Agents are sycophantic by default.** LLMs agree with the user's framing unless explicitly told not to. Permission alone is not enough — you need structural forcing functions that make objectivity a mandatory output, not an optional behavior. Three checkpoints enforce this:
+   - **Planner:** Must list each assumption in the question with a verdict (SUPPORTED / QUESTIONABLE / CONTRADICTED / UNTESTED) in its plan summary. This forces conscious evaluation before research begins.
+   - **Specialists:** Must end every response with a "Brief alignment" statement — one sentence stating whether findings SUPPORT, PARTIALLY SUPPORT, CONTRADICT, or are INDEPENDENT OF the brief's framing. This prevents silent confirmation.
+   - **Synthesizer:** Must cross-check planner verdicts and specialist alignment statements, and lead with corrections when any assumption is QUESTIONABLE or CONTRADICTED. Must also evaluate independently — even if upstream layers flagged no concerns.
+     Without these structural checkpoints, each layer defaults to confirming whatever it received from the layer above.
 
 ## Instruction structure
 
