@@ -3,6 +3,7 @@ from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.apps import App
 from google.adk.tools import google_search
+from google.genai import Client, types
 from .specialists import (
     MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG,
     SPECIALIST_TOOLS, RETRY,
@@ -11,8 +12,13 @@ from .places_tools import get_restaurant_details, find_nearby_restaurants, searc
 from .chat_logger import ChatLoggerPlugin
 from pathlib import Path
 
-# Fast model for simple tasks (routing, scoping) — no thinking needed
-_FAST_MODEL = Gemini(model="gemini-2.0-flash-001", retry_options=RETRY)
+# Fast model for simple tasks (routing, scoping) — no thinking needed.
+# Route via global endpoint (same as 3.1 models).
+_FAST_MODEL = Gemini(model="gemini-2.5-flash", retry_options=RETRY)
+_FAST_MODEL.api_client = Client(
+    vertexai=True, location="global",
+    http_options=types.HttpOptions(retry_options=RETRY),
+)
 
 INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
