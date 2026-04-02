@@ -35,12 +35,18 @@ async function streamAgentOnce(
 	signal: AbortSignal | undefined,
 	canRetry: boolean
 ): Promise<void> {
+	const t0 = Date.now();
+	const log = (msg: string) =>
+		console.log(`[sse +${((Date.now() - t0) / 1000).toFixed(1)}s] ${msg}`);
+
+	log('fetch start');
 	const res = await fetch(url, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(body),
 		signal
 	});
+	log(`fetch resolved: ${res.status}`);
 
 	if (!res.ok) {
 		const data = await res.json().catch(() => null);
@@ -61,6 +67,7 @@ async function streamAgentOnce(
 	let completed = false;
 	let receivedAnyEvent = false;
 	const startTime = Date.now();
+	let chunkCount = 0;
 
 	// Inactivity timeout — reset on any data or keepalive
 	let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
@@ -81,8 +88,15 @@ async function streamAgentOnce(
 	try {
 		while (true) {
 			const { done, value } = await reader.read();
-			if (done) break;
+			if (done) {
+				log(
+					`stream done after ${chunkCount} chunks, completed=${completed}, events=${receivedAnyEvent}`
+				);
+				break;
+			}
 
+			chunkCount++;
+			if (chunkCount <= 3) log(`chunk #${chunkCount}: ${value.byteLength}B`);
 			resetInactivity();
 			buffer += decoder.decode(value, { stream: true });
 
@@ -122,12 +136,21 @@ async function streamAgentOnce(
 		}
 
 		if (!completed) {
+			const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+			log(
+				`stream closed incomplete: elapsed=${elapsed}s, events=${receivedAnyEvent}, chunks=${chunkCount}`
+			);
 			// Stream closed with zero events within 5s — transient infra failure, retry once
 			if (canRetry && !receivedAnyEvent && Date.now() - startTime < 5_000) {
+				log('retrying (early close with no events)');
 				return streamAgentOnce(url, body, callbacks, signal, false);
 			}
 			callbacks.onError('Connection closed before response completed.');
 		}
+	} catch (err) {
+		const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+		log(`error at +${elapsed}s: ${err instanceof Error ? err.message : err}`);
+		throw err;
 	} finally {
 		if (inactivityTimer) clearTimeout(inactivityTimer);
 	}

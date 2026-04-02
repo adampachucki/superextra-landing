@@ -444,10 +444,12 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 	});
 	res.write(': ok\n\n');
 
+	const t0 = Date.now();
 	const keepalive = setInterval(() => res.write(': keepalive\n\n'), 15000);
 	const ac = new AbortController();
 	req.on('close', () => {
-		if (!res.writableEnded) console.warn('Client disconnected before stream completed');
+		const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+		if (!res.writableEnded) console.warn(`Client disconnected at +${elapsed}s (before stream completed)`);
 		ac.abort();
 		clearInterval(keepalive);
 	});
@@ -455,6 +457,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 	try {
 		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
 		const headers = await client.getRequestHeaders();
+		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] auth ready`);
 
 		// Session management (same as agent endpoint)
 		let cached = sessionMap.get(sessionId);
@@ -468,6 +471,8 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 				sessionMap.set(sessionId, { adkSessionId, userId });
 			}
 		}
+		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] session lookup: ${adkSessionId ? 'found' : 'new'}`);
+
 		if (!adkSessionId) {
 			const createRes = await fetch(`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(ip)}/sessions`, {
 				method: 'POST',
@@ -489,6 +494,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 				userId: ip,
 				createdAt: Date.now()
 			});
+			console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] session created: ${adkSessionId}`);
 		}
 
 		// Build query
@@ -503,6 +509,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 		const titlePromise = isFirstMessage ? generateTitle(message) : null;
 
 		// Call ADK with streaming
+		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] calling run_sse (aborted=${ac.signal.aborted})`);
 		const adkResponse = await fetch(`${ADK_SERVICE_URL}/run_sse`, {
 			method: 'POST',
 			headers: { ...headers, 'Content-Type': 'application/json' },
@@ -524,6 +531,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 		}
 
 		// Stream-parse ADK SSE events
+		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] run_sse connected`);
 		const reader = adkResponse.body.getReader();
 		const decoder = new TextDecoder();
 		let buffer = '';
