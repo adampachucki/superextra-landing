@@ -1,14 +1,18 @@
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.agents import LlmAgent
+from google.adk.models.google_llm import Gemini
 from google.adk.apps import App
 from google.adk.tools import google_search
 from .specialists import (
     MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG,
-    SPECIALIST_TOOLS,
+    SPECIALIST_TOOLS, RETRY,
 )
 from .places_tools import get_restaurant_details, find_nearby_restaurants, search_restaurants
 from .chat_logger import ChatLoggerPlugin
 from pathlib import Path
+
+# Fast model for simple tasks (routing, scoping) — no thinking needed
+_FAST_MODEL = Gemini(model="gemini-2.0-flash-001", retry_options=RETRY)
 
 INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
@@ -79,7 +83,7 @@ def _make_synthesizer(name="synthesizer"):
 
 research_scoper = LlmAgent(
     name="research_scoper",
-    model=MODEL_GEMINI,
+    model=_FAST_MODEL,
     instruction=_SCOPER_INSTRUCTION,
     description="Analyzes the user question and presents a concise research plan for user approval.",
     output_key="scope_plan",
@@ -126,7 +130,7 @@ research_pipeline = SequentialAgent(
 
 _router = LlmAgent(
     name="router",
-    model=MODEL_GEMINI,
+    model=_FAST_MODEL,
     instruction=(INSTRUCTIONS_DIR / "router.md").read_text(),
     description="Routes user questions to scoping, execution, or full research pipeline.",
     sub_agents=[research_scoper, execution_pipeline, research_pipeline],
