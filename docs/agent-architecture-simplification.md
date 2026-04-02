@@ -24,7 +24,7 @@ Router → Enricher → Planner → Specialists → Synthesizer
 
 **Two nearly-identical orchestrators** — Executor and Planner — solve the same problem (plan + dispatch specialists) via different paths depending on conversation state. The only meaningful difference is that Planner does reconnaissance via `google_search` before planning. That is one feature difference, not enough to justify two agents.
 
-**The Router adds a hop without adding value.** It classifies conversation state (first message? follow-up? plan confirmation?), but that classification exists *because* of the two-pipeline, confirmation-gate design. Remove those and the router largely disappears.
+**The Router adds a hop without adding value.** It classifies conversation state (first message? follow-up? plan confirmation?), but that classification exists _because_ of the two-pipeline, confirmation-gate design. Remove those and the router largely disappears.
 
 ---
 
@@ -51,6 +51,7 @@ The premise auditing threaded through Planner/Executor/Synthesizer is genuinely 
 ### 1. Merge Scoper + Executor + Planner into one Research Orchestrator
 
 The orchestrator:
+
 - Always runs 2-3 `google_search` reconnaissance queries first (Planner's best feature)
 - Audits premises before dispatching (already in Planner)
 - Dispatches specialists in parallel immediately — no user confirmation
@@ -103,13 +104,14 @@ Zero roundtrips. The user corrects course via a follow-up, which is already hand
 
 Stream progress instead of asking for plan approval:
 
-> *Researching your competitive set... checking guest sentiment... analyzing pricing...*
+> _Researching your competitive set... checking guest sentiment... analyzing pricing..._
 
 Solves the engagement problem without a roundtrip. SSE streaming is already in place.
 
 ### Outcome
 
 This collapses 6 router rules to effectively 2:
+
 - Genuinely vague → ask one question
 - Everything else → research immediately, state interpretation if needed
 
@@ -119,15 +121,15 @@ The Scoper agent and its confirmation loop go away entirely.
 
 ## Net impact
 
-| | Now | After |
-|---|---|---|
-| Agents | 15 | ~9 (Router, Enricher, Orchestrator, 7 Specialists) |
-| Pipelines | 2 | 1 |
-| Instruction files | 15 | ~11 |
-| User roundtrips to first answer | 2 (plan confirm + response) | 1 (response) |
-| Estimated time to first answer | 2-3 min | 1-1.5 min |
-| Premise auditing | Preserved | Preserved (orchestrator + synthesizer) |
-| Specialist depth | Unchanged | Unchanged |
+|                                 | Now                         | After                                              |
+| ------------------------------- | --------------------------- | -------------------------------------------------- |
+| Agents                          | 15                          | ~9 (Router, Enricher, Orchestrator, 7 Specialists) |
+| Pipelines                       | 2                           | 1                                                  |
+| Instruction files               | 15                          | ~11                                                |
+| User roundtrips to first answer | 2 (plan confirm + response) | 1 (response)                                       |
+| Estimated time to first answer  | 2-3 min                     | 1-1.5 min                                          |
+| Premise auditing                | Preserved                   | Preserved (orchestrator + synthesizer)             |
+| Specialist depth                | Unchanged                   | Unchanged                                          |
 
 ---
 
