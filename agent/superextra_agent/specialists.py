@@ -1,6 +1,6 @@
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
-from google.adk.tools import google_search, FunctionTool
+from google.adk.tools import google_search
 from google.genai import Client, types
 from pathlib import Path
 import os
@@ -123,7 +123,8 @@ async def set_specialist_briefs(briefs: dict, tool_context) -> str:
     return f"Briefs set for: {', '.join(briefs.keys())}"
 
 
-set_specialist_briefs_tool = FunctionTool(set_specialist_briefs)
+    # No FunctionTool wrapper — pass the raw callable to tools=[] so ADK
+    # auto-wraps it as a python callable, keeping AFC compatible with google_search.
 
 
 market_landscape = LlmAgent(

@@ -7,7 +7,7 @@ from google.adk.tools import google_search
 from google.genai import Client, types
 from .specialists import (
     MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG,
-    ALL_SPECIALISTS, set_specialist_briefs_tool, RETRY,
+    ALL_SPECIALISTS, set_specialist_briefs, RETRY,
 )
 from .places_tools import get_restaurant_details, find_nearby_restaurants, search_restaurants
 from .chat_logger import ChatLoggerPlugin
@@ -83,7 +83,7 @@ research_orchestrator = LlmAgent(
     model=MODEL_GEMINI,
     instruction=_orchestrator_instruction,
     description="Plans research: reconnaissance, premise audit, and specialist brief assignment.",
-    tools=[google_search, set_specialist_briefs_tool],
+    tools=[google_search, set_specialist_briefs],
     output_key="research_plan",
     generate_content_config=THINKING_CONFIG,
 )
