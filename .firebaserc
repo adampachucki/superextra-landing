@@ -1,5 +1,13 @@
 {
 	"projects": {
 		"default": "superextra-site"
+	},
+	"targets": {
+		"superextra-site": {
+			"hosting": {
+				"landing": ["superextra-landing"],
+				"agent": ["superextra-agent"]
+			}
+		}
 	}
 }

@@ -1,44 +1,94 @@
 {
-	"hosting": {
-		"site": "superextra-landing",
-		"public": "build",
-		"ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-		"cleanUrls": true,
-		"rewrites": [
-			{
-				"source": "/api/intake",
-				"function": "intake"
-			},
-			{
-				"source": "/api/agent/check",
-				"function": "agentCheck"
-			},
-			{
-				"source": "/api/agent/debug",
-				"function": "agentDebug"
-			},
-			{
-				"source": "/api/agent/stream",
-				"function": "agentStream"
-			},
-			{
-				"source": "/api/agent",
-				"function": "agent"
-			},
-			{
-				"source": "/api/stt-token",
-				"function": "sttToken"
-			},
-			{
-				"source": "/api/tts",
-				"function": "tts"
-			},
-			{
-				"source": "**",
-				"destination": "/200.html"
-			}
-		]
-	},
+	"hosting": [
+		{
+			"target": "landing",
+			"public": "build",
+			"ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+			"cleanUrls": true,
+			"redirects": [
+				{
+					"source": "/agent/chat{,/**}",
+					"destination": "https://agent.superextra.ai/chat",
+					"type": 301
+				},
+				{
+					"source": "/agent{,/**}",
+					"destination": "https://agent.superextra.ai",
+					"type": 301
+				}
+			],
+			"rewrites": [
+				{
+					"source": "/api/intake",
+					"function": "intake"
+				},
+				{
+					"source": "/api/stt-token",
+					"function": "sttToken"
+				},
+				{
+					"source": "/api/tts",
+					"function": "tts"
+				},
+				{
+					"source": "**",
+					"destination": "/200.html"
+				}
+			]
+		},
+		{
+			"target": "agent",
+			"public": "build",
+			"ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+			"cleanUrls": true,
+			"redirects": [
+				{
+					"source": "/agent/chat",
+					"destination": "/chat",
+					"type": 301
+				},
+				{
+					"source": "/agent",
+					"destination": "/",
+					"type": 301
+				}
+			],
+			"rewrites": [
+				{
+					"source": "/api/agent/check",
+					"function": "agentCheck"
+				},
+				{
+					"source": "/api/agent/debug",
+					"function": "agentDebug"
+				},
+				{
+					"source": "/api/agent/stream",
+					"function": "agentStream"
+				},
+				{
+					"source": "/api/agent",
+					"function": "agent"
+				},
+				{
+					"source": "/api/stt-token",
+					"function": "sttToken"
+				},
+				{
+					"source": "/api/tts",
+					"function": "tts"
+				},
+				{
+					"source": "/chat",
+					"destination": "/agent/chat.html"
+				},
+				{
+					"source": "/",
+					"destination": "/agent.html"
+				}
+			]
+		}
+	],
 	"functions": [
 		{
 			"source": "functions",

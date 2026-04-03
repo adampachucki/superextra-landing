@@ -104,8 +104,19 @@
 		if (leaving) return;
 		placeNudge = false;
 		leaving = true;
-		chatState.start(userQuery.trim(), selectedPlace);
-		setTimeout(() => goto('/agent/chat'), 400);
+		if (import.meta.env.DEV) {
+			chatState.start(userQuery.trim(), selectedPlace);
+			setTimeout(() => goto('/agent/chat'), 400);
+		} else {
+			const url = new URL('https://agent.superextra.ai/chat');
+			url.searchParams.set('q', userQuery.trim());
+			if (selectedPlace) {
+				url.searchParams.set('placeName', selectedPlace.name);
+				url.searchParams.set('placeSecondary', selectedPlace.secondary);
+				url.searchParams.set('placeId', selectedPlace.placeId);
+			}
+			setTimeout(() => (window.location.href = url.toString()), 400);
+		}
 	}
 
 	function handleKeydown(e: KeyboardEvent) {

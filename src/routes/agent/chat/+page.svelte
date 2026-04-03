@@ -118,7 +118,25 @@
 	onMount(() => {
 		const params = new URL(window.location.href).searchParams;
 		const sid = params.get('sid');
-		if (sid) {
+		const q = params.get('q');
+		if (q) {
+			const place =
+				params.get('placeId') && params.get('placeName')
+					? {
+							placeId: params.get('placeId')!,
+							name: params.get('placeName')!,
+							secondary: params.get('placeSecondary') ?? ''
+						}
+					: null;
+			chatState.start(q, place);
+			// Strip query params so reload doesn't re-send
+			const clean = new URL(window.location.href);
+			clean.searchParams.delete('q');
+			clean.searchParams.delete('placeName');
+			clean.searchParams.delete('placeSecondary');
+			clean.searchParams.delete('placeId');
+			history.replaceState(history.state, '', clean);
+		} else if (sid) {
 			chatState.switchTo(sid);
 		}
 		sidebarOpen = window.matchMedia('(min-width: 1024px)').matches;
@@ -447,10 +465,7 @@
 			style="--sb-delay: 0.15s"
 			class:visible={sidebarContentVisible}
 		>
-			<a
-				href="/agent"
-				class="group flex items-center gap-0.5 text-black no-underline dark:text-white"
-			>
+			<a href="/" class="group flex items-center gap-0.5 text-black no-underline dark:text-white">
 				<svg
 					class="-mt-2.5 h-[18px] w-[18px] transition-transform duration-500 ease-out group-hover:rotate-45 md:-mt-2"
 					viewBox="0 0 12 12"

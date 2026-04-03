@@ -58,7 +58,7 @@
 		property="og:description"
 		content="See what's happening outside your four walls. Market analyst for every restaurant."
 	/>
-	<meta property="og:url" content="https://superextra.ai/agent" />
+	<meta property="og:url" content="https://agent.superextra.ai" />
 </svelte:head>
 
 <Navbar minimal />

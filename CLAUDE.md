@@ -4,9 +4,12 @@ AI-native market intelligence and competitor benchmarking for the restaurant ind
 
 ## Domains & hosting sites
 
-- **This repo** (`superextra-landing` hosting site) → **`landing.superextra.ai`** — NOT `superextra.ai`
+- **This repo** deploys to two Firebase Hosting sites (both in project `superextra-site`):
+  - `superextra-landing` → **`landing.superextra.ai`** (marketing landing page)
+  - `superextra-agent` → **`agent.superextra.ai`** (agent UI)
 - `superextra-site` is a separate hosting site serving `superextra.ai` (main marketing page) — not part of this repo
-- Agent UI routes: `/agent` (landing.superextra.ai/agent) and `/agent/chat`
+- Agent UI routes: `agent.superextra.ai/` (agent landing) and `agent.superextra.ai/chat`
+- `landing.superextra.ai/agent` 301-redirects to `agent.superextra.ai`
 
 ## Commands
 
