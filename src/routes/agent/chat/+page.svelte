@@ -1186,7 +1186,7 @@
 
 	/* Plop in: delayed entrance with overshoot */
 	.toggle-float.toggle-plop {
-		animation: togglePlop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) 0.35s both;
+		animation: togglePlop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
 	}
 
 	@keyframes toggleOut {
