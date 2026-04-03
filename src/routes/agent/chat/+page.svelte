@@ -123,9 +123,13 @@
 		function onVisibilityChange() {
 			if (document.visibilityState === 'hidden') {
 				hiddenAt = Date.now();
-			} else if (document.visibilityState === 'visible' && hiddenAt > 0) {
-				chatState.handleReturn(Date.now() - hiddenAt);
-				hiddenAt = 0;
+				chatState.pageHidden = true;
+			} else if (document.visibilityState === 'visible') {
+				chatState.pageHidden = false;
+				if (hiddenAt > 0) {
+					chatState.handleReturn(Date.now() - hiddenAt);
+					hiddenAt = 0;
+				}
 			}
 		}
 		document.addEventListener('visibilitychange', onVisibilityChange);

@@ -519,6 +519,35 @@ describe('chatState', () => {
 
 			vi.unstubAllGlobals();
 		});
+
+		it('returns true immediately when reply already exists in messages', async () => {
+			expect.assertions(2);
+
+			// Create a conversation where the agent reply was already delivered via SSE
+			const stream = hangingStream();
+			chatState.start('query', null);
+			stream.cbs.onComplete('already delivered', [], undefined);
+			stream.resolve();
+			await waitUntil(() => !chatState.loading);
+
+			// Now recover — agentCheck returns the same reply
+			const mockFetch = vi.fn().mockResolvedValue({
+				json: () =>
+					Promise.resolve({
+						ok: true,
+						reply: 'already delivered',
+						sources: []
+					})
+			});
+			vi.stubGlobal('fetch', mockFetch);
+
+			const result = await chatState.recover();
+			expect(result).toBe(true);
+			// Should only poll once, not keep going
+			expect(mockFetch).toHaveBeenCalledTimes(1);
+
+			vi.unstubAllGlobals();
+		});
 	});
 
 	// ----------------------------------------------------------------

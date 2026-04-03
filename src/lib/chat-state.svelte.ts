@@ -66,6 +66,7 @@ let streamingText = $state('');
 let streamingProgress = $state<StreamingStep[]>([]);
 let streamingActivities = $state<ActivityItem[]>([]);
 let abortController: AbortController | null = null;
+let pageHidden = $state(false);
 
 // All conversations
 let conversations = $state<Conversation[]>([]);
@@ -274,7 +275,7 @@ async function send(text: string) {
 					}
 				},
 				onError(err) {
-					if (currentId === sendingConvId) {
+					if (currentId === sendingConvId && !pageHidden) {
 						error = err;
 					}
 				},
@@ -309,7 +310,12 @@ async function send(text: string) {
 			abortController.signal
 		);
 	} catch (e: unknown) {
-		if (e instanceof Error && e.name !== 'AbortError' && currentId === sendingConvId) {
+		if (
+			e instanceof Error &&
+			e.name !== 'AbortError' &&
+			currentId === sendingConvId &&
+			!pageHidden
+		) {
 			error = 'Could not reach the server. Please check your connection.';
 		}
 	} finally {
@@ -422,15 +428,13 @@ async function recover(): Promise<boolean> {
 				return false;
 			}
 
-			// Reply received
-			if (
-				data.ok &&
-				data.reply &&
-				!messages.some((m) => m.role === 'agent' && m.text === data.reply)
-			) {
-				const sources: ChatSource[] | undefined = data.sources?.length ? data.sources : undefined;
-				messages.push({ role: 'agent', text: data.reply, timestamp: Date.now(), sources });
-				persist();
+			// Reply received — either new or already delivered via SSE
+			if (data.ok && data.reply) {
+				if (!messages.some((m) => m.role === 'agent' && m.text === data.reply)) {
+					const sources: ChatSource[] | undefined = data.sources?.length ? data.sources : undefined;
+					messages.push({ role: 'agent', text: data.reply, timestamp: Date.now(), sources });
+					persist();
+				}
 				loading = false;
 				recovering = false;
 				return true;
@@ -522,6 +526,9 @@ export const chatState = {
 	},
 	get error() {
 		return error;
+	},
+	set pageHidden(v: boolean) {
+		pageHidden = v;
 	},
 	get active() {
 		return active;
