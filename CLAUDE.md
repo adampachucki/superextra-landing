@@ -152,6 +152,20 @@ The `agentStream` SSE endpoint is called directly via its Cloud Run URL (not `cl
 - This applies to everything: library APIs, platform behavior, syntax, error causes, configuration options. Read the source before you answer.
 - **External APIs and services:** When integrating any external tool, SDK, or API (ElevenLabs, Firebase, Google, etc.), read the official documentation first — before writing any code. Understand the exact message formats, data flow, and expected behavior. Do not guess how an API works based on naming conventions or assumptions.
 
+## Chrome DevTools MCP
+
+The browser inspection tool is **Chrome DevTools MCP** (`chrome-devtools-mcp`), configured with `--isolated` (temp profile per session, no lock conflicts). Playwright MCP has been removed — do not use it or suggest it.
+
+- **Always use Chrome DevTools MCP** for browser tasks: inspecting pages, taking screenshots, checking network requests, reading console logs, clicking/filling elements
+- **Never fall back to Playwright.** If Chrome DevTools MCP fails, diagnose and fix the connection — do not switch tools
+- **Common conflict: "browser is already running"** — caused by a stale Chrome process holding the profile lock. Fix:
+  1. `pkill -f "chrome.*chrome-devtools-mcp"`
+  2. `rm ~/.cache/chrome-devtools-mcp/chrome-profile/SingletonLock`
+  3. Retry the Chrome MCP tool
+- **If CDP connection drops** (e.g. `detached` / `replaced_with_devtools`), ask the user to close Chrome DevTools (F12) — opening the browser's built-in DevTools kicks remote CDP clients
+- **`--isolated` tradeoff:** Each session gets a fresh Chrome with no cookies/logins. This is fine for inspecting localhost. If logged-in state is needed, temporarily reconfigure with `--browser-url=http://127.0.0.1:9222` to attach to the user's real browser instead
+- **Dev server runs on port 5199** — when navigating to the local site, use `http://localhost:5199`
+
 ## Don'ts
 
 - No Svelte 4 syntax (`export let`, `$:`, `on:click`, `<slot>`)
