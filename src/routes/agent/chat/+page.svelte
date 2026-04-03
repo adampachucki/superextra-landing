@@ -117,6 +117,15 @@
 		if (chatState.activeId && msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
 			chatState.recover();
 		}
+
+		// Recover from Safari (and other browsers) killing SSE connections when backgrounded
+		function onVisibilityChange() {
+			if (document.visibilityState === 'visible') {
+				chatState.handleReturn();
+			}
+		}
+		document.addEventListener('visibilitychange', onVisibilityChange);
+		return () => document.removeEventListener('visibilitychange', onVisibilityChange);
 	});
 
 	// Keep URL in sync with active session

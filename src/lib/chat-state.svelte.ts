@@ -394,6 +394,38 @@ async function recover(): Promise<boolean> {
 	return false;
 }
 
+/**
+ * Called on visibilitychange → 'visible' to recover from Safari killing SSE connections.
+ *
+ * iOS Safari fully suspends the WebContent process when backgrounded, killing TCP
+ * connections (webkit.org/blog/8970/how-web-content-can-get-unloaded/). When the tab
+ * returns, the pending reader.read() rejects or resolves with done=true.
+ *
+ * A short delay is needed before fetching because iOS 18 Safari's networking stack
+ * may not be ready immediately after visibility change (WebKit Bug 284946).
+ */
+function handleReturn() {
+	if (!currentId) return;
+	if (messages.length === 0 || messages[messages.length - 1].role !== 'user') return;
+
+	if (loading) {
+		// Stream was in-flight when the tab was backgrounded — connection is dead
+		abortController?.abort();
+		// Wait for send() finally block to clear loading state, plus iOS networking delay
+		setTimeout(() => {
+			error = '';
+			if (!loading) recover();
+		}, 300);
+	} else {
+		// Stream already ended (with error or silently) — try to recover the response
+		// Delay for iOS 18 networking stack reinitialization (WebKit Bug 284946)
+		setTimeout(() => {
+			error = '';
+			recover();
+		}, 300);
+	}
+}
+
 function deleteConversation(id: string) {
 	conversations = conversations.filter((c) => c.id !== id);
 	if (id === currentId) {
@@ -448,6 +480,7 @@ export const chatState = {
 	start,
 	reset,
 	recover,
+	handleReturn,
 	switchTo,
 	deleteConversation
 };
