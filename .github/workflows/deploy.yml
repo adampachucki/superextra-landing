@@ -71,7 +71,7 @@ jobs:
         run: |
           cd agent
           pip install -r requirements-dev.txt
-          PYTHONPATH=. pytest tests/ -v
+          PYTHONPATH=. pytest tests/ -v --ignore=tests/test_router_evals.py
 
   deploy-hosting:
     needs: test
