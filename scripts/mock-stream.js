@@ -228,6 +228,14 @@ async function fullResearch(res) {
 			agent: s
 		});
 	}
+	// Aggregate search activity
+	sse(res, 'activity', {
+		id: 'search-web',
+		category: 'search',
+		status: 'running',
+		label: 'Searching the web',
+		agent: 'research_orchestrator'
+	});
 
 	// Phase 3: Specialists search in parallel (staggered)
 	const searches = [
@@ -315,6 +323,7 @@ async function fullResearch(res) {
 	completions.sort((a, b) => a.delay - b.delay);
 
 	let lastDelay = 0;
+	let completedCount = 0;
 	for (const c of completions) {
 		const gap = c.delay - lastDelay;
 		lastDelay = c.delay;
@@ -374,6 +383,17 @@ async function fullResearch(res) {
 				agent: c.agent
 			});
 		}
+
+		// Update search-web counter
+		completedCount++;
+		sse(res, 'activity', {
+			id: 'search-web',
+			category: 'search',
+			status: completedCount >= completions.length ? 'complete' : 'running',
+			label: `Searching the web (${completedCount}/${completions.length})`,
+			detail: completedCount < completions.length ? labels[c.agent] : undefined,
+			agent: 'research_orchestrator'
+		});
 	}
 
 	// Phase 5: Synthesis

@@ -29,9 +29,12 @@
 						: analyzeItemsVisible;
 		if (items.length === 0) return false;
 		if (!items.every((a) => a.status === 'complete')) return false;
-		// Data section: don't show Done until data-check is complete (prevents flash after primary)
-		if (key === 'data' && !items.some((a) => a.id === 'data-check' && a.status === 'complete'))
-			return false;
+		// Data section: don't show Done until data-check is complete (when it exists)
+		if (key === 'data') {
+			const hasCheck = items.some((a) => a.id === 'data-check');
+			if (hasCheck && !items.some((a) => a.id === 'data-check' && a.status === 'complete'))
+				return false;
+		}
 		return true;
 	}
 
@@ -49,38 +52,6 @@
 		const count = phase <= 3 ? phase : 6 - phase;
 		return '.'.repeat(count);
 	}
-
-	// --- Typewriter for read item labels ---
-	let readDisplay: Record<string, string> = $state({});
-	let readTargets: Record<string, string> = {};
-	let readRafs: Record<string, number> = {};
-
-	function drainRead(id: string) {
-		const target = readTargets[id];
-		if (!target) return;
-		const current = readDisplay[id] || '';
-		if (current.length < target.length) {
-			readDisplay[id] = target.slice(0, current.length + 2);
-			readRafs[id] = requestAnimationFrame(() => drainRead(id));
-		} else {
-			delete readRafs[id];
-		}
-	}
-
-	$effect(() => {
-		for (const item of readItems) {
-			const fullLabel = item.detail ? `${item.label} — ${item.detail}` : item.label;
-			if (readTargets[item.id] !== fullLabel) {
-				readTargets[item.id] = fullLabel;
-				readDisplay[item.id] = '';
-				if (readRafs[item.id]) cancelAnimationFrame(readRafs[item.id]);
-				readRafs[item.id] = requestAnimationFrame(() => drainRead(item.id));
-			}
-		}
-		return () => {
-			for (const raf of Object.values(readRafs)) cancelAnimationFrame(raf);
-		};
-	});
 
 	// --- Typewriter for data item details (place names cycling below labels) ---
 	let dataDisplay: Record<string, string> = $state({});
@@ -144,6 +115,68 @@
 		};
 	});
 
+	// --- Reading section: staggered reveal + typewriter ---
+	let readRevealedCount = $state(0);
+	let visibleReadItems = $derived(readItems.slice(0, readRevealedCount));
+	let readDone = $derived(
+		readItems.length > 0 &&
+			readItems.every((a) => a.status === 'complete') &&
+			readRevealedCount >= readItems.length
+	);
+
+	// Stagger timer: reveal one item every 200ms
+	$effect(() => {
+		if (readRevealedCount >= readItems.length) return;
+		const interval = setInterval(() => {
+			readRevealedCount++;
+			if (readRevealedCount >= readItems.length) clearInterval(interval);
+		}, 200);
+		return () => clearInterval(interval);
+	});
+
+	let readDisplay: Record<string, string> = $state({});
+	let readTargets: Record<string, string> = {};
+	let readRafs: Record<string, number> = {};
+
+	function drainRead(id: string) {
+		const target = readTargets[id];
+		if (!target) return;
+		const current = readDisplay[id] || '';
+		if (current.length < target.length) {
+			readDisplay[id] = target.slice(0, current.length + 2);
+			readRafs[id] = requestAnimationFrame(() => drainRead(id));
+		} else {
+			delete readRafs[id];
+		}
+	}
+
+	// Typewriter only runs for visible (revealed) items
+	$effect(() => {
+		for (const item of visibleReadItems) {
+			const fullLabel = formatReadUrl(item.url || item.label);
+			if (readTargets[item.id] !== fullLabel) {
+				readTargets[item.id] = fullLabel;
+				readDisplay[item.id] = '';
+				if (readRafs[item.id]) cancelAnimationFrame(readRafs[item.id]);
+				readRafs[item.id] = requestAnimationFrame(() => drainRead(item.id));
+			}
+		}
+		return () => {
+			for (const raf of Object.values(readRafs)) cancelAnimationFrame(raf);
+		};
+	});
+
+	function formatReadUrl(url: string): string {
+		try {
+			const u = new URL(url);
+			const path = u.hostname + u.pathname.replace(/\/$/, '');
+			return path.length > 60 ? path.slice(0, 57) + '...' : path;
+		} catch {
+			return url.length > 60 ? url.slice(0, 57) + '...' : url;
+		}
+	}
+
+	// Sections for the generic loop (read excluded — rendered separately)
 	const SECTION_CONFIG: {
 		key: ActivityCategory;
 		label: string;
@@ -151,7 +184,6 @@
 	}[] = [
 		{ key: 'data', label: 'Gathering data', items: () => dataItems },
 		{ key: 'search', label: 'Searching', items: () => searchItems },
-		{ key: 'read', label: 'Reading', items: () => readItems },
 		{ key: 'analyze', label: 'Analyzing', items: () => analyzeItemsVisible }
 	];
 </script>
@@ -213,19 +245,24 @@
 									</span>
 								{/if}
 							</div>
-						{:else if section.key === 'read'}
-							<span
-								class={[
-									item.status === 'complete'
-										? 'text-black/40 dark:text-white/40'
-										: 'text-black/60 dark:text-white/60'
-								]}
-							>
-								{readDisplay[item.id] ||
-									item.label}{#if readDisplay[item.id] && readDisplay[item.id].length < (readTargets[item.id] || '').length}<span
-										class="cursor-blink">|</span
-									>{/if}
-							</span>
+						{:else if section.key === 'search' && item.id === 'search-web'}
+							<!-- Aggregate search: label + specialist detail below -->
+							<div class="flex flex-col">
+								<span
+									class={[
+										item.status === 'complete'
+											? 'text-black/40 dark:text-white/40'
+											: 'text-black/60 dark:text-white/60'
+									]}
+								>
+									{item.label}
+								</span>
+								{#if item.detail}
+									<span class="text-[12px] text-black/30 dark:text-white/30">
+										{item.detail}
+									</span>
+								{/if}
+							</div>
 						{:else if section.key === 'search'}
 							<span
 								class={[
@@ -242,6 +279,48 @@
 			</div>
 		{/if}
 	{/each}
+
+	<!-- Reading section: counter + staggered children -->
+	{#if readItems.length > 0}
+		<div class="flex flex-col gap-0.5">
+			<span class="text-[13px] text-black/30 dark:text-white/30">
+				{readDone ? 'Reading – Done' : `Reading${getDots(dotPhase)}`}
+			</span>
+
+			<!-- Counter with dot -->
+			<div class="activity-appear flex items-start gap-2 text-[13px] leading-snug">
+				{#if readDone}
+					<span class="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
+				{:else}
+					<span class="stage-pulse mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"></span>
+				{/if}
+				<span
+					class={readDone ? 'text-black/40 dark:text-white/40' : 'text-black/60 dark:text-white/60'}
+				>
+					Sources: {readItems.length}
+				</span>
+			</div>
+
+			<!-- Staggered children: indented, no dots, smaller font -->
+			{#each readDone ? visibleReadItems.slice(0, 5) : visibleReadItems as item (item.id)}
+				<div class="activity-appear pl-5 text-[12px] leading-snug text-black/30 dark:text-white/30">
+					{readDisplay[item.id] ||
+						formatReadUrl(
+							item.url || item.label
+						)}{#if readDisplay[item.id] && readDisplay[item.id].length < (readTargets[item.id] || '').length}<span
+							class="cursor-blink">|</span
+						>{/if}
+				</div>
+			{/each}
+
+			<!-- Collapse overflow when done -->
+			{#if readDone && readItems.length > 5}
+				<div class="pl-5 text-[12px] leading-snug text-black/20 dark:text-white/20">
+					and {readItems.length - 5} more
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	{#if researchComplete}
 		<span class="activity-appear text-[13px] text-black/30 dark:text-white/30">

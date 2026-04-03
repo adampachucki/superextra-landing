@@ -182,6 +182,8 @@ export async function parseADKStream(reader, emit) {
 	let placesTotal = 0;                         // total places found from search/nearby
 	let placesCompleted = 0;                     // how many get_restaurant_details responses received
 	let checkEmitted = false;                    // whether data-check activity has been emitted
+	let totalSpecialists = 0;                    // specialist count from set_specialist_briefs
+	let completedSpecialists = 0;                // how many specialists have completed
 
 	while (true) {
 		const { done, value } = await reader.read();
@@ -363,6 +365,18 @@ export async function parseADKStream(reader, emit) {
 								});
 							}
 						}
+						// activity:search — aggregate "Searching the web" counter
+						totalSpecialists = briefKeys.filter(k => TOOL_LABELS[k]).length;
+						completedSpecialists = 0;
+						if (totalSpecialists > 0) {
+							emit('activity', {
+								id: 'search-web',
+								category: 'search',
+								status: 'running',
+								label: 'Searching the web',
+								agent: 'research_orchestrator',
+							});
+						}
 					}
 
 					// 4. google_search calls from any agent → activity:search
@@ -463,6 +477,18 @@ export async function parseADKStream(reader, emit) {
 										agent: author,
 									});
 								}
+							}
+							// activity:search — update web search counter
+							completedSpecialists++;
+							if (totalSpecialists > 0) {
+								emit('activity', {
+									id: 'search-web',
+									category: 'search',
+									status: completedSpecialists >= totalSpecialists ? 'complete' : 'running',
+									label: `Searching the web (${completedSpecialists}/${totalSpecialists})`,
+									detail: completedSpecialists < totalSpecialists ? TOOL_LABELS[author] : undefined,
+									agent: 'research_orchestrator',
+								});
 							}
 						}
 					}

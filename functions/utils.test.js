@@ -632,6 +632,80 @@ describe('parseADKStream activity events', () => {
 		assert.equal(synth.d.label, 'Synthesizing findings');
 	});
 
+	it('emits search-web activity on set_specialist_briefs', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'set_specialist_briefs', args: { briefs: {
+					market_landscape: 'brief1',
+					menu_pricing: 'brief2',
+					guest_intelligence: 'brief3',
+				} } } }] },
+				author: 'research_orchestrator',
+				partial: null,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const searchWeb = events.find(ev => ev.e === 'activity' && ev.d.id === 'search-web');
+		assert.ok(searchWeb);
+		assert.equal(searchWeb.d.status, 'running');
+		assert.equal(searchWeb.d.label, 'Searching the web');
+		assert.equal(searchWeb.d.category, 'search');
+	});
+
+	it('updates search-web counter as specialists complete', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'set_specialist_briefs', args: { briefs: {
+					market_landscape: 'brief1',
+					menu_pricing: 'brief2',
+				} } } }] },
+				author: 'research_orchestrator',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { market_result: 'Full analysis of the competitive landscape.' } },
+				content: { parts: [] },
+				author: 'market_landscape',
+				partial: null,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const searchUpdates = events.filter(ev => ev.e === 'activity' && ev.d.id === 'search-web');
+		const last = searchUpdates[searchUpdates.length - 1];
+		assert.equal(last.d.label, 'Searching the web (1/2)');
+		assert.equal(last.d.status, 'running');
+		assert.equal(last.d.detail, 'Market Landscape');
+	});
+
+	it('marks search-web complete when all specialists done', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'set_specialist_briefs', args: { briefs: {
+					market_landscape: 'brief1',
+				} } } }] },
+				author: 'research_orchestrator',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { market_result: 'Full analysis.' } },
+				content: { parts: [] },
+				author: 'market_landscape',
+				partial: null,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const searchUpdates = events.filter(ev => ev.e === 'activity' && ev.d.id === 'search-web');
+		const last = searchUpdates[searchUpdates.length - 1];
+		assert.equal(last.d.status, 'complete');
+		assert.equal(last.d.label, 'Searching the web (1/1)');
+	});
+
 	it('updates counter with total on find_nearby_restaurants functionResponse', async () => {
 		const reader = mockReader([
 			`data: ${JSON.stringify({
