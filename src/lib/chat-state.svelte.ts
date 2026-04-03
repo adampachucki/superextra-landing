@@ -457,14 +457,18 @@ async function recover(): Promise<boolean> {
  * connections (webkit.org/blog/8970/how-web-content-can-get-unloaded/). When the tab
  * returns, the pending reader.read() rejects or resolves with done=true.
  *
- * A short delay is needed before fetching because iOS 18 Safari's networking stack
- * may not be ready immediately after visibility change (WebKit Bug 284946).
+ * Desktop browsers keep connections alive during brief tab switches, so we only
+ * abort + recover if the tab was hidden long enough for the connection to be dead
+ * (>30s, i.e. two missed server keepalives at 15s intervals).
  */
-function handleReturn() {
+function handleReturn(hiddenMs = Infinity) {
 	if (!currentId) return;
 	if (messages.length === 0 || messages[messages.length - 1].role !== 'user') return;
 
 	if (loading) {
+		// If hidden briefly (<30s), the stream is likely still alive — don't interfere
+		if (hiddenMs < 30_000) return;
+
 		// Stream was in-flight when the tab was backgrounded — connection is dead
 		abortController?.abort();
 		// Poll until send()'s finally block clears loading, then recover.

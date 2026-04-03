@@ -119,9 +119,13 @@
 		}
 
 		// Recover from Safari (and other browsers) killing SSE connections when backgrounded
+		let hiddenAt = 0;
 		function onVisibilityChange() {
-			if (document.visibilityState === 'visible') {
-				chatState.handleReturn();
+			if (document.visibilityState === 'hidden') {
+				hiddenAt = Date.now();
+			} else if (document.visibilityState === 'visible' && hiddenAt > 0) {
+				chatState.handleReturn(Date.now() - hiddenAt);
+				hiddenAt = 0;
 			}
 		}
 		document.addEventListener('visibilitychange', onVisibilityChange);
