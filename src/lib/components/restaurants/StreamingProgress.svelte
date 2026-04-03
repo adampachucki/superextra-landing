@@ -27,7 +27,12 @@
 					: key === 'read'
 						? readItems
 						: analyzeItemsVisible;
-		return items.length > 0 && items.every((a) => a.status === 'complete');
+		if (items.length === 0) return false;
+		if (!items.every((a) => a.status === 'complete')) return false;
+		// Data section: don't show Done until data-check is complete (prevents flash after primary)
+		if (key === 'data' && !items.some((a) => a.id === 'data-check' && a.status === 'complete'))
+			return false;
+		return true;
 	}
 
 	// --- Animated dots for section headers (type then backspace) ---
@@ -77,7 +82,7 @@
 		};
 	});
 
-	// --- Typewriter for data item labels (restaurant names + ratings) ---
+	// --- Typewriter for data item details (place names cycling below labels) ---
 	let dataDisplay: Record<string, string> = $state({});
 	let dataTargets: Record<string, string> = {};
 	let dataRafs: Record<string, number> = {};
@@ -96,9 +101,8 @@
 
 	$effect(() => {
 		for (const item of dataItems) {
-			const fullLabel = item.detail ? `${item.label} — ${item.detail}` : item.label;
-			if (dataTargets[item.id] !== fullLabel) {
-				dataTargets[item.id] = fullLabel;
+			if (item.detail && dataTargets[item.id] !== item.detail) {
+				dataTargets[item.id] = item.detail;
 				dataDisplay[item.id] = '';
 				if (dataRafs[item.id]) cancelAnimationFrame(dataRafs[item.id]);
 				dataRafs[item.id] = requestAnimationFrame(() => drainData(item.id));
@@ -160,82 +164,28 @@
 			<div class="flex flex-col gap-0.5">
 				<span class="text-[13px] text-black/30 dark:text-white/30">
 					{#if done}
-						{section.label} – Done!
+						{section.label} – Done
 					{:else}
 						{section.label}{getDots(dotPhase)}
 					{/if}
 				</span>
 				{#each items as item (item.id)}
-					{#if section.key === 'data' && item.id === 'data-current'}
-						<!-- Cycling place name: no dot, indented sub-line -->
-						<div class="activity-appear pl-3.5 text-[13px] leading-snug">
-							<span class="text-black/40 dark:text-white/40">
-								{dataDisplay[item.id] ||
-									item.label}{#if dataDisplay[item.id] && dataDisplay[item.id].length < (dataTargets[item.id] || '').length}<span
-										class="cursor-blink">|</span
-									>{/if}
-							</span>
-						</div>
-					{:else}
-						<div class="activity-appear flex items-start gap-2 text-[13px] leading-snug">
-							<!-- Status dot -->
-							{#if item.status === 'complete'}
-								<span class="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
-							{:else if item.status === 'running'}
-								<span class="stage-pulse mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"
-								></span>
-							{:else}
-								<span
-									class="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-black/15 dark:bg-white/15"
-								></span>
-							{/if}
+					<div class="activity-appear flex items-start gap-2 text-[13px] leading-snug">
+						<!-- Status dot -->
+						{#if item.status === 'complete'}
+							<span class="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
+						{:else if item.status === 'running'}
+							<span class="stage-pulse mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"
+							></span>
+						{:else}
+							<span class="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-black/15 dark:bg-white/15"
+							></span>
+						{/if}
 
-							<!-- Content varies by category -->
-							{#if section.key === 'read'}
-								<span
-									class={[
-										item.status === 'complete'
-											? 'text-black/40 dark:text-white/40'
-											: 'text-black/60 dark:text-white/60'
-									]}
-								>
-									{readDisplay[item.id] ||
-										item.label}{#if readDisplay[item.id] && readDisplay[item.id].length < (readTargets[item.id] || '').length}<span
-											class="cursor-blink">|</span
-										>{/if}
-								</span>
-							{:else if section.key === 'analyze'}
-								<div class="flex flex-col">
-									<span
-										class={[
-											item.status === 'complete'
-												? 'text-black/40 dark:text-white/40'
-												: 'text-black/60 dark:text-white/60'
-										]}
-									>
-										{item.label}
-									</span>
-									{#if excerptDisplay[item.id]}
-										<span class="text-[12px] text-black/30 dark:text-white/30">
-											{excerptDisplay[
-												item.id
-											]}{#if excerptDisplay[item.id].length < (excerptTargets[item.id] || '').length}<span
-													class="cursor-blink">|</span
-												>{/if}
-										</span>
-									{/if}
-								</div>
-							{:else if section.key === 'search'}
-								<span
-									class={[
-										item.status === 'complete'
-											? 'text-black/40 dark:text-white/40'
-											: 'text-black/60 dark:text-white/60'
-									]}
-								>
-									"{item.label}"
-								</span>
-							{:else}
+						<!-- Content varies by category -->
+						{#if section.key === 'data' || section.key === 'analyze'}
+							<!-- Data + Analyze: label with detail below in smaller font -->
+							<div class="flex flex-col">
 								<span
 									class={[
 										item.status === 'complete'
@@ -245,9 +195,49 @@
 								>
 									{item.label}
 								</span>
-							{/if}
-						</div>
-					{/if}
+								{#if section.key === 'data' && dataDisplay[item.id]}
+									<span class="text-[12px] text-black/30 dark:text-white/30">
+										{dataDisplay[
+											item.id
+										]}{#if dataDisplay[item.id].length < (dataTargets[item.id] || '').length}<span
+												class="cursor-blink">|</span
+											>{/if}
+									</span>
+								{:else if section.key === 'analyze' && excerptDisplay[item.id]}
+									<span class="text-[12px] text-black/30 dark:text-white/30">
+										{excerptDisplay[
+											item.id
+										]}{#if excerptDisplay[item.id].length < (excerptTargets[item.id] || '').length}<span
+												class="cursor-blink">|</span
+											>{/if}
+									</span>
+								{/if}
+							</div>
+						{:else if section.key === 'read'}
+							<span
+								class={[
+									item.status === 'complete'
+										? 'text-black/40 dark:text-white/40'
+										: 'text-black/60 dark:text-white/60'
+								]}
+							>
+								{readDisplay[item.id] ||
+									item.label}{#if readDisplay[item.id] && readDisplay[item.id].length < (readTargets[item.id] || '').length}<span
+										class="cursor-blink">|</span
+									>{/if}
+							</span>
+						{:else if section.key === 'search'}
+							<span
+								class={[
+									item.status === 'complete'
+										? 'text-black/40 dark:text-white/40'
+										: 'text-black/60 dark:text-white/60'
+								]}
+							>
+								"{item.label}"
+							</span>
+						{/if}
+					</div>
 				{/each}
 			</div>
 		{/if}

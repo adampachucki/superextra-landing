@@ -110,7 +110,8 @@ async function fullResearch(res) {
 		id: 'data-primary',
 		category: 'data',
 		status: 'complete',
-		label: 'Loading place details: Shake Shack, 1,234 reviews',
+		label: 'Loading place details',
+		detail: 'Shake Shack, 1,234 reviews',
 		agent: 'context_enricher'
 	});
 
@@ -155,29 +156,23 @@ async function fullResearch(res) {
 	for (let i = 0; i < competitors.length; i++) {
 		const c = competitors[i];
 
-		// Show place name while loading
+		// Show place name on data-check detail while loading
 		sse(res, 'activity', {
-			id: 'data-current',
+			id: 'data-check',
 			category: 'data',
 			status: 'running',
-			label: c.name,
+			detail: c.name,
 			agent: 'context_enricher'
 		});
 		await wait(300 + Math.random() * 250);
 
-		// Detail response → update counter + cycling name
+		// Detail response → update counter + detail
 		sse(res, 'activity', {
 			id: 'data-check',
 			category: 'data',
 			status: 'running',
 			label: `Checking nearby places: ${i + 1}/${competitors.length}`,
-			agent: 'context_enricher'
-		});
-		sse(res, 'activity', {
-			id: 'data-current',
-			category: 'data',
-			status: 'running',
-			label: `${c.name}, ${c.reviews.toLocaleString()} reviews`,
+			detail: `${c.name}, ${c.reviews.toLocaleString()} reviews`,
 			agent: 'context_enricher'
 		});
 		await wait(80);
@@ -453,7 +448,8 @@ async function slowSpecialist(res) {
 		id: 'data-primary',
 		category: 'data',
 		status: 'complete',
-		label: "Loading place details: Joe's Pizza, 3,456 reviews",
+		label: 'Loading place details',
+		detail: "Joe's Pizza, 3,456 reviews",
 		agent: 'context_enricher'
 	});
 
@@ -486,10 +482,10 @@ async function slowSpecialist(res) {
 	for (let i = 0; i < competitors.length; i++) {
 		const c = competitors[i];
 		sse(res, 'activity', {
-			id: 'data-current',
+			id: 'data-check',
 			category: 'data',
 			status: 'running',
-			label: c.name,
+			detail: c.name,
 			agent: 'context_enricher'
 		});
 		await wait(300 + Math.random() * 200);
@@ -498,13 +494,7 @@ async function slowSpecialist(res) {
 			category: 'data',
 			status: 'running',
 			label: `Checking nearby places: ${i + 1}/6`,
-			agent: 'context_enricher'
-		});
-		sse(res, 'activity', {
-			id: 'data-current',
-			category: 'data',
-			status: 'running',
-			label: `${c.name}, ${c.reviews.toLocaleString()} reviews`,
+			detail: `${c.name}, ${c.reviews.toLocaleString()} reviews`,
 			agent: 'context_enricher'
 		});
 		await wait(80);

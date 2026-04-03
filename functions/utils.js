@@ -210,7 +210,6 @@ export async function parseADKStream(reader, emit) {
 							if (!fc || !PLACES_TOOL_LABELS[fc.name]) continue;
 
 							if (fc.name === 'find_nearby_restaurants' || fc.name === 'search_restaurants') {
-								// Emit/update the single counter activity
 								if (!checkEmitted) {
 									checkEmitted = true;
 									emit('activity', {
@@ -224,7 +223,7 @@ export async function parseADKStream(reader, emit) {
 							}
 							if (fc.name === 'get_restaurant_details') {
 								if (!checkEmitted) {
-									// First detail call (primary place from prompt) — before any search/nearby
+									// First detail call (primary place from prompt)
 									emit('activity', {
 										id: 'data-primary',
 										category: 'data',
@@ -233,15 +232,15 @@ export async function parseADKStream(reader, emit) {
 										agent: 'context_enricher',
 									});
 								} else {
-									// Subsequent calls (competitors) — show name if known
+									// Show name on data-check detail while loading
 									const placeId = fc.args?.place_id || '';
 									const knownName = placeIdToName.get(placeId);
 									if (knownName) {
 										emit('activity', {
-											id: 'data-current',
+											id: 'data-check',
 											category: 'data',
 											status: 'running',
-											label: knownName,
+											detail: knownName,
 											agent: 'context_enricher',
 										});
 									}
@@ -250,7 +249,7 @@ export async function parseADKStream(reader, emit) {
 						}
 					}
 
-					// 0b. Context enricher functionResponse → update counter + cycling place name
+					// 0b. Context enricher functionResponse → update counter + detail
 					if (author === 'context_enricher') {
 						for (const p of parts) {
 							const fr = p.functionResponse;
@@ -258,16 +257,12 @@ export async function parseADKStream(reader, emit) {
 
 							if (fr.name === 'find_nearby_restaurants' || fr.name === 'search_restaurants') {
 								const results = fr.response?.results || [];
-								// Build place_id → name mapping
 								for (const r of results) {
 									const name = extractPlaceName(r);
 									if (r.id && name) placeIdToName.set(r.id, name);
 								}
 								placesTotal += results.length;
-								// Update counter with total
-								if (!checkEmitted) {
-									checkEmitted = true;
-								}
+								if (!checkEmitted) checkEmitted = true;
 								emit('activity', {
 									id: 'data-check',
 									category: 'data',
@@ -281,24 +276,22 @@ export async function parseADKStream(reader, emit) {
 								const place = fr.response?.place;
 								if (place) {
 									const name = extractPlaceName(place);
-									const detailLabel = name
+									const placeDetail = name
 										? (place.userRatingCount ? `${name}, ${place.userRatingCount.toLocaleString()} reviews` : name)
 										: '';
 
 									if (!checkEmitted) {
-										// Primary place response (before search/nearby)
-										if (detailLabel) {
-											emit('activity', {
-												id: 'data-primary',
-												category: 'data',
-												status: 'complete',
-												label: `Loading place details: ${detailLabel}`,
-												agent: 'context_enricher',
-											});
-										}
+										// Primary place response
+										emit('activity', {
+											id: 'data-primary',
+											category: 'data',
+											status: 'complete',
+											label: 'Loading place details',
+											detail: placeDetail || undefined,
+											agent: 'context_enricher',
+										});
 									} else {
 										placesCompleted++;
-										// Update counter with progress
 										const counterLabel = placesTotal > 0
 											? `Checking nearby places: ${placesCompleted}/${placesTotal}`
 											: `Checking nearby places: ${placesCompleted}`;
@@ -307,18 +300,9 @@ export async function parseADKStream(reader, emit) {
 											category: 'data',
 											status: 'running',
 											label: counterLabel,
+											detail: placeDetail || undefined,
 											agent: 'context_enricher',
 										});
-										// Update cycling place name
-										if (detailLabel) {
-											emit('activity', {
-												id: 'data-current',
-												category: 'data',
-												status: 'running',
-												label: detailLabel,
-												agent: 'context_enricher',
-											});
-										}
 									}
 								}
 							}

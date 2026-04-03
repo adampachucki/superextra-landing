@@ -683,9 +683,9 @@ describe('parseADKStream activity events', () => {
 		]);
 		const events = [];
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const current = events.find(ev => ev.e === 'activity' && ev.d.id === 'data-current');
-		assert.ok(current);
-		assert.equal(current.d.label, 'Shake Shack');
+		const checks = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-check');
+		const withDetail = checks.find(c => c.d.detail === 'Shake Shack');
+		assert.ok(withDetail);
 	});
 
 	it('updates counter progress and cycling name on detail response', async () => {
@@ -721,9 +721,7 @@ describe('parseADKStream activity events', () => {
 		const checks = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-check');
 		const lastCheck = checks[checks.length - 1];
 		assert.equal(lastCheck.d.label, 'Checking nearby places: 1/2');
-		const current = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-current');
-		const lastCurrent = current[current.length - 1];
-		assert.equal(lastCurrent.d.label, 'Shake Shack, 1,234 reviews');
+		assert.equal(lastCheck.d.detail, 'Shake Shack, 1,234 reviews');
 	});
 
 	it('completes primary place detail with name and reviews (no stars)', async () => {
@@ -751,8 +749,9 @@ describe('parseADKStream activity events', () => {
 		const primary = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-primary');
 		assert.equal(primary.length, 2); // running + complete
 		assert.equal(primary[1].d.status, 'complete');
-		assert.equal(primary[1].d.label, 'Loading place details: Shake Shack, 1,234 reviews');
-		assert.ok(!primary[1].d.label.includes('★'), 'should not contain star symbol');
+		assert.equal(primary[1].d.label, 'Loading place details');
+		assert.equal(primary[1].d.detail, 'Shake Shack, 1,234 reviews');
+		assert.ok(!primary[1].d.detail.includes('★'), 'should not contain star symbol');
 	});
 
 	it('handles displayName as plain string', async () => {
@@ -778,7 +777,7 @@ describe('parseADKStream activity events', () => {
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
 		const primary = events.find(ev => ev.e === 'activity' && ev.d.id === 'data-primary' && ev.d.status === 'complete');
 		assert.ok(primary);
-		assert.ok(primary.d.label.includes('Plain Name Restaurant'));
+		assert.ok(primary.d.detail.includes('Plain Name Restaurant'));
 	});
 
 	it('handles functionResponse with error status gracefully', async () => {
