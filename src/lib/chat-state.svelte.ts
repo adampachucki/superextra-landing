@@ -1,5 +1,16 @@
 import { streamAgent, type ActivityEvent } from '$lib/sse-client';
 
+/** crypto.randomUUID() is only available in secure contexts (HTTPS / localhost).
+ *  Fall back to crypto.getRandomValues() which works everywhere. */
+function uuid(): string {
+	if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+		return crypto.randomUUID();
+	}
+	return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) =>
+		(+c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (+c / 4)))).toString(16)
+	);
+}
+
 interface ChatSource {
 	title: string;
 	url: string;
@@ -131,7 +142,7 @@ if (typeof localStorage !== 'undefined') {
 				const s = JSON.parse(old);
 				if (s.messages?.length) {
 					const conv: Conversation = {
-						id: s.sessionId || crypto.randomUUID(),
+						id: s.sessionId || uuid(),
 						title: generateTitle(s.messages[0]?.text || 'Untitled'),
 						messages: s.messages,
 						placeContext: s.placeContext || null,
@@ -332,7 +343,7 @@ async function send(text: string) {
 function start(query: string, place: PlaceContext | null) {
 	syncCurrentToList();
 
-	const id = crypto.randomUUID();
+	const id = uuid();
 	const conv: Conversation = {
 		id,
 		title: generateTitle(query),
