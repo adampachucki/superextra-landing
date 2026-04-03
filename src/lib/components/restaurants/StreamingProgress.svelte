@@ -9,6 +9,42 @@
 	let readItems = $derived(activities.filter((a) => a.category === 'read'));
 	let analyzeItems = $derived(activities.filter((a) => a.category === 'analyze'));
 
+	// Filter out completed synthesizer from analyze items (rendered as its own header)
+	let analyzeItemsVisible = $derived(
+		analyzeItems.filter((a) => !(a.id === 'analyze-synthesizer' && a.status === 'complete'))
+	);
+	let researchComplete = $derived(
+		analyzeItems.some((a) => a.id === 'analyze-synthesizer' && a.status === 'complete')
+	);
+
+	// Section done state
+	function isSectionDone(key: ActivityCategory): boolean {
+		const items =
+			key === 'data'
+				? dataItems
+				: key === 'search'
+					? searchItems
+					: key === 'read'
+						? readItems
+						: analyzeItemsVisible;
+		return items.length > 0 && items.every((a) => a.status === 'complete');
+	}
+
+	// --- Animated dots for section headers (type then backspace) ---
+	let dotPhase = $state(0);
+
+	$effect(() => {
+		const interval = setInterval(() => {
+			dotPhase = (dotPhase + 1) % 6;
+		}, 350);
+		return () => clearInterval(interval);
+	});
+
+	function getDots(phase: number): string {
+		const count = phase <= 3 ? phase : 6 - phase;
+		return '.'.repeat(count);
+	}
+
 	// --- Typewriter for read item labels ---
 	let readDisplay: Record<string, string> = $state({});
 	let readTargets: Record<string, string> = {};
@@ -112,7 +148,7 @@
 		{ key: 'data', label: 'Gathering data', items: () => dataItems },
 		{ key: 'search', label: 'Searching', items: () => searchItems },
 		{ key: 'read', label: 'Reading', items: () => readItems },
-		{ key: 'analyze', label: 'Analyzing', items: () => analyzeItems }
+		{ key: 'analyze', label: 'Analyzing', items: () => analyzeItemsVisible }
 	];
 </script>
 
@@ -120,69 +156,19 @@
 	{#each SECTION_CONFIG as section (section.key)}
 		{@const items = section.items()}
 		{#if items.length > 0}
+			{@const done = isSectionDone(section.key)}
 			<div class="flex flex-col gap-0.5">
 				<span class="text-[13px] text-black/30 dark:text-white/30">
-					{section.label}...
+					{#if done}
+						{section.label} – Done!
+					{:else}
+						{section.label}{getDots(dotPhase)}
+					{/if}
 				</span>
 				{#each items as item (item.id)}
-					<div class="activity-appear flex items-start gap-2 text-[13px] leading-snug">
-						<!-- Status dot -->
-						{#if item.status === 'complete'}
-							<span class="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
-						{:else if item.status === 'running'}
-							<span class="stage-pulse mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"
-							></span>
-						{:else}
-							<span class="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-black/15 dark:bg-white/15"
-							></span>
-						{/if}
-
-						<!-- Content varies by category -->
-						{#if section.key === 'read'}
-							<span
-								class={[
-									item.status === 'complete'
-										? 'text-black/40 dark:text-white/40'
-										: 'text-black/60 dark:text-white/60'
-								]}
-							>
-								{readDisplay[item.id] ||
-									item.label}{#if readDisplay[item.id] && readDisplay[item.id].length < (readTargets[item.id] || '').length}<span
-										class="cursor-blink">|</span
-									>{/if}
-							</span>
-						{:else if section.key === 'analyze'}
-							<div class="flex flex-col">
-								<span
-									class={[
-										item.status === 'complete'
-											? 'text-black/40 dark:text-white/40'
-											: 'text-black/60 dark:text-white/60'
-									]}
-								>
-									{item.label}
-								</span>
-								{#if excerptDisplay[item.id]}
-									<span class="text-[12px] text-black/30 dark:text-white/30">
-										{excerptDisplay[
-											item.id
-										]}{#if excerptDisplay[item.id].length < (excerptTargets[item.id] || '').length}<span
-												class="cursor-blink">|</span
-											>{/if}
-									</span>
-								{/if}
-							</div>
-						{:else if section.key === 'search'}
-							<span
-								class={[
-									item.status === 'complete'
-										? 'text-black/40 dark:text-white/40'
-										: 'text-black/60 dark:text-white/60'
-								]}
-							>
-								"{item.label}"
-							</span>
-						{:else}
+					{#if section.key === 'data'}
+						<!-- Data items: no dot, indented like analyze excerpts -->
+						<div class="activity-appear pl-3.5 text-[13px] leading-snug">
 							<span
 								class={[
 									item.status === 'complete'
@@ -195,12 +181,79 @@
 										class="cursor-blink">|</span
 									>{/if}
 							</span>
-						{/if}
-					</div>
+						</div>
+					{:else}
+						<div class="activity-appear flex items-start gap-2 text-[13px] leading-snug">
+							<!-- Status dot -->
+							{#if item.status === 'complete'}
+								<span class="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
+							{:else if item.status === 'running'}
+								<span class="stage-pulse mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"
+								></span>
+							{:else}
+								<span
+									class="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-black/15 dark:bg-white/15"
+								></span>
+							{/if}
+
+							<!-- Content varies by category -->
+							{#if section.key === 'read'}
+								<span
+									class={[
+										item.status === 'complete'
+											? 'text-black/40 dark:text-white/40'
+											: 'text-black/60 dark:text-white/60'
+									]}
+								>
+									{readDisplay[item.id] ||
+										item.label}{#if readDisplay[item.id] && readDisplay[item.id].length < (readTargets[item.id] || '').length}<span
+											class="cursor-blink">|</span
+										>{/if}
+								</span>
+							{:else if section.key === 'analyze'}
+								<div class="flex flex-col">
+									<span
+										class={[
+											item.status === 'complete'
+												? 'text-black/40 dark:text-white/40'
+												: 'text-black/60 dark:text-white/60'
+										]}
+									>
+										{item.label}
+									</span>
+									{#if excerptDisplay[item.id]}
+										<span class="text-[12px] text-black/30 dark:text-white/30">
+											{excerptDisplay[
+												item.id
+											]}{#if excerptDisplay[item.id].length < (excerptTargets[item.id] || '').length}<span
+													class="cursor-blink">|</span
+												>{/if}
+										</span>
+									{/if}
+								</div>
+							{:else if section.key === 'search'}
+								<span
+									class={[
+										item.status === 'complete'
+											? 'text-black/40 dark:text-white/40'
+											: 'text-black/60 dark:text-white/60'
+									]}
+								>
+									"{item.label}"
+								</span>
+							{/if}
+						</div>
+					{/if}
 				{/each}
 			</div>
 		{/if}
 	{/each}
+
+	{#if researchComplete}
+		<span class="activity-appear text-[13px] text-black/30 dark:text-white/30">
+			Research complete!
+		</span>
+	{/if}
 
 	{#if loading}
 		<div class="flex items-center gap-2">
