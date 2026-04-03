@@ -438,7 +438,7 @@
 </svelte:head>
 
 <div
-	class="chat-enter fixed inset-0 flex bg-cream pb-[env(safe-area-inset-bottom)] {mounted
+	class="chat-enter fixed inset-0 flex pb-[env(safe-area-inset-bottom)] {mounted
 		? 'is-mounted'
 		: ''}"
 >

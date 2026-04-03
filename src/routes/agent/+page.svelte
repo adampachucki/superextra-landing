@@ -61,7 +61,7 @@
 	<meta property="og:url" content="https://agent.superextra.ai" />
 </svelte:head>
 
-<Navbar minimal />
+<Navbar minimal static />
 
 <main>
 	<RestaurantHero />

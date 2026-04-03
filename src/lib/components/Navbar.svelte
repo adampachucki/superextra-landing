@@ -2,8 +2,11 @@
 	import { formState } from '$lib/form-state.svelte';
 	import { onMount } from 'svelte';
 
-	let { transparent = false, minimal = false }: { transparent?: boolean; minimal?: boolean } =
-		$props();
+	let {
+		transparent = false,
+		minimal = false,
+		static: isStatic = false
+	}: { transparent?: boolean; minimal?: boolean; static?: boolean } = $props();
 
 	let scrolled = $state(false);
 	let mobileOpen = $state(false);
@@ -30,7 +33,9 @@
 <svelte:window onscroll={handleScroll} />
 
 <nav
-	class="fixed top-0 right-0 left-0 z-50 transition-colors duration-300 {over ? '' : 'bg-cream'}"
+	class="{isStatic
+		? 'relative'
+		: 'fixed top-0 right-0 left-0 z-50'} transition-colors duration-300 {over ? '' : 'bg-cream'}"
 >
 	<div
 		class="absolute inset-x-0 bottom-0 h-px bg-cream-200 transition-opacity duration-300 {scrolled
