@@ -94,35 +94,82 @@ const SOURCES = [
 ];
 
 async function fullResearch(res) {
-	// Phase 1: Context enricher — Places API calls
+	// Phase 1: Context enricher — find nearby, search, then detail each competitor
 	await wait(400);
+
+	// find_nearby call → response
 	sse(res, 'activity', {
 		id: 'data-0',
-		category: 'data',
-		status: 'running',
-		label: 'Loading restaurant details',
-		agent: 'context_enricher'
-	});
-
-	await wait(600);
-	sse(res, 'activity', {
-		id: 'data-1',
 		category: 'data',
 		status: 'running',
 		label: 'Finding nearby competitors',
 		agent: 'context_enricher'
 	});
+	await wait(800);
+	sse(res, 'activity', {
+		id: 'data-0',
+		category: 'data',
+		status: 'complete',
+		label: 'Found 12 nearby restaurants',
+		agent: 'context_enricher'
+	});
 
+	// search_restaurants call → response
 	await wait(300);
 	sse(res, 'activity', {
-		id: 'data-2',
+		id: 'data-1',
 		category: 'data',
 		status: 'running',
 		label: 'Searching restaurants: "burger restaurants Union Square"',
 		agent: 'context_enricher'
 	});
+	await wait(600);
+	sse(res, 'activity', {
+		id: 'data-1',
+		category: 'data',
+		status: 'complete',
+		label: 'Found 8 results for "burger restaurants Union Square"',
+		agent: 'context_enricher'
+	});
 
-	await wait(800);
+	// Sequential get_restaurant_details calls with names + ratings
+	const competitors = [
+		{ name: 'Shake Shack', rating: 4.5, reviews: 1234 },
+		{ name: 'Bareburger', rating: 4.1, reviews: 567 },
+		{ name: 'Five Guys', rating: 4.0, reviews: 890 },
+		{ name: 'Smashburger', rating: 3.9, reviews: 423 },
+		{ name: 'Chipotle Mexican Grill', rating: 3.8, reviews: 2100 },
+		{ name: 'Shake Shack Madison Square', rating: 4.3, reviews: 1876 },
+		{ name: 'Umami Burger', rating: 4.2, reviews: 312 },
+		{ name: 'Black Tap Craft Burgers', rating: 4.4, reviews: 1543 }
+	];
+
+	for (let i = 0; i < competitors.length; i++) {
+		const c = competitors[i];
+		const actId = `data-${i + 2}`;
+
+		// functionCall → name known from search results
+		sse(res, 'activity', {
+			id: actId,
+			category: 'data',
+			status: 'running',
+			label: c.name,
+			agent: 'context_enricher'
+		});
+		await wait(400 + Math.random() * 300);
+
+		// functionResponse → complete with rating detail
+		sse(res, 'activity', {
+			id: actId,
+			category: 'data',
+			status: 'complete',
+			label: c.name,
+			detail: `${c.rating}\u2605 \u00b7 ${c.reviews.toLocaleString()} reviews`,
+			agent: 'context_enricher'
+		});
+		await wait(100);
+	}
+
 	sse(res, 'progress', {
 		stage: 'context',
 		status: 'complete',
@@ -369,14 +416,54 @@ async function quickRouter(res) {
 async function slowSpecialist(res) {
 	// Same as fullResearch but one specialist takes much longer
 	await wait(300);
+
+	// find_nearby
 	sse(res, 'activity', {
 		id: 'data-0',
 		category: 'data',
 		status: 'running',
-		label: 'Loading restaurant details',
+		label: 'Finding nearby competitors',
 		agent: 'context_enricher'
 	});
-	await wait(500);
+	await wait(400);
+	sse(res, 'activity', {
+		id: 'data-0',
+		category: 'data',
+		status: 'complete',
+		label: 'Found 6 nearby restaurants',
+		agent: 'context_enricher'
+	});
+
+	// Sequential detail calls
+	const competitors = [
+		{ name: "Joe's Pizza", rating: 4.7, reviews: 3456 },
+		{ name: 'Prince Street Pizza', rating: 4.5, reviews: 2100 },
+		{ name: "Artichoke Basille's", rating: 4.3, reviews: 1876 },
+		{ name: 'Di Fara Pizza', rating: 4.6, reviews: 890 }
+	];
+
+	for (let i = 0; i < competitors.length; i++) {
+		const c = competitors[i];
+		const actId = `data-${i + 1}`;
+		sse(res, 'activity', {
+			id: actId,
+			category: 'data',
+			status: 'running',
+			label: c.name,
+			agent: 'context_enricher'
+		});
+		await wait(300 + Math.random() * 200);
+		sse(res, 'activity', {
+			id: actId,
+			category: 'data',
+			status: 'complete',
+			label: c.name,
+			detail: `${c.rating}\u2605 \u00b7 ${c.reviews.toLocaleString()} reviews`,
+			agent: 'context_enricher'
+		});
+		await wait(80);
+	}
+
 	sse(res, 'progress', {
 		stage: 'context',
 		status: 'complete',

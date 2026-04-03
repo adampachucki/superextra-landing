@@ -148,6 +148,16 @@ export function extractLastSentence(text) {
 // --- ADK stream parser ---
 
 /**
+ * Extract displayName from a Places API place object.
+ * Handles both { text: "..." } (Google API) and plain string forms.
+ */
+function extractPlaceName(place) {
+	if (!place) return '';
+	const dn = place.displayName;
+	return (typeof dn === 'object' ? dn?.text : dn) || '';
+}
+
+/**
  * Parse ADK SSE stream events and emit frontend-facing SSE events.
  *
  * @param {object} reader - ReadableStream-like reader with read() returning {done, value}
@@ -168,6 +178,9 @@ export async function parseADKStream(reader, emit) {
 	let activitySeq = 0;
 	const pendingSearchesByAuthor = new Map(); // author → Set<activityId>
 	const emittedSourceUrls = new Set();
+	const placeIdToName = new Map();            // place_id → displayName (from search/nearby responses)
+	const pendingDetailActivityIds = new Map();  // place_id → activityId (for get_restaurant_details responses)
+	const pendingSearchActivityIds = new Map();  // tool_name → activityId (for search/nearby responses)
 
 	while (true) {
 		const { done, value } = await reader.read();
@@ -189,22 +202,92 @@ export async function parseADKStream(reader, emit) {
 					const parts = evt.content?.parts || [];
 					const author = evt.author || '';
 
-					// 0. Context enricher Places API tool calls → activity:data
+					// 0a. Context enricher Places API tool calls → activity:data
 					if (author === 'context_enricher') {
 						for (const p of parts) {
 							const fc = p.functionCall;
 							if (fc && PLACES_TOOL_LABELS[fc.name]) {
-								let label = PLACES_TOOL_LABELS[fc.name];
-								if (fc.name === 'search_restaurants' && fc.args?.query) {
-									label += `: "${fc.args.query}"`;
+								const actId = `data-${activitySeq++}`;
+								if (fc.name === 'get_restaurant_details') {
+									const placeId = fc.args?.place_id || '';
+									const knownName = placeIdToName.get(placeId);
+									emit('activity', {
+										id: actId,
+										category: 'data',
+										status: 'running',
+										label: knownName || PLACES_TOOL_LABELS[fc.name],
+										agent: 'context_enricher',
+									});
+									if (placeId) pendingDetailActivityIds.set(placeId, actId);
+								} else {
+									let label = PLACES_TOOL_LABELS[fc.name];
+									if (fc.name === 'search_restaurants' && fc.args?.query) {
+										label += `: "${fc.args.query}"`;
+									}
+									emit('activity', {
+										id: actId,
+										category: 'data',
+										status: 'running',
+										label,
+										agent: 'context_enricher',
+									});
+									pendingSearchActivityIds.set(fc.name, actId);
 								}
-								emit('activity', {
-									id: `data-${activitySeq++}`,
-									category: 'data',
-									status: 'running',
-									label,
-									agent: 'context_enricher',
-								});
+							}
+						}
+					}
+
+					// 0b. Context enricher functionResponse → update data activities with names/counts
+					if (author === 'context_enricher') {
+						for (const p of parts) {
+							const fr = p.functionResponse;
+							if (!fr) continue;
+
+							if (fr.name === 'get_restaurant_details') {
+								const place = fr.response?.place;
+								if (place) {
+									const placeId = place.id || '';
+									const name = extractPlaceName(place);
+									const actId = pendingDetailActivityIds.get(placeId);
+									if (actId && name) {
+										const detailParts = [];
+										if (place.rating) detailParts.push(`${place.rating}★`);
+										if (place.userRatingCount) detailParts.push(`${place.userRatingCount.toLocaleString()} reviews`);
+										emit('activity', {
+											id: actId,
+											category: 'data',
+											status: 'complete',
+											label: name,
+											detail: detailParts.length ? detailParts.join(' · ') : undefined,
+											agent: 'context_enricher',
+										});
+										pendingDetailActivityIds.delete(placeId);
+									}
+								}
+							}
+
+							if (fr.name === 'find_nearby_restaurants' || fr.name === 'search_restaurants') {
+								const results = fr.response?.results || [];
+								// Build place_id → name mapping for future get_restaurant_details calls
+								for (const r of results) {
+									const name = extractPlaceName(r);
+									if (r.id && name) placeIdToName.set(r.id, name);
+								}
+								// Update the activity label with result count
+								const actId = pendingSearchActivityIds.get(fr.name);
+								if (actId && results.length > 0) {
+									const label = fr.name === 'find_nearby_restaurants'
+										? `Found ${results.length} nearby restaurants`
+										: `Found ${results.length} results`;
+									emit('activity', {
+										id: actId,
+										category: 'data',
+										status: 'complete',
+										label,
+										agent: 'context_enricher',
+									});
+									pendingSearchActivityIds.delete(fr.name);
+								}
 							}
 						}
 					}

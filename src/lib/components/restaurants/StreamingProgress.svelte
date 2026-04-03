@@ -41,6 +41,38 @@
 		};
 	});
 
+	// --- Typewriter for data item labels (restaurant names + ratings) ---
+	let dataDisplay: Record<string, string> = $state({});
+	let dataTargets: Record<string, string> = {};
+	let dataRafs: Record<string, number> = {};
+
+	function drainData(id: string) {
+		const target = dataTargets[id];
+		if (!target) return;
+		const current = dataDisplay[id] || '';
+		if (current.length < target.length) {
+			dataDisplay[id] = target.slice(0, current.length + 2);
+			dataRafs[id] = requestAnimationFrame(() => drainData(id));
+		} else {
+			delete dataRafs[id];
+		}
+	}
+
+	$effect(() => {
+		for (const item of dataItems) {
+			const fullLabel = item.detail ? `${item.label} — ${item.detail}` : item.label;
+			if (dataTargets[item.id] !== fullLabel) {
+				dataTargets[item.id] = fullLabel;
+				dataDisplay[item.id] = '';
+				if (dataRafs[item.id]) cancelAnimationFrame(dataRafs[item.id]);
+				dataRafs[item.id] = requestAnimationFrame(() => drainData(item.id));
+			}
+		}
+		return () => {
+			for (const raf of Object.values(dataRafs)) cancelAnimationFrame(raf);
+		};
+	});
+
 	// --- Sentence-rotation typewriter for analyze excerpts ---
 	let excerptDisplay: Record<string, string> = $state({});
 	let excerptTargets: Record<string, string> = {};
@@ -158,7 +190,10 @@
 										: 'text-black/60 dark:text-white/60'
 								]}
 							>
-								{item.label}
+								{dataDisplay[item.id] ||
+									item.label}{#if dataDisplay[item.id] && dataDisplay[item.id].length < (dataTargets[item.id] || '').length}<span
+										class="cursor-blink">|</span
+									>{/if}
 							</span>
 						{/if}
 					</div>
