@@ -404,7 +404,11 @@
 	/>
 </svelte:head>
 
-<div class="chat-enter fixed inset-0 flex bg-cream {mounted ? 'is-mounted' : ''}">
+<div
+	class="chat-enter fixed inset-0 flex bg-cream pb-[env(safe-area-inset-bottom)] {mounted
+		? 'is-mounted'
+		: ''}"
+>
 	<!-- Sidebar -->
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
@@ -414,7 +418,7 @@
 		onclick={() => (sidebarOpen = false)}
 	></div>
 	<aside
-		class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {mounted
+		class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream pt-[env(safe-area-inset-top)] dark:border-white/[0.06] {mounted
 			? 'animated'
 			: ''} {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen
 			? ''
@@ -466,7 +470,10 @@
 		<!-- Panel content -->
 		<div class="flex-1 overflow-y-auto px-5 py-2">
 			<button
-				onclick={handleNewChat}
+				onclick={() => {
+					handleNewChat();
+					if (!isDesktop) sidebarOpen = false;
+				}}
 				class="sb-item mb-6 flex w-full cursor-pointer items-center gap-2 rounded-lg bg-cream-100 px-2 py-1.5 text-[13px] text-black/70 transition-colors hover:bg-cream-200 hover:text-black dark:bg-cream-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
 				style="--sb-delay: 0.25s"
 				class:visible={sidebarContentVisible}
@@ -548,7 +555,10 @@
 								</div>
 							{:else}
 								<button
-									onclick={() => chatState.switchTo(conv.id)}
+									onclick={() => {
+										chatState.switchTo(conv.id);
+										if (!isDesktop) sidebarOpen = false;
+									}}
 									class="w-full cursor-pointer rounded-lg px-2 py-2 pr-8 text-left transition-colors {conv.id ===
 									chatState.activeId
 										? 'bg-cream-100 dark:bg-cream-100'
@@ -671,7 +681,7 @@
 		<button
 			onclick={toggleSidebar}
 			aria-label="Open sidebar"
-			class="toggle-float absolute top-4 left-4 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white dark:bg-white/20 dark:text-white/70 dark:backdrop-blur-md dark:hover:bg-white/30 dark:hover:text-white {sidebarOpen ||
+			class="toggle-float absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white dark:bg-white/20 dark:text-white/70 dark:backdrop-blur-md dark:hover:bg-white/30 dark:hover:text-white {sidebarOpen ||
 			!mounted
 				? 'pointer-events-none opacity-0'
 				: 'opacity-100'}"
