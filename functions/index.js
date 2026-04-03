@@ -652,7 +652,9 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 
 		if (!reply) {
 			// Detect stuck sessions: if no reply after 5 minutes, the pipeline is dead
-			const ageMs = Date.now() - (createdAt?.toMillis?.() || Date.now());
+			// createdAt may be a Firestore Timestamp (.toMillis()) or a plain epoch ms number
+			const createdMs = typeof createdAt === 'number' ? createdAt : createdAt?.toMillis?.() ?? Date.now();
+			const ageMs = Date.now() - createdMs;
 			if (ageMs > 5 * 60 * 1000) {
 				res.json({ ok: false, reason: 'timed_out' });
 				return;
