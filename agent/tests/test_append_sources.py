@@ -49,16 +49,15 @@ class TestAppendSources:
         assert "https://b.com/2" in text
         assert "Article A Dup" not in text
 
-    def test_url_without_domain(self):
-        """URL without domain omits the {domain} suffix."""
+    def test_url_without_domain_uses_title(self):
+        """URL without domain falls back to title for {domain} suffix."""
         chunks = [_make_chunk("https://example.com/page", title="Page", domain=None)]
         resp = _make_response("Text.", chunks)
 
         result = _append_sources(callback_context=None, llm_response=resp)
 
         text = result.content.parts[0].text
-        assert "- [Page](https://example.com/page)" in text
-        assert "{" not in text.split("## Sources")[1]
+        assert "- [Page](https://example.com/page){Page}" in text
 
     def test_no_grounding_metadata(self):
         """No grounding_metadata → response unchanged."""

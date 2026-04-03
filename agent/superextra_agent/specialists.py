@@ -29,7 +29,8 @@ def _append_sources(*, callback_context, llm_response):
         if chunk.web and chunk.web.uri and chunk.web.uri not in seen:
             title = chunk.web.title or chunk.web.uri
             uri = chunk.web.uri
-            domain = chunk.web.domain or ""
+            # domain is often None; title typically contains the domain name
+            domain = chunk.web.domain or chunk.web.title or ""
             urls.append((title, uri, domain))
             seen.add(chunk.web.uri)
     if not urls:

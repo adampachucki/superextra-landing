@@ -234,18 +234,21 @@ export async function parseADKStream(reader, emit) {
 										agent: 'context_enricher',
 									});
 								} else {
-									// Show name on data-check detail while loading
+									// Advance counter on each call (fallback when functionResponse missing)
+									placesCompleted++;
 									const placeId = fc.args?.place_id || '';
 									const knownName = placeIdToName.get(placeId);
-									if (knownName) {
-										emit('activity', {
-											id: 'data-check',
-											category: 'data',
-											status: 'running',
-											detail: knownName,
-											agent: 'context_enricher',
-										});
-									}
+									const counterLabel = placesTotal > 0
+										? `Checking nearby places: ${placesCompleted}/${placesTotal}`
+										: `Checking nearby places: ${placesCompleted}`;
+									emit('activity', {
+										id: 'data-check',
+										category: 'data',
+										status: 'running',
+										label: counterLabel,
+										detail: knownName || undefined,
+										agent: 'context_enricher',
+									});
 								}
 							}
 						}
@@ -293,15 +296,11 @@ export async function parseADKStream(reader, emit) {
 											agent: 'context_enricher',
 										});
 									} else {
-										placesCompleted++;
-										const counterLabel = placesTotal > 0
-											? `Checking nearby places: ${placesCompleted}/${placesTotal}`
-											: `Checking nearby places: ${placesCompleted}`;
+										// Update detail with full info (name + reviews) from response
 										emit('activity', {
 											id: 'data-check',
 											category: 'data',
 											status: 'running',
-											label: counterLabel,
 											detail: placeDetail || undefined,
 											agent: 'context_enricher',
 										});
@@ -343,6 +342,13 @@ export async function parseADKStream(reader, emit) {
 					if (delta.research_plan && !planningDone) {
 						planningDone = true;
 						emit('progress', { stage: 'planning', status: 'complete', label: 'Research planned' });
+						emit('activity', {
+							id: 'search-planning',
+							category: 'search',
+							status: 'complete',
+							label: 'Planning research',
+							agent: 'research_orchestrator',
+						});
 					}
 
 					// 3. Orchestrator assigned specialists via set_specialist_briefs

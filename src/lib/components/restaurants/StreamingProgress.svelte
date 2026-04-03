@@ -193,7 +193,7 @@
 		{@const items = section.items()}
 		{#if items.length > 0}
 			{@const done = isSectionDone(section.key)}
-			<div class="flex flex-col gap-0.5">
+			<div class="section-appear flex flex-col gap-0.5">
 				<span class="text-[13px] text-black/30 dark:text-white/30">
 					{#if done}
 						{section.label} – Done
@@ -282,7 +282,7 @@
 
 	<!-- Reading section: counter + staggered children -->
 	{#if readItems.length > 0}
-		<div class="flex flex-col gap-0.5">
+		<div class="section-appear flex flex-col gap-0.5">
 			<span class="text-[13px] text-black/30 dark:text-white/30">
 				{readDone ? 'Reading – Done' : `Reading${getDots(dotPhase)}`}
 			</span>
@@ -341,6 +341,21 @@
 </div>
 
 <style>
+	.section-appear {
+		animation: sectionIn 0.3s ease-out both;
+	}
+
+	@keyframes sectionIn {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
 	.activity-appear {
 		animation: activityIn 0.2s ease-out both;
 	}

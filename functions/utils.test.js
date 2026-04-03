@@ -762,7 +762,7 @@ describe('parseADKStream activity events', () => {
 		assert.ok(withDetail);
 	});
 
-	it('updates counter progress and cycling name on detail response', async () => {
+	it('updates counter on functionCall and detail on functionResponse', async () => {
 		const reader = mockReader([
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
@@ -779,6 +779,14 @@ describe('parseADKStream activity events', () => {
 				author: 'context_enricher',
 				partial: null,
 			})}\n\n`,
+			// functionCall advances counter + shows known name
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'get_restaurant_details', args: { place_id: 'ChIJ1' } } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
+			// functionResponse updates detail with full info
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
 				content: { parts: [{ functionResponse: { name: 'get_restaurant_details', response: { status: 'success', place: {
@@ -793,9 +801,13 @@ describe('parseADKStream activity events', () => {
 		const events = [];
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
 		const checks = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-check');
-		const lastCheck = checks[checks.length - 1];
-		assert.equal(lastCheck.d.label, 'Checking nearby places: 1/2');
-		assert.equal(lastCheck.d.detail, 'Shake Shack, 1,234 reviews');
+		// functionCall should advance counter
+		const callCheck = checks.find(c => c.d.label?.includes('1/2'));
+		assert.ok(callCheck);
+		assert.equal(callCheck.d.detail, 'Shake Shack');
+		// functionResponse should update detail with reviews
+		const respCheck = checks[checks.length - 1];
+		assert.equal(respCheck.d.detail, 'Shake Shack, 1,234 reviews');
 	});
 
 	it('completes primary place detail with name and reviews (no stars)', async () => {
