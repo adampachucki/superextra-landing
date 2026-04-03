@@ -166,16 +166,10 @@
 					{/if}
 				</span>
 				{#each items as item (item.id)}
-					{#if section.key === 'data'}
-						<!-- Data items: no dot, indented like analyze excerpts -->
+					{#if section.key === 'data' && item.id === 'data-current'}
+						<!-- Cycling place name: no dot, indented sub-line -->
 						<div class="activity-appear pl-3.5 text-[13px] leading-snug">
-							<span
-								class={[
-									item.status === 'complete'
-										? 'text-black/40 dark:text-white/40'
-										: 'text-black/60 dark:text-white/60'
-								]}
-							>
+							<span class="text-black/40 dark:text-white/40">
 								{dataDisplay[item.id] ||
 									item.label}{#if dataDisplay[item.id] && dataDisplay[item.id].length < (dataTargets[item.id] || '').length}<span
 										class="cursor-blink">|</span
@@ -240,6 +234,16 @@
 									]}
 								>
 									"{item.label}"
+								</span>
+							{:else}
+								<span
+									class={[
+										item.status === 'complete'
+											? 'text-black/40 dark:text-white/40'
+											: 'text-black/60 dark:text-white/60'
+									]}
+								>
+									{item.label}
 								</span>
 							{/if}
 						</div>

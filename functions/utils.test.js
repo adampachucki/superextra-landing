@@ -295,7 +295,7 @@ describe('parseADKStream', () => {
 		assert.ok(ctx);
 		assert.equal(ctx.d.status, 'complete');
 		assert.ok(ctx.d.label.includes('Shake Shack'));
-		assert.ok(ctx.d.label.includes('4.5★'));
+		assert.ok(!ctx.d.label.includes('★'), 'should not contain star symbol');
 		assert.ok(ctx.d.label.includes('1,234 reviews'));
 	});
 
@@ -447,7 +447,7 @@ describe('extractLastSentence', () => {
 // --- parseADKStream activity events ---
 
 describe('parseADKStream activity events', () => {
-	it('emits data activity on enricher get_restaurant_details call', async () => {
+	it('emits data-primary for first get_restaurant_details before search/nearby', async () => {
 		const reader = mockReader([
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
@@ -460,12 +460,12 @@ describe('parseADKStream activity events', () => {
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
 		const data = events.find(ev => ev.e === 'activity' && ev.d.category === 'data');
 		assert.ok(data);
+		assert.equal(data.d.id, 'data-primary');
 		assert.equal(data.d.status, 'running');
-		assert.equal(data.d.label, 'Loading restaurant details');
-		assert.equal(data.d.agent, 'context_enricher');
+		assert.equal(data.d.label, 'Loading place details');
 	});
 
-	it('emits data activity for find_nearby_restaurants and search_restaurants', async () => {
+	it('emits data-check counter on find_nearby_restaurants call', async () => {
 		const reader = mockReader([
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
@@ -473,19 +473,13 @@ describe('parseADKStream activity events', () => {
 				author: 'context_enricher',
 				partial: null,
 			})}\n\n`,
-			`data: ${JSON.stringify({
-				actions: { stateDelta: {} },
-				content: { parts: [{ functionCall: { name: 'search_restaurants', args: { query: 'pizza near Union Square' } } }] },
-				author: 'context_enricher',
-				partial: null,
-			})}\n\n`
 		]);
 		const events = [];
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const dataEvents = events.filter(ev => ev.e === 'activity' && ev.d.category === 'data');
-		assert.equal(dataEvents.length, 2);
-		assert.equal(dataEvents[0].d.label, 'Finding nearby competitors');
-		assert.ok(dataEvents[1].d.label.includes('pizza near Union Square'));
+		const check = events.find(ev => ev.e === 'activity' && ev.d.id === 'data-check');
+		assert.ok(check);
+		assert.equal(check.d.status, 'running');
+		assert.equal(check.d.label, 'Checking nearby places');
 	});
 
 	it('emits all-complete for data when places_context set', async () => {
@@ -497,7 +491,7 @@ describe('parseADKStream activity events', () => {
 				partial: null,
 			})}\n\n`,
 			`data: ${JSON.stringify({
-				actions: { stateDelta: { places_context: 'Name: Test\nRating: 4.0\n100 reviews' } },
+				actions: { stateDelta: { places_context: 'Name: Test\n100 reviews' } },
 				content: { parts: [] },
 				author: 'context_enricher',
 				partial: null,
@@ -638,7 +632,7 @@ describe('parseADKStream activity events', () => {
 		assert.equal(synth.d.label, 'Synthesizing findings');
 	});
 
-	it('updates find_nearby_restaurants activity with result count on functionResponse', async () => {
+	it('updates counter with total on find_nearby_restaurants functionResponse', async () => {
 		const reader = mockReader([
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
@@ -649,9 +643,9 @@ describe('parseADKStream activity events', () => {
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
 				content: { parts: [{ functionResponse: { name: 'find_nearby_restaurants', response: { status: 'success', results: [
-					{ id: 'ChIJ1', displayName: { text: 'Shake Shack' }, rating: 4.5 },
-					{ id: 'ChIJ2', displayName: { text: 'Five Guys' }, rating: 4.0 },
-					{ id: 'ChIJ3', displayName: { text: 'Bareburger' }, rating: 4.1 },
+					{ id: 'ChIJ1', displayName: { text: 'Shake Shack' } },
+					{ id: 'ChIJ2', displayName: { text: 'Five Guys' } },
+					{ id: 'ChIJ3', displayName: { text: 'Bareburger' } },
 				] } } }] },
 				author: 'context_enricher',
 				partial: null,
@@ -659,28 +653,27 @@ describe('parseADKStream activity events', () => {
 		]);
 		const events = [];
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const dataEvents = events.filter(ev => ev.e === 'activity' && ev.d.category === 'data');
-		assert.equal(dataEvents.length, 2); // running + complete update
-		assert.equal(dataEvents[0].d.status, 'running');
-		assert.equal(dataEvents[0].d.label, 'Finding nearby competitors');
-		assert.equal(dataEvents[1].d.status, 'complete');
-		assert.equal(dataEvents[1].d.label, 'Found 3 nearby restaurants');
-		assert.equal(dataEvents[1].d.id, dataEvents[0].d.id);
+		const checks = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-check');
+		assert.equal(checks.length, 2); // initial + count update
+		assert.equal(checks[1].d.label, 'Checking nearby places: 3');
 	});
 
-	it('builds place_id map and uses names for get_restaurant_details calls', async () => {
+	it('builds place_id map and shows name on get_restaurant_details call', async () => {
 		const reader = mockReader([
-			// find_nearby response builds the mapping
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'find_nearby_restaurants', args: {} } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
 				content: { parts: [{ functionResponse: { name: 'find_nearby_restaurants', response: { status: 'success', results: [
 					{ id: 'ChIJ_ABC', displayName: { text: 'Shake Shack' } },
-					{ id: 'ChIJ_DEF', displayName: { text: 'Five Guys' } },
 				] } } }] },
 				author: 'context_enricher',
 				partial: null,
 			})}\n\n`,
-			// get_restaurant_details call uses known name
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
 				content: { parts: [{ functionCall: { name: 'get_restaurant_details', args: { place_id: 'ChIJ_ABC' } } }] },
@@ -690,13 +683,50 @@ describe('parseADKStream activity events', () => {
 		]);
 		const events = [];
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const dataEvents = events.filter(ev => ev.e === 'activity' && ev.d.category === 'data');
-		const detailCall = dataEvents.find(d => d.d.status === 'running' && d.d.label !== 'Finding nearby competitors');
-		assert.ok(detailCall);
-		assert.equal(detailCall.d.label, 'Shake Shack');
+		const current = events.find(ev => ev.e === 'activity' && ev.d.id === 'data-current');
+		assert.ok(current);
+		assert.equal(current.d.label, 'Shake Shack');
 	});
 
-	it('completes get_restaurant_details activity with rating from functionResponse', async () => {
+	it('updates counter progress and cycling name on detail response', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'find_nearby_restaurants', args: {} } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionResponse: { name: 'find_nearby_restaurants', response: { status: 'success', results: [
+					{ id: 'ChIJ1', displayName: { text: 'Shake Shack' } },
+					{ id: 'ChIJ2', displayName: { text: 'Five Guys' } },
+				] } } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionResponse: { name: 'get_restaurant_details', response: { status: 'success', place: {
+					id: 'ChIJ1',
+					displayName: { text: 'Shake Shack' },
+					userRatingCount: 1234,
+				} } } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const checks = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-check');
+		const lastCheck = checks[checks.length - 1];
+		assert.equal(lastCheck.d.label, 'Checking nearby places: 1/2');
+		const current = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-current');
+		const lastCurrent = current[current.length - 1];
+		assert.equal(lastCurrent.d.label, 'Shake Shack, 1,234 reviews');
+	});
+
+	it('completes primary place detail with name and reviews (no stars)', async () => {
 		const reader = mockReader([
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
@@ -718,12 +748,11 @@ describe('parseADKStream activity events', () => {
 		]);
 		const events = [];
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const dataEvents = events.filter(ev => ev.e === 'activity' && ev.d.category === 'data');
-		assert.equal(dataEvents.length, 2);
-		assert.equal(dataEvents[1].d.status, 'complete');
-		assert.equal(dataEvents[1].d.label, 'Shake Shack');
-		assert.equal(dataEvents[1].d.detail, '4.5★ · 1,234 reviews');
-		assert.equal(dataEvents[1].d.id, dataEvents[0].d.id);
+		const primary = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-primary');
+		assert.equal(primary.length, 2); // running + complete
+		assert.equal(primary[1].d.status, 'complete');
+		assert.equal(primary[1].d.label, 'Loading place details: Shake Shack, 1,234 reviews');
+		assert.ok(!primary[1].d.label.includes('★'), 'should not contain star symbol');
 	});
 
 	it('handles displayName as plain string', async () => {
@@ -739,7 +768,7 @@ describe('parseADKStream activity events', () => {
 				content: { parts: [{ functionResponse: { name: 'get_restaurant_details', response: { status: 'success', place: {
 					id: 'ChIJplain',
 					displayName: 'Plain Name Restaurant',
-					rating: 3.9,
+					userRatingCount: 500,
 				} } } }] },
 				author: 'context_enricher',
 				partial: null,
@@ -747,54 +776,9 @@ describe('parseADKStream activity events', () => {
 		]);
 		const events = [];
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const complete = events.find(ev => ev.e === 'activity' && ev.d.status === 'complete' && ev.d.category === 'data');
-		assert.ok(complete);
-		assert.equal(complete.d.label, 'Plain Name Restaurant');
-	});
-
-	it('falls back to generic label when place_id not in mapping', async () => {
-		const reader = mockReader([
-			`data: ${JSON.stringify({
-				actions: { stateDelta: {} },
-				content: { parts: [{ functionCall: { name: 'get_restaurant_details', args: { place_id: 'unknown_id' } } }] },
-				author: 'context_enricher',
-				partial: null,
-			})}\n\n`,
-		]);
-		const events = [];
-		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const data = events.find(ev => ev.e === 'activity' && ev.d.category === 'data');
-		assert.ok(data);
-		assert.equal(data.d.label, 'Loading restaurant details');
-	});
-
-	it('updates search_restaurants activity with result count', async () => {
-		const reader = mockReader([
-			`data: ${JSON.stringify({
-				actions: { stateDelta: {} },
-				content: { parts: [{ functionCall: { name: 'search_restaurants', args: { query: 'pizza downtown' } } }] },
-				author: 'context_enricher',
-				partial: null,
-			})}\n\n`,
-			`data: ${JSON.stringify({
-				actions: { stateDelta: {} },
-				content: { parts: [{ functionResponse: { name: 'search_restaurants', response: { status: 'success', results: [
-					{ id: 'a', displayName: { text: 'A' } },
-					{ id: 'b', displayName: { text: 'B' } },
-					{ id: 'c', displayName: { text: 'C' } },
-					{ id: 'd', displayName: { text: 'D' } },
-					{ id: 'e', displayName: { text: 'E' } },
-				] } } }] },
-				author: 'context_enricher',
-				partial: null,
-			})}\n\n`,
-		]);
-		const events = [];
-		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const dataEvents = events.filter(ev => ev.e === 'activity' && ev.d.category === 'data');
-		const updated = dataEvents.find(d => d.d.status === 'complete');
-		assert.ok(updated);
-		assert.equal(updated.d.label, 'Found 5 results');
+		const primary = events.find(ev => ev.e === 'activity' && ev.d.id === 'data-primary' && ev.d.status === 'complete');
+		assert.ok(primary);
+		assert.ok(primary.d.label.includes('Plain Name Restaurant'));
 	});
 
 	it('handles functionResponse with error status gracefully', async () => {
@@ -815,7 +799,7 @@ describe('parseADKStream activity events', () => {
 		const events = [];
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
 		const dataEvents = events.filter(ev => ev.e === 'activity' && ev.d.category === 'data');
-		// Only the running event from functionCall — no crash, no update
+		// Only the running event from functionCall — no crash, no update from error
 		assert.equal(dataEvents.length, 1);
 		assert.equal(dataEvents[0].d.status, 'running');
 	});

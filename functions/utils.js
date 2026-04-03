@@ -179,8 +179,9 @@ export async function parseADKStream(reader, emit) {
 	const pendingSearchesByAuthor = new Map(); // author → Set<activityId>
 	const emittedSourceUrls = new Set();
 	const placeIdToName = new Map();            // place_id → displayName (from search/nearby responses)
-	const pendingDetailActivityIds = new Map();  // place_id → activityId (for get_restaurant_details responses)
-	const pendingSearchActivityIds = new Map();  // tool_name → activityId (for search/nearby responses)
+	let placesTotal = 0;                         // total places found from search/nearby
+	let placesCompleted = 0;                     // how many get_restaurant_details responses received
+	let checkEmitted = false;                    // whether data-check activity has been emitted
 
 	while (true) {
 		const { done, value } = await reader.read();
@@ -202,91 +203,123 @@ export async function parseADKStream(reader, emit) {
 					const parts = evt.content?.parts || [];
 					const author = evt.author || '';
 
-					// 0a. Context enricher Places API tool calls → activity:data
+					// 0a. Context enricher Places API tool calls → aggregated data-check counter
 					if (author === 'context_enricher') {
 						for (const p of parts) {
 							const fc = p.functionCall;
-							if (fc && PLACES_TOOL_LABELS[fc.name]) {
-								const actId = `data-${activitySeq++}`;
-								if (fc.name === 'get_restaurant_details') {
+							if (!fc || !PLACES_TOOL_LABELS[fc.name]) continue;
+
+							if (fc.name === 'find_nearby_restaurants' || fc.name === 'search_restaurants') {
+								// Emit/update the single counter activity
+								if (!checkEmitted) {
+									checkEmitted = true;
+									emit('activity', {
+										id: 'data-check',
+										category: 'data',
+										status: 'running',
+										label: 'Checking nearby places',
+										agent: 'context_enricher',
+									});
+								}
+							}
+							if (fc.name === 'get_restaurant_details') {
+								if (!checkEmitted) {
+									// First detail call (primary place from prompt) — before any search/nearby
+									emit('activity', {
+										id: 'data-primary',
+										category: 'data',
+										status: 'running',
+										label: 'Loading place details',
+										agent: 'context_enricher',
+									});
+								} else {
+									// Subsequent calls (competitors) — show name if known
 									const placeId = fc.args?.place_id || '';
 									const knownName = placeIdToName.get(placeId);
-									emit('activity', {
-										id: actId,
-										category: 'data',
-										status: 'running',
-										label: knownName || PLACES_TOOL_LABELS[fc.name],
-										agent: 'context_enricher',
-									});
-									if (placeId) pendingDetailActivityIds.set(placeId, actId);
-								} else {
-									let label = PLACES_TOOL_LABELS[fc.name];
-									if (fc.name === 'search_restaurants' && fc.args?.query) {
-										label += `: "${fc.args.query}"`;
+									if (knownName) {
+										emit('activity', {
+											id: 'data-current',
+											category: 'data',
+											status: 'running',
+											label: knownName,
+											agent: 'context_enricher',
+										});
 									}
-									emit('activity', {
-										id: actId,
-										category: 'data',
-										status: 'running',
-										label,
-										agent: 'context_enricher',
-									});
-									pendingSearchActivityIds.set(fc.name, actId);
 								}
 							}
 						}
 					}
 
-					// 0b. Context enricher functionResponse → update data activities with names/counts
+					// 0b. Context enricher functionResponse → update counter + cycling place name
 					if (author === 'context_enricher') {
 						for (const p of parts) {
 							const fr = p.functionResponse;
 							if (!fr) continue;
 
-							if (fr.name === 'get_restaurant_details') {
-								const place = fr.response?.place;
-								if (place) {
-									const placeId = place.id || '';
-									const name = extractPlaceName(place);
-									const actId = pendingDetailActivityIds.get(placeId);
-									if (actId && name) {
-										const detailParts = [];
-										if (place.rating) detailParts.push(`${place.rating}★`);
-										if (place.userRatingCount) detailParts.push(`${place.userRatingCount.toLocaleString()} reviews`);
-										emit('activity', {
-											id: actId,
-											category: 'data',
-											status: 'complete',
-											label: name,
-											detail: detailParts.length ? detailParts.join(' · ') : undefined,
-											agent: 'context_enricher',
-										});
-										pendingDetailActivityIds.delete(placeId);
-									}
-								}
-							}
-
 							if (fr.name === 'find_nearby_restaurants' || fr.name === 'search_restaurants') {
 								const results = fr.response?.results || [];
-								// Build place_id → name mapping for future get_restaurant_details calls
+								// Build place_id → name mapping
 								for (const r of results) {
 									const name = extractPlaceName(r);
 									if (r.id && name) placeIdToName.set(r.id, name);
 								}
-								// Update the activity label with result count
-								const actId = pendingSearchActivityIds.get(fr.name);
-								if (actId && results.length > 0) {
-									const label = fr.name === 'find_nearby_restaurants'
-										? `Found ${results.length} nearby restaurants`
-										: `Found ${results.length} results`;
-									emit('activity', {
-										id: actId,
-										category: 'data',
-										status: 'complete',
-										label,
-										agent: 'context_enricher',
-									});
-									pendingSearchActivityIds.delete(fr.name);
+								placesTotal += results.length;
+								// Update counter with total
+								if (!checkEmitted) {
+									checkEmitted = true;
+								}
+								emit('activity', {
+									id: 'data-check',
+									category: 'data',
+									status: 'running',
+									label: `Checking nearby places: ${placesTotal}`,
+									agent: 'context_enricher',
+								});
+							}
+
+							if (fr.name === 'get_restaurant_details') {
+								const place = fr.response?.place;
+								if (place) {
+									const name = extractPlaceName(place);
+									const detailLabel = name
+										? (place.userRatingCount ? `${name}, ${place.userRatingCount.toLocaleString()} reviews` : name)
+										: '';
+
+									if (!checkEmitted) {
+										// Primary place response (before search/nearby)
+										if (detailLabel) {
+											emit('activity', {
+												id: 'data-primary',
+												category: 'data',
+												status: 'complete',
+												label: `Loading place details: ${detailLabel}`,
+												agent: 'context_enricher',
+											});
+										}
+									} else {
+										placesCompleted++;
+										// Update counter with progress
+										const counterLabel = placesTotal > 0
+											? `Checking nearby places: ${placesCompleted}/${placesTotal}`
+											: `Checking nearby places: ${placesCompleted}`;
+										emit('activity', {
+											id: 'data-check',
+											category: 'data',
+											status: 'running',
+											label: counterLabel,
+											agent: 'context_enricher',
+										});
+										// Update cycling place name
+										if (detailLabel) {
+											emit('activity', {
+												id: 'data-current',
+												category: 'data',
+												status: 'running',
+												label: detailLabel,
+												agent: 'context_enricher',
+											});
+										}
+									}
 								}
 							}
 						}
@@ -298,14 +331,25 @@ export async function parseADKStream(reader, emit) {
 						let label = 'Place data gathered';
 						const ctx = typeof delta.places_context === 'string' ? delta.places_context : '';
 						const nameMatch = ctx.match(/(?:Name|Display\s*Name):\s*(.+?)(?:\n|$)/i);
-						const ratingMatch = ctx.match(/Rating:\s*([\d.]+)/i);
 						const reviewMatch = ctx.match(/([\d,]+)\s*review/i);
 						if (nameMatch) {
 							label = nameMatch[1].replace(/[*#_]/g, '').trim();
-							if (ratingMatch) label += ` — ${ratingMatch[1]}★`;
 							if (reviewMatch) label += ` · ${reviewMatch[1]} reviews`;
 						}
 						emit('progress', { stage: 'context', status: 'complete', label });
+						// Finalize counter with completed count
+						if (checkEmitted) {
+							const finalLabel = placesTotal > 0
+								? `Checking nearby places: ${placesTotal}/${placesTotal}`
+								: 'Checking nearby places';
+							emit('activity', {
+								id: 'data-check',
+								category: 'data',
+								status: 'complete',
+								label: finalLabel,
+								agent: 'context_enricher',
+							});
+						}
 						emit('activity', { category: 'data', status: 'all-complete' });
 					}
 
