@@ -1,4 +1,4 @@
-import { streamAgent } from '$lib/sse-client';
+import { streamAgent, type ActivityEvent } from '$lib/sse-client';
 
 interface ChatSource {
 	title: string;
@@ -11,6 +11,19 @@ interface StreamingStep {
 	status: string;
 	label: string;
 	previews?: Array<{ name: string; preview: string }>;
+}
+
+export type ActivityCategory = 'data' | 'search' | 'read' | 'analyze';
+
+export interface ActivityItem {
+	id: string;
+	category: ActivityCategory;
+	status: 'pending' | 'running' | 'complete';
+	label: string;
+	detail?: string;
+	url?: string;
+	agent?: string;
+	timestamp: number;
 }
 
 interface ChatMessage {
@@ -50,6 +63,7 @@ let currentId = $state<string | null>(null);
 // Streaming state (ephemeral — never persisted to localStorage)
 let streamingText = $state('');
 let streamingProgress = $state<StreamingStep[]>([]);
+let streamingActivities = $state<ActivityItem[]>([]);
 let abortController: AbortController | null = null;
 
 // All conversations
@@ -208,6 +222,7 @@ async function send(text: string) {
 	error = '';
 	streamingText = '';
 	streamingProgress = [];
+	streamingActivities = [];
 	persist();
 
 	abortController = new AbortController();
@@ -260,6 +275,33 @@ async function send(text: string) {
 				onError(err) {
 					if (currentId === sendingConvId) {
 						error = err;
+					}
+				},
+				onActivity(activity: ActivityEvent) {
+					if (currentId !== sendingConvId) return;
+					if (activity.status === 'all-complete') {
+						streamingActivities = streamingActivities.map((a) =>
+							a.category === activity.category && a.status !== 'complete'
+								? { ...a, status: 'complete' as const }
+								: a
+						);
+						return;
+					}
+					const { status, id, category, label, detail, url, agent } = activity;
+					const idx = streamingActivities.findIndex((a) => a.id === id);
+					if (idx >= 0) {
+						// Only overwrite fields that are defined in the incoming event
+						const update: Partial<ActivityItem> = { status };
+						if (label !== undefined) update.label = label;
+						if (detail !== undefined) update.detail = detail;
+						if (url !== undefined) update.url = url;
+						if (agent !== undefined) update.agent = agent;
+						streamingActivities[idx] = { ...streamingActivities[idx], ...update };
+					} else {
+						streamingActivities = [
+							...streamingActivities,
+							{ id, category, status, label, detail, url, agent, timestamp: Date.now() }
+						];
 					}
 				}
 			},
@@ -470,8 +512,13 @@ export const chatState = {
 	get streamingProgress() {
 		return streamingProgress;
 	},
+	get streamingActivities() {
+		return streamingActivities;
+	},
 	get isStreaming() {
-		return streamingText.length > 0 || streamingProgress.length > 0;
+		return (
+			streamingText.length > 0 || streamingProgress.length > 0 || streamingActivities.length > 0
+		);
 	},
 	abort() {
 		abortController?.abort();

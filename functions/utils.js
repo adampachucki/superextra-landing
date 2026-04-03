@@ -127,6 +127,24 @@ export const SPECIALIST_OUTPUT_KEYS = {
 	dynamic_researcher_2: 'dynamic_result_2',
 };
 
+export const PLACES_TOOL_LABELS = {
+	get_restaurant_details: 'Loading restaurant details',
+	find_nearby_restaurants: 'Finding nearby competitors',
+	search_restaurants: 'Searching restaurants',
+};
+
+/**
+ * Extract the last complete sentence (>10 chars) from text.
+ * Strips markdown before splitting.
+ */
+export function extractLastSentence(text) {
+	const plain = stripMarkdown(text);
+	const sentences = plain.split(/(?<=[.!?])\s+/).filter(s => s.length > 10);
+	if (sentences.length === 0) return '';
+	const last = sentences[sentences.length - 1].trim();
+	return last.length > 120 ? last.slice(0, 117) + '...' : last;
+}
+
 // --- ADK stream parser ---
 
 /**
@@ -145,6 +163,11 @@ export async function parseADKStream(reader, emit) {
 	let synthesisStarted = false;
 	let contextDone = false;
 	let planningDone = false;
+
+	// Activity tracking
+	let activitySeq = 0;
+	const pendingSearchesByAuthor = new Map(); // author → Set<activityId>
+	const emittedSourceUrls = new Set();
 
 	while (true) {
 		const { done, value } = await reader.read();
@@ -166,6 +189,26 @@ export async function parseADKStream(reader, emit) {
 					const parts = evt.content?.parts || [];
 					const author = evt.author || '';
 
+					// 0. Context enricher Places API tool calls → activity:data
+					if (author === 'context_enricher') {
+						for (const p of parts) {
+							const fc = p.functionCall;
+							if (fc && PLACES_TOOL_LABELS[fc.name]) {
+								let label = PLACES_TOOL_LABELS[fc.name];
+								if (fc.name === 'search_restaurants' && fc.args?.query) {
+									label += `: "${fc.args.query}"`;
+								}
+								emit('activity', {
+									id: `data-${activitySeq++}`,
+									category: 'data',
+									status: 'running',
+									label,
+									agent: 'context_enricher',
+								});
+							}
+						}
+					}
+
 					// 1. Context enricher complete
 					if (delta.places_context && !contextDone) {
 						contextDone = true;
@@ -180,6 +223,7 @@ export async function parseADKStream(reader, emit) {
 							if (reviewMatch) label += ` · ${reviewMatch[1]} reviews`;
 						}
 						emit('progress', { stage: 'context', status: 'complete', label });
+						emit('activity', { category: 'data', status: 'all-complete' });
 					}
 
 					// 2. Research plan complete (orchestrator set_specialist_briefs or output)
@@ -196,18 +240,70 @@ export async function parseADKStream(reader, emit) {
 						if (labels.length) {
 							emit('progress', { stage: 'specialists', status: 'running', label: `Researching: ${labels.join(', ')}` });
 						}
+						// activity:analyze — pending for each specialist
+						for (const k of briefKeys) {
+							if (TOOL_LABELS[k]) {
+								emit('activity', {
+									id: `analyze-${k}`,
+									category: 'analyze',
+									status: 'pending',
+									label: TOOL_LABELS[k],
+									agent: k,
+								});
+							}
+						}
 					}
 
-					// 4. Individual specialist google_search calls
-					if (TOOL_LABELS[author]) {
+					// 4. google_search calls from any agent → activity:search
+					{
 						const searchCall = parts.find(p => p.functionCall?.name === 'google_search');
 						if (searchCall) {
 							const query = searchCall.functionCall.args?.query;
 							if (query) {
-								emit('progress', {
-									stage: author,
-									status: 'searching',
-									label: `Searching: "${query.length > 80 ? query.slice(0, 77) + '...' : query}"`,
+								// Existing progress event for specialists
+								if (TOOL_LABELS[author]) {
+									emit('progress', {
+										stage: author,
+										status: 'searching',
+										label: `Searching: "${query.length > 80 ? query.slice(0, 77) + '...' : query}"`,
+									});
+								}
+								// activity:search for all agents
+								const searchId = `search-${activitySeq++}`;
+								emit('activity', {
+									id: searchId,
+									category: 'search',
+									status: 'running',
+									label: query.length > 80 ? query.slice(0, 77) + '...' : query,
+									agent: author,
+								});
+								if (!pendingSearchesByAuthor.has(author)) pendingSearchesByAuthor.set(author, new Set());
+								pendingSearchesByAuthor.get(author).add(searchId);
+							}
+						}
+					}
+
+					// 4b. Specialist partial text → activity:analyze (sentence excerpt)
+					if (TOOL_LABELS[author] && evt.partial === true && author !== 'synthesizer') {
+						const partialText = parts.find(p => p.text)?.text;
+						if (partialText) {
+							const sentence = extractLastSentence(partialText);
+							if (sentence) {
+								// Complete any pending searches for this author
+								const pending = pendingSearchesByAuthor.get(author);
+								if (pending?.size) {
+									for (const sid of pending) {
+										emit('activity', { id: sid, category: 'search', status: 'complete', agent: author });
+									}
+									pending.clear();
+								}
+								emit('activity', {
+									id: `analyze-${author}`,
+									category: 'analyze',
+									status: 'running',
+									label: TOOL_LABELS[author],
+									detail: sentence,
+									agent: author,
 								});
 							}
 						}
@@ -225,6 +321,38 @@ export async function parseADKStream(reader, emit) {
 								label: TOOL_LABELS[author],
 								preview,
 							});
+							// Complete pending searches for this author
+							const pending = pendingSearchesByAuthor.get(author);
+							if (pending?.size) {
+								for (const sid of pending) {
+									emit('activity', { id: sid, category: 'search', status: 'complete', agent: author });
+								}
+								pending.clear();
+							}
+							// activity:analyze — complete
+							emit('activity', {
+								id: `analyze-${author}`,
+								category: 'analyze',
+								status: 'complete',
+								label: TOOL_LABELS[author],
+								detail: preview,
+								agent: author,
+							});
+							// activity:read — sources from this specialist's output
+							for (const s of extractSourcesFromText(delta[outputKey])) {
+								if (!emittedSourceUrls.has(s.url)) {
+									emittedSourceUrls.add(s.url);
+									emit('activity', {
+										id: `read-${activitySeq++}`,
+										category: 'read',
+										status: 'complete',
+										label: s.domain || new URL(s.url).hostname,
+										detail: s.title || '',
+										url: s.url,
+										agent: author,
+									});
+								}
+							}
 						}
 					}
 
@@ -233,13 +361,29 @@ export async function parseADKStream(reader, emit) {
 						if (!synthesisStarted) {
 							synthesisStarted = true;
 							emit('progress', { stage: 'synthesis', status: 'running', label: 'Synthesizing findings' });
+							emit('activity', {
+								id: 'analyze-synthesizer',
+								category: 'analyze',
+								status: 'running',
+								label: 'Synthesizing findings',
+								agent: 'synthesizer',
+							});
 						}
 						const text = parts.find(p => p.text)?.text;
 						if (text) emit('token', { text });
 					}
 
 					// 7. Final report
-					if (delta.final_report) reply = delta.final_report;
+					if (delta.final_report) {
+						reply = delta.final_report;
+						emit('activity', {
+							id: 'analyze-synthesizer',
+							category: 'analyze',
+							status: 'complete',
+							label: 'Research complete',
+							agent: 'synthesizer',
+						});
+					}
 
 					// 8. Router response
 					if (delta.router_response && !reply) routerResponse = delta.router_response;

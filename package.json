@@ -15,7 +15,9 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"test:unit": "vitest",
-		"test": "npm run test:unit -- --run"
+		"test": "npm run test:unit -- --run",
+		"test:evals": "cd agent && PYTHONPATH=. .venv/bin/pytest tests/test_router_evals.py -v",
+		"mock-stream": "node scripts/mock-stream.js"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.0.3",

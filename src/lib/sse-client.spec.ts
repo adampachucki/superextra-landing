@@ -383,4 +383,54 @@ describe('streamAgent', () => {
 		);
 		expect(cb.onError).not.toHaveBeenCalled();
 	});
+
+	it('activity event dispatches to onActivity callback', async () => {
+		const activityData = {
+			id: 'data-0',
+			category: 'data',
+			status: 'running',
+			label: 'Loading restaurant details',
+			agent: 'context_enricher'
+		};
+		server.use(
+			http.post(TEST_URL, () => {
+				return new HttpResponse(
+					sseStream([
+						{ event: 'activity', data: activityData },
+						{ event: 'complete', data: { reply: 'done', sources: [] } }
+					]),
+					{ headers: { 'Content-Type': 'text/event-stream' } }
+				);
+			})
+		);
+
+		const cb = makeCallbacks();
+		const onActivity = vi.fn();
+		await streamAgent(TEST_URL, { message: 'hi' }, { ...cb, onActivity });
+
+		expect(onActivity).toHaveBeenCalledWith(activityData);
+		expect(cb.onComplete).toHaveBeenCalled();
+	});
+
+	it('activity event is ignored when onActivity is not provided', async () => {
+		server.use(
+			http.post(TEST_URL, () => {
+				return new HttpResponse(
+					sseStream([
+						{
+							event: 'activity',
+							data: { id: 'x', category: 'search', status: 'running', label: 'q' }
+						},
+						{ event: 'complete', data: { reply: 'ok', sources: [] } }
+					]),
+					{ headers: { 'Content-Type': 'text/event-stream' } }
+				);
+			})
+		);
+
+		const cb = makeCallbacks();
+		// onActivity not provided — should not throw
+		await streamAgent(TEST_URL, { message: 'hi' }, cb);
+		expect(cb.onComplete).toHaveBeenCalledWith('ok', [], undefined);
+	});
 });

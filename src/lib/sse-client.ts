@@ -3,6 +3,16 @@ interface ChatSource {
 	url: string;
 }
 
+export interface ActivityEvent {
+	id: string;
+	category: 'data' | 'search' | 'read' | 'analyze';
+	status: 'pending' | 'running' | 'complete' | 'all-complete';
+	label: string;
+	detail?: string;
+	url?: string;
+	agent?: string;
+}
+
 export interface SSECallbacks {
 	onProgress: (
 		stage: string,
@@ -13,6 +23,7 @@ export interface SSECallbacks {
 	onToken: (text: string) => void;
 	onComplete: (reply: string, sources: ChatSource[], title?: string) => void;
 	onError: (error: string) => void;
+	onActivity?: (activity: ActivityEvent) => void;
 }
 
 /**
@@ -171,6 +182,9 @@ function dispatchEvent(event: string, data: string, callbacks: SSECallbacks) {
 				break;
 			case 'error':
 				callbacks.onError(parsed.error || 'Unknown error');
+				break;
+			case 'activity':
+				callbacks.onActivity?.(parsed as ActivityEvent);
 				break;
 		}
 	} catch (e) {

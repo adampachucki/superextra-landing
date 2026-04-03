@@ -2,6 +2,7 @@
 	import { marked } from 'marked';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { tts } from '$lib/tts.svelte';
+	import StreamingProgress from './StreamingProgress.svelte';
 
 	marked.setOptions({ breaks: true, gfm: true });
 
@@ -12,6 +13,7 @@
 		chatState.loading;
 		chatState.streamingText;
 		chatState.streamingProgress;
+		chatState.streamingActivities;
 		if (scrollEl) {
 			requestAnimationFrame(() => {
 				scrollEl!.scrollTop = scrollEl!.scrollHeight;
@@ -24,7 +26,9 @@
 	}
 
 	let hasStreamingContent = $derived(
-		chatState.streamingProgress.length > 0 || chatState.streamingText.length > 0
+		chatState.streamingProgress.length > 0 ||
+			chatState.streamingText.length > 0 ||
+			chatState.streamingActivities.length > 0
 	);
 
 	// Elapsed timer — ticks while any step is "running"
@@ -92,6 +96,13 @@
 <div bind:this={scrollEl} class="flex-1 overflow-y-auto px-4 py-6 md:px-6">
 	<div class="mx-auto flex max-w-[700px] flex-col gap-5">
 		{#each chatState.messages as msg, i}
+			{#if i === chatState.messages.length - 1 && msg.role === 'agent' && chatState.streamingActivities.length > 0 && !chatState.loading}
+				<div class="msg-appear flex justify-start">
+					<div class="max-w-[95%] px-1 py-1">
+						<StreamingProgress activities={chatState.streamingActivities} />
+					</div>
+				</div>
+			{/if}
 			<div class="msg-appear flex {msg.role === 'user' ? 'justify-end' : 'justify-start'}">
 				{#if msg.role === 'user'}
 					<div
@@ -212,10 +223,28 @@
 			</div>
 		{/each}
 
+		{#if chatState.streamingActivities.length > 0 && chatState.loading}
+			<div class="msg-appear flex justify-start">
+				<div class="max-w-[95%] px-1 py-1">
+					<StreamingProgress
+						activities={chatState.streamingActivities}
+						loading={chatState.loading}
+					/>
+				</div>
+			</div>
+		{/if}
+
 		{#if chatState.loading}
 			<div class="msg-appear flex justify-start">
 				<div class="max-w-[95%] px-1 py-1">
-					{#if hasStreamingContent}
+					{#if displayText}
+						<div
+							class="prose mt-4 max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
+						>
+							{@html renderMarkdown(displayText)}
+							<span class="cursor-blink">|</span>
+						</div>
+					{:else if hasStreamingContent && chatState.streamingActivities.length === 0}
 						<div class="flex flex-col gap-1.5">
 							{#each chatState.streamingProgress as step}
 								<div class="flex items-center gap-2 text-[13px]">
@@ -232,36 +261,16 @@
 										>
 									{/if}
 								</div>
-								{#if step.previews?.length}
-									<div class="ml-3.5 flex flex-col gap-1">
-										{#each step.previews as p, i}
-											<p
-												class="preview-stagger text-[12px] leading-snug text-black/40 dark:text-white/40"
-												style="animation-delay: {i * 150}ms"
-											>
-												{p.preview}
-											</p>
-										{/each}
-									</div>
-								{/if}
 							{/each}
 						</div>
-						{#if displayText}
-							<div
-								class="prose mt-4 max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
-							>
-								{@html renderMarkdown(displayText)}
-								<span class="cursor-blink">|</span>
-							</div>
-						{/if}
-					{:else}
+					{:else if chatState.streamingActivities.length === 0}
 						<div class="flex items-center gap-2">
-							<span class="shimmer-text text-[13px]">Researching</span>
 							<span class="loading-dots flex gap-1">
 								<span class="h-1 w-1 rounded-full bg-[#6ee7b3]"></span>
 								<span class="h-1 w-1 rounded-full bg-[#a78bfa]"></span>
 								<span class="h-1 w-1 rounded-full bg-[#f472b6]"></span>
 							</span>
+							<span class="shimmer-text text-[13px]">Researching...</span>
 						</div>
 					{/if}
 				</div>

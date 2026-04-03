@@ -25,6 +25,15 @@ type Callbacks = {
 		title?: string
 	) => void;
 	onError: (error: string) => void;
+	onActivity?: (activity: {
+		id: string;
+		category: string;
+		status: string;
+		label: string;
+		detail?: string;
+		url?: string;
+		agent?: string;
+	}) => void;
 };
 
 /** Make streamAgent hang and return refs to captured callbacks and a resolve function. */
@@ -501,6 +510,106 @@ describe('chatState', () => {
 			// Switch back to conv1 to verify messages are preserved
 			chatState.switchTo(conv1Id);
 			expect(chatState.messages.some((m) => m.text === 'reply for conv1')).toBe(true);
+		});
+	});
+
+	describe('streamingActivities', () => {
+		it('onActivity upserts items by id', async () => {
+			const stream = hangingStream();
+			chatState.start('test', null);
+
+			stream.cbs.onActivity!({
+				id: 'data-0',
+				category: 'data',
+				status: 'running',
+				label: 'Loading restaurant details'
+			});
+			expect(chatState.streamingActivities).toHaveLength(1);
+			expect(chatState.streamingActivities[0].status).toBe('running');
+
+			// Update same id
+			stream.cbs.onActivity!({
+				id: 'data-0',
+				category: 'data',
+				status: 'complete',
+				label: 'Loading restaurant details'
+			});
+			expect(chatState.streamingActivities).toHaveLength(1);
+			expect(chatState.streamingActivities[0].status).toBe('complete');
+
+			stream.cbs.onComplete('reply', []);
+			stream.resolve();
+		});
+
+		it('all-complete marks category items complete', async () => {
+			const stream = hangingStream();
+			chatState.start('test', null);
+
+			stream.cbs.onActivity!({
+				id: 'data-0',
+				category: 'data',
+				status: 'running',
+				label: 'Loading'
+			});
+			stream.cbs.onActivity!({
+				id: 'data-1',
+				category: 'data',
+				status: 'running',
+				label: 'Finding'
+			});
+			expect(chatState.streamingActivities.filter((a) => a.status === 'running')).toHaveLength(2);
+
+			stream.cbs.onActivity!({
+				id: '',
+				category: 'data',
+				status: 'all-complete',
+				label: ''
+			});
+			expect(chatState.streamingActivities.every((a) => a.status === 'complete')).toBe(true);
+
+			stream.cbs.onComplete('reply', []);
+			stream.resolve();
+		});
+
+		it('streamingActivities cleared on next send, not on completion', async () => {
+			// First send — inject an activity
+			const stream1 = hangingStream();
+			chatState.start('test1', null);
+			stream1.cbs.onActivity!({
+				id: 'data-0',
+				category: 'data',
+				status: 'running',
+				label: 'Loading'
+			});
+			stream1.cbs.onComplete('reply', []);
+			stream1.resolve();
+			await waitUntil(() => !chatState.loading);
+
+			// Activities persist after completion
+			expect(chatState.streamingActivities).toHaveLength(1);
+
+			// Second send clears them
+			instantStream();
+			chatState.send('test2');
+			await waitUntil(() => !chatState.loading);
+			expect(chatState.streamingActivities).toHaveLength(0);
+		});
+
+		it('isStreaming reflects activities', async () => {
+			const stream = hangingStream();
+			chatState.start('test', null);
+
+			expect(chatState.isStreaming).toBe(false);
+			stream.cbs.onActivity!({
+				id: 'search-0',
+				category: 'search',
+				status: 'running',
+				label: 'query'
+			});
+			expect(chatState.isStreaming).toBe(true);
+
+			stream.cbs.onComplete('reply', []);
+			stream.resolve();
 		});
 	});
 });

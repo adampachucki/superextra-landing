@@ -2,8 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	esc, row, confirmationHtml, stripMarkdown, extractSourcesFromText,
-	sendSSE, checkRateLimit, parseADKStream,
-	SPECIALIST_RESULT_KEYS, SPECIALIST_KEYS, TOOL_LABELS,
+	sendSSE, checkRateLimit, parseADKStream, extractLastSentence,
+	SPECIALIST_RESULT_KEYS, SPECIALIST_KEYS, TOOL_LABELS, PLACES_TOOL_LABELS,
 } from './utils.js';
 
 // --- esc ---
@@ -410,5 +410,253 @@ describe('parseADKStream', () => {
 		const events = [];
 		const result = await parseADKStream(reader, (e, d) => events.push({ e, d }));
 		assert.equal(result.reply, 'report');
+	});
+});
+
+// --- extractLastSentence ---
+
+describe('extractLastSentence', () => {
+	it('returns last sentence from multi-sentence text', () => {
+		const text = 'First sentence here. Second sentence is longer than ten characters. Third one too.';
+		assert.equal(extractLastSentence(text), 'Third one too.');
+	});
+
+	it('returns empty string for short text', () => {
+		assert.equal(extractLastSentence('Hi.'), '');
+	});
+
+	it('strips markdown before extracting', () => {
+		assert.equal(
+			extractLastSentence('## Title\nFirst sentence here. **Bold text** with a longer sentence here.'),
+			'Bold text with a longer sentence here.'
+		);
+	});
+
+	it('truncates to 120 chars', () => {
+		const long = 'A'.repeat(150) + '.';
+		const result = extractLastSentence(long);
+		assert.ok(result.length <= 120);
+		assert.ok(result.endsWith('...'));
+	});
+
+	it('returns empty for empty input', () => {
+		assert.equal(extractLastSentence(''), '');
+	});
+});
+
+// --- parseADKStream activity events ---
+
+describe('parseADKStream activity events', () => {
+	it('emits data activity on enricher get_restaurant_details call', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'get_restaurant_details', args: { place_id: 'ChIJ123' } } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const data = events.find(ev => ev.e === 'activity' && ev.d.category === 'data');
+		assert.ok(data);
+		assert.equal(data.d.status, 'running');
+		assert.equal(data.d.label, 'Loading restaurant details');
+		assert.equal(data.d.agent, 'context_enricher');
+	});
+
+	it('emits data activity for find_nearby_restaurants and search_restaurants', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'find_nearby_restaurants', args: { latitude: 40.7, longitude: -74.0 } } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'search_restaurants', args: { query: 'pizza near Union Square' } } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const dataEvents = events.filter(ev => ev.e === 'activity' && ev.d.category === 'data');
+		assert.equal(dataEvents.length, 2);
+		assert.equal(dataEvents[0].d.label, 'Finding nearby competitors');
+		assert.ok(dataEvents[1].d.label.includes('pizza near Union Square'));
+	});
+
+	it('emits all-complete for data when places_context set', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'get_restaurant_details', args: { place_id: 'x' } } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { places_context: 'Name: Test\nRating: 4.0\n100 reviews' } },
+				content: { parts: [] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const complete = events.find(ev => ev.e === 'activity' && ev.d.status === 'all-complete');
+		assert.ok(complete);
+		assert.equal(complete.d.category, 'data');
+	});
+
+	it('emits search activity for google_search from any agent', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'google_search', args: { query: 'orchestrator search query' } } }] },
+				author: 'research_orchestrator',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'google_search', args: { query: 'specialist search query' } } }] },
+				author: 'market_landscape',
+				partial: null,
+			})}\n\n`
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const searches = events.filter(ev => ev.e === 'activity' && ev.d.category === 'search');
+		assert.equal(searches.length, 2);
+		assert.equal(searches[0].d.label, 'orchestrator search query');
+		assert.equal(searches[0].d.agent, 'research_orchestrator');
+		assert.equal(searches[1].d.label, 'specialist search query');
+		assert.equal(searches[1].d.agent, 'market_landscape');
+	});
+
+	it('marks searches complete when specialist outputs', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'google_search', args: { query: 'test query' } } }] },
+				author: 'market_landscape',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { market_result: 'The market analysis shows significant growth patterns in the region.' } },
+				content: { parts: [] },
+				author: 'market_landscape',
+				partial: null,
+			})}\n\n`
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const searches = events.filter(ev => ev.e === 'activity' && ev.d.category === 'search');
+		assert.equal(searches.length, 2); // running + complete
+		assert.equal(searches[0].d.status, 'running');
+		assert.equal(searches[1].d.status, 'complete');
+		assert.equal(searches[1].d.id, searches[0].d.id); // same ID updated
+	});
+
+	it('emits read activities from specialist source text', async () => {
+		const result = 'Analysis here.\n\n## Sources\n- [NYC Eats](https://eater.com/nyc){eater.com}\n- [Grub](https://grubstreet.com)';
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { market_result: result } },
+				content: { parts: [] },
+				author: 'market_landscape',
+				partial: null,
+			})}\n\n`
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const reads = events.filter(ev => ev.e === 'activity' && ev.d.category === 'read');
+		assert.equal(reads.length, 2);
+		assert.equal(reads[0].d.label, 'eater.com');
+		assert.equal(reads[0].d.detail, 'NYC Eats');
+		assert.equal(reads[0].d.url, 'https://eater.com/nyc');
+		assert.equal(reads[1].d.url, 'https://grubstreet.com');
+	});
+
+	it('emits analyze pending on briefs, running on partial, complete on output', async () => {
+		const reader = mockReader([
+			// Briefs assigned
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'set_specialist_briefs', args: { briefs: { market_landscape: 'Investigate market.' } } } }] },
+				author: 'research_orchestrator',
+				partial: null,
+			})}\n\n`,
+			// Specialist partial text
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ text: 'The market landscape shows five direct competitors within a short distance.' }] },
+				author: 'market_landscape',
+				partial: true,
+			})}\n\n`,
+			// Specialist completes
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { market_result: 'Full market analysis with significant findings about the competitive landscape.' } },
+				content: { parts: [] },
+				author: 'market_landscape',
+				partial: null,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const analyze = events.filter(ev => ev.e === 'activity' && ev.d.category === 'analyze');
+		assert.ok(analyze.length >= 3);
+		// pending
+		const pending = analyze.find(a => a.d.status === 'pending');
+		assert.ok(pending);
+		assert.equal(pending.d.label, 'Market Landscape');
+		// running with excerpt
+		const running = analyze.find(a => a.d.status === 'running');
+		assert.ok(running);
+		assert.ok(running.d.detail.length > 0);
+		// complete
+		const complete = analyze.find(a => a.d.status === 'complete');
+		assert.ok(complete);
+		assert.equal(complete.d.label, 'Market Landscape');
+	});
+
+	it('emits synthesizer analyze activity', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ text: 'Based on' }] },
+				author: 'synthesizer',
+				partial: true,
+			})}\n\n`
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const synth = events.find(ev => ev.e === 'activity' && ev.d.id === 'analyze-synthesizer');
+		assert.ok(synth);
+		assert.equal(synth.d.status, 'running');
+		assert.equal(synth.d.label, 'Synthesizing findings');
+	});
+
+	it('deduplicates read sources across specialists', async () => {
+		const sharedSource = 'Text.\n\n## Sources\n- [Same](https://shared.com){shared.com}';
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { market_result: sharedSource } },
+				content: { parts: [] },
+				author: 'market_landscape',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { pricing_result: sharedSource } },
+				content: { parts: [] },
+				author: 'menu_pricing',
+				partial: null,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const reads = events.filter(ev => ev.e === 'activity' && ev.d.category === 'read');
+		assert.equal(reads.length, 1); // deduplicated
 	});
 });
