@@ -27,10 +27,24 @@
 	let inputEl: HTMLTextAreaElement | undefined = $state();
 	let query = $state('');
 	let sidebarOpen = $state(false);
+	let prevSidebarOpen = $state(false);
+	let toggleBtnAnim = $state<'idle' | 'fade-out' | 'plop-in'>('idle');
 	let isDesktop = $state(false);
 	let isMobile = $state(false);
 	let mounted = $state(false);
 	let sidebarContentVisible = $derived(sidebarOpen && mounted);
+
+	$effect(() => {
+		if (!mounted) return;
+		if (sidebarOpen && !prevSidebarOpen) {
+			// Sidebar opening — button fades out quickly
+			toggleBtnAnim = 'fade-out';
+		} else if (!sidebarOpen && prevSidebarOpen) {
+			// Sidebar closing — button plops in after panel is gone
+			toggleBtnAnim = 'plop-in';
+		}
+		prevSidebarOpen = sidebarOpen;
+	});
 
 	let display = $state(PREFIX);
 	let isAnimating = $derived(
@@ -108,6 +122,7 @@
 			chatState.switchTo(sid);
 		}
 		sidebarOpen = window.matchMedia('(min-width: 1024px)').matches;
+		prevSidebarOpen = sidebarOpen;
 		requestAnimationFrame(() => {
 			mounted = true;
 		});
@@ -676,15 +691,21 @@
 	</aside>
 
 	<!-- Main area -->
-	<div class="relative flex min-w-0 flex-1 flex-col">
+	<div class="relative flex min-w-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
 		<!-- Floating sidebar toggle (when closed) -->
 		<button
 			onclick={toggleSidebar}
+			onanimationend={() => (toggleBtnAnim = 'idle')}
 			aria-label="Open sidebar"
-			class="toggle-float absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white dark:bg-white/20 dark:text-white/70 dark:backdrop-blur-md dark:hover:bg-white/30 dark:hover:text-white {sidebarOpen ||
-			!mounted
-				? 'pointer-events-none opacity-0'
-				: 'opacity-100'}"
+			class="toggle-float absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white dark:bg-white/20 dark:text-white/70 dark:backdrop-blur-md dark:hover:bg-white/30 dark:hover:text-white
+			{sidebarOpen ? 'pointer-events-none' : ''}
+			{toggleBtnAnim === 'fade-out'
+				? 'toggle-out'
+				: toggleBtnAnim === 'plop-in'
+					? 'toggle-plop'
+					: !sidebarOpen && mounted
+						? 'scale-100 opacity-100'
+						: 'scale-75 opacity-0'}"
 		>
 			<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
 				<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
@@ -1153,14 +1174,45 @@
 	}
 
 	.toggle-float {
-		transition: none;
-	}
-
-	.is-mounted .toggle-float {
 		transition:
-			opacity 0.2s ease,
 			background-color 0.2s ease,
 			color 0.2s ease;
+	}
+
+	/* Fade out: quick, independent dip */
+	.toggle-float.toggle-out {
+		animation: toggleOut 0.15s ease-in forwards;
+	}
+
+	/* Plop in: delayed entrance with overshoot */
+	.toggle-float.toggle-plop {
+		animation: togglePlop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) 0.35s both;
+	}
+
+	@keyframes toggleOut {
+		from {
+			opacity: 1;
+			transform: scale(1);
+		}
+		to {
+			opacity: 0;
+			transform: scale(0.6);
+		}
+	}
+
+	@keyframes togglePlop {
+		0% {
+			opacity: 0;
+			transform: scale(0.5);
+		}
+		60% {
+			opacity: 1;
+			transform: scale(1.15);
+		}
+		100% {
+			opacity: 1;
+			transform: scale(1);
+		}
 	}
 
 	.context-slide {
