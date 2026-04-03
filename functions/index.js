@@ -438,8 +438,9 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 		// Title generation in parallel (first message only)
 		const titlePromise = isFirstMessage ? generateTitle(message) : null;
 
-		// Call ADK with streaming
+		// Call ADK with streaming — 240s timeout leaves 60s buffer for completion handling
 		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] calling run_sse (aborted=${ac.signal.aborted})`);
+		const adkTimeout = AbortSignal.timeout(240_000);
 		const adkResponse = await fetch(`${ADK_SERVICE_URL}/run_sse`, {
 			method: 'POST',
 			headers: { ...headers, 'Content-Type': 'application/json' },
@@ -450,7 +451,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 				new_message: { role: 'user', parts: [{ text: queryText }] },
 				streaming: true
 			}),
-			signal: ac.signal
+			signal: AbortSignal.any([ac.signal, adkTimeout])
 		});
 
 		if (!adkResponse.ok) {
@@ -632,7 +633,7 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 			return;
 		}
 
-		const { adkSessionId, userId } = doc.data();
+		const { adkSessionId, userId, createdAt } = doc.data();
 		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
 		const headers = await client.getRequestHeaders();
 
@@ -650,6 +651,12 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		const reply = session.state?.final_report || session.state?.router_response || null;
 
 		if (!reply) {
+			// Detect stuck sessions: if no reply after 5 minutes, the pipeline is dead
+			const ageMs = Date.now() - (createdAt?.toMillis?.() || Date.now());
+			if (ageMs > 5 * 60 * 1000) {
+				res.json({ ok: false, reason: 'timed_out' });
+				return;
+			}
 			res.json({ ok: true, reply: null, status: 'processing' });
 			return;
 		}

@@ -1,5 +1,6 @@
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
+from google.adk.models.llm_response import LlmResponse
 from google.adk.tools import google_search
 from google.genai import Client, types
 from pathlib import Path
@@ -110,6 +111,21 @@ def _make_skip_callback(name: str):
     return callback
 
 
+def _on_model_error(callback_context, llm_request, error):
+    """Return a graceful fallback when the LLM call fails."""
+    return LlmResponse(
+        content=types.Content(
+            role="model",
+            parts=[types.Part(text=f"Research unavailable: {type(error).__name__}")]
+        )
+    )
+
+
+def _on_tool_error(tool, args, tool_context, error):
+    """Return a fallback dict when a tool (e.g., google_search) fails."""
+    return {"error": f"Tool {tool.name} failed: {type(error).__name__}"}
+
+
 async def set_specialist_briefs(briefs: dict, tool_context) -> str:
     """Assign research briefs to specialist agents.
 
@@ -137,6 +153,8 @@ market_landscape = LlmAgent(
     generate_content_config=THINKING_CONFIG,
     before_agent_callback=_make_skip_callback("market_landscape"),
     after_model_callback=_append_sources,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
 )
 
 menu_pricing = LlmAgent(
@@ -149,6 +167,8 @@ menu_pricing = LlmAgent(
     generate_content_config=THINKING_CONFIG,
     before_agent_callback=_make_skip_callback("menu_pricing"),
     after_model_callback=_append_sources,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
 )
 
 revenue_sales = LlmAgent(
@@ -161,6 +181,8 @@ revenue_sales = LlmAgent(
     generate_content_config=THINKING_CONFIG,
     before_agent_callback=_make_skip_callback("revenue_sales"),
     after_model_callback=_append_sources,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
 )
 
 guest_intelligence = LlmAgent(
@@ -173,6 +195,8 @@ guest_intelligence = LlmAgent(
     generate_content_config=THINKING_CONFIG,
     before_agent_callback=_make_skip_callback("guest_intelligence"),
     after_model_callback=_append_sources,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
 )
 
 location_traffic = LlmAgent(
@@ -185,6 +209,8 @@ location_traffic = LlmAgent(
     generate_content_config=THINKING_CONFIG,
     before_agent_callback=_make_skip_callback("location_traffic"),
     after_model_callback=_append_sources,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
 )
 
 operations = LlmAgent(
@@ -197,6 +223,8 @@ operations = LlmAgent(
     generate_content_config=THINKING_CONFIG,
     before_agent_callback=_make_skip_callback("operations"),
     after_model_callback=_append_sources,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
 )
 
 marketing_digital = LlmAgent(
@@ -209,6 +237,8 @@ marketing_digital = LlmAgent(
     generate_content_config=THINKING_CONFIG,
     before_agent_callback=_make_skip_callback("marketing_digital"),
     after_model_callback=_append_sources,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
 )
 
 dynamic_researcher_1 = LlmAgent(
@@ -221,6 +251,8 @@ dynamic_researcher_1 = LlmAgent(
     generate_content_config=THINKING_CONFIG,
     before_agent_callback=_make_skip_callback("dynamic_researcher_1"),
     after_model_callback=_append_sources,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
 )
 
 dynamic_researcher_2 = LlmAgent(
@@ -233,6 +265,8 @@ dynamic_researcher_2 = LlmAgent(
     generate_content_config=THINKING_CONFIG,
     before_agent_callback=_make_skip_callback("dynamic_researcher_2"),
     after_model_callback=_append_sources,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
 )
 
 ALL_SPECIALISTS = [

@@ -55,6 +55,7 @@ const MAX_CONVERSATIONS = 50;
 // Working state — the currently loaded conversation
 let messages = $state<ChatMessage[]>([]);
 let loading = $state(false);
+let recovering = $state(false);
 let error = $state('');
 let active = $state(false);
 let placeContext = $state<PlaceContext | null>(null);
@@ -380,6 +381,7 @@ async function recover(): Promise<boolean> {
 	if (!currentId || loading) return false;
 	const recoveringConvId = currentId;
 	loading = true;
+	recovering = true;
 	error = '';
 
 	const checkUrl = import.meta.env.DEV
@@ -393,6 +395,7 @@ async function recover(): Promise<boolean> {
 	for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
 		if (currentId !== recoveringConvId) {
 			loading = false;
+			recovering = false;
 			return false;
 		}
 		try {
@@ -403,11 +406,19 @@ async function recover(): Promise<boolean> {
 			if (!data.ok && data.reason === 'session_not_found') {
 				error = 'Session not found. Please start a new conversation.';
 				loading = false;
+				recovering = false;
 				return false;
 			}
 			if (!data.ok && data.reason === 'agent_unavailable') {
 				error = 'Agent unavailable. Please try again.';
 				loading = false;
+				recovering = false;
+				return false;
+			}
+			if (!data.ok && data.reason === 'timed_out') {
+				error = 'The request timed out. Please try again.';
+				loading = false;
+				recovering = false;
 				return false;
 			}
 
@@ -421,6 +432,7 @@ async function recover(): Promise<boolean> {
 				messages.push({ role: 'agent', text: data.reply, timestamp: Date.now(), sources });
 				persist();
 				loading = false;
+				recovering = false;
 				return true;
 			}
 			// Still processing — wait before retrying
@@ -432,7 +444,9 @@ async function recover(): Promise<boolean> {
 		}
 	}
 
+	error = 'Could not retrieve the response. Please try again.';
 	loading = false;
+	recovering = false;
 	return false;
 }
 
@@ -453,11 +467,22 @@ function handleReturn() {
 	if (loading) {
 		// Stream was in-flight when the tab was backgrounded — connection is dead
 		abortController?.abort();
-		// Wait for send() finally block to clear loading state, plus iOS networking delay
+		// Poll until send()'s finally block clears loading, then recover.
+		// A fixed 300ms delay isn't enough — iOS process resumption can be slow.
+		const poll = setInterval(() => {
+			if (!loading) {
+				clearInterval(poll);
+				error = '';
+				recover();
+			}
+		}, 100);
+		// Safety: if loading never clears after 2s, force it and recover anyway
 		setTimeout(() => {
+			clearInterval(poll);
+			if (loading) loading = false;
 			error = '';
-			if (!loading) recover();
-		}, 300);
+			recover();
+		}, 2000);
 	} else {
 		// Stream already ended (with error or silently) — try to recover the response
 		// Delay for iOS 18 networking stack reinitialization (WebKit Bug 284946)
@@ -487,6 +512,9 @@ export const chatState = {
 	},
 	get loading() {
 		return loading;
+	},
+	get recovering() {
+		return recovering;
 	},
 	get error() {
 		return error;

@@ -234,7 +234,7 @@
 			</div>
 		{/if}
 
-		{#if chatState.loading}
+		{#if chatState.loading && !chatState.recovering}
 			<div class="msg-appear flex justify-start">
 				<div class="max-w-[95%] px-1 py-1">
 					{#if displayText}
@@ -273,6 +273,23 @@
 							<span class="shimmer-text text-[13px]">Researching...</span>
 						</div>
 					{/if}
+				</div>
+			</div>
+		{/if}
+
+		{#if chatState.recovering && chatState.loading}
+			<div class="msg-appear flex justify-start">
+				<div
+					class="flex items-center gap-2 rounded-2xl border border-amber-200/50 bg-amber-50/50 px-5 py-3 dark:border-amber-400/20 dark:bg-amber-900/10"
+				>
+					<span class="loading-dots flex gap-1">
+						<span class="h-1 w-1 rounded-full bg-amber-400"></span>
+						<span class="h-1 w-1 rounded-full bg-amber-500"></span>
+						<span class="h-1 w-1 rounded-full bg-amber-400"></span>
+					</span>
+					<span class="text-[13px] text-amber-600/80 dark:text-amber-400/80"
+						>Reconnecting to your session...</span
+					>
 				</div>
 			</div>
 		{/if}

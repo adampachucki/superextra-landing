@@ -441,6 +441,84 @@ describe('chatState', () => {
 
 			vi.unstubAllGlobals();
 		});
+
+		it('reason: timed_out stops immediately, sets error', async () => {
+			expect.assertions(2);
+
+			const stream = hangingStream();
+			chatState.start('query', null);
+			stream.resolve();
+			await waitUntil(() => !chatState.loading);
+
+			const mockFetch = vi.fn().mockResolvedValue({
+				json: () => Promise.resolve({ ok: false, reason: 'timed_out' })
+			});
+			vi.stubGlobal('fetch', mockFetch);
+
+			const result = await chatState.recover();
+			expect(result).toBe(false);
+			expect(chatState.error).toBe('The request timed out. Please try again.');
+
+			vi.unstubAllGlobals();
+		});
+
+		it('sets error after polling exhaustion', async () => {
+			expect.assertions(3);
+
+			const stream = hangingStream();
+			chatState.start('query', null);
+			stream.resolve();
+			await waitUntil(() => !chatState.loading);
+
+			// Mock fetch to throw on 2nd call — triggers catch { break } path
+			// which also exits the loop and should set the exhaustion error.
+			let callCount = 0;
+			const mockFetch = vi.fn().mockImplementation(async () => {
+				callCount++;
+				if (callCount === 1) {
+					return { json: () => Promise.resolve({ ok: true, reply: null, status: 'processing' }) };
+				}
+				throw new Error('network error');
+			});
+			vi.stubGlobal('fetch', mockFetch);
+
+			const result = await chatState.recover();
+			expect(result).toBe(false);
+			expect(chatState.error).toBe('Could not retrieve the response. Please try again.');
+			expect(chatState.loading).toBe(false);
+
+			vi.unstubAllGlobals();
+		});
+
+		it('sets recovering flag during polling', async () => {
+			expect.assertions(3);
+
+			const stream = hangingStream();
+			chatState.start('query', null);
+			stream.resolve();
+			await waitUntil(() => !chatState.loading);
+
+			let sawRecovering = false;
+			const mockFetch = vi.fn().mockImplementation(async () => {
+				if (chatState.recovering) sawRecovering = true;
+				return {
+					json: () =>
+						Promise.resolve({
+							ok: true,
+							reply: 'recovered answer',
+							sources: []
+						})
+				};
+			});
+			vi.stubGlobal('fetch', mockFetch);
+
+			const result = await chatState.recover();
+			expect(result).toBe(true);
+			expect(sawRecovering).toBe(true);
+			expect(chatState.recovering).toBe(false);
+
+			vi.unstubAllGlobals();
+		});
 	});
 
 	// ----------------------------------------------------------------
