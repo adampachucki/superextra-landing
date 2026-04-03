@@ -1109,9 +1109,6 @@
 							</div>
 						</div>
 					{/if}
-					<p class="mt-2 text-center text-[11px] text-black/20 dark:text-white/20">
-						Superextra may make mistakes.
-					</p>
 				</div>
 			</div>
 		</div>
