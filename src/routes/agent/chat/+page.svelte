@@ -726,7 +726,7 @@
 	</aside>
 
 	<!-- Main area -->
-	<div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
+	<div class="relative flex min-w-0 flex-1 flex-col">
 		<!-- Chat thread -->
 		{#if chatState.active}
 			<div
@@ -738,7 +738,7 @@
 			</div>
 		{:else}
 			<div
-				class="chat-thread-enter flex flex-1 items-center justify-center {mounted
+				class="chat-thread-enter flex min-h-0 flex-1 items-center justify-center {mounted
 					? 'is-mounted'
 					: ''}"
 			>
@@ -751,11 +751,11 @@
 			<div
 				class="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[var(--color-cream)]/80 to-transparent"
 			></div>
-			<div class="relative z-10 bg-cream">
-				<div class="mx-auto max-w-[800px] px-4 pb-3 md:px-6">
+			<div class="relative z-10">
+				<div
+					class="mx-auto max-w-[800px] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6"
+				>
 					{#if chatState.active}
-						<!-- Active conversation: simple follow-up prompt -->
-						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 						<div
 							onclick={() => inputEl?.focus()}
 							class="prompt-card cursor-text rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]"
@@ -860,8 +860,6 @@
 							</div>
 						</div>
 					{:else}
-						<!-- No conversation: full prompt with place/map/mic -->
-						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 						<div
 							onclick={() => inputEl?.focus()}
 							class="prompt-card cursor-text rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]"
