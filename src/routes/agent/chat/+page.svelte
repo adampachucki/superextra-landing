@@ -437,23 +437,40 @@
 	/>
 </svelte:head>
 
-<div
-	class="chat-enter fixed inset-0 flex pb-[env(safe-area-inset-bottom)] {mounted
-		? 'is-mounted'
-		: ''}"
+<!-- Floating sidebar toggle (outside chat-enter to avoid transform containing block) -->
+<button
+	onclick={toggleSidebar}
+	onanimationend={() => (toggleBtnAnim = 'idle')}
+	aria-label="Open sidebar"
+	class="toggle-float fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white dark:bg-white/20 dark:text-white/70 dark:backdrop-blur-md dark:hover:bg-white/30 dark:hover:text-white
+	{sidebarOpen ? 'pointer-events-none' : ''}
+	{toggleBtnAnim === 'fade-out'
+		? 'toggle-out'
+		: toggleBtnAnim === 'plop-in'
+			? 'toggle-plop'
+			: !sidebarOpen && mounted
+				? 'scale-100 opacity-100'
+				: 'scale-75 opacity-0'}"
 >
+	<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
+		<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
+		<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
+	</svg>
+</button>
+
+<div class="chat-enter relative flex min-h-dvh {mounted ? 'is-mounted' : ''}">
 	<!-- Sidebar -->
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
-		class="sidebar-overlay fixed inset-0 z-40 bg-black/20 {!isDesktop && sidebarOpen
+		class="sidebar-overlay absolute inset-0 z-40 bg-black/20 {!isDesktop && sidebarOpen
 			? 'pointer-events-auto opacity-100'
 			: 'pointer-events-none opacity-0'}"
 		onclick={() => (sidebarOpen = false)}
 	></div>
 	<aside
-		class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream pt-[env(safe-area-inset-top)] dark:border-white/[0.06] {mounted
+		class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {mounted
 			? 'animated'
-			: ''} {isDesktop ? 'relative' : 'fixed inset-y-0 left-0 z-50'} {sidebarOpen
+			: ''} {isDesktop ? 'relative' : 'absolute inset-y-0 left-0 z-50'} {sidebarOpen
 			? ''
 			: isDesktop
 				? '-ml-64'
@@ -465,7 +482,10 @@
 			style="--sb-delay: 0.15s"
 			class:visible={sidebarContentVisible}
 		>
-			<a href="/" class="group flex items-center gap-0.5 text-black no-underline dark:text-white">
+			<a
+				href="/agent"
+				class="group flex items-center gap-0.5 text-black no-underline dark:text-white"
+			>
 				<svg
 					class="-mt-2.5 h-[18px] w-[18px] transition-transform duration-500 ease-out group-hover:rotate-45 md:-mt-2"
 					viewBox="0 0 12 12"
@@ -706,32 +726,13 @@
 	</aside>
 
 	<!-- Main area -->
-	<div class="relative flex min-w-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
-		<!-- Floating sidebar toggle (when closed) -->
-		<button
-			onclick={toggleSidebar}
-			onanimationend={() => (toggleBtnAnim = 'idle')}
-			aria-label="Open sidebar"
-			class="toggle-float absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white dark:bg-white/20 dark:text-white/70 dark:backdrop-blur-md dark:hover:bg-white/30 dark:hover:text-white
-			{sidebarOpen ? 'pointer-events-none' : ''}
-			{toggleBtnAnim === 'fade-out'
-				? 'toggle-out'
-				: toggleBtnAnim === 'plop-in'
-					? 'toggle-plop'
-					: !sidebarOpen && mounted
-						? 'scale-100 opacity-100'
-						: 'scale-75 opacity-0'}"
-		>
-			<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
-				<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
-				<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
-			</svg>
-		</button>
-
+	<div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
 		<!-- Chat thread -->
 		{#if chatState.active}
 			<div
-				class="chat-thread-enter flex flex-1 flex-col overflow-hidden {mounted ? 'is-mounted' : ''}"
+				class="chat-thread-enter flex min-h-0 flex-1 flex-col overflow-hidden {mounted
+					? 'is-mounted'
+					: ''}"
 			>
 				<ChatThread />
 			</div>
@@ -746,7 +747,7 @@
 		{/if}
 
 		<!-- Input bar -->
-		<div class="chat-input-enter relative {mounted ? 'is-mounted' : ''}">
+		<div class="chat-input-enter {mounted ? 'is-mounted' : ''}">
 			<div
 				class="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[var(--color-cream)]/80 to-transparent"
 			></div>
