@@ -130,7 +130,7 @@ Host superextra-vm
 - `~/.claude.json` — MCP server config
 - `~/src/superextra-landing/.env` — app env vars
 - `~/src/superextra-landing/agent/.env` — agent env vars
-- `~/src/superextra-landing/.claude/worktree-setup.sh` — worktree initialization script
+- `~/src/superextra-landing/scripts/worktree-setup.sh` — worktree initialization script
 
 ## Deploying from VM
 
