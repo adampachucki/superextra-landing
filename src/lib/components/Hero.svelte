@@ -1,4 +1,3 @@
-<!-- remote-setup-verified -->
 <script lang="ts">
 	import { formState } from '$lib/form-state.svelte';
 	import HeroCanvas from './HeroCanvas.svelte';
