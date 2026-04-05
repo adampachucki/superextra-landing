@@ -93,7 +93,7 @@
 	}
 </script>
 
-<div bind:this={scrollEl} class="flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 md:px-6">
+<div bind:this={scrollEl} class="flex-1 overflow-y-auto overscroll-y-contain px-5 py-6 md:px-6">
 	<div class="mx-auto flex max-w-[700px] flex-col gap-5">
 		{#each chatState.messages as msg, i}
 			{#if i === chatState.messages.length - 1 && msg.role === 'agent' && chatState.streamingActivities.length > 0 && !chatState.loading}
