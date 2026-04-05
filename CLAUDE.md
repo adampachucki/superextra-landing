@@ -169,6 +169,23 @@ The browser inspection tool is **Chrome DevTools MCP** (`chrome-devtools-mcp`), 
 - **`--isolated` tradeoff:** Each session gets a fresh Chrome with no cookies/logins. This is fine for inspecting localhost. If logged-in state is needed, temporarily reconfigure with `--browser-url=http://127.0.0.1:9222` to attach to the user's real browser instead
 - **Dev server runs on port 5199** — when navigating to the local site, use `http://localhost:5199`
 
+## Remote VM
+
+GCP AI Workstation in Belgium (`adam@100.101.35.72` via Tailscale), used for running parallel Claude Code sessions accessible from any device.
+
+- **SSH**: `ssh adam@100.101.35.72`
+- **Repo**: `~/src/superextra-landing`
+- **Sessions managed via `cv` function** (defined in VM `~/.bashrc` and local `~/.zshrc`):
+  - `cv <name>` — new tmux session with Claude in the repo
+  - `cv l` — list sessions (interactive, pick by number)
+  - `cv a <name>` — attach to existing session
+  - `cv k <name>` — kill a session
+  - `cv K` — kill all sessions
+- Sessions persist across disconnects — attach from Mac, phone (Termius), iPad
+- tmux sets terminal tab title to session name (`set-titles-string "#S"` in `~/.tmux.conf`)
+- Env files (`.env`, `agent/.env`) are gitignored — must be created manually on the VM
+- VM user `adam` has sudo (added via `usermod -aG sudo adam`)
+
 ## Don'ts
 
 - No Svelte 4 syntax (`export let`, `$:`, `on:click`, `<slot>`)
