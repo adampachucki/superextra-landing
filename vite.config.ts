@@ -16,7 +16,7 @@ export default defineConfig({
 				rewrite: (path: string) => path.replace(/^\/api\/agent\/check/, '/agentCheck')
 			},
 			'/api/agent/stream': {
-				target: 'https://us-central1-superextra-site.cloudfunctions.net',
+				target: 'https://agentstream-907466498524.us-central1.run.app',
 				changeOrigin: true,
 				rewrite: (path: string) => path.replace(/^\/api\/agent\/stream/, '/agentStream'),
 				timeout: 0
