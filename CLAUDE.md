@@ -171,9 +171,9 @@ The browser inspection tool is **Chrome DevTools MCP** (`chrome-devtools-mcp`), 
 
 ## Remote VM
 
-GCP AI Workstation in Belgium (`adam@100.101.35.72` via Tailscale), used for running parallel Claude Code sessions accessible from any device.
+GCP AI Workstation in Belgium (static IP `34.38.81.215`), used for running parallel Claude Code sessions accessible from any device.
 
-- **SSH**: `ssh adam@100.101.35.72`
+- **SSH**: `ssh superextra-vm` (or `ssh adam@34.38.81.215`)
 - **Repo**: `~/src/superextra-landing`
 - **Sessions managed via `cv` function** (defined in VM `~/.bashrc` and local `~/.zshrc`):
   - `cv <name>` — new tmux session with Claude in the repo

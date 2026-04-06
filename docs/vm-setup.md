@@ -2,22 +2,22 @@
 
 ## What
 
-A GCP VM (g2-standard-4, Belgium) running Claude Code, accessible from any device via Tailscale. Claude runs in persistent tmux sessions on the VM — start a session from your Mac, pick it up from your phone, continue on your iPad.
+A GCP VM (g2-standard-4, Belgium) running Claude Code, accessible from any device via direct SSH (static IP). Claude runs in persistent tmux sessions on the VM — start a session from your Mac, pick it up from your phone, continue on your iPad.
 
 ## Why
 
 - **Always-on sessions** — Claude keeps working after you close the laptop
 - **Multi-device** — same session from Mac (Cursor terminal, CLI), phone (Termius), iPad
 - **Parallel work** — multiple Claude sessions on different tasks simultaneously
-- **Fast connection** — mosh transport for snappy typing over Berlin → Belgium latency
+- **Fast connection** — direct SSH with static IP (~50-70ms from Poland)
 - **Isolated worktrees** — parallel sessions on separate branches without conflicts
 
 ## Architecture
 
 ```
 Your device
-  ↓ mosh (interactive) / ssh (commands)
-GCP VM (100.101.35.72 via Tailscale)
+  ↓ ssh (direct, static IP)
+GCP VM (34.38.81.215)
   ↓
 tmux session
   ↓
@@ -70,7 +70,7 @@ Use `cv` (no worktree) for single sessions — instant startup. Use `cv w` when 
 
 | Layer       | Tool              | Purpose                                                              |
 | ----------- | ----------------- | -------------------------------------------------------------------- |
-| Network     | Tailscale         | Private mesh VPN, no port forwarding needed                          |
+| Network     | Direct IP         | Static IP `34.38.81.215`, no VPN needed                              |
 | Transport   | mosh              | Resilient UDP connection, survives sleep/roaming, instant local echo |
 | Persistence | tmux              | Sessions survive disconnects                                         |
 | IDE         | Cursor Remote SSH | Full editor features on remote files                                 |
@@ -84,13 +84,13 @@ SSH is used for one-shot commands (`cv k`, `cv K`). Interactive sessions use mos
 - Survives Wi-Fi → cellular switches
 - Survives laptop sleep without reconnecting
 
-### Cursor Remote SSH
+### VS Code Remote SSH
 
-Connects Cursor IDE to the VM for file browsing, syntax highlighting, go-to-definition:
+Connects VS Code to the VM for file browsing, syntax highlighting, go-to-definition:
 
 1. `Cmd+Shift+P` → "Remote-SSH: Connect to Host" → `superextra-vm`
 2. Open `/home/adam/src/superextra-landing`
-3. Run `cv feature-x` in Cursor's integrated terminal
+3. Run `cv feature-x` in VS Code's integrated terminal
 4. Claude's file changes appear in the editor in real-time
 5. `npm run dev` in another terminal tab — auto-forwarded to `localhost:5199`
 
@@ -98,18 +98,19 @@ SSH config (`~/.ssh/config`):
 
 ```
 Host superextra-vm
-    HostName 100.101.35.72
+    HostName 34.38.81.215
     User adam
     ForwardAgent yes
     ServerAliveInterval 60
-    ServerAliveCountMax 3
+    ServerAliveCountMax 720
+    TCPKeepAlive no
 ```
 
 ## VM details
 
 |           |                                                     |
 | --------- | --------------------------------------------------- |
-| Host      | `adam@100.101.35.72` (Tailscale)                    |
+| Host      | `adam@34.38.81.215` (static IP)                     |
 | Machine   | GCP g2-standard-4, Belgium                          |
 | OS        | Ubuntu 24.04                                        |
 | Repo      | `~/src/superextra-landing`                          |
@@ -138,9 +139,7 @@ Push to `main` → GitHub Actions → Firebase Hosting. Same as local developmen
 
 ## Troubleshooting
 
-**mosh locale error** — Mac sends invalid `LC_CTYPE=UTF-8`. The `cv` function handles this by setting `LC_CTYPE=en_US.UTF-8` explicitly. If you see this error outside `cv`, run: `LC_CTYPE=en_US.UTF-8 mosh adam@100.101.35.72`
-
-**Cursor SSH can't connect** — Check Tailscale is running. Try `ssh superextra-vm` first to verify SSH works. If Cursor updated recently, the remote server may need reinstalling — SSH in manually and `rm -rf ~/.cursor-server/`, then reconnect.
+**VS Code SSH can't connect** — Try `ssh superextra-vm` first to verify SSH works. If VS Code updated recently, the remote server may need reinstalling — SSH in manually and `rm -rf ~/.vscode-server/`, then reconnect.
 
 **Claude not authenticated on VM** — Run `claude auth login` on the VM and follow the browser flow.
 
