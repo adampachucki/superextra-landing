@@ -26,6 +26,7 @@ vite.config.ts.timestamp-*
 
 # Claude Code
 .claude
+.mcp.json
 
 # Playwright MCP
 .playwright-mcp
