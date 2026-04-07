@@ -7,6 +7,21 @@
 	marked.setOptions({ breaks: true, gfm: true });
 
 	let scrollEl: HTMLDivElement | undefined = $state();
+	let scrollParent: HTMLElement | undefined = $state();
+
+	// Find the nearest scrollable ancestor
+	function findScrollParent(el: HTMLElement): HTMLElement | undefined {
+		let p = el.parentElement;
+		while (p) {
+			if (p.scrollHeight > p.clientHeight) return p;
+			p = p.parentElement;
+		}
+		return undefined;
+	}
+
+	$effect(() => {
+		if (scrollEl) scrollParent = findScrollParent(scrollEl);
+	});
 
 	$effect(() => {
 		chatState.messages.length;
@@ -14,9 +29,10 @@
 		chatState.streamingText;
 		chatState.streamingProgress;
 		chatState.streamingActivities;
-		if (scrollEl) {
+		const target = scrollParent ?? scrollEl;
+		if (target) {
 			requestAnimationFrame(() => {
-				scrollEl!.scrollTop = scrollEl!.scrollHeight;
+				target.scrollTop = target.scrollHeight;
 			});
 		}
 	});
@@ -93,7 +109,7 @@
 	}
 </script>
 
-<div bind:this={scrollEl} class="flex-1 overflow-y-auto overscroll-y-contain px-5 py-6 md:px-6">
+<div bind:this={scrollEl} class="px-5 py-6 md:px-6">
 	<div class="mx-auto flex max-w-[700px] flex-col gap-5">
 		{#each chatState.messages as msg, i}
 			{#if i === chatState.messages.length - 1 && msg.role === 'agent' && chatState.streamingActivities.length > 0 && !chatState.loading}
