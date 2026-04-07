@@ -7,21 +7,6 @@
 	marked.setOptions({ breaks: true, gfm: true });
 
 	let scrollEl: HTMLDivElement | undefined = $state();
-	let scrollParent: HTMLElement | undefined = $state();
-
-	// Find the nearest scrollable ancestor
-	function findScrollParent(el: HTMLElement): HTMLElement | undefined {
-		let p = el.parentElement;
-		while (p) {
-			if (p.scrollHeight > p.clientHeight) return p;
-			p = p.parentElement;
-		}
-		return undefined;
-	}
-
-	$effect(() => {
-		if (scrollEl) scrollParent = findScrollParent(scrollEl);
-	});
 
 	$effect(() => {
 		chatState.messages.length;
@@ -29,10 +14,9 @@
 		chatState.streamingText;
 		chatState.streamingProgress;
 		chatState.streamingActivities;
-		const target = scrollParent ?? scrollEl;
-		if (target) {
+		if (scrollEl) {
 			requestAnimationFrame(() => {
-				target.scrollTop = target.scrollHeight;
+				window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
 			});
 		}
 	});

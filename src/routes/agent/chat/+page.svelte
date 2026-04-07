@@ -115,6 +115,13 @@
 		sidebarOpen = !sidebarOpen;
 	}
 
+	// Lock body scroll when sidebar open on mobile
+	$effect(() => {
+		if (isDesktop || !sidebarOpen) return;
+		document.body.style.overflow = 'hidden';
+		return () => (document.body.style.overflow = '');
+	});
+
 	onMount(() => {
 		const params = new URL(window.location.href).searchParams;
 		const sid = params.get('sid');
@@ -458,318 +465,512 @@
 	</svg>
 </button>
 
-<div class="chat-enter relative flex h-dvh overflow-hidden {mounted ? 'is-mounted' : ''}">
-	<!-- Sidebar -->
+{#if !isDesktop && sidebarOpen}
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
-		class="sidebar-overlay absolute inset-0 z-40 bg-black/20 {!isDesktop && sidebarOpen
-			? 'pointer-events-auto opacity-100'
-			: 'pointer-events-none opacity-0'}"
+		class="fixed inset-0 z-40 touch-none bg-black/20"
 		onclick={() => (sidebarOpen = false)}
 	></div>
-	<aside
-		class="sidebar flex w-64 shrink-0 flex-col border-r border-black/[0.06] bg-cream dark:border-white/[0.06] {mounted
-			? 'animated'
-			: ''} {isDesktop ? 'relative' : 'absolute inset-y-0 left-0 z-50'} {sidebarOpen
-			? ''
-			: isDesktop
-				? '-ml-64'
-				: '-translate-x-full'}"
+{/if}
+<aside
+	class="sidebar fixed top-0 left-0 z-50 flex h-dvh w-64 flex-col overflow-y-auto overscroll-y-contain border-r border-black/[0.06] bg-cream pt-[env(safe-area-inset-top)] dark:border-white/[0.06] {mounted
+		? 'animated'
+		: ''} {sidebarOpen ? '' : '-translate-x-full'}"
+>
+	<!-- Logo + toggle -->
+	<div
+		class="sb-item flex items-center justify-between px-6 py-5"
+		style="--sb-delay: 0.15s"
+		class:visible={sidebarContentVisible}
 	>
-		<!-- Logo + toggle -->
-		<div
-			class="sb-item flex items-center justify-between px-6 py-5"
-			style="--sb-delay: 0.15s"
+		<a
+			href="/agent"
+			class="group flex items-center gap-0.5 text-black no-underline dark:text-white"
+		>
+			<svg
+				class="-mt-2.5 h-[18px] w-[18px] transition-transform duration-500 ease-out group-hover:rotate-45 md:-mt-2"
+				viewBox="0 0 12 12"
+				fill="none"
+			>
+				<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5" />
+				<line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="currentColor" stroke-width="1.5" />
+				<line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="currentColor" stroke-width="1.5" />
+			</svg>
+			<span class="text-[22px] font-light tracking-tight">Superextra</span>
+		</a>
+		<button
+			onclick={toggleSidebar}
+			aria-label="Close sidebar"
+			class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-black/40 transition-all duration-200 hover:bg-black/[0.06] hover:text-black/60 dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-white/60"
+		>
+			<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
+				<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
+				<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
+			</svg>
+		</button>
+	</div>
+
+	<!-- Panel content -->
+	<div class="flex-1 overflow-y-auto px-5 py-2">
+		<button
+			onclick={() => {
+				handleNewChat();
+				if (!isDesktop) sidebarOpen = false;
+			}}
+			class="sb-item mb-6 flex w-full cursor-pointer items-center gap-2 rounded-lg bg-cream-100 px-2 py-1.5 text-[13px] text-black/70 transition-colors hover:bg-cream-200 hover:text-black dark:bg-cream-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
+			style="--sb-delay: 0.25s"
 			class:visible={sidebarContentVisible}
 		>
-			<a
-				href="/agent"
-				class="group flex items-center gap-0.5 text-black no-underline dark:text-white"
+			<svg
+				class="h-3.5 w-3.5"
+				xmlns="http://www.w3.org/2000/svg"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="2"
 			>
-				<svg
-					class="-mt-2.5 h-[18px] w-[18px] transition-transform duration-500 ease-out group-hover:rotate-45 md:-mt-2"
-					viewBox="0 0 12 12"
-					fill="none"
-				>
-					<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5" />
-					<line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="currentColor" stroke-width="1.5" />
-					<line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="currentColor" stroke-width="1.5" />
-				</svg>
-				<span class="text-[22px] font-light tracking-tight">Superextra</span>
-			</a>
-			<button
-				onclick={toggleSidebar}
-				aria-label="Close sidebar"
-				class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-black/40 transition-all duration-200 hover:bg-black/[0.06] hover:text-black/60 dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-white/60"
-			>
-				<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
-					<rect
-						x="2"
-						y="4"
-						width="20"
-						height="16"
-						rx="2"
-						stroke="currentColor"
-						stroke-width="1.5"
-					/>
-					<line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.5" />
-				</svg>
-			</button>
-		</div>
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+			</svg>
+			New chat
+		</button>
 
-		<!-- Panel content -->
-		<div class="flex-1 overflow-y-auto px-5 py-2">
-			<button
-				onclick={() => {
-					handleNewChat();
-					if (!isDesktop) sidebarOpen = false;
-				}}
-				class="sb-item mb-6 flex w-full cursor-pointer items-center gap-2 rounded-lg bg-cream-100 px-2 py-1.5 text-[13px] text-black/70 transition-colors hover:bg-cream-200 hover:text-black dark:bg-cream-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
-				style="--sb-delay: 0.25s"
+		{#if chatState.conversations.length > 0}
+			<p
+				class="sb-item mb-2 text-[11px] font-medium tracking-wide text-black/40 dark:text-white/40"
+				style="--sb-delay: 0.32s"
 				class:visible={sidebarContentVisible}
 			>
-				<svg
-					class="h-3.5 w-3.5"
-					xmlns="http://www.w3.org/2000/svg"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-				</svg>
-				New chat
-			</button>
-
-			{#if chatState.conversations.length > 0}
-				<p
-					class="sb-item mb-2 text-[11px] font-medium tracking-wide text-black/40 dark:text-white/40"
-					style="--sb-delay: 0.32s"
-					class:visible={sidebarContentVisible}
-				>
-					CONVERSATIONS
-				</p>
-				<div class="flex flex-col gap-0.5">
-					{#each chatState.conversations as conv, i (conv.id)}
-						<div
-							class="sb-item group relative"
-							style="--sb-delay: {Math.min(0.38 + i * 0.05, 0.7)}s"
-							class:visible={sidebarContentVisible}
-						>
-							{#if confirmDeleteId === conv.id}
-								<div
-									class="flex w-full items-center justify-between rounded-lg bg-red-50 px-3 py-2 dark:bg-red-950/30"
-								>
-									<span class="text-[13px] text-red-600 dark:text-red-400">Delete?</span>
-									<div class="flex items-center gap-1">
-										<button
-											onclick={() => (confirmDeleteId = null)}
-											aria-label="Cancel delete"
-											class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-black/40 transition-colors hover:bg-black/[0.06] dark:text-white/40 dark:hover:bg-white/[0.06]"
+				CONVERSATIONS
+			</p>
+			<div class="flex flex-col gap-0.5">
+				{#each chatState.conversations as conv, i (conv.id)}
+					<div
+						class="sb-item group relative"
+						style="--sb-delay: {Math.min(0.38 + i * 0.05, 0.7)}s"
+						class:visible={sidebarContentVisible}
+					>
+						{#if confirmDeleteId === conv.id}
+							<div
+								class="flex w-full items-center justify-between rounded-lg bg-red-50 px-3 py-2 dark:bg-red-950/30"
+							>
+								<span class="text-[13px] text-red-600 dark:text-red-400">Delete?</span>
+								<div class="flex items-center gap-1">
+									<button
+										onclick={() => (confirmDeleteId = null)}
+										aria-label="Cancel delete"
+										class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-black/40 transition-colors hover:bg-black/[0.06] dark:text-white/40 dark:hover:bg-white/[0.06]"
+									>
+										<svg
+											class="h-3.5 w-3.5"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2"
 										>
-											<svg
-												class="h-3.5 w-3.5"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="2"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													d="M6 18L18 6M6 6l12 12"
-												/>
-											</svg>
-										</button>
-										<button
-											onclick={() => {
-												chatState.deleteConversation(conv.id);
-												confirmDeleteId = null;
-											}}
-											aria-label="Confirm delete"
-											class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-100 dark:hover:bg-red-900/30"
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M6 18L18 6M6 6l12 12"
+											/>
+										</svg>
+									</button>
+									<button
+										onclick={() => {
+											chatState.deleteConversation(conv.id);
+											confirmDeleteId = null;
+										}}
+										aria-label="Confirm delete"
+										class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-100 dark:hover:bg-red-900/30"
+									>
+										<svg
+											class="h-3.5 w-3.5"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2.5"
 										>
-											<svg
-												class="h-3.5 w-3.5"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="2.5"
-											>
-												<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-											</svg>
-										</button>
-									</div>
+											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+										</svg>
+									</button>
 								</div>
-							{:else}
-								<button
-									onclick={() => {
-										chatState.switchTo(conv.id);
-										if (!isDesktop) sidebarOpen = false;
-									}}
-									class="w-full cursor-pointer rounded-lg px-2 py-2 pr-8 text-left transition-colors {conv.id ===
-									chatState.activeId
-										? 'bg-cream-100 dark:bg-cream-100'
-										: 'hover:bg-cream-100/50 dark:hover:bg-cream-50/50'}"
+							</div>
+						{:else}
+							<button
+								onclick={() => {
+									chatState.switchTo(conv.id);
+									if (!isDesktop) sidebarOpen = false;
+								}}
+								class="w-full cursor-pointer rounded-lg px-2 py-2 pr-8 text-left transition-colors {conv.id ===
+								chatState.activeId
+									? 'bg-cream-100 dark:bg-cream-100'
+									: 'hover:bg-cream-100/50 dark:hover:bg-cream-50/50'}"
+							>
+								<p
+									class="truncate text-[13px] {conv.id === chatState.activeId
+										? 'text-black dark:text-white'
+										: 'text-black/70 dark:text-white/70'}"
 								>
-									<p
-										class="truncate text-[13px] {conv.id === chatState.activeId
-											? 'text-black dark:text-white'
-											: 'text-black/70 dark:text-white/70'}"
-									>
-										{conv.title}
-									</p>
-									<div class="mt-0.5 flex items-center gap-1.5">
-										{#if conv.placeContext}
-											<span class="truncate text-[11px] text-black/40 dark:text-white/40"
-												>{conv.placeContext.name}</span
-											>
-											<span class="text-[11px] text-black/20 dark:text-white/20">&middot;</span>
-										{/if}
-										<span class="shrink-0 text-[11px] text-black/30 dark:text-white/30"
-											>{formatRelativeTime(conv.updatedAt)}</span
+									{conv.title}
+								</p>
+								<div class="mt-0.5 flex items-center gap-1.5">
+									{#if conv.placeContext}
+										<span class="truncate text-[11px] text-black/40 dark:text-white/40"
+											>{conv.placeContext.name}</span
 										>
-									</div>
-								</button>
-								<button
-									onclick={() => (confirmDeleteId = conv.id)}
-									aria-label="Delete conversation"
-									class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] lg:opacity-0 lg:group-hover:opacity-100 dark:hover:bg-white/[0.06]"
-								>
-									<svg
-										class="h-3 w-3 text-black/30 dark:text-white/30"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="2"
+										<span class="text-[11px] text-black/20 dark:text-white/20">&middot;</span>
+									{/if}
+									<span class="shrink-0 text-[11px] text-black/30 dark:text-white/30"
+										>{formatRelativeTime(conv.updatedAt)}</span
 									>
-										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-									</svg>
-								</button>
+								</div>
+							</button>
+							<button
+								onclick={() => (confirmDeleteId = conv.id)}
+								aria-label="Delete conversation"
+								class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] lg:opacity-0 lg:group-hover:opacity-100 dark:hover:bg-white/[0.06]"
+							>
+								<svg
+									class="h-3 w-3 text-black/30 dark:text-white/30"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							</button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</div>
+
+	<!-- Footer -->
+	<div
+		class="sb-item border-t border-black/[0.06] px-5 py-4 dark:border-white/[0.06]"
+		style="--sb-delay: 0.45s"
+		class:visible={sidebarContentVisible}
+	>
+		<div class="flex items-center gap-4">
+			<a
+				href="/privacy-policy"
+				class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70"
+				>Privacy</a
+			>
+			<a
+				href="/terms"
+				class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70"
+				>Terms</a
+			>
+			<button
+				onclick={() => theme.cycle()}
+				class="ml-auto cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+				aria-label="Toggle theme"
+			>
+				{#if theme.mode === 'dark'}
+					<svg
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="1.5"
+						><path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"
+						/></svg
+					>
+				{:else if theme.mode === 'light'}
+					<svg
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="1.5"
+						><circle cx="12" cy="12" r="4" /><path
+							stroke-linecap="round"
+							d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"
+						/></svg
+					>
+				{:else}
+					<svg
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="1.5"
+						><path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z"
+						/></svg
+					>
+				{/if}
+			</button>
+		</div>
+		<p class="mt-2 text-[11px] text-black/35 dark:text-white/35">
+			&copy; {new Date().getFullYear()} Superextra
+		</p>
+	</div>
+</aside>
+
+<div class="chat-enter relative min-h-dvh {mounted ? 'is-mounted' : ''}">
+	<!-- Main area (flows in document, page-level scroll) -->
+	<div
+		class="relative min-h-dvh pb-40 transition-[padding-left] duration-300 ease-out {isDesktop &&
+		sidebarOpen
+			? 'pl-64'
+			: ''}"
+	>
+		{#if chatState.active}
+			<div class="chat-thread-enter {mounted ? 'is-mounted' : ''}">
+				<ChatThread />
+			</div>
+		{:else}
+			<div
+				class="chat-thread-enter flex min-h-dvh items-center justify-center {mounted
+					? 'is-mounted'
+					: ''}"
+			>
+				<p class="text-[14px] text-black/40 dark:text-white/40">Start a new conversation below</p>
+			</div>
+		{/if}
+	</div>
+</div>
+
+<!-- Input bar (fixed, outside chat-enter) -->
+<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+<div
+	class="fixed right-0 bottom-0 left-0 z-20 bg-[var(--color-cream)] transition-[left] duration-300 ease-out {isDesktop &&
+	sidebarOpen
+		? 'left-64'
+		: ''}"
+>
+	<div
+		class="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[var(--color-cream)]/60 to-transparent"
+	></div>
+	<div class="mx-auto max-w-[800px] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6">
+		{#if chatState.active}
+			<div
+				onclick={() => inputEl?.focus()}
+				class="prompt-card cursor-text rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]"
+			>
+				<div class="px-5 pt-4">
+					<textarea
+						bind:this={inputEl}
+						bind:value={query}
+						onkeydown={handleKeydown}
+						placeholder={dictation.active ? 'Start speaking...' : 'Ask a follow-up...'}
+						rows="1"
+						autocomplete="off"
+						autocapitalize="off"
+						spellcheck="false"
+						class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none dark:text-white dark:placeholder:text-white/45"
+					></textarea>
+				</div>
+				<div class="flex items-center justify-end gap-1 px-4 pb-4">
+					{#if dictation.supported}
+						<button
+							onclick={handleDictation}
+							aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
+							class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active
+								? 'text-red-500'
+								: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
+						>
+							{#if dictation.active}
+								<span
+									class="absolute inset-0 rounded-full bg-red-500/15"
+									style="transform: scale({1 + dictation.volume * 0.5}); opacity: {0.4 +
+										dictation.volume * 0.6};"
+								></span>
+							{/if}
+							<svg
+								class="relative h-[18px] w-[18px]"
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="1.75"
+							>
+								<path
+									stroke-linecap="square"
+									stroke-linejoin="miter"
+									d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
+								/>
+								<path
+									stroke-linecap="square"
+									stroke-linejoin="miter"
+									d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"
+								/>
+							</svg>
+						</button>
+					{:else}
+						<button
+							disabled
+							aria-label="Voice input not supported"
+							class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15"
+						>
+							<svg
+								class="h-[18px] w-[18px]"
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="1.75"
+							>
+								<path
+									stroke-linecap="square"
+									stroke-linejoin="miter"
+									d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
+								/>
+								<path
+									stroke-linecap="square"
+									stroke-linejoin="miter"
+									d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"
+								/>
+							</svg>
+						</button>
+					{/if}
+					<button
+						onclick={handleSend}
+						disabled={!query.trim() || chatState.loading}
+						aria-label="Send"
+						class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
+					>
+						<svg
+							class="h-4 w-4 text-white dark:text-black"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2.5"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
+							/>
+						</svg>
+					</button>
+				</div>
+			</div>
+		{:else}
+			<div
+				onclick={() => inputEl?.focus()}
+				class="prompt-card cursor-text rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]"
+			>
+				<div class="flex flex-col">
+					<div class="relative px-5 pt-5">
+						<textarea
+							bind:this={inputEl}
+							bind:value={query}
+							onkeydown={handleKeydown}
+							placeholder={dictation.active
+								? 'Start speaking...'
+								: isAnimating
+									? display
+									: 'What do you want to know about your market?'}
+							rows="3"
+							autocomplete="off"
+							autocapitalize="off"
+							spellcheck="false"
+							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating
+								? 'placeholder:text-black/70 dark:placeholder:text-white/70'
+								: 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
+						></textarea>
+					</div>
+
+					<div class="flex items-center justify-between px-4 pb-2">
+						<!-- Left icons + place chip -->
+						<div class="relative flex items-center gap-1">
+							<button
+								onclick={toggleContext}
+								aria-label="Add place"
+								class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {contextOpen ||
+								selectedPlace
+									? 'text-black/60 dark:text-white/60'
+									: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
+							>
+								<svg
+									class="h-[18px] w-[18px]"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="1.75"
+								>
+									<path
+										stroke-linecap="square"
+										stroke-linejoin="miter"
+										d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
+									/>
+									<path
+										stroke-linecap="square"
+										stroke-linejoin="miter"
+										d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
+									/>
+								</svg>
+							</button>
+							<button
+								disabled
+								aria-label="Map view"
+								class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15"
+							>
+								<svg
+									class="h-[18px] w-[18px]"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="1.75"
+								>
+									<path
+										stroke-linecap="square"
+										stroke-linejoin="miter"
+										d="M3 7l6-3 6 3 6-3v14l-6 3-6-3-6 3V7zM9 4v14M15 7v14"
+									/>
+								</svg>
+							</button>
+							{#if selectedPlace}
+								<span
+									class="context-slide absolute inset-y-0 left-0 my-auto inline-flex h-6 items-center gap-1.5 rounded-full border border-black/[0.10] bg-cream-100 pr-1 pl-2.5 text-xs text-black/65 dark:border-white/[0.10] dark:bg-cream-50 dark:text-white/65"
+								>
+									<span class="truncate">{selectedPlace.name}</span>
+									{#if selectedPlace.secondary}
+										<span class="hidden truncate text-black/35 md:inline dark:text-white/35"
+											>{selectedPlace.secondary}</span
+										>
+									{/if}
+									<button
+										onclick={removePlace}
+										aria-label="Remove place"
+										class="flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
+									>
+										<svg
+											class="h-3 w-3 text-black/30 dark:text-white/30"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M6 18L18 6M6 6l12 12"
+											/>
+										</svg>
+									</button>
+								</span>
 							{/if}
 						</div>
-					{/each}
-				</div>
-			{/if}
-		</div>
 
-		<!-- Footer -->
-		<div
-			class="sb-item border-t border-black/[0.06] px-5 py-4 dark:border-white/[0.06]"
-			style="--sb-delay: 0.45s"
-			class:visible={sidebarContentVisible}
-		>
-			<div class="flex items-center gap-4">
-				<a
-					href="/privacy-policy"
-					class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70"
-					>Privacy</a
-				>
-				<a
-					href="/terms"
-					class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70"
-					>Terms</a
-				>
-				<button
-					onclick={() => theme.cycle()}
-					class="ml-auto cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
-					aria-label="Toggle theme"
-				>
-					{#if theme.mode === 'dark'}
-						<svg
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="1.5"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"
-							/></svg
-						>
-					{:else if theme.mode === 'light'}
-						<svg
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="1.5"
-							><circle cx="12" cy="12" r="4" /><path
-								stroke-linecap="round"
-								d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"
-							/></svg
-						>
-					{:else}
-						<svg
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="1.5"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z"
-							/></svg
-						>
-					{/if}
-				</button>
-			</div>
-			<p class="mt-2 text-[11px] text-black/35 dark:text-white/35">
-				&copy; {new Date().getFullYear()} Superextra
-			</p>
-		</div>
-	</aside>
-
-	<!-- Main area -->
-	<div class="relative flex min-w-0 flex-1 flex-col">
-		<!-- Chat scroll area -->
-		<div class="min-h-0 flex-1 overflow-y-auto">
-			{#if chatState.active}
-				<div class="chat-thread-enter {mounted ? 'is-mounted' : ''}">
-					<ChatThread />
-				</div>
-			{:else}
-				<div
-					class="chat-thread-enter flex min-h-full items-center justify-center {mounted
-						? 'is-mounted'
-						: ''}"
-				>
-					<p class="text-[14px] text-black/40 dark:text-white/40">Start a new conversation below</p>
-				</div>
-			{/if}
-		</div>
-
-		<!-- Input bar (flex sibling, below scroll area) -->
-		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-		<div class="relative bg-[var(--color-cream)]">
-			<div
-				class="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[var(--color-cream)]/60 to-transparent"
-			></div>
-			<div class="mx-auto max-w-[800px] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6">
-				{#if chatState.active}
-					<div
-						onclick={() => inputEl?.focus()}
-						class="prompt-card cursor-text rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]"
-					>
-						<div class="px-5 pt-4">
-							<textarea
-								bind:this={inputEl}
-								bind:value={query}
-								onkeydown={handleKeydown}
-								placeholder={dictation.active ? 'Start speaking...' : 'Ask a follow-up...'}
-								rows="1"
-								autocomplete="off"
-								autocapitalize="off"
-								spellcheck="false"
-								class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none dark:text-white dark:placeholder:text-white/45"
-							></textarea>
-						</div>
-						<div class="flex items-center justify-end gap-1 px-4 pb-4">
+						<!-- Right icons: mic + send -->
+						<div class="flex items-center gap-1">
 							{#if dictation.supported}
 								<button
 									onclick={handleDictation}
@@ -834,9 +1035,8 @@
 							{/if}
 							<button
 								onclick={handleSend}
-								disabled={!query.trim() || chatState.loading}
-								aria-label="Send"
-								class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
+								aria-label="Explore"
+								class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
 							>
 								<svg
 									class="h-4 w-4 text-white dark:text-black"
@@ -855,293 +1055,94 @@
 							</button>
 						</div>
 					</div>
-				{:else}
-					<div
-						onclick={() => inputEl?.focus()}
-						class="prompt-card cursor-text rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]"
-					>
-						<div class="flex flex-col">
-							<div class="relative px-5 pt-5">
-								<textarea
-									bind:this={inputEl}
-									bind:value={query}
-									onkeydown={handleKeydown}
-									placeholder={dictation.active
-										? 'Start speaking...'
-										: isAnimating
-											? display
-											: 'What do you want to know about your market?'}
-									rows="3"
-									autocomplete="off"
-									autocapitalize="off"
-									spellcheck="false"
-									class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating
-										? 'placeholder:text-black/70 dark:placeholder:text-white/70'
-										: 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
-								></textarea>
-							</div>
 
-							<div class="flex items-center justify-between px-4 pb-2">
-								<!-- Left icons + place chip -->
-								<div class="relative flex items-center gap-1">
-									<button
-										onclick={toggleContext}
-										aria-label="Add place"
-										class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {contextOpen ||
-										selectedPlace
-											? 'text-black/60 dark:text-white/60'
-											: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
-									>
+					<!-- Place nudge -->
+					{#if placeNudge && !selectedPlace}
+						<p class="context-nudge mx-5 mb-2 text-[12px] text-black/40 dark:text-white/40">
+							Select your restaurant so we can focus on the right area
+						</p>
+					{/if}
+
+					<!-- Expanded context: place search -->
+					<div class="context-expand" class:open={contextExpanded}>
+						<div
+							class="context-expand-inner"
+							class:allow-overflow={contextOverflow}
+							inert={contextExpanded ? undefined : true}
+						>
+							<div
+								class="context-reveal relative mx-4 mb-4 pt-2"
+								class:visible={contextExpanded}
+								onclick={(e) => e.stopPropagation()}
+							>
+								<div class="relative">
+									<input
+										bind:this={placeInputEl}
+										type="text"
+										value={placeName}
+										oninput={onPlaceInput}
+										onfocus={() => {
+											if (placeSuggestions.length) showSuggestions = true;
+										}}
+										onblur={() => setTimeout(() => (showSuggestions = false), 150)}
+										placeholder="Restaurant name..."
+										autocomplete="off"
+										autocorrect="off"
+										spellcheck="false"
+										class="w-full rounded-xl border border-black/[0.08] bg-cream-50/50 px-4 py-2.5 pr-9 text-[13px] text-black placeholder:text-black/30 focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/25"
+									/>
+									{#if loadingSuggestions}
 										<svg
-											class="h-[18px] w-[18px]"
+											class="absolute top-1/2 right-3 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-black/25 dark:text-white/25"
 											xmlns="http://www.w3.org/2000/svg"
 											fill="none"
 											viewBox="0 0 24 24"
-											stroke="currentColor"
-											stroke-width="1.75"
 										>
+											<circle
+												class="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												stroke-width="3"
+											></circle>
 											<path
-												stroke-linecap="square"
-												stroke-linejoin="miter"
-												d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
-											/>
-											<path
-												stroke-linecap="square"
-												stroke-linejoin="miter"
-												d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
-											/>
+												class="opacity-75"
+												fill="currentColor"
+												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+											></path>
 										</svg>
-									</button>
-									<button
-										disabled
-										aria-label="Map view"
-										class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15"
-									>
-										<svg
-											class="h-[18px] w-[18px]"
-											xmlns="http://www.w3.org/2000/svg"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-											stroke-width="1.75"
-										>
-											<path
-												stroke-linecap="square"
-												stroke-linejoin="miter"
-												d="M3 7l6-3 6 3 6-3v14l-6 3-6-3-6 3V7zM9 4v14M15 7v14"
-											/>
-										</svg>
-									</button>
-									{#if selectedPlace}
-										<span
-											class="context-slide absolute inset-y-0 left-0 my-auto inline-flex h-6 items-center gap-1.5 rounded-full border border-black/[0.10] bg-cream-100 pr-1 pl-2.5 text-xs text-black/65 dark:border-white/[0.10] dark:bg-cream-50 dark:text-white/65"
-										>
-											<span class="truncate">{selectedPlace.name}</span>
-											{#if selectedPlace.secondary}
-												<span class="hidden truncate text-black/35 md:inline dark:text-white/35"
-													>{selectedPlace.secondary}</span
-												>
-											{/if}
-											<button
-												onclick={removePlace}
-												aria-label="Remove place"
-												class="flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
-											>
-												<svg
-													class="h-3 w-3 text-black/30 dark:text-white/30"
-													xmlns="http://www.w3.org/2000/svg"
-													fill="none"
-													viewBox="0 0 24 24"
-													stroke="currentColor"
-													stroke-width="2"
-												>
-													<path
-														stroke-linecap="round"
-														stroke-linejoin="round"
-														d="M6 18L18 6M6 6l12 12"
-													/>
-												</svg>
-											</button>
-										</span>
 									{/if}
 								</div>
-
-								<!-- Right icons: mic + send -->
-								<div class="flex items-center gap-1">
-									{#if dictation.supported}
-										<button
-											onclick={handleDictation}
-											aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
-											class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active
-												? 'text-red-500'
-												: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
-										>
-											{#if dictation.active}
-												<span
-													class="absolute inset-0 rounded-full bg-red-500/15"
-													style="transform: scale({1 + dictation.volume * 0.5}); opacity: {0.4 +
-														dictation.volume * 0.6};"
-												></span>
-											{/if}
-											<svg
-												class="relative h-[18px] w-[18px]"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="1.75"
-											>
-												<path
-													stroke-linecap="square"
-													stroke-linejoin="miter"
-													d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
-												/>
-												<path
-													stroke-linecap="square"
-													stroke-linejoin="miter"
-													d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"
-												/>
-											</svg>
-										</button>
-									{:else}
-										<button
-											disabled
-											aria-label="Voice input not supported"
-											class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15"
-										>
-											<svg
-												class="h-[18px] w-[18px]"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="1.75"
-											>
-												<path
-													stroke-linecap="square"
-													stroke-linejoin="miter"
-													d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
-												/>
-												<path
-													stroke-linecap="square"
-													stroke-linejoin="miter"
-													d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"
-												/>
-											</svg>
-										</button>
-									{/if}
-									<button
-										onclick={handleSend}
-										aria-label="Explore"
-										class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
+								{#if showSuggestions && placeSuggestions.length > 0}
+									<ul
+										class="absolute right-0 bottom-full left-0 z-50 mb-1 max-h-48 overflow-auto rounded-xl border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50"
 									>
-										<svg
-											class="h-4 w-4 text-white dark:text-black"
-											xmlns="http://www.w3.org/2000/svg"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-											stroke-width="2.5"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
-											/>
-										</svg>
-									</button>
-								</div>
-							</div>
-
-							<!-- Place nudge -->
-							{#if placeNudge && !selectedPlace}
-								<p class="context-nudge mx-5 mb-2 text-[12px] text-black/40 dark:text-white/40">
-									Select your restaurant so we can focus on the right area
-								</p>
-							{/if}
-
-							<!-- Expanded context: place search -->
-							<div class="context-expand" class:open={contextExpanded}>
-								<div
-									class="context-expand-inner"
-									class:allow-overflow={contextOverflow}
-									inert={contextExpanded ? undefined : true}
-								>
-									<div
-										class="context-reveal relative mx-4 mb-4 pt-2"
-										class:visible={contextExpanded}
-										onclick={(e) => e.stopPropagation()}
-									>
-										<div class="relative">
-											<input
-												bind:this={placeInputEl}
-												type="text"
-												value={placeName}
-												oninput={onPlaceInput}
-												onfocus={() => {
-													if (placeSuggestions.length) showSuggestions = true;
-												}}
-												onblur={() => setTimeout(() => (showSuggestions = false), 150)}
-												placeholder="Restaurant name..."
-												autocomplete="off"
-												autocorrect="off"
-												spellcheck="false"
-												class="w-full rounded-xl border border-black/[0.08] bg-cream-50/50 px-4 py-2.5 pr-9 text-[13px] text-black placeholder:text-black/30 focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/25"
-											/>
-											{#if loadingSuggestions}
-												<svg
-													class="absolute top-1/2 right-3 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-black/25 dark:text-white/25"
-													xmlns="http://www.w3.org/2000/svg"
-													fill="none"
-													viewBox="0 0 24 24"
+										{#each placeSuggestions as s}
+											<li>
+												<button
+													type="button"
+													class="w-full cursor-pointer px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-cream-50 dark:hover:bg-white/[0.04]"
+													onpointerdown={(e) => e.preventDefault()}
+													onclick={() => selectPlaceSuggestion(s)}
 												>
-													<circle
-														class="opacity-25"
-														cx="12"
-														cy="12"
-														r="10"
-														stroke="currentColor"
-														stroke-width="3"
-													></circle>
-													<path
-														class="opacity-75"
-														fill="currentColor"
-														d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-													></path>
-												</svg>
-											{/if}
-										</div>
-										{#if showSuggestions && placeSuggestions.length > 0}
-											<ul
-												class="absolute right-0 bottom-full left-0 z-50 mb-1 max-h-48 overflow-auto rounded-xl border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50"
-											>
-												{#each placeSuggestions as s}
-													<li>
-														<button
-															type="button"
-															class="w-full cursor-pointer px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-cream-50 dark:hover:bg-white/[0.04]"
-															onpointerdown={(e) => e.preventDefault()}
-															onclick={() => selectPlaceSuggestion(s)}
+													<span class="text-black dark:text-white">{s.name}</span>
+													{#if s.secondary}
+														<span class="ml-1.5 text-black/45 dark:text-white/45"
+															>{s.secondary}</span
 														>
-															<span class="text-black dark:text-white">{s.name}</span>
-															{#if s.secondary}
-																<span class="ml-1.5 text-black/45 dark:text-white/45"
-																	>{s.secondary}</span
-																>
-															{/if}
-														</button>
-													</li>
-												{/each}
-											</ul>
-										{/if}
-									</div>
-								</div>
+													{/if}
+												</button>
+											</li>
+										{/each}
+									</ul>
+								{/if}
 							</div>
 						</div>
 					</div>
-				{/if}
+				</div>
 			</div>
-		</div>
+		{/if}
 	</div>
 </div>
 

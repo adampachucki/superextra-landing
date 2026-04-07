@@ -101,17 +101,23 @@ Use `opacity`-only animations for fixed elements near safe areas, or skip the an
 
 A parent with `transform` (even `transform: scale(1)`) creates a new containing block. Any `position: fixed` child inside it behaves as `position: absolute` — it won't be fixed to the viewport.
 
+This is permanent, not just during animation. A CSS transition that ends at `transform: scale(1)` still maintains a containing block after the animation finishes. This affects **all** fixed children: sidebars, overlays, floating buttons, prompt bars — they all need to be siblings of the transform container, not children.
+
 ```html
 <!-- The entrance animation sets transform on .chat-enter -->
 <div class="chat-enter">
-	<!-- has transform: scale(0.97) → scale(1) -->
-	<!-- BAD: this button won't actually be fixed to the viewport -->
+	<!-- has transform: scale(0.97) → scale(1) — permanent containing block! -->
+	<!-- BAD: none of these will be fixed to the viewport -->
 	<button class="fixed top-4 left-4">Toggle</button>
+	<aside class="fixed top-0 left-0 h-dvh w-64">Sidebar</aside>
+	<div class="fixed right-0 bottom-0 left-0">Prompt bar</div>
 </div>
 
-<!-- GOOD: move fixed elements outside the transform container -->
+<!-- GOOD: move ALL fixed elements outside the transform container -->
 <button class="fixed top-4 left-4">Toggle</button>
+<aside class="fixed top-0 left-0 h-dvh w-64">Sidebar</aside>
 <div class="chat-enter">...</div>
+<div class="fixed right-0 bottom-0 left-0">Prompt bar</div>
 ```
 
 ### 6. Small fixed elements are fine
@@ -127,31 +133,74 @@ Small fixed elements (buttons, FABs, floating cards) at any screen edge don't br
 </button>
 ```
 
+### 7. `fixed inset-0` elements must be conditionally rendered
+
+Even invisible `fixed inset-0` elements (e.g. `opacity-0`, `pointer-events-none`) trigger solid safe areas. Safari's heuristic checks CSS properties, not visual appearance. If you have a modal overlay, sidebar backdrop, or any full-screen fixed element, conditionally render it with `{#if}` rather than toggling opacity.
+
+```html
+<!-- BAD: always in DOM, kills translucent even when invisible -->
+<div
+	class="{open ? 'opacity-100' : 'opacity-0 pointer-events-none'} fixed inset-0 bg-black/20"
+></div>
+
+<!-- GOOD: removed from DOM when not needed -->
+{#if open}
+<div class="fixed inset-0 bg-black/20"></div>
+{/if}
+```
+
+### 8. Page-level scroll vs inner overflow scroll
+
+Safari grants translucent safe areas to the **page-level scroll**, not to inner `overflow-y: auto` containers. If your content scrolls inside a bounded `div` (e.g. a flex child with `overflow-y-auto`), the page itself doesn't scroll, and Safari treats it as an app-like layout.
+
+To get translucent safe areas on a chat UI, let the content flow in normal document flow and scroll with the page:
+
+```html
+<!-- BAD: inner scroll container, page doesn't scroll → solid safe areas -->
+<div class="flex h-dvh">
+	<div class="flex-1 overflow-y-auto">
+		<ChatThread />
+	</div>
+</div>
+
+<!-- GOOD: page-level scroll → translucent safe areas -->
+<div class="min-h-dvh">
+	<ChatThread />
+	<!-- content flows naturally, page scrolls -->
+</div>
+```
+
+This means the scrollbar appears at the page edge (not within a content column), but it's the only way to get translucent safe areas on a scroll-heavy layout.
+
 ## Putting it together: chat UI pattern
 
 ```html
 <!-- Fixed toggle button (outside transform container) -->
 <button class="fixed top-[max(1rem,env(safe-area-inset-top))] left-4 z-30 ...">...</button>
 
-<!-- Fixed prompt card (outside transform container, no full-width bg) -->
-<div
-	class="fixed right-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-4 z-20 mx-auto max-w-3xl"
->
-	<div class="rounded-2xl border bg-white ...">
-		<textarea>...</textarea>
+<!-- Main layout (normal document flow, page-level scroll) -->
+<div class="app-enter relative min-h-dvh">
+	<!-- Sidebar: fixed, slides in/out. Overlay conditionally rendered. -->
+	{#if !isDesktop && sidebarOpen}
+	<div class="fixed inset-0 z-40 bg-black/20" onclick="{closeSidebar}"></div>
+	{/if}
+	<aside class="{sidebarOpen ? '' : '-translate-x-full'} fixed top-0 left-0 z-50 h-dvh w-64">
+		...
+	</aside>
+
+	<!-- Main content (flows in document, page scrolls) -->
+	<div class="{isDesktop && sidebarOpen ? 'pl-64' : ''} min-h-dvh pb-40">
+		<ChatThread />
 	</div>
 </div>
 
-<!-- Main layout (normal document flow) -->
-<div class="app-enter relative flex min-h-dvh">
-	<!-- Sidebar: absolute on mobile, relative on desktop -->
-	<aside class="{isDesktop ? 'relative' : 'absolute z-50'} inset-y-0 left-0 ...">...</aside>
-
-	<!-- Main content column -->
-	<div class="relative flex min-w-0 flex-1 flex-col">
-		<!-- Chat thread: min-h-0 allows shrinking, overflow-hidden clips -->
-		<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
-			<ChatThread />
+<!-- Fixed prompt bar (outside transform container, full-width bg = solid bottom safe area) -->
+<div
+	class="{isDesktop && sidebarOpen ? 'left-64' : ''} fixed right-0 bottom-0 left-0 z-20 bg-cream"
+>
+	<div class="mx-auto max-w-3xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+		<div class="rounded-2xl border bg-white ...">
+			<textarea>...</textarea>
 		</div>
 	</div>
 </div>
@@ -160,11 +209,13 @@ Small fixed elements (buttons, FABs, floating cards) at any screen edge don't br
 Key points:
 
 - `min-h-dvh` on the outer container (not `h-dvh`)
-- Fixed elements (toggle, prompt) are siblings of the layout, not children
-- No full-width background on the fixed prompt — just a bordered card with margins
-- No `transform`-based animations on fixed elements
-- Sidebar uses `absolute` (not `fixed`) on mobile so it stays within the layout container
-- Chat thread uses `min-h-0 flex-1 overflow-hidden` to scroll internally
+- Content flows in normal document flow — page-level scroll gives translucent top safe area
+- Fixed elements (toggle, prompt) are siblings of the layout, not children of transform containers
+- Sidebar overlay conditionally rendered (`{#if}`) — `fixed inset-0` in DOM kills translucent even when invisible
+- Sidebar is `fixed` with `h-dvh` (narrow element, doesn't trigger solid)
+- Full-width prompt bar with `bg-cream` at bottom = solid bottom safe area (acceptable trade-off)
+- No `transform`-based animations on fixed elements near safe areas
+- `pb-40` on content area clears the fixed prompt bar
 
 ## What we tested
 
@@ -172,10 +223,13 @@ Key points:
 | -------------------------------------------------- | ------------- | ---------------- |
 | `fixed inset-0 bg-cream`                           | Solid         | Solid            |
 | `fixed inset-0` (no bg)                            | Solid         | Solid            |
+| `fixed inset-0 opacity-0` (invisible but in DOM)   | Solid         | Solid            |
 | `h-dvh flex`                                       | Solid         | Solid            |
 | `min-h-dvh`                                        | Translucent   | Translucent      |
 | `min-h-dvh flex`                                   | Translucent   | Translucent      |
 | `min-h-dvh flex` + child `max-h-dvh`               | Solid         | Solid            |
+| Inner `overflow-y-auto` (page doesn't scroll)      | Solid         | Solid            |
+| Page-level scroll (`min-h-dvh`, no overflow)       | Translucent   | Translucent      |
 | Small fixed button (top)                           | Translucent   | Translucent      |
 | Small fixed button (bottom)                        | Translucent   | Translucent      |
 | Wide fixed button (bottom, `left-4 right-4`)       | Translucent   | Translucent      |
