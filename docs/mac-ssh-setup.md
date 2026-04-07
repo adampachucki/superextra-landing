@@ -2,121 +2,102 @@
 
 ## Context
 
-We run Claude Code on a remote GCP AI Workstation (Belgium, `34.38.81.215`) via tmux. Previously we used mosh + Tailscale, but we're simplifying to plain SSH with ControlMaster for connection reuse, auto-reconnect, and iTerm2's native tmux integration (`tmux -CC`).
+We run Claude Code on a remote GCP AI Workstation (Belgium, `34.38.81.215`) via mosh + tmux. Each parallel Claude agent runs in its own tmux session. The Mac connects via mosh for low-latency typing; the phone (Moshi app) also uses mosh.
 
-The phone (Moshi app) still uses mosh — that's handled in the app, not here.
+SSH with ControlMaster is configured for fast `scp` and non-interactive commands (e.g., listing/killing sessions). VS Code connects via SSH (not mosh).
 
 ## Prerequisites
 
-- macOS with iTerm2 installed (https://iterm2.com/downloads.html — install if missing)
-- SSH key already authorized on the VM (`ssh adam@34.38.81.215` works without password prompt)
+- macOS with mosh installed (`brew install mosh`)
+- SSH key (`~/.ssh/id_ed25519`) authorized on the VM
+- Any terminal app (iTerm2, Ghostty, Terminal.app all work)
 
-## Step 1: SSH config
+## SSH config
 
-Edit `~/.ssh/config` on the Mac. If a `Host superextra-vm` block already exists, replace it. Otherwise add it:
+`~/.ssh/config` on the Mac:
 
 ```
 Host superextra-vm
     HostName 34.38.81.215
     User adam
     ServerAliveInterval 15
-    ServerAliveCountMax 3
+    ServerAliveCountMax 6000
+    TCPKeepAlive no
     ControlMaster auto
     ControlPath ~/.ssh/sockets/%r@%h-%p
     ControlPersist 4h
 ```
 
-Then create the sockets directory:
-
-```bash
-mkdir -p ~/.ssh/sockets
-```
+Create the sockets directory: `mkdir -p ~/.ssh/sockets`
 
 **What this does:**
 
-- `ServerAliveInterval 15` + `ServerAliveCountMax 3` — detects dead connections in ~45 seconds instead of hanging for minutes
-- `ControlMaster auto` — first SSH connection becomes a master; all subsequent `ssh`, `scp`, `cv` commands piggyback on it instantly (no handshake)
-- `ControlPath` — where the master socket file lives
-- `ControlPersist 4h` — master connection stays open 4 hours after last use, so reconnects are instant even after closing the terminal
+- `ServerAliveInterval 15` + `ServerAliveCountMax 6000` — detects dead connections in ~45s, keeps alive for ~25 hours
+- `ControlMaster auto` — first SSH connection becomes a master; subsequent `ssh`, `scp` commands piggyback instantly (no handshake)
+- `ControlPersist 4h` — master stays open 4 hours after last use
 
-## Step 2: `cv` wrapper in `~/.zshrc`
+VM side (`/etc/ssh/sshd_config`) has `ClientAliveInterval 60` + `ClientAliveCountMax 6000`.
 
-Find the existing `cv` function in `~/.zshrc` and replace it with this version. If there's no existing `cv` function, add this:
-
-```bash
-# cv - connect to VM tmux session via iTerm2's native tmux integration
-# Usage: cv [session-name]  (defaults to "main")
-# Auto-reconnects on SSH disconnect. Ctrl+C to stop.
-cv() {
-  local session="${1:-main}"
-  while true; do
-    ssh -t superextra-vm "tmux -CC new -A -s $session"
-    echo "Disconnected. Reconnecting in 2s... (Ctrl+C to stop)"
-    sleep 2
-  done
-}
-```
-
-Then reload:
+## `cv` command — Mac side (`~/.zshrc`)
 
 ```bash
-source ~/.zshrc
+CVM_HOST="adam@34.38.81.215"
+CVM_REPO="~/src/superextra-landing"
+CVM_MOSH() { LC_CTYPE=en_US.UTF-8 mosh --server="LANG=en_US.UTF-8 LC_CTYPE=en_US.UTF-8 mosh-server" "$@"; }
+
+cv          — new session (random name via petname), opens claude via mosh
+cv l        — list sessions, pick one to attach via mosh
+cv k [name] — kill a session (interactive picker if no name)
+cv K        — kill all sessions
+cv w [name] — new worktree session
 ```
 
-**What this does:**
+## `cv` command — VM side (`~/.bashrc`)
 
-- `tmux -CC` — iTerm2's control mode. Each tmux window becomes a native iTerm2 tab with native scrollback, clipboard, and split panes. tmux is still running on the VM but iTerm2 renders everything as if it were local.
-- `new -A -s $session` — attaches to existing session or creates a new one
-- The `while true` loop auto-reconnects if SSH drops (2 second pause between attempts)
-- Works with the same tmux sessions the phone connects to — same session, different UI
-
-## Step 3: Remove old mosh setup (if present)
-
-If there's a `mosh` alias or mosh-based `cv` function in `~/.zshrc`, remove it. We no longer use mosh on the Mac.
-
-Check for and remove:
-
-- Any `alias` lines referencing `mosh`
-- Any function that calls `mosh` to connect to the VM
-
-Do NOT remove the screenshot-to-vm setup (Cmd+Shift+7) — that stays.
-
-## Step 4: Test
-
-Open **iTerm2** (not Terminal.app — `tmux -CC` only works in iTerm2) and run:
+Same subcommands, runs locally using tmux directly:
 
 ```bash
-cv main
+cv          — new session (random name via petname), opens claude
+cv l        — list sessions, pick one (uses tmux attach outside tmux, switch-client inside tmux)
+cv k [name] — kill a session (interactive picker if no name)
+cv K        — kill all sessions
+cv w [name] — new worktree session
 ```
 
-You should see iTerm2 open native tabs for each tmux window. Verify:
+Also available on VM: `bye` (kill current session), `rename <name>` (rename current session).
 
-1. Scrollback works (scroll up with trackpad)
-2. Cmd+C / Cmd+V work for copy-paste
-3. New tmux windows appear as new iTerm2 tabs
-4. Disconnect by closing the tab — then run `cv main` again, session should reattach with everything intact
+## VS Code
 
-## Step 5: Test ControlMaster
-
-With `cv` running in one tab, open another iTerm2 tab and run:
+Open VS Code to the VM from Mac terminal:
 
 ```bash
-ssh superextra-vm echo "instant connection"
+cvs    # alias for: code --remote ssh-remote+superextra-vm /home/adam/src/superextra-landing
 ```
 
-It should connect instantly (no SSH handshake delay). This also makes the screenshot-to-vm SCP uploads faster.
+Key VS Code settings (`settings.json`):
 
-## Daily use
+- `remote.SSH.useLocalServer: true` — keeps remote server alive through brief disconnects
+- `remote.SSH.localServerDownload: "always"` — pre-downloads server binary
+- `remote.SSH.connectTimeout: 60` — longer timeout for reconnects
+- `window.restoreWindows: "all"` — restores all windows (including remote) on restart
 
-- `cv main` — connect to main session from Mac (native iTerm2 tabs)
-- `cv research` — connect to a different session
-- Phone (Moshi app) — connects to the same session via mosh + regular tmux
-- Both can be connected simultaneously — same session, different views
-- If SSH drops on Mac, it auto-reconnects in 2 seconds
+**Note:** VS Code's integrated terminal is noticeably slower than standalone terminals for typing. Use iTerm2/Ghostty with `cv` for Claude Code sessions. Use VS Code for file browsing, editing, and quick commands. Mosh local echo does not work in VS Code's terminal.
+
+## How parallel agents work
+
+Each `cv` (from Mac) opens a new mosh connection to a new tmux session. Each session runs its own Claude Code instance. They work in parallel, fully independent.
+
+- Mac: each session is a separate terminal tab (iTerm2, Ghostty, etc.)
+- Mobile (Moshi): each session is a separate mosh connection
+- Both Mac and phone can connect to the same session simultaneously
+
+## Screenshot to VM
+
+`Cmd+Shift+1` takes a screenshot on the Mac, uploads to `/home/adam/screenshots/` on the VM via SCP, and copies the remote path to clipboard. Paste the path into Claude Code to share images.
+
+Script: `~/.local/bin/screenshot-to-vm`
 
 ## Troubleshooting
 
-- **"tmux -CC" shows raw escape codes instead of native tabs**: You're not in iTerm2. This feature is iTerm2-only. Open iTerm2 and try again.
-- **SSH hangs instead of reconnecting**: Check that `ServerAliveInterval` is in your SSH config. Run `ssh -v superextra-vm` to debug.
+- **mosh exits immediately**: Check UDP ports 60000-61000 in GCP firewall. Verify locale: `locale -a | grep en_US.utf8`.
 - **ControlMaster socket stale**: `rm ~/.ssh/sockets/*` and reconnect.
-- **Phone and Mac fighting over tmux window**: Both clients share the active window by default. This is normal — switching windows on one device switches on the other.
