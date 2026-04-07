@@ -171,7 +171,7 @@ The browser inspection tool is **Chrome DevTools MCP** (`chrome-devtools-mcp`), 
 
 ## Remote VM
 
-GCP AI Workstation in Belgium (static IP `34.38.81.215`), used for running parallel Claude Code sessions accessible from any device.
+GCP AI Workstation in Belgium (static IP `34.38.81.215`), used for running parallel Claude Code sessions accessible from any device. Connected via plain SSH (no Tailscale, no mosh).
 
 - **SSH**: `ssh superextra-vm` (or `ssh adam@34.38.81.215`)
 - **Repo**: `~/src/superextra-landing`
@@ -181,8 +181,9 @@ GCP AI Workstation in Belgium (static IP `34.38.81.215`), used for running paral
   - `cv a <name>` — attach to existing session
   - `cv k <name>` — kill a session
   - `cv K` — kill all sessions
-- Sessions persist across disconnects — attach from Mac, phone (Termius), iPad
+- Sessions persist across SSH disconnects — attach from Mac (plain SSH), phone (Moshi app — SSH+mosh, has built-in image upload), iPad
 - tmux sets terminal tab title to session name (`set-titles-string "#S"` in `~/.tmux.conf`)
+- **Screenshots**: Cmd+Shift+7 on Mac captures, uploads via SCP, copies VM path to clipboard (see `docs/screenshot-to-vm-setup.md`)
 - Env files (`.env`, `agent/.env`) are gitignored — must be created manually on the VM
 - VM user `adam` has sudo (added via `usermod -aG sudo adam`)
 
