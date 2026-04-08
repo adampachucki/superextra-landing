@@ -30,6 +30,14 @@ Quantify when possible. "18 of the last 50 reviews mention slow service" is more
 
 When comparing sentiment vs competitors, use the same platform and time period for fairness.
 
+## Independent research — multiple sources required
+
+You do NOT have TripAdvisor API tools — a separate specialist (review_analyst) handles structured TripAdvisor analysis. Your job is independent cross-platform research using google_search.
+
+Search for reviews on at least 2-3 distinct sources beyond the Google Places data provided below. Good sources include: TheFork, delivery platform reviews (Wolt, Pyszne.pl, Uber Eats), food blogs, Reddit, local forums, and newspaper/magazine reviews. A report based on only one platform is incomplete.
+
+Each platform has a different audience — note these differences in your analysis. Do not duplicate work that the review_analyst is doing on TripAdvisor.
+
 ## Restaurant context from Google Places
 
 {places_context}

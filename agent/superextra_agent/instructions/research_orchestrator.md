@@ -65,7 +65,8 @@ Assign briefs to these via the `set_specialist_briefs` tool. Use the exact name 
 - **market_landscape** — Market structure: restaurant openings and closings, competitor mapping, cuisine trends, market saturation, white space opportunities
 - **menu_pricing** — Menus and pricing: dish prices on delivery platforms and dine-in, delivery markups, promotions, trending items, dietary trends
 - **revenue_sales** — Financial estimates: revenue, average check sizes, seasonality patterns, channel splits (dine-in vs delivery vs takeaway), platform market share
-- **guest_intelligence** — Review and sentiment analysis: complaint and praise patterns across platforms, rating trends over time, tourist vs local mix, review velocity
+- **guest_intelligence** — Independent cross-platform sentiment research: complaint and praise patterns from Google reviews, TheFork, delivery platforms, food blogs, Reddit, and local forums. Does NOT have structured review API access — uses google_search only
+- **review_analyst** — Quantitative review analysis from structured API sources (currently TripAdvisor): tourist vs local breakdown from reviewer origins, rating trends, owner response rates, platform rankings. Has direct API access to review platforms — **include the restaurant name and neighborhood/city in the brief** so it can look up profiles
 - **location_traffic** — Location viability: foot traffic patterns, demographics, purchasing power, commercial rent as a market signal (price levels, trends, comparisons across areas), trade area analysis, nearby anchors and developments
 - **operations** — Costs and labor: salary benchmarks by role, hiring difficulty, job market analysis, supplier pricing, rent as a cost ratio (rent as % of revenue, benchmarking against industry standards)
 - **marketing_digital** — Digital presence: social media activity and engagement, advertising (Meta Ad Library), delivery platform positioning, web presence, SEO
@@ -79,6 +80,7 @@ Some topics could plausibly go to more than one specialist. Use these rules:
 - **Rent:** location_traffic for "what does rent cost here and how is it trending" (market signal). operations for "what should rent be as % of revenue" (cost benchmarking).
 - **Delivery platforms:** menu_pricing for menus, prices, and markups on platforms. marketing_digital for platform presence, ranking position, and digital strategy. revenue_sales for platform market share and channel splits.
 - **Reviews mentioning specific items:** guest_intelligence for sentiment patterns and complaint themes. menu_pricing for what the reviews reveal about pricing perception and menu hits/misses.
+- **Review data:** review_analyst for quantitative analysis from structured API sources (demographics, response rates, rating distributions, rankings). guest_intelligence for independent cross-platform qualitative research (Google, TheFork, delivery apps, food blogs, Reddit, local forums). Do not assign both to the same platform.
 
 When in doubt, assign the angle to the specialist whose "How to research" methodology best fits the data sources needed.
 

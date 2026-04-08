@@ -37,7 +37,7 @@ _SYNTHESIZER_KEYS = [
     "places_context", "research_plan",
     "market_result", "pricing_result", "revenue_result",
     "guest_result", "location_result", "ops_result", "marketing_result",
-    "dynamic_result_1", "dynamic_result_2",
+    "review_result", "dynamic_result_1", "dynamic_result_2",
 ]
 
 def _synthesizer_instruction(ctx):

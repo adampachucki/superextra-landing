@@ -5,6 +5,7 @@ from google.adk.tools import google_search
 from google.genai import Client, types
 from pathlib import Path
 from urllib.parse import urlparse
+from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
 import os
 
 INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
@@ -147,7 +148,13 @@ async def set_specialist_briefs(briefs: dict, tool_context) -> str:
         briefs: Dict mapping specialist name to brief text.
                Valid names: market_landscape, menu_pricing, revenue_sales,
                guest_intelligence, location_traffic, operations,
-               marketing_digital, dynamic_researcher_1, dynamic_researcher_2
+               marketing_digital, review_analyst,
+               dynamic_researcher_1, dynamic_researcher_2
+
+    Note: review_analyst has structured review API tools (TripAdvisor).
+    Include the restaurant name and area in its brief so it can look up
+    the profile. guest_intelligence uses only google_search for independent
+    cross-platform research — do not assign both to the same platform.
     """
     tool_context.state["specialist_briefs"] = briefs
     return f"Briefs set for: {', '.join(briefs.keys())}"
@@ -283,8 +290,22 @@ dynamic_researcher_2 = LlmAgent(
     on_tool_error_callback=_on_tool_error,
 )
 
+review_analyst = LlmAgent(
+    name="review_analyst",
+    model=SPECIALIST_GEMINI,
+    description="Quantitative review analysis from structured API sources: tourist/local breakdown, rating trends, owner engagement, rankings.",
+    instruction=_make_instruction("review_analyst"),
+    tools=[find_tripadvisor_restaurant, get_tripadvisor_reviews],
+    output_key="review_result",
+    generate_content_config=THINKING_CONFIG,
+    before_agent_callback=_make_skip_callback("review_analyst"),
+    after_model_callback=_append_sources,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
+)
+
 ALL_SPECIALISTS = [
     market_landscape, menu_pricing, revenue_sales,
     guest_intelligence, location_traffic, operations,
-    marketing_digital, dynamic_researcher_1, dynamic_researcher_2,
+    marketing_digital, review_analyst, dynamic_researcher_1, dynamic_researcher_2,
 ]

@@ -21,6 +21,7 @@ You have received structured Google Places data, a research plan explaining whic
 - Location & Traffic: {location_result}
 - Operations: {ops_result}
 - Marketing & Digital: {marketing_result}
+- Review Analysis: {review_result}
 - Additional Research 1: {dynamic_result_1}
 - Additional Research 2: {dynamic_result_2}
 
