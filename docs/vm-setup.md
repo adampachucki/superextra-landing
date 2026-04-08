@@ -159,3 +159,12 @@ Push to `main` → GitHub Actions → Firebase Hosting. Same as local developmen
 **Worktree env files missing** — The setup script symlinks them, but if you create worktrees manually, copy or symlink `.env` and `agent/.env` from the main checkout.
 
 **tmux session name conflict** — `cv feature-x` fails if a session named `feature-x` already exists. Use `cv a feature-x` to attach, or `cv k feature-x` to kill it first.
+
+## Why not Tailscale
+
+Evaluated April 2026. Previously used (Tailscale IP `100.101.35.72`), removed in `57c7416` due to ~300ms latency from DERP relay fallback. Re-evaluated whether it could improve VS Code SSH reliability after sleep/wake. Decision: **don't use it.**
+
+- **Mosh doesn't need it** — already handles roaming and sleep natively via UDP
+- **Won't fix VS Code sleep/wake** — SSH TCP sessions inside the WireGuard tunnel still time out during extended sleep (15+ min). VS Code shows "Cannot reconnect" regardless of transport
+- **macOS sleep/wake bugs** — Tailscale fails to reconnect after sleep >15 min ([#1134](https://github.com/tailscale/tailscale/issues/1134)), can break all internet on wake ([#17736](https://github.com/tailscale/tailscale/issues/17736), [#17937](https://github.com/tailscale/tailscale/issues/17937))
+- **The 300ms was fixable** — caused by DERP relay, not WireGuard. Opening UDP 41641 in GCP firewall gives direct P2P (~1-3ms overhead). But no benefit over current setup even with direct connections
