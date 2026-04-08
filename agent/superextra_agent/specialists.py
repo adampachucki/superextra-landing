@@ -100,15 +100,16 @@ MODEL_GEMINI = _make_gemini(MODEL)
 SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 
 
-def _make_instruction(name: str):
+def _make_instruction(name: str, brief_key: str | None = None):
     """Create an InstructionProvider that injects places_context and brief into the template."""
     template = (INSTRUCTIONS_DIR / f"{name}.md").read_text()
+    _brief_key = brief_key or name
 
     def provider(ctx):
         places_context = ctx.state.get("places_context", "No Google Places data available.")
         instruction = template.format(places_context=places_context)
         briefs = ctx.state.get("specialist_briefs", {})
-        brief = briefs.get(name, "")
+        brief = briefs.get(_brief_key, "")
         if brief:
             instruction += f"\n\n## Your research brief\n\n{brief}"
         return instruction
@@ -160,152 +161,46 @@ async def set_specialist_briefs(briefs: dict, tool_context) -> str:
     return f"Briefs set for: {', '.join(briefs.keys())}"
 
 
-    # No FunctionTool wrapper — pass the raw callable to tools=[] so ADK
-    # auto-wraps it as a python callable, keeping AFC compatible with google_search.
+def _make_specialist(name, description, output_key, tools=None, instruction_name=None):
+    """Create a specialist agent with standard callbacks and config."""
+    return LlmAgent(
+        name=name,
+        model=SPECIALIST_GEMINI,
+        description=description,
+        instruction=_make_instruction(instruction_name or name, brief_key=name),
+        tools=tools or [google_search],
+        output_key=output_key,
+        generate_content_config=THINKING_CONFIG,
+        before_agent_callback=_make_skip_callback(name),
+        after_model_callback=_append_sources,
+        on_model_error_callback=_on_model_error,
+        on_tool_error_callback=_on_tool_error,
+    )
 
 
-market_landscape = LlmAgent(
-    name="market_landscape",
-    model=SPECIALIST_GEMINI,
-    description="Analyzes restaurant market dynamics: openings, closings, competitor activity, cuisine trends, saturation, white space.",
-    instruction=_make_instruction("market_landscape"),
-    tools=[google_search],
-    output_key="market_result",
-    generate_content_config=THINKING_CONFIG,
-    before_agent_callback=_make_skip_callback("market_landscape"),
-    after_model_callback=_append_sources,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
-menu_pricing = LlmAgent(
-    name="menu_pricing",
-    model=SPECIALIST_GEMINI,
-    description="Analyzes menus, pricing, delivery markups, promotions, trending dishes.",
-    instruction=_make_instruction("menu_pricing"),
-    tools=[google_search],
-    output_key="pricing_result",
-    generate_content_config=THINKING_CONFIG,
-    before_agent_callback=_make_skip_callback("menu_pricing"),
-    after_model_callback=_append_sources,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
-revenue_sales = LlmAgent(
-    name="revenue_sales",
-    model=SPECIALIST_GEMINI,
-    description="Estimates revenue, check size, seasonality, channel splits, platform share.",
-    instruction=_make_instruction("revenue_sales"),
-    tools=[google_search],
-    output_key="revenue_result",
-    generate_content_config=THINKING_CONFIG,
-    before_agent_callback=_make_skip_callback("revenue_sales"),
-    after_model_callback=_append_sources,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
-guest_intelligence = LlmAgent(
-    name="guest_intelligence",
-    model=SPECIALIST_GEMINI,
-    description="Analyzes review sentiment, complaint/praise patterns, rating trends.",
-    instruction=_make_instruction("guest_intelligence"),
-    tools=[google_search],
-    output_key="guest_result",
-    generate_content_config=THINKING_CONFIG,
-    before_agent_callback=_make_skip_callback("guest_intelligence"),
-    after_model_callback=_append_sources,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
-location_traffic = LlmAgent(
-    name="location_traffic",
-    model=SPECIALIST_GEMINI,
-    description="Analyzes foot traffic, demographics, purchasing power, rent, trade areas.",
-    instruction=_make_instruction("location_traffic"),
-    tools=[google_search],
-    output_key="location_result",
-    generate_content_config=THINKING_CONFIG,
-    before_agent_callback=_make_skip_callback("location_traffic"),
-    after_model_callback=_append_sources,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
-operations = LlmAgent(
-    name="operations",
-    model=SPECIALIST_GEMINI,
-    description="Analyzes labor market, salary benchmarks, rent, supplier pricing.",
-    instruction=_make_instruction("operations"),
-    tools=[google_search],
-    output_key="ops_result",
-    generate_content_config=THINKING_CONFIG,
-    before_agent_callback=_make_skip_callback("operations"),
-    after_model_callback=_append_sources,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
-marketing_digital = LlmAgent(
-    name="marketing_digital",
-    model=SPECIALIST_GEMINI,
-    description="Analyzes social media, ads, delivery platform presence, web presence.",
-    instruction=_make_instruction("marketing_digital"),
-    tools=[google_search],
-    output_key="marketing_result",
-    generate_content_config=THINKING_CONFIG,
-    before_agent_callback=_make_skip_callback("marketing_digital"),
-    after_model_callback=_append_sources,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
-dynamic_researcher_1 = LlmAgent(
-    name="dynamic_researcher_1",
-    model=SPECIALIST_GEMINI,
-    description="Flexible research agent for investigating specific angles that don't fit the 7 specialist domains. Provide a clear, specific research brief.",
-    instruction=_make_instruction("dynamic_researcher"),
-    tools=[google_search],
-    output_key="dynamic_result_1",
-    generate_content_config=THINKING_CONFIG,
-    before_agent_callback=_make_skip_callback("dynamic_researcher_1"),
-    after_model_callback=_append_sources,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
-dynamic_researcher_2 = LlmAgent(
-    name="dynamic_researcher_2",
-    model=SPECIALIST_GEMINI,
-    description="Second flexible research agent for investigating additional angles that don't fit the 7 specialist domains. Provide a clear, specific research brief.",
-    instruction=_make_instruction("dynamic_researcher"),
-    tools=[google_search],
-    output_key="dynamic_result_2",
-    generate_content_config=THINKING_CONFIG,
-    before_agent_callback=_make_skip_callback("dynamic_researcher_2"),
-    after_model_callback=_append_sources,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
-review_analyst = LlmAgent(
-    name="review_analyst",
-    model=SPECIALIST_GEMINI,
-    description="Quantitative review analysis from structured API sources: tourist/local breakdown, rating trends, owner engagement, rankings.",
-    instruction=_make_instruction("review_analyst"),
-    tools=[find_tripadvisor_restaurant, get_tripadvisor_reviews],
-    output_key="review_result",
-    generate_content_config=THINKING_CONFIG,
-    before_agent_callback=_make_skip_callback("review_analyst"),
-    after_model_callback=_append_sources,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
-ALL_SPECIALISTS = [
-    market_landscape, menu_pricing, revenue_sales,
-    guest_intelligence, location_traffic, operations,
-    marketing_digital, review_analyst, dynamic_researcher_1, dynamic_researcher_2,
+_SPECIALIST_CONFIGS = [
+    ("market_landscape", "Analyzes restaurant market dynamics: openings, closings, competitor activity, cuisine trends, saturation, white space.", "market_result"),
+    ("menu_pricing", "Analyzes menus, pricing, delivery markups, promotions, trending dishes.", "pricing_result"),
+    ("revenue_sales", "Estimates revenue, check size, seasonality, channel splits, platform share.", "revenue_result"),
+    ("guest_intelligence", "Analyzes review sentiment, complaint/praise patterns, rating trends.", "guest_result"),
+    ("location_traffic", "Analyzes foot traffic, demographics, purchasing power, rent, trade areas.", "location_result"),
+    ("operations", "Analyzes labor market, salary benchmarks, rent, supplier pricing.", "ops_result"),
+    ("marketing_digital", "Analyzes social media, ads, delivery platform presence, web presence.", "marketing_result"),
 ]
+
+ALL_SPECIALISTS = [_make_specialist(n, d, k) for n, d, k in _SPECIALIST_CONFIGS]
+
+ALL_SPECIALISTS.append(_make_specialist(
+    "review_analyst",
+    "Quantitative review analysis from structured API sources: tourist/local breakdown, rating trends, owner engagement, rankings.",
+    "review_result",
+    tools=[find_tripadvisor_restaurant, get_tripadvisor_reviews],
+))
+
+for i in (1, 2):
+    ALL_SPECIALISTS.append(_make_specialist(
+        f"dynamic_researcher_{i}",
+        "Flexible research agent for investigating specific angles that don't fit the 7 specialist domains.",
+        f"dynamic_result_{i}",
+        instruction_name="dynamic_researcher",
+    ))
