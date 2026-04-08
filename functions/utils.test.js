@@ -910,4 +910,96 @@ describe('parseADKStream activity events', () => {
 		const reads = events.filter(ev => ev.e === 'activity' && ev.d.category === 'read');
 		assert.equal(reads.length, 1); // deduplicated
 	});
+
+	it('accumulates place names in detail across multiple get_restaurant_details calls', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'find_nearby_restaurants', args: {} } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionResponse: { name: 'find_nearby_restaurants', response: { status: 'success', results: [
+					{ id: 'ChIJ1', displayName: { text: 'Shake Shack' } },
+					{ id: 'ChIJ2', displayName: { text: 'Five Guys' } },
+				] } } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'get_restaurant_details', args: { place_id: 'ChIJ1' } } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ functionCall: { name: 'get_restaurant_details', args: { place_id: 'ChIJ2' } } }] },
+				author: 'context_enricher',
+				partial: null,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const checks = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-check');
+		const lastCheck = checks[checks.length - 1];
+		assert.ok(lastCheck.d.detail.includes('Shake Shack'));
+		assert.ok(lastCheck.d.detail.includes('Five Guys'));
+	});
+
+	it('emits search activities from _web_search_queries in stateDelta', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { _web_search_queries: ['restaurant reviews NYC', 'best pizza Brooklyn'] } },
+				content: { parts: [{ text: 'Some text' }] },
+				author: 'market_landscape',
+				partial: true,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const searches = events.filter(ev => ev.e === 'activity' && ev.d.category === 'search');
+		assert.equal(searches.length, 2);
+		assert.equal(searches[0].d.label, 'restaurant reviews NYC');
+		assert.equal(searches[0].d.status, 'complete');
+		assert.equal(searches[1].d.label, 'best pizza Brooklyn');
+		assert.equal(searches[1].d.agent, 'market_landscape');
+	});
+
+	it('emits search activities from groundingMetadata.webSearchQueries', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ text: 'Some text' }] },
+				author: 'guest_intelligence',
+				partial: true,
+				groundingMetadata: { webSearchQueries: ['test grounding query'] },
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const searches = events.filter(ev => ev.e === 'activity' && ev.d.category === 'search');
+		assert.equal(searches.length, 1);
+		assert.equal(searches[0].d.label, 'test grounding query');
+	});
+
+	it('read activity label avoids vertexaisearch hostname', async () => {
+		const source = 'Text.\n\n## Sources\n- [Yelp Review](https://vertexaisearch.cloud.google.com/redirect/abc)';
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: { market_result: source } },
+				content: { parts: [] },
+				author: 'market_landscape',
+				partial: null,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const reads = events.filter(ev => ev.e === 'activity' && ev.d.category === 'read');
+		assert.equal(reads.length, 1);
+		assert.equal(reads[0].d.label, 'Yelp Review');
+		assert.ok(!reads[0].d.label.includes('vertexaisearch'));
+	});
 });

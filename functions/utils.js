@@ -179,6 +179,7 @@ export async function parseADKStream(reader, emit) {
 	const pendingSearchesByAuthor = new Map(); // author → Set<activityId>
 	const emittedSourceUrls = new Set();
 	const placeIdToName = new Map();            // place_id → displayName (from search/nearby responses)
+	const discoveredPlaceNames = [];             // accumulated place names for typewriter detail
 	let placesTotal = 0;                         // total places found from search/nearby
 	let placesCompleted = 0;                     // how many get_restaurant_details responses received
 	let checkEmitted = false;                    // whether data-check activity has been emitted
@@ -238,6 +239,9 @@ export async function parseADKStream(reader, emit) {
 									placesCompleted++;
 									const placeId = fc.args?.place_id || '';
 									const knownName = placeIdToName.get(placeId);
+									if (knownName && !discoveredPlaceNames.includes(knownName)) {
+										discoveredPlaceNames.push(knownName);
+									}
 									const counterLabel = placesTotal > 0
 										? `Checking nearby places: ${placesCompleted}/${placesTotal}`
 										: `Checking nearby places: ${placesCompleted}`;
@@ -246,7 +250,7 @@ export async function parseADKStream(reader, emit) {
 										category: 'data',
 										status: 'running',
 										label: counterLabel,
-										detail: knownName || undefined,
+										detail: discoveredPlaceNames.length > 0 ? discoveredPlaceNames.join(', ') : undefined,
 										agent: 'context_enricher',
 									});
 								}
@@ -296,12 +300,20 @@ export async function parseADKStream(reader, emit) {
 											agent: 'context_enricher',
 										});
 									} else {
-										// Update detail with full info (name + reviews) from response
+										// Accumulate place name (upgrade plain name → enriched)
+										if (placeDetail) {
+											const plainIdx = discoveredPlaceNames.indexOf(name);
+											if (plainIdx >= 0) {
+												discoveredPlaceNames[plainIdx] = placeDetail;
+											} else if (!discoveredPlaceNames.includes(placeDetail)) {
+												discoveredPlaceNames.push(placeDetail);
+											}
+										}
 										emit('activity', {
 											id: 'data-check',
 											category: 'data',
 											status: 'running',
-											detail: placeDetail || undefined,
+											detail: discoveredPlaceNames.length > 0 ? discoveredPlaceNames.join(', ') : undefined,
 											agent: 'context_enricher',
 										});
 									}
@@ -342,13 +354,6 @@ export async function parseADKStream(reader, emit) {
 					if (delta.research_plan && !planningDone) {
 						planningDone = true;
 						emit('progress', { stage: 'planning', status: 'complete', label: 'Research planned' });
-						emit('activity', {
-							id: 'search-planning',
-							category: 'search',
-							status: 'complete',
-							label: 'Planning research',
-							agent: 'research_orchestrator',
-						});
 					}
 
 					// 3. Orchestrator assigned specialists via set_specialist_briefs
@@ -414,7 +419,43 @@ export async function parseADKStream(reader, emit) {
 						}
 					}
 
-					// 4b. Specialist partial text → activity:analyze (sentence excerpt)
+					// 4b. Grounding search queries from state delta (model-side grounding, not function call)
+					{
+						const queries = delta._web_search_queries;
+						if (queries && Array.isArray(queries)) {
+							for (const q of queries) {
+								if (typeof q !== 'string' || !q.trim()) continue;
+								const searchId = `search-${activitySeq++}`;
+								emit('activity', {
+									id: searchId,
+									category: 'search',
+									status: 'complete',
+									label: q.length > 80 ? q.slice(0, 77) + '...' : q,
+									agent: author,
+								});
+							}
+						}
+					}
+
+					// 4c. Fallback: grounding metadata directly on event
+					{
+						const gQueries = evt.groundingMetadata?.webSearchQueries;
+						if (gQueries && Array.isArray(gQueries) && !delta._web_search_queries) {
+							for (const q of gQueries) {
+								if (typeof q !== 'string' || !q.trim()) continue;
+								const searchId = `search-${activitySeq++}`;
+								emit('activity', {
+									id: searchId,
+									category: 'search',
+									status: 'complete',
+									label: q.length > 80 ? q.slice(0, 77) + '...' : q,
+									agent: author,
+								});
+							}
+						}
+					}
+
+					// 4d. Specialist partial text → activity:analyze (sentence excerpt)
 					if (TOOL_LABELS[author] && evt.partial === true && author !== 'synthesizer') {
 						const partialText = parts.find(p => p.text)?.text;
 						if (partialText) {
@@ -477,7 +518,7 @@ export async function parseADKStream(reader, emit) {
 										id: `read-${activitySeq++}`,
 										category: 'read',
 										status: 'complete',
-										label: s.domain || new URL(s.url).hostname,
+										label: s.domain || (() => { try { const h = new URL(s.url).hostname; return h.includes('vertexaisearch') ? (s.title || 'Source') : h; } catch { return s.title || 'Source'; } })(),
 										detail: s.title || '',
 										url: s.url,
 										agent: author,

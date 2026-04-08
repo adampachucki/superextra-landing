@@ -4,6 +4,7 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.tools import google_search
 from google.genai import Client, types
 from pathlib import Path
+from urllib.parse import urlparse
 import os
 
 INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
@@ -21,6 +22,9 @@ def _append_sources(*, callback_context, llm_response):
     where the Cloud Function can extract them.
     """
     gm = llm_response.grounding_metadata
+    # Inject search queries into state so they appear in the SSE stream
+    if gm and gm.web_search_queries and callback_context:
+        callback_context.state["_web_search_queries"] = list(gm.web_search_queries)
     if not gm or not gm.grounding_chunks:
         return llm_response
     urls = []
@@ -29,8 +33,17 @@ def _append_sources(*, callback_context, llm_response):
         if chunk.web and chunk.web.uri and chunk.web.uri not in seen:
             title = chunk.web.title or chunk.web.uri
             uri = chunk.web.uri
-            # domain is often None; title typically contains the domain name
-            domain = chunk.web.domain or chunk.web.title or ""
+            # domain is often None; extract from URI if possible, else use title
+            domain = chunk.web.domain
+            if not domain and uri:
+                try:
+                    hostname = urlparse(uri).hostname or ""
+                    if hostname and "vertexaisearch" not in hostname:
+                        domain = hostname
+                except Exception:
+                    pass
+            if not domain:
+                domain = chunk.web.title or ""
             urls.append((title, uri, domain))
             seen.add(chunk.web.uri)
     if not urls:

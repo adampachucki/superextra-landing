@@ -49,15 +49,65 @@ class TestAppendSources:
         assert "https://b.com/2" in text
         assert "Article A Dup" not in text
 
-    def test_url_without_domain_uses_title(self):
-        """URL without domain falls back to title for {domain} suffix."""
+    def test_url_without_domain_extracts_hostname(self):
+        """URL without domain extracts hostname from URI."""
         chunks = [_make_chunk("https://example.com/page", title="Page", domain=None)]
         resp = _make_response("Text.", chunks)
 
         result = _append_sources(callback_context=None, llm_response=resp)
 
         text = result.content.parts[0].text
-        assert "- [Page](https://example.com/page){Page}" in text
+        assert "- [Page](https://example.com/page){example.com}" in text
+
+    def test_vertexaisearch_uri_falls_back_to_title(self):
+        """Vertexaisearch redirect URI falls back to title for domain."""
+        chunks = [_make_chunk(
+            "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc123",
+            title="BBC News", domain=None
+        )]
+        resp = _make_response("Text.", chunks)
+
+        result = _append_sources(callback_context=None, llm_response=resp)
+
+        text = result.content.parts[0].text
+        assert "{BBC News}" in text
+        assert "vertexaisearch" not in text.split("{")[-1]
+
+    def test_web_search_queries_injected_into_state(self):
+        """web_search_queries from grounding metadata are written to state."""
+        chunks = [_make_chunk("https://example.com", title="Ex", domain="example.com")]
+        gm = types.GroundingMetadata(
+            grounding_chunks=chunks,
+            web_search_queries=["best pizza NYC", "pizza reviews manhattan"],
+        )
+        content = types.Content(parts=[types.Part(text="Analysis.")])
+        resp = LlmResponse(content=content, grounding_metadata=gm)
+
+        class FakeContext:
+            state = {}
+        ctx = FakeContext()
+
+        _append_sources(callback_context=ctx, llm_response=resp)
+
+        assert ctx.state["_web_search_queries"] == ["best pizza NYC", "pizza reviews manhattan"]
+
+    def test_web_search_queries_without_chunks(self):
+        """web_search_queries injected even when no grounding_chunks."""
+        gm = types.GroundingMetadata(
+            web_search_queries=["test query"],
+        )
+        content = types.Content(parts=[types.Part(text="Analysis.")])
+        resp = LlmResponse(content=content, grounding_metadata=gm)
+
+        class FakeContext:
+            state = {}
+        ctx = FakeContext()
+
+        result = _append_sources(callback_context=ctx, llm_response=resp)
+
+        assert ctx.state["_web_search_queries"] == ["test query"]
+        # No chunks → text unchanged (no sources appended)
+        assert result.content.parts[0].text == "Analysis."
 
     def test_no_grounding_metadata(self):
         """No grounding_metadata → response unchanged."""

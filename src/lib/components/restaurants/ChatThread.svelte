@@ -182,11 +182,14 @@
 											src.domain ||
 											(() => {
 												try {
-													return new URL(src.url).hostname;
+													const h = new URL(src.url).hostname;
+													return h.includes('vertexaisearch') ? '' : h;
 												} catch {
 													return '';
 												}
-											})()}
+											})() ||
+											src.title ||
+											''}
 										<a
 											href={src.url}
 											target="_blank"
@@ -242,7 +245,6 @@
 							class="prose mt-4 max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
 						>
 							{@html renderMarkdown(displayText)}
-							<span class="cursor-blink">|</span>
 						</div>
 					{:else if hasStreamingContent && chatState.streamingActivities.length === 0}
 						<div class="flex flex-col gap-1.5">
@@ -403,22 +405,6 @@
 		}
 		50% {
 			opacity: 1;
-		}
-	}
-
-	.cursor-blink {
-		animation: cursorBlink 1s step-end infinite;
-		font-weight: 300;
-		opacity: 0.6;
-	}
-
-	@keyframes cursorBlink {
-		0%,
-		100% {
-			opacity: 0.6;
-		}
-		50% {
-			opacity: 0;
 		}
 	}
 

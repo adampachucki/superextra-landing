@@ -73,8 +73,12 @@
 	$effect(() => {
 		for (const item of dataItems) {
 			if (item.detail && dataTargets[item.id] !== item.detail) {
+				const oldTarget = dataTargets[item.id] || '';
 				dataTargets[item.id] = item.detail;
-				dataDisplay[item.id] = '';
+				// Only reset if the new target doesn't extend the old one
+				if (!item.detail.startsWith(oldTarget)) {
+					dataDisplay[item.id] = '';
+				}
 				if (dataRafs[item.id]) cancelAnimationFrame(dataRafs[item.id]);
 				dataRafs[item.id] = requestAnimationFrame(() => drainData(item.id));
 			}
@@ -229,19 +233,11 @@
 								</span>
 								{#if section.key === 'data' && dataDisplay[item.id]}
 									<span class="text-[12px] text-black/30 dark:text-white/30">
-										{dataDisplay[
-											item.id
-										]}{#if dataDisplay[item.id].length < (dataTargets[item.id] || '').length}<span
-												class="cursor-blink">|</span
-											>{/if}
+										{dataDisplay[item.id]}
 									</span>
 								{:else if section.key === 'analyze' && excerptDisplay[item.id]}
 									<span class="text-[12px] text-black/30 dark:text-white/30">
-										{excerptDisplay[
-											item.id
-										]}{#if excerptDisplay[item.id].length < (excerptTargets[item.id] || '').length}<span
-												class="cursor-blink">|</span
-											>{/if}
+										{excerptDisplay[item.id]}
 									</span>
 								{/if}
 							</div>
@@ -304,12 +300,7 @@
 			<!-- Staggered children: indented, no dots, smaller font -->
 			{#each readDone ? visibleReadItems.slice(0, 5) : visibleReadItems as item (item.id)}
 				<div class="activity-appear pl-5 text-[12px] leading-snug text-black/30 dark:text-white/30">
-					{readDisplay[item.id] ||
-						formatReadUrl(
-							item.url || item.label
-						)}{#if readDisplay[item.id] && readDisplay[item.id].length < (readTargets[item.id] || '').length}<span
-							class="cursor-blink">|</span
-						>{/if}
+					{readDisplay[item.id] || formatReadUrl(item.url || item.label)}
 				</div>
 			{/each}
 
@@ -382,22 +373,6 @@
 		}
 		50% {
 			opacity: 1;
-		}
-	}
-
-	.cursor-blink {
-		animation: cursorBlink 1s step-end infinite;
-		font-weight: 300;
-		opacity: 0.6;
-	}
-
-	@keyframes cursorBlink {
-		0%,
-		100% {
-			opacity: 0.6;
-		}
-		50% {
-			opacity: 0;
 		}
 	}
 
