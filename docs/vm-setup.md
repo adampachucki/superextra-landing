@@ -43,6 +43,17 @@ One function, defined in Mac `~/.zshrc` and VM `~/.bashrc`. Manages all Claude s
 
 Sessions persist across disconnects. Close terminal, switch Wi-Fi, sleep laptop — `cv a` picks up where you left off.
 
+### Session lifecycle
+
+When you run `cv feature-x`, tmux starts a session that runs `claude` as its sole command. When Claude exits (via `/exit`, Ctrl+C, or crash), the tmux session closes automatically — no orphan shells left behind. This is intentional: Claude Code doesn't support resuming a crashed session, so a fallback shell would just be an empty prompt in the repo directory with nothing useful to do.
+
+Two helpers for managing the current session from inside it:
+
+| Command         | Action                          |
+| --------------- | ------------------------------- |
+| `bye`           | Kill the current tmux session   |
+| `rename <name>` | Rename the current tmux session |
+
 ### Terminal tab titles
 
 tmux sets the terminal tab title to the session name. Cursor needs this setting to pick it up:
