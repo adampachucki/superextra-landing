@@ -8,6 +8,12 @@ export default defineConfig({
 		host: true,
 		port: 5199,
 		allowedHosts: true,
+		// No hmr.host — client auto-adapts to page hostname (works on both localhost and IP).
+		// Longer timeout reduces reload loops from mobile Safari dropping WebSocket connections.
+		hmr: {
+			timeout: 60000,
+			overlay: false
+		},
 		proxy: {
 			'/api/intake': 'https://superextra-landing.web.app',
 			'/api/agent/check': {
