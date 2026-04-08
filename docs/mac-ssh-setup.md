@@ -75,7 +75,6 @@ Additional tuning (marginal but harmless):
 - `net.ipv4.tcp_low_latency=1` — prioritizes latency over throughput
 - `net.ipv4.tcp_notsent_lowat=131072` — caps kernel send buffer at 128KB, reduces output bufferbloat
 - `net.ipv4.tcp_thin_linear_timeouts=1` — faster retransmit for thin streams (SSH)
-- `net.ipv4.tcp_no_metrics_save=1` — prevents cached metrics from suboptimal connections
 
 **Packet scheduling:**
 
@@ -109,7 +108,7 @@ Verify settings: `sysctl net.inet.tcp.delayed_ack` (should be 0), `sysctl net.in
 ## `cv` command — Mac side (`~/.zshrc`)
 
 ```bash
-CVM_HOST="adam@34.38.81.215"
+CVM_HOST="superextra-vm"
 CVM_REPO="~/src/superextra-landing"
 CVM_MOSH() { LC_CTYPE=en_US.UTF-8 mosh --server="LANG=en_US.UTF-8 LC_CTYPE=en_US.UTF-8 mosh-server" "$@"; }
 
@@ -119,6 +118,8 @@ cv k [name] — kill a session (interactive picker if no name)
 cv K        — kill all sessions
 cv w [name] — new worktree session
 ```
+
+**Important:** `CVM_HOST` uses the SSH alias `superextra-vm` (not the raw IP) so all `ssh` calls in `cv` inherit the SSH config optimizations (cipher, ObscureKeystrokeTiming, ControlMaster, etc.).
 
 ## `cv` command — VM side (`~/.bashrc`)
 
@@ -158,10 +159,20 @@ cvs    # alias for: code --remote ssh-remote+superextra-vm /home/adam/src/supere
 Key VS Code settings (`settings.json`):
 
 - `terminal.integrated.gpuAcceleration: "auto"` — WebGL rendering, fastest terminal renderer
+- `terminal.integrated.shellIntegration.enabled: false` — disables shell integration to prevent terminal relaunch warnings
+- `git.terminalAuthentication: false` — prevents Git extension from injecting env vars into terminals (fixes orange tab warnings on reconnect while keeping Source Control sidebar)
 - `remote.SSH.useLocalServer: true` — keeps remote server alive through brief disconnects
 - `remote.SSH.localServerDownload: "always"` — pre-downloads server binary
 - `remote.SSH.connectTimeout: 60` — longer timeout for reconnects
 - `window.restoreWindows: "all"` — restores all windows (including remote) on restart
+
+### VS Code orange terminal tabs on reconnect
+
+After SSH reconnects, terminal tabs can turn orange with "extensions want to relaunch" warning. Fixed by:
+
+- `git.terminalAuthentication: false` — stops Git from injecting GIT_ASKPASS into terminals
+- `terminal.integrated.shellIntegration.enabled: false` — stops shell integration relaunch requests
+- Claude Code and Copilot Chat extensions disabled on the remote workspace (no per-extension setting to disable their terminal injection)
 
 ### VS Code terminal typing latency
 
@@ -192,3 +203,4 @@ Script: `~/.local/bin/screenshot-to-vm`
 - **Typing feels slow**: Run `ping 34.38.81.215` to check if it's network (~40ms is normal) or config. Verify `sysctl net.inet.tcp.delayed_ack` is 0. Check `ObscureKeystrokeTiming no` is in SSH config.
 - **Scrolling jumpy in VS Code**: Check `tmux show -g mouse` — should be `off`. Toggle with Ctrl+B, m.
 - **Scrolling broken on mobile**: Toggle mouse on with Ctrl+B, m.
+- **Orange terminal tabs after reconnect**: Check `git.terminalAuthentication` is `false`. Ensure Claude Code and Copilot Chat extensions are disabled on the remote workspace.
