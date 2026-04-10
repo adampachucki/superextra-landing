@@ -51,7 +51,6 @@ Defined in Mac `~/.zshrc`. Use from VS Code terminal or any Mac terminal.
 | `zxj <name>`       | Join session by name                                      |
 | `zxk <name>`       | Kill session (both zmx + tmux)                            |
 | `zxK`              | Kill all sessions                                         |
-| `zxw <name>`       | Worktree session                                          |
 
 **Keyboard shortcut:** Cmd+Shift+X in VS Code opens a terminal and runs `zx`.
 
@@ -66,7 +65,6 @@ Defined in VM `~/.bashrc`. Use after mosh-ing in from Moshi.
 | `txj <name>`       | Join session by name (auto-creates tmux wrapper) |
 | `txk <name>`       | Kill session (both zmx + tmux)                   |
 | `txK`              | Kill all sessions                                |
-| `txw <name>`       | Worktree session                                 |
 
 ### `zx` on the VM
 
@@ -82,22 +80,6 @@ Also defined in VM `~/.bashrc`. Use when connected via SSH or ET directly (not t
 ### Session lifecycle
 
 When Claude exits (`/exit`, Ctrl+C, or crash), zmx session dies, tmux wrapper dies. No orphans.
-
-### Legacy `cv` command
-
-The old `cv` command (mosh + tmux, no native scroll) still works as a fallback. Defined in both Mac `~/.zshrc` and VM `~/.bashrc`.
-
-## Worktrees
-
-For parallel sessions that need branch isolation. `zxw feature-x` / `txw feature-x`:
-
-1. Creates git worktree at `~/src/superextra-landing-worktrees/feature-x/`
-2. Creates branch `feature-x`
-3. Symlinks `.env` and `agent/.env` from main checkout
-4. Runs `npm install`
-5. Starts Claude in the worktree
-
-Use `zx` (no worktree) for quick sessions — instant startup. Use `zxw` when running multiple sessions that might conflict on the same branch.
 
 ## Connection details
 
@@ -207,12 +189,11 @@ set-hook -g client-focus-in run-shell -b printf \"\\033[?25h\" > #{client_tty}
 
 **Keyboard shortcuts:**
 
-| Shortcut    | Action                                    |
-| ----------- | ----------------------------------------- |
-| Cmd+Shift+X | New terminal + `zx` (create zmx session)  |
-| Cmd+Shift+M | New terminal + `cv` (legacy tmux session) |
-| Cmd+Shift+B | Claude BR terminal profile                |
-| Cmd+Shift+R | Rename terminal tab                       |
+| Shortcut    | Action                                   |
+| ----------- | ---------------------------------------- |
+| Cmd+Shift+X | New terminal + `zx` (create zmx session) |
+| Cmd+Shift+B | Claude BR terminal profile               |
+| Cmd+Shift+R | Rename terminal tab                      |
 
 ## Mutagen file sync
 
@@ -260,7 +241,7 @@ Cmd+Shift+7 on Mac captures screenshot, uploads via SCP to `/home/adam/screensho
 
 ### Config files on VM
 
-- `~/.bashrc` — `zx`, `tx`, `cv` functions, performance env vars
+- `~/.bashrc` — `zx`, `tx` functions, performance env vars
 - `~/.tmux.conf` — mouse on, status off (mobile wrapper only)
 - `/etc/et.cfg` — ET server config
 - `~/.claude.json` — MCP server config
@@ -289,6 +270,5 @@ Cmd+Shift+7 on Mac captures screenshot, uploads via SCP to `/home/adam/screensho
 | **Mobile shows Mouse OFF**      | Stale tmux config. Kill tmux session (`txk <name>`), rejoin (`txj <name>`)                                                                                                                                                                                                                        |
 | **VS Code SSH can't connect**   | Try `ssh superextra-vm` first. If VS Code updated, `rm -rf ~/.vscode-server/` on VM and reconnect                                                                                                                                                                                                 |
 | **Claude not authenticated**    | Run `claude auth login` on VM                                                                                                                                                                                                                                                                     |
-| **Worktree env files missing**  | Setup script symlinks them. If created manually, copy `.env` and `agent/.env` from main checkout                                                                                                                                                                                                  |
 | **Mutagen not syncing**         | `mutagen sync list` for status. `mutagen sync flush` to force. `mutagen daemon start` if daemon died                                                                                                                                                                                              |
 | **skhd not intercepting keys**  | macOS Accessibility won't list ad-hoc signed binaries. Wrap in .app: `/Applications/skhd.app/Contents/MacOS/skhd` (copy from brew cellar, add Info.plist with bundle ID `com.koekeishiya.skhd`). Update LaunchAgent to point to .app binary. Then add skhd.app in System Settings → Accessibility |
