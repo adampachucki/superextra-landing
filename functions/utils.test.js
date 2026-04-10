@@ -214,13 +214,13 @@ describe('checkRateLimit', () => {
 // --- Constants ---
 
 describe('constants', () => {
-	it('SPECIALIST_RESULT_KEYS has 9 entries', () => {
-		assert.equal(SPECIALIST_RESULT_KEYS.length, 9);
+	it('SPECIALIST_RESULT_KEYS has 10 entries', () => {
+		assert.equal(SPECIALIST_RESULT_KEYS.length, 10);
 	});
 
 	it('SPECIALIST_KEYS is a Set matching SPECIALIST_RESULT_KEYS', () => {
 		assert.ok(SPECIALIST_KEYS instanceof Set);
-		assert.equal(SPECIALIST_KEYS.size, 9);
+		assert.equal(SPECIALIST_KEYS.size, 10);
 		for (const key of SPECIALIST_RESULT_KEYS) {
 			assert.ok(SPECIALIST_KEYS.has(key), `Missing ${key}`);
 		}

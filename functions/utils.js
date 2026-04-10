@@ -93,13 +93,13 @@ export function checkRateLimit(map, ip, now, windowMs, maxRequests) {
 
 export const SPECIALIST_RESULT_KEYS = [
 	'market_result', 'pricing_result', 'revenue_result', 'guest_result',
-	'location_result', 'ops_result', 'marketing_result',
+	'location_result', 'ops_result', 'marketing_result', 'review_result',
 	'dynamic_result_1', 'dynamic_result_2',
 ];
 
 export const SPECIALIST_KEYS = new Set([
 	'guest_result', 'pricing_result', 'revenue_result', 'market_result',
-	'location_result', 'ops_result', 'marketing_result',
+	'location_result', 'ops_result', 'marketing_result', 'review_result',
 	'dynamic_result_1', 'dynamic_result_2',
 ]);
 
