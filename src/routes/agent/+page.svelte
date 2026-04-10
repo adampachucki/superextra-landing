@@ -1,5 +1,4 @@
 <script lang="ts">
-	// sync test
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import AccessForm from '$lib/components/AccessForm.svelte';
