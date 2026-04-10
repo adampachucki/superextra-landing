@@ -171,18 +171,49 @@ The browser inspection tool is **Chrome DevTools MCP** (`chrome-devtools-mcp`), 
 
 ## Remote VM
 
-GCP AI Workstation in Belgium (static IP `34.38.81.215`), used for running parallel Claude Code sessions accessible from any device. Connected via plain SSH (no Tailscale, no mosh).
+GCP AI Workstation in Belgium (static IP `34.38.81.215`), used for running parallel Claude Code sessions accessible from any device.
 
-- **SSH**: `ssh superextra-vm` (or `ssh adam@34.38.81.215`)
+### Connections
+
+- **Mac (VS Code terminal)**: EternalTerminal (ET) → zmx (native scroll, auto-reconnect after sleep)
+- **Mobile (Moshi app)**: mosh → tmux → zmx (tmux mouse scroll through mosh, instant reconnect)
+- **Direct SSH**: `ssh superextra-vm` (or `ssh adam@34.38.81.215`)
 - **Repo**: `~/src/superextra-landing`
-- **Sessions managed via `cv` function** (defined in VM `~/.bashrc` and local `~/.zshrc`):
-  - `cv <name>` — new tmux session with Claude in the repo
-  - `cv l` — list sessions (interactive, pick by number)
-  - `cv a <name>` — attach to existing session
-  - `cv k <name>` — kill a session
-  - `cv K` — kill all sessions
-- Sessions persist across SSH disconnects — attach from Mac (plain SSH), phone (Moshi app — SSH+mosh, has built-in image upload), iPad
-- tmux sets terminal tab title to session name (`set-titles-string "#S"` in `~/.tmux.conf`)
+
+### Session commands
+
+Two sister command sets — `zx` for Mac/desktop (native scroll via ET), `tx` for mobile (tmux scroll via mosh). Both manage the same zmx sessions.
+
+**Mac (`~/.zshrc`) — use `zx`:**
+
+- `zx` / `zx <name>` — create session running Claude (Cmd+Shift+X in VS Code)
+- `zxl` — list sessions, pick to join
+- `zxj <name>` — join session by name
+- `zxk <name>` — kill session · `zxK` — kill all
+
+**Mobile/VM (`~/.bashrc`) — use `tx` through mosh, `zx` through SSH/ET:**
+
+- `tx` / `tx <name>` — create session (tmux wrapping zmx)
+- `txl` — list sessions, pick to join
+- `txj <name>` — join session by name
+- `txk <name>` — kill session · `txK` — kill all
+- `zx` / `zxl` / `zxj` — same but direct zmx attach (for SSH/ET, not mosh)
+
+### Architecture
+
+```
+zmx session foo          ← owns the process (Claude), persists across all connections
+└── tmux session foo     ← scroll wrapper for mobile, auto-created
+    └── runs: zmx attach foo
+```
+
+- **zmx**: session manager (raw pty relay, no alternate screen = native scroll in VS Code). Built from source at `~/src/zmx`. Update with `zmx-update`.
+- **ET**: transport for Mac (TCP port 2022, auto-reconnects). Config: `/etc/et.cfg`.
+- **tmux**: scroll wrapper for mobile only (mouse on, status off). Not in the Mac path.
+- **Old `cv` command** still works (mosh + tmux, no native scroll) as fallback.
+
+### Other details
+
 - **Screenshots**: Cmd+Shift+7 on Mac captures, uploads via SCP, copies VM path to clipboard (see `docs/screenshot-to-vm-setup.md`)
 - Env files (`.env`, `agent/.env`) are gitignored — must be created manually on the VM
 - VM user `adam` has sudo (added via `usermod -aG sudo adam`)

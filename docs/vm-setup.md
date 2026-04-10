@@ -2,120 +2,241 @@
 
 ## What
 
-A GCP VM (g2-standard-4, Belgium) running Claude Code, accessible from any device via direct SSH (static IP). Claude runs in persistent tmux sessions on the VM — start a session from your Mac, pick it up from your phone, continue on your iPad.
+A GCP VM (g2-standard-4, Belgium) running Claude Code, accessible from any device. Claude runs in persistent zmx sessions on the VM — start a session from your Mac, pick it up from your phone.
 
 ## Why
 
 - **Always-on sessions** — Claude keeps working after you close the laptop
-- **Multi-device** — same session from Mac (Cursor terminal, CLI), phone (Termius), iPad
+- **Multi-device** — same session from Mac (VS Code terminal) and phone (Moshi app)
+- **Native scroll on Mac** — zmx doesn't use alternate screen, so VS Code terminal scrolls natively
 - **Parallel work** — multiple Claude sessions on different tasks simultaneously
-- **Fast connection** — direct SSH with static IP (~50-70ms from Poland)
-- **Isolated worktrees** — parallel sessions on separate branches without conflicts
+- **Fast reconnect** — ET auto-reconnects after sleep/wake, mosh survives roaming
 
 ## Architecture
 
 ```
-Your device
-  ↓ ssh (direct, static IP)
-GCP VM (34.38.81.215)
-  ↓
-tmux session
-  ↓
-Claude Code → edits ~/src/superextra-landing
+Mac (VS Code terminal)                       Mobile (Moshi app)
+  ↓ ET (TCP, port 2022)                        ↓ mosh (UDP)
+GCP VM (34.38.81.215)                        GCP VM
+  ↓                                            ↓
+zmx session ← native scroll                 tmux session (scroll wrapper)
+  ↓                                            ↓ zmx attach
+Claude Code                                  same zmx session → Claude Code
 ```
 
-Cursor Remote SSH connects separately for IDE features (file browsing, syntax highlighting, go-to-definition) on the same files Claude edits.
+**zmx** owns the process. **tmux** is a thin scroll wrapper only used on mobile (mosh breaks native scroll). Both devices connect to the same zmx session.
 
-## The `cv` command
+### Why not just tmux?
 
-One function, defined in Mac `~/.zshrc` and VM `~/.bashrc`. Manages all Claude sessions.
+tmux uses the alternate screen buffer, which causes VS Code's xterm.js to convert scroll wheel events to arrow key sequences. This is hardcoded in xterm.js — no setting can fix it. zmx is a raw pty relay that doesn't use alternate screen, so native scroll works.
 
-| Command          | Action                                                              |
-| ---------------- | ------------------------------------------------------------------- |
-| `cv feature-x`   | New session named `feature-x` with Claude                           |
-| `cv`             | New session with auto-generated name                                |
-| `cv w feature-x` | New session in isolated git worktree (own branch, own node_modules) |
-| `cv l`           | List sessions — pick one by number to attach                        |
-| `cv a feature-x` | Attach to existing session by name                                  |
-| `cv k feature-x` | Kill session by name                                                |
-| `cv k`           | List sessions — pick one by number to kill                          |
-| `cv K`           | Kill all sessions                                                   |
+### Why ET over SSH/mosh?
 
-Sessions persist across disconnects. Close terminal, switch Wi-Fi, sleep laptop — `cv a` picks up where you left off.
+- **vs SSH**: ET auto-reconnects after laptop sleep (1-5s). SSH connections die.
+- **vs mosh**: ET is a raw byte pipe — native scroll works. Mosh runs a terminal emulator that re-renders, breaking native scroll.
+- **Trade-off**: ET has no local echo (unlike mosh), so typing has ~130ms round-trip latency. VS Code GPU rendering and Claude Code no-flicker mode mitigate this.
+
+## Session commands
+
+Two sister command sets. Same interface, different transport layer.
+
+### `zx` — Mac/desktop (native scroll via ET)
+
+Defined in Mac `~/.zshrc`. Use from VS Code terminal or any Mac terminal.
+
+| Command            | Action                                                    |
+| ------------------ | --------------------------------------------------------- |
+| `zx` / `zx <name>` | Create session running Claude (+ tmux wrapper for mobile) |
+| `zxl`              | List sessions, pick to join                               |
+| `zxj <name>`       | Join session by name                                      |
+| `zxk <name>`       | Kill session (both zmx + tmux)                            |
+| `zxK`              | Kill all sessions                                         |
+| `zxw <name>`       | Worktree session                                          |
+
+**Keyboard shortcut:** Cmd+Shift+X in VS Code opens a terminal and runs `zx`.
+
+### `tx` — Mobile (tmux scroll via mosh)
+
+Defined in VM `~/.bashrc`. Use after mosh-ing in from Moshi.
+
+| Command            | Action                                           |
+| ------------------ | ------------------------------------------------ |
+| `tx` / `tx <name>` | Create session (tmux wrapping zmx)               |
+| `txl`              | List sessions, pick to join                      |
+| `txj <name>`       | Join session by name (auto-creates tmux wrapper) |
+| `txk <name>`       | Kill session (both zmx + tmux)                   |
+| `txK`              | Kill all sessions                                |
+| `txw <name>`       | Worktree session                                 |
+
+### `zx` on the VM
+
+Also defined in VM `~/.bashrc`. Use when connected via SSH or ET directly (not through mosh). Attaches to zmx without tmux — native scroll.
+
+### Cross-device workflow
+
+1. Create from Mac: `zx my-task` → creates zmx session + detached tmux wrapper
+2. Join from phone: `txj my-task` → attaches via tmux to same zmx session
+3. Or vice versa — create from phone with `tx`, join from Mac with `zxj`
+4. Both devices can be connected simultaneously (zmx leader policy: last typist controls resize)
 
 ### Session lifecycle
 
-When you run `cv feature-x`, tmux starts a session that runs `claude` as its sole command. When Claude exits (via `/exit`, Ctrl+C, or crash), the tmux session closes automatically — no orphan shells left behind. This is intentional: Claude Code doesn't support resuming a crashed session, so a fallback shell would just be an empty prompt in the repo directory with nothing useful to do.
+When Claude exits (`/exit`, Ctrl+C, or crash), zmx session dies, tmux wrapper dies. No orphans.
 
-Two helpers for managing the current session from inside it:
+### Legacy `cv` command
 
-| Command         | Action                          |
-| --------------- | ------------------------------- |
-| `bye`           | Kill the current tmux session   |
-| `rename <name>` | Rename the current tmux session |
+The old `cv` command (mosh + tmux, no native scroll) still works as a fallback. Defined in both Mac `~/.zshrc` and VM `~/.bashrc`.
 
-### Terminal tab titles
+## Worktrees
 
-tmux sets the terminal tab title to the session name. Cursor needs this setting to pick it up:
-
-```json
-"terminal.integrated.tabs.title": "${sequence}",
-"terminal.integrated.tabs.description": "${process}"
-```
-
-Mac Terminal.app and Termius pick up titles automatically.
-
-## Worktrees (`cv w`)
-
-For parallel sessions that need isolation. `cv w feature-x`:
+For parallel sessions that need branch isolation. `zxw feature-x` / `txw feature-x`:
 
 1. Creates git worktree at `~/src/superextra-landing-worktrees/feature-x/`
 2. Creates branch `feature-x`
 3. Symlinks `.env` and `agent/.env` from main checkout
-4. Runs `npm install` (~30-60 sec)
+4. Runs `npm install`
 5. Starts Claude in the worktree
 
-Use `cv` (no worktree) for single sessions — instant startup. Use `cv w` when running multiple sessions that might conflict.
+Use `zx` (no worktree) for quick sessions — instant startup. Use `zxw` when running multiple sessions that might conflict on the same branch.
 
-## Connection stack
+## Connection details
 
-| Layer       | Tool              | Purpose                                                              |
-| ----------- | ----------------- | -------------------------------------------------------------------- |
-| Network     | Direct IP         | Static IP `34.38.81.215`, no VPN needed                              |
-| Transport   | mosh              | Resilient UDP connection, survives sleep/roaming, instant local echo |
-| Persistence | tmux              | Sessions survive disconnects                                         |
-| IDE         | Cursor Remote SSH | Full editor features on remote files                                 |
-| Dev server  | Port forwarding   | Cursor auto-forwards port 5199 to localhost                          |
+### ET (EternalTerminal)
 
-### Why mosh over SSH
+- **Server**: systemd service `et.service`, port 2022, config at `/etc/et.cfg`
+- **Client**: `brew install MisterTea/et/et` on Mac
+- **GCP firewall**: rule `allow-et` (TCP 2022)
+- **Telemetry**: disabled in `/etc/et.cfg`
 
-SSH is used for one-shot commands (`cv k`, `cv K`). Interactive sessions use mosh for:
+### mosh
 
-- Instant local echo (typing feels responsive despite latency)
-- Survives Wi-Fi → cellular switches
-- Survives laptop sleep without reconnecting
+- **Server**: installed on VM, auto-spawns `mosh-server` processes
+- **Client**: Moshi app on iPhone
+- **GCP firewall**: rule `allow-mosh` (UDP 60000-61000)
 
-### VS Code Remote SSH
+### SSH
 
-Connects VS Code to the VM for file browsing, syntax highlighting, go-to-definition:
+Used for non-interactive commands (listing/killing sessions).
 
-1. `Cmd+Shift+P` → "Remote-SSH: Connect to Host" → `superextra-vm`
-2. Open `/home/adam/src/superextra-landing`
-3. Run `cv feature-x` in VS Code's integrated terminal
-4. Claude's file changes appear in the editor in real-time
-5. `npm run dev` in another terminal tab — auto-forwarded to `localhost:5199`
-
-SSH config (`~/.ssh/config`):
+`~/.ssh/config` on Mac:
 
 ```
 Host superextra-vm
     HostName 34.38.81.215
     User adam
-    ForwardAgent yes
-    ServerAliveInterval 60
-    ServerAliveCountMax 720
+    AddressFamily inet
+    ServerAliveInterval 15
+    ServerAliveCountMax 6000
     TCPKeepAlive no
+    ControlMaster auto
+    ControlPath ~/.ssh/sockets/%r@%h-%p
+    ControlPersist 4h
+    Ciphers aes128-gcm@openssh.com,chacha20-poly1305@openssh.com
+    ObscureKeystrokeTiming no
+    KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org
+    HostKeyAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com
+    PreferredAuthentications publickey
+    IdentitiesOnly yes
+    IdentityFile ~/.ssh/id_ed25519
+    CheckHostIP no
+    RekeyLimit 1G 1h
 ```
+
+Key optimizations: `ObscureKeystrokeTiming no` (disables 20ms delay), `Ciphers aes128-gcm` (hardware AES), `ControlMaster` (connection reuse).
+
+## Performance tuning
+
+### VM TCP (`/etc/sysctl.conf`)
+
+- `net.ipv4.tcp_congestion_control=bbr` — better latency than cubic
+- `net.ipv4.tcp_autocorking=0` — sends keystrokes immediately
+- `net.ipv4.tcp_slow_start_after_idle=0` — keeps connection warm
+- BBR + Fair Queue qdisc: `tc qdisc replace dev ens4 root fq` (persistent via `fq-qdisc.service`)
+
+### macOS TCP
+
+- `sudo sysctl -w net.inet.tcp.delayed_ack=0` — immediate ACKs (persistent via LaunchDaemon)
+- `sudo sysctl -w net.inet.tcp.mssdflt=1448` — proper Ethernet MSS
+
+### VS Code terminal
+
+| Setting                                        | Value   | Why                                                           |
+| ---------------------------------------------- | ------- | ------------------------------------------------------------- |
+| `terminal.integrated.gpuAcceleration`          | `on`    | WebGL rendering, fastest on Retina                            |
+| `terminal.integrated.smoothScrolling`          | `false` | No animation delay                                            |
+| `terminal.integrated.localEchoEnabled`         | `off`   | Tested and rejected — causes visual artifacts with Claude TUI |
+| `terminal.integrated.defaultProfile.osx`       | `zsh`   | Required for `zx` commands                                    |
+| `terminal.integrated.shellIntegration.enabled` | `false` | Prevents relaunch warnings                                    |
+
+### Claude Code
+
+Environment variables in VM `~/.bashrc`:
+
+- `CLAUDE_CODE_NO_FLICKER=1` — double-buffered rendering, less data per frame
+- `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` — no telemetry traffic competing with keystrokes
+
+## zmx
+
+Session manager that replaced tmux for the Mac path. Raw pty relay — doesn't use alternate screen, so native scroll works in VS Code.
+
+- **Binary**: `/usr/local/bin/zmx`
+- **Source**: `~/src/zmx` (built from main branch for leader resize policy, not yet in a release)
+- **Build requires**: Zig 0.15.2 (installed at `/opt/zig/`)
+- **Update**: run `zmx-update` (pulls, builds, installs)
+- **Logs**: `/run/user/1001/zmx/logs/`
+- **Leader policy**: whoever typed last controls terminal resize (handles Mac + mobile different sizes)
+
+## tmux config (`~/.tmux.conf` on VM)
+
+Only used as mobile scroll wrapper. Minimal config:
+
+```tmux
+set -g set-titles on
+set -g set-titles-string #S
+set -g mouse on              # needed for scroll through mosh
+set -g escape-time 0
+set -g window-size latest
+set -g status off
+set -g focus-events on
+
+set-hook -g client-focus-out run-shell -b printf \"\\033[?25l\" > #{client_tty}
+set-hook -g client-focus-in run-shell -b printf \"\\033[?25h\" > #{client_tty}
+```
+
+## VS Code
+
+**Keyboard shortcuts:**
+
+| Shortcut    | Action                                    |
+| ----------- | ----------------------------------------- |
+| Cmd+Shift+X | New terminal + `zx` (create zmx session)  |
+| Cmd+Shift+M | New terminal + `cv` (legacy tmux session) |
+| Cmd+Shift+B | Claude BR terminal profile                |
+| Cmd+Shift+R | Rename terminal tab                       |
+
+## Mutagen file sync
+
+Real-time bidirectional sync between VM and local mirror folder. Claude edits on the VM appear instantly in local VS Code.
+
+| Folder                                  | Purpose                                     |
+| --------------------------------------- | ------------------------------------------- |
+| `~/src/superextra-landing`              | Your real local repo — no sync              |
+| `~/src/superextra-landing-vm`           | Mutagen mirror — bidirectional sync with VM |
+| VM: `/home/adam/src/superextra-landing` | The remote repo where Claude works          |
+
+Session: `superextra-vm-sync`, mode `two-way-safe`. .git IS synced. Daemon auto-starts on boot.
+
+| Command                                 | Action                         |
+| --------------------------------------- | ------------------------------ |
+| `mutagen sync list`                     | Show sync status and conflicts |
+| `mutagen sync flush`                    | Force immediate sync           |
+| `mutagen sync reset superextra-vm-sync` | Reset if stuck                 |
+
+Conflict watcher: LaunchAgent at `~/Library/LaunchAgents/com.user.mutagen-conflict-watch.plist`. Shows macOS notification on conflict.
+
+## Screenshots
+
+Cmd+Shift+7 on Mac captures screenshot, uploads via SCP to `/home/adam/screenshots/` on VM, copies path to clipboard. Paste into Claude Code to share images. See `docs/screenshot-to-vm-setup.md`.
 
 ## VM details
 
@@ -132,39 +253,41 @@ Host superextra-vm
 ### What's installed
 
 - Node 22, Python 3.12, Docker, mosh, tmux, gcloud CLI
-- MCP servers: GitHub (Docker), Svelte, Miro, Apify (all HTTP-based except GitHub)
-- No browser-dependent MCPs (Chrome DevTools, Pencil, Playwright)
+- EternalTerminal 6.2.10 (systemd service)
+- zmx (built from source, Zig 0.15.2)
+- Tailscale (installed, running on VM only — backup access path)
+- MCP servers: GitHub (npx), Svelte, Miro, Apify
 
 ### Config files on VM
 
-- `~/.bashrc` — contains `cv` function
-- `~/.tmux.conf` — `set-titles on`, `set-titles-string "#S"`
+- `~/.bashrc` — `zx`, `tx`, `cv` functions, performance env vars
+- `~/.tmux.conf` — mouse on, status off (mobile wrapper only)
+- `/etc/et.cfg` — ET server config
 - `~/.claude.json` — MCP server config
 - `~/src/superextra-landing/.env` — app env vars
 - `~/src/superextra-landing/agent/.env` — agent env vars
-- `~/src/superextra-landing/scripts/worktree-setup.sh` — worktree initialization script
 
-## Deploying from VM
+## GCP firewall rules
 
-Push to `main` → GitHub Actions → Firebase Hosting. Same as local development. Claude on the VM has full git access via SSH key (`~/.ssh/id_ed25519`, added to GitHub as `GCP AI Workstation`).
+| Rule                | Protocol | Ports       | Purpose         |
+| ------------------- | -------- | ----------- | --------------- |
+| `default-allow-ssh` | TCP      | 22          | SSH             |
+| `allow-et`          | TCP      | 2022        | EternalTerminal |
+| `allow-mosh`        | UDP      | 60000-61000 | mosh            |
+| `allow-dev-server`  | TCP      | 5199        | Dev server      |
 
 ## Troubleshooting
 
-**VS Code SSH can't connect** — Try `ssh superextra-vm` first to verify SSH works. If VS Code updated recently, the remote server may need reinstalling — SSH in manually and `rm -rf ~/.vscode-server/`, then reconnect.
-
-**Claude not authenticated on VM** — Run `claude auth login` on the VM and follow the browser flow.
-
-**sudo not working** — `adam` must be in the sudo group. Fix via: `gcloud compute ssh ai-workstation --zone=europe-west1-b -- "sudo usermod -aG sudo adam"`
-
-**Worktree env files missing** — The setup script symlinks them, but if you create worktrees manually, copy or symlink `.env` and `agent/.env` from the main checkout.
-
-**tmux session name conflict** — `cv feature-x` fails if a session named `feature-x` already exists. Use `cv a feature-x` to attach, or `cv k feature-x` to kill it first.
-
-## Why not Tailscale
-
-Evaluated April 2026. Previously used (Tailscale IP `100.101.35.72`), removed in `57c7416` due to ~300ms latency from DERP relay fallback. Re-evaluated whether it could improve VS Code SSH reliability after sleep/wake. Decision: **don't use it.**
-
-- **Mosh doesn't need it** — already handles roaming and sleep natively via UDP
-- **Won't fix VS Code sleep/wake** — SSH TCP sessions inside the WireGuard tunnel still time out during extended sleep (15+ min). VS Code shows "Cannot reconnect" regardless of transport
-- **macOS sleep/wake bugs** — Tailscale fails to reconnect after sleep >15 min ([#1134](https://github.com/tailscale/tailscale/issues/1134)), can break all internet on wake ([#17736](https://github.com/tailscale/tailscale/issues/17736), [#17937](https://github.com/tailscale/tailscale/issues/17937))
-- **The 300ms was fixable** — caused by DERP relay, not WireGuard. Opening UDP 41641 in GCP firewall gives direct P2P (~1-3ms overhead). But no benefit over current setup even with direct connections
+| Problem                         | Fix                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **ET disconnected after sleep** | Usually auto-reconnects in 1-5s. If not, run `zxl` to rejoin — zmx session is still alive                    |
+| **mosh exits immediately**      | Check UDP ports 60000-61000 in GCP firewall. Verify locale: `locale -a \| grep en_US.utf8`                   |
+| **Stale SSH sockets**           | `rm ~/.ssh/sockets/*` (or just run `zx` — auto-clears)                                                       |
+| **Typing feels slow**           | ~65ms ping is normal. Check `CLAUDE_CODE_NO_FLICKER=1` is set. ET has no local echo — this is the hard floor |
+| **zmx needs rebuilding**        | Run `zmx-update` on VM. Requires Zig 0.15.2 at `/opt/zig/`                                                   |
+| **zmx session lost**            | If zmx crashes, the Claude session dies (SIGHUP). Git-committed work is safe. Restart with `zx`              |
+| **Mobile shows Mouse OFF**      | Stale tmux config. Kill tmux session (`txk <name>`), rejoin (`txj <name>`)                                   |
+| **VS Code SSH can't connect**   | Try `ssh superextra-vm` first. If VS Code updated, `rm -rf ~/.vscode-server/` on VM and reconnect            |
+| **Claude not authenticated**    | Run `claude auth login` on VM                                                                                |
+| **Worktree env files missing**  | Setup script symlinks them. If created manually, copy `.env` and `agent/.env` from main checkout             |
+| **Mutagen not syncing**         | `mutagen sync list` for status. `mutagen sync flush` to force. `mutagen daemon start` if daemon died         |
