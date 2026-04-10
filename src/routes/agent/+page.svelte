@@ -84,5 +84,5 @@
 	<RestaurantCTA />
 </main>
 
-<Footer />
+<Footer borderless />
 <AccessForm />

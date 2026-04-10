@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { theme } from '$lib/theme.svelte';
 
+	let { borderless = false }: { borderless?: boolean } = $props();
+
 	let year = $state(new Date().getFullYear());
 </script>
 
-<footer class="border-t border-cream-200 py-12 pb-20 md:pb-12">
+<footer class="{borderless ? '' : 'border-t border-cream-200'} py-12 pb-20 md:pb-12">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="flex flex-col items-center justify-between gap-6 md:flex-row">
 			<div class="flex flex-col items-center gap-2 md:items-start">

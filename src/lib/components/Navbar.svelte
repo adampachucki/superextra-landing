@@ -37,11 +37,13 @@
 		? 'relative'
 		: 'fixed top-0 right-0 left-0 z-50'} transition-colors duration-300 {over ? '' : 'bg-cream'}"
 >
-	<div
-		class="absolute inset-x-0 bottom-0 h-px bg-cream-200 transition-opacity duration-300 {scrolled
-			? 'opacity-100'
-			: 'opacity-0'}"
-	></div>
+	{#if !minimal}
+		<div
+			class="absolute inset-x-0 bottom-0 h-px bg-cream-200 transition-opacity duration-300 {scrolled
+				? 'opacity-100'
+				: 'opacity-0'}"
+		></div>
+	{/if}
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
 		<a
 			href="/"
