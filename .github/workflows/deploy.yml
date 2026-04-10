@@ -148,7 +148,7 @@ jobs:
             --trace_to_cloud \
             superextra_agent \
             -- --no-allow-unauthenticated \
-            --update-env-vars=GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }} 2>&1) || true
+            --update-env-vars=GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }},SERPAPI_API_KEY=${{ secrets.SERPAPI_API_KEY }} 2>&1) || true
           echo "$OUTPUT"
 
           # Verify a new revision was actually created
