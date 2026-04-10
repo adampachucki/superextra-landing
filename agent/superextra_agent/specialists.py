@@ -100,6 +100,25 @@ MODEL_GEMINI = _make_gemini(MODEL)
 SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 
 
+_SOURCE_GUIDANCE = """
+## Source quality
+
+When making quantitative claims (market size, growth rates, average prices, salary benchmarks,
+demographic statistics), prefer authoritative primary sources — government statistical agencies,
+industry databases and reports, trade publications, public company filings, and academic research.
+
+For qualitative signals (trends, sentiment, local dynamics, recent events), any credible source
+provides legitimate signal — news articles, local media, food blogs, forums, and social media.
+
+When you cite a number, note the source. "Average restaurant revenue: PLN 1.2M (GUS, 2025)"
+is more credible than an unsourced figure. If a claim only appears in non-authoritative sources,
+note this limitation.
+
+Do not limit yourself to authoritative sources — they often lack local specificity. Use them for
+benchmarks and baselines, then add local detail from any credible source.
+"""
+
+
 def _make_instruction(name: str, brief_key: str | None = None):
     """Create an InstructionProvider that injects places_context and brief into the template."""
     template = (INSTRUCTIONS_DIR / f"{name}.md").read_text()
@@ -108,6 +127,7 @@ def _make_instruction(name: str, brief_key: str | None = None):
     def provider(ctx):
         places_context = ctx.state.get("places_context", "No Google Places data available.")
         instruction = template.format(places_context=places_context)
+        instruction += _SOURCE_GUIDANCE
         briefs = ctx.state.get("specialist_briefs", {})
         brief = briefs.get(_brief_key, "")
         if brief:
@@ -115,6 +135,20 @@ def _make_instruction(name: str, brief_key: str | None = None):
         return instruction
 
     return provider
+
+
+def _inject_geo_bias(callback_context, llm_request):
+    """Bias google_search results toward the target restaurant's location."""
+    lat = callback_context.state.get("_target_lat")
+    lng = callback_context.state.get("_target_lng")
+    if not lat or not lng:
+        return None
+    llm_request.config = llm_request.config or types.GenerateContentConfig()
+    llm_request.config.tool_config = llm_request.config.tool_config or types.ToolConfig()
+    llm_request.config.tool_config.retrieval_config = types.RetrievalConfig(
+        lat_lng=types.LatLng(latitude=lat, longitude=lng),
+    )
+    return None
 
 
 def _make_skip_callback(name: str):
@@ -150,7 +184,7 @@ async def set_specialist_briefs(briefs: dict, tool_context) -> str:
                Valid names: market_landscape, menu_pricing, revenue_sales,
                guest_intelligence, location_traffic, operations,
                marketing_digital, review_analyst,
-               dynamic_researcher_1, dynamic_researcher_2
+               dynamic_researcher_1
 
     Note: review_analyst has structured review API tools (TripAdvisor).
     Include the restaurant name and area in its brief so it can look up
@@ -172,6 +206,7 @@ def _make_specialist(name, description, output_key, tools=None, instruction_name
         output_key=output_key,
         generate_content_config=THINKING_CONFIG,
         before_agent_callback=_make_skip_callback(name),
+        before_model_callback=_inject_geo_bias,
         after_model_callback=_append_sources,
         on_model_error_callback=_on_model_error,
         on_tool_error_callback=_on_tool_error,
@@ -197,10 +232,54 @@ ALL_SPECIALISTS.append(_make_specialist(
     tools=[find_tripadvisor_restaurant, get_tripadvisor_reviews],
 ))
 
-for i in (1, 2):
-    ALL_SPECIALISTS.append(_make_specialist(
-        f"dynamic_researcher_{i}",
-        "Flexible research agent for investigating specific angles that don't fit the 7 specialist domains.",
-        f"dynamic_result_{i}",
-        instruction_name="dynamic_researcher",
-    ))
+ALL_SPECIALISTS.append(_make_specialist(
+    "dynamic_researcher_1",
+    "Flexible research agent for investigating specific angles that don't fit the 7 specialist domains.",
+    "dynamic_result_1",
+    instruction_name="dynamic_researcher",
+))
+
+# --- Gap researcher (Phase 2 of two-phase research) ---
+
+_GAP_RESEARCHER_TEMPLATE = (INSTRUCTIONS_DIR / "gap_researcher.md").read_text()
+_GAP_RESEARCHER_KEYS = [
+    "places_context", "research_plan",
+    "market_result", "pricing_result", "revenue_result",
+    "guest_result", "location_result", "ops_result", "marketing_result",
+    "review_result", "dynamic_result_1",
+]
+
+
+def _gap_researcher_instruction(ctx):
+    values = {k: ctx.state.get(k, "Agent did not produce output.") for k in _GAP_RESEARCHER_KEYS}
+    return _GAP_RESEARCHER_TEMPLATE.format(**values)
+
+
+def _skip_if_no_outputs(callback_context):
+    """Skip gap researcher if no specialists produced output."""
+    output_keys = [
+        "market_result", "pricing_result", "revenue_result",
+        "guest_result", "location_result", "ops_result", "marketing_result",
+        "review_result", "dynamic_result_1",
+    ]
+    default = "Agent did not produce output."
+    if all(callback_context.state.get(k, default) == default for k in output_keys):
+        return types.Content(role="model", parts=[types.Part(text="No specialist outputs to analyze.")])
+    return None
+
+
+def make_gap_researcher():
+    return LlmAgent(
+        name="gap_researcher",
+        model=SPECIALIST_GEMINI,
+        description="Analyzes Phase 1 specialist outputs for gaps, contradictions, and underexplored angles.",
+        instruction=_gap_researcher_instruction,
+        tools=[google_search],
+        output_key="dynamic_result_2",
+        generate_content_config=THINKING_CONFIG,
+        before_agent_callback=_skip_if_no_outputs,
+        before_model_callback=_inject_geo_bias,
+        after_model_callback=_append_sources,
+        on_model_error_callback=_on_model_error,
+        on_tool_error_callback=_on_tool_error,
+    )

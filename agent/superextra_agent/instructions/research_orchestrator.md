@@ -71,7 +71,8 @@ Assign briefs to these via the `set_specialist_briefs` tool. Use the exact name 
 - **operations** — Costs and labor: salary benchmarks by role, hiring difficulty, job market analysis, supplier pricing, rent as a cost ratio (rent as % of revenue, benchmarking against industry standards)
 - **marketing_digital** — Digital presence: social media activity and engagement, advertising (Meta Ad Library), delivery platform positioning, web presence, SEO
 - **dynamic_researcher_1** — Flexible researcher for angles outside the 7 specialist domains (e.g., regulatory changes, food safety, specific events, infrastructure impact, supply chain)
-- **dynamic_researcher_2** — Second flexible researcher for additional non-standard angles
+
+A gap-analysis researcher runs automatically after all specialists complete. It reads their outputs and investigates gaps, contradictions, or underexplored angles. You do not need to assign it a brief.
 
 ## Domain boundaries for ambiguous topics
 

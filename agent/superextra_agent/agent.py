@@ -1,6 +1,7 @@
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents import LlmAgent
+from google.adk.code_executors import BuiltInCodeExecutor
 from google.adk.models.google_llm import Gemini
 from google.adk.apps import App
 from google.adk.tools import google_search
@@ -8,6 +9,7 @@ from google.genai import Client, types
 from .specialists import (
     MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG,
     ALL_SPECIALISTS, set_specialist_briefs, RETRY,
+    _inject_geo_bias, make_gap_researcher,
 )
 from .places_tools import get_restaurant_details, find_nearby_restaurants, search_restaurants
 from .chat_logger import ChatLoggerPlugin
@@ -73,6 +75,7 @@ def _make_synthesizer(name="synthesizer"):
         description="Synthesizes findings from all specialist agents into a cohesive report.",
         output_key="final_report",
         generate_content_config=THINKING_CONFIG,
+        code_executor=BuiltInCodeExecutor(),
     )
 
 
@@ -86,6 +89,7 @@ research_orchestrator = LlmAgent(
     tools=[google_search, set_specialist_briefs],
     output_key="research_plan",
     generate_content_config=THINKING_CONFIG,
+    before_model_callback=_inject_geo_bias,
 )
 
 specialist_pool = ParallelAgent(
@@ -98,7 +102,7 @@ specialist_pool = ParallelAgent(
 
 research_pipeline = SequentialAgent(
     name="research_pipeline",
-    sub_agents=[_make_enricher(), research_orchestrator, specialist_pool, _make_synthesizer()],
+    sub_agents=[_make_enricher(), research_orchestrator, specialist_pool, make_gap_researcher(), _make_synthesizer()],
     description="Enriches context, plans research, runs specialists in parallel, then synthesizes findings.",
 )
 

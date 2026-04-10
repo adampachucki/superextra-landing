@@ -70,7 +70,7 @@ def _get_api_key() -> str:
     return key
 
 
-async def get_restaurant_details(place_id: str) -> dict:
+async def get_restaurant_details(place_id: str, tool_context=None) -> dict:
     """Get the full Google Places profile of a restaurant including reviews,
     hours, and service modes.
 
@@ -89,7 +89,14 @@ async def get_restaurant_details(place_id: str) -> dict:
         )
         if resp.status_code != 200:
             return {"status": "error", "error_message": f"Places API error {resp.status_code}: {resp.text}"}
-        return {"status": "success", "place": resp.json()}
+        place = resp.json()
+        # Store coordinates for geo-biased search
+        if tool_context:
+            loc = place.get("location", {})
+            if loc.get("latitude") and loc.get("longitude"):
+                tool_context.state["_target_lat"] = loc["latitude"]
+                tool_context.state["_target_lng"] = loc["longitude"]
+        return {"status": "success", "place": place}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}
 
