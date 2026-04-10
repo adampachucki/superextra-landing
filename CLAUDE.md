@@ -34,21 +34,10 @@ AI-native market intelligence and competitor benchmarking for the restaurant ind
 
 Three test suites — **run all before pushing changes to chat, SSE, Cloud Functions, or agent code**:
 
-- `npm run test` — Vitest: SSE client (`src/lib/sse-client.spec.ts`), chat state machine (`src/lib/chat-state.spec.ts`), plus any `.spec.ts`/`.test.ts` files
-- `cd functions && npm test` — Node test runner: Cloud Function utilities and ADK stream parser (`functions/utils.test.js`)
-- `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — pytest: source extraction callback, Places tools, instruction providers
-
-CI runs all three suites automatically. After ADK deploy, a smoke test hits `/health` on the Cloud Run service to verify the container started.
-
-When modifying:
-
-- **`functions/index.js` or `functions/utils.js`** → run `cd functions && npm test`
-- **`src/lib/sse-client.ts`** → run `npx vitest run src/lib/sse-client.spec.ts`
-- **`src/lib/chat-state.svelte.ts`** → run `npx vitest run src/lib/chat-state.spec.ts`
-- **`agent/superextra_agent/specialists.py`** → run agent pytest (covers `_append_sources`)
-- **`agent/superextra_agent/places_tools.py`** → run agent pytest
-- **`agent/superextra_agent/agent.py`** (instruction providers) → run agent pytest
-- **`agent/superextra_agent/instructions/router.md`** → run `npm run test:evals` (live Gemini calls, not in CI)
+- `npm run test` — Vitest: SSE client, chat state machine, plus any `.spec.ts`/`.test.ts` files
+- `cd functions && npm test` — Node test runner: Cloud Function utilities and ADK stream parser
+- `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — pytest: source extraction, Places tools, instruction providers
+- `npm run test:evals` — live Gemini eval calls for router instructions (not in CI)
 
 ## Branding
 
@@ -89,13 +78,10 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 
 - Class-based dark mode via `.dark` on `<html>` — configured with `@variant dark` in `app.css`
 - CSS variables (`--color-cream`, `--color-text`, `--mockup-text`, `--mockup-bg`) swap in `:root.dark`
-- Theme toggle in footer cycles light → dark → system; state persisted in `localStorage('se_theme')`
-- `theme` singleton (`theme.svelte.ts`) manages mode — follows `formState` pattern
-- **All new/changed UI must support both modes** — use `dark:` variants for `text-black`/`border-black` patterns (e.g. `text-black dark:text-white`, `border-black/10 dark:border-white/10`)
+- **All new/changed UI must support both modes** — use `dark:` variants for `text-black`/`border-black` patterns
 - Cream-based classes (`bg-cream`, `border-cream-200`) auto-switch via CSS variables — no `dark:` needed
-- Mockup `<style>` blocks use `rgba(var(--mockup-text), X)` and `rgb(var(--mockup-bg))` — not hardcoded `rgba(0,0,0,...)` or `#fff`
-- SVGs should use `stroke="currentColor"` / `fill="currentColor"` with `text-black dark:text-white` on the parent
-- Default is light; inline script in `app.html` prevents FOUC
+- Mockup `<style>` blocks use `rgba(var(--mockup-text), X)` and `rgb(var(--mockup-bg))` — not hardcoded colors
+- SVGs: `stroke="currentColor"` / `fill="currentColor"` with `text-black dark:text-white` on parent
 
 ## Patterns
 
@@ -103,120 +89,38 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 - CSS keyframes + `animation-delay` for staggered animations (not Svelte transitions)
 - Visibility classes (`max-lg:hidden`/`lg:hidden`) — never duplicate blocks for mobile/desktop
 - `formState` singleton (`form-state.svelte.ts`) controls access form modal
+- `theme` singleton (`theme.svelte.ts`) manages dark mode — follows `formState` pattern
 - `/api/intake` → Cloud Function → Resend email; dev proxy in vite.config.ts
 
 ## Agent system
 
 - Pipeline: Router → Context Enricher → Research Orchestrator → Specialists (via AgentTool) → Synthesizer
 - Agent code lives in `agent/superextra_agent/`, instructions in `agent/superextra_agent/instructions/`
-- **Read `instructions/AUTHORING.md` before writing or modifying any agent instruction file** — it documents the architecture, patterns, and pitfalls
+- **Read `instructions/AUTHORING.md` before writing or modifying any agent instruction file**
 
 ## Deployment
 
 Push to `main` → `.github/workflows/deploy.yml` runs 4 parallel jobs:
 
-1. **detect-changes** — `dorny/paths-filter` checks if `agent/superextra_agent/**`, `agent/requirements.txt`, or `deploy.yml` changed
-2. **test** — lint, format check, svelte-check, Vitest, functions tests, agent tests (only if agent changed)
+1. **detect-changes** — `dorny/paths-filter` checks if agent code changed
+2. **test** — lint, format check, svelte-check, Vitest, functions tests, agent tests
 3. **deploy-hosting** — Firebase Hosting + Cloud Functions (always runs after tests pass)
 4. **deploy-agent** — ADK Cloud Run deploy + smoke test (skipped if agent code unchanged)
 
-`deploy-hosting` and `deploy-agent` run in parallel after `test` passes. Agent deploy is the slowest step (~4-5 min) and is skipped on frontend-only pushes. Agent deps are pinned in `agent/requirements.txt` and cached via `actions/setup-python` pip cache.
-
-The `agentStream` SSE endpoint is called directly via its Cloud Run URL (not `cloudfunctions.net`) — see "Cloud Functions streaming gotchas" below.
-
-### ADK Cloud Run gotchas
-
-- **`adk deploy cloud_run` returns exit 0 even when gcloud fails.** The `deploy-agent` job in `deploy.yml` snapshots the revision before/after and fails if no new revision was created. If the ADK deploy "succeeds" but changes don't appear, check the deploy step output — it may have silently failed. **Always verify** after agent changes: `gcloud run revisions list --service=superextra-agent --region=us-central1 --project=superextra-site --limit=3` — check the latest revision timestamp matches your deploy.
-- **Auto-generated Dockerfile** bakes `GOOGLE_CLOUD_LOCATION=us-central1` into the image from `--region`. Do not override this env var — Agent Engine sessions require `us-central1`.
-- **Model routing is separate from session routing.** Some models (Gemini 3.1) only work via the global Vertex AI endpoint. `specialists.py` handles this by overriding `api_client` with `location='global'` on Gemini instances. If adding new models, check regional availability first.
-- **`agent/.env` is NOT read at runtime in the container.** The file gets copied into the image but ADK's server ignores it. Any env var the agent code needs (e.g. `GOOGLE_PLACES_API_KEY`) must be set as a Cloud Run service-level env var. The deploy pipeline passes these via `--update-env-vars` in the gcloud passthrough after `--` in `deploy.yml`. **When adding a new env var:** add it as a GitHub secret, then append it to the `--update-env-vars` flag in `deploy.yml`. Use `--update-env-vars` (merges) not `--set-env-vars` (replaces all). Service-level env vars persist across deploys.
-- **Filesystem is read-only** except `/tmp`. Detect Cloud Run via `K_SERVICE` env var.
-- **AgentTool discards sub-agent grounding metadata.** Specialist agents called via `AgentTool` produce `grounding_metadata.grounding_chunks` with source URLs, but AgentTool only propagates text output back to the parent. The `_append_sources` callback in `specialists.py` works around this by appending a `## Sources` markdown section to the specialist's response text before AgentTool captures it.
-- **ADK callbacks use keyword arguments.** Agent-level callbacks like `after_model_callback` receive `(*, callback_context, llm_response)` — not positional args. Wrong signatures cause silent TypeErrors.
-- **Local deploy**: `cd agent && .venv/bin/adk deploy cloud_run --project=superextra-site --region=us-central1 --service_name=superextra-agent --session_service_uri=agentengine://2746721333428617216 --trace_to_cloud superextra_agent -- --no-allow-unauthenticated`
-
-### Cloud Functions streaming gotchas
-
-- **`cloudfunctions.net` GFE proxy kills SSE streams.** The Google Frontend proxy for Cloud Functions v2 terminates SSE/streaming responses after the first `res.write()`. The `agentStream` function bypasses this by having the frontend call the Cloud Run `run.app` URL directly (`agentstream-907466498524.us-central1.run.app`), not the `cloudfunctions.net` URL. Non-streaming endpoints (`agentCheck`, `agent`) can stay on `cloudfunctions.net`.
-- **Use `res.on('close')`, never `req.on('close')` for SSE disconnect detection.** On Cloud Run with HTTP/2, `req.on('close')` fires when the request body stream ends — immediately for a POST request — not when the client disconnects. Using `req.on('close')` will abort the SSE stream at +0.0s. The `res.on('close')` event correctly fires only when the response connection is actually closed by the client.
-- **The `agentStream` Cloud Run service must allow unauthenticated access** (`allUsers` with `roles/run.invoker`) since the frontend calls it directly without a Firebase auth layer.
-
-### Debugging agent issues
-
-- **Always read Cloud Run logs first**: `gcloud run services logs read superextra-agent --region=us-central1 --project=superextra-site --limit=30`
-- **Check env vars**: `gcloud run services describe superextra-agent --region=us-central1 --project=superextra-site --format="yaml(spec.template.spec.containers[0].env)"`
-- **Test end-to-end via Cloud Function**: `curl -X POST https://us-central1-superextra-site.cloudfunctions.net/agent -H 'Content-Type: application/json' -d '{"message":"hello","sessionId":"test"}'`
-- **IAM**: Cloud Function SA `907466498524-compute@developer.gserviceaccount.com` needs `roles/run.invoker` on the Cloud Run service
+For deployment gotchas (ADK, SSE streaming, debugging): @docs/deployment-gotchas.md
 
 ## Assume nothing — verify
 
-- Never rely on training knowledge for factual claims. Every time you explore a topic, hit a coding issue, or reason through a decision — stop and check the real source: docs, code, APIs, actual data.
-- If you can look it up, look it up. If you can't, say you don't know. Never fill a gap with a plausible guess.
-- This applies to everything: library APIs, platform behavior, syntax, error causes, configuration options. Read the source before you answer.
-- **External APIs and services:** When integrating any external tool, SDK, or API (ElevenLabs, Firebase, Google, etc.), read the official documentation first — before writing any code. Understand the exact message formats, data flow, and expected behavior. Do not guess how an API works based on naming conventions or assumptions.
+- Never rely on training knowledge for factual claims — check the real source: docs, code, APIs, actual data.
+- If you can look it up, look it up. If you can't, say you don't know.
+- **External APIs and services:** Read the official documentation first — before writing any code.
 
 ## Chrome DevTools MCP
 
-The browser inspection tool is **Chrome DevTools MCP** (`chrome-devtools-mcp`), configured with `--isolated` (temp profile per session, no lock conflicts). Playwright MCP has been removed — do not use it or suggest it.
-
-- **Always use Chrome DevTools MCP** for browser tasks: inspecting pages, taking screenshots, checking network requests, reading console logs, clicking/filling elements
-- **Never fall back to Playwright.** If Chrome DevTools MCP fails, diagnose and fix the connection — do not switch tools
-- **Common conflict: "browser is already running"** — caused by a stale Chrome process holding the profile lock. Fix:
-  1. `pkill -f "chrome.*chrome-devtools-mcp"`
-  2. `rm ~/.cache/chrome-devtools-mcp/chrome-profile/SingletonLock`
-  3. Retry the Chrome MCP tool
-- **If CDP connection drops** (e.g. `detached` / `replaced_with_devtools`), ask the user to close Chrome DevTools (F12) — opening the browser's built-in DevTools kicks remote CDP clients
-- **`--isolated` tradeoff:** Each session gets a fresh Chrome with no cookies/logins. This is fine for inspecting localhost. If logged-in state is needed, temporarily reconfigure with `--browser-url=http://127.0.0.1:9222` to attach to the user's real browser instead
-- **Dev server runs on port 5199** — when navigating to the local site, use `http://localhost:5199`
-
-## Remote VM
-
-GCP AI Workstation in Belgium (static IP `34.38.81.215`), used for running parallel Claude Code sessions accessible from any device.
-
-### Connections
-
-- **Mac (VS Code terminal)**: EternalTerminal (ET) → zmx (native scroll, auto-reconnect after sleep)
-- **Mobile (Moshi app)**: mosh → tmux → zmx (tmux mouse scroll through mosh, instant reconnect)
-- **Direct SSH**: `ssh superextra-vm` (or `ssh adam@34.38.81.215`)
-- **Repo**: `~/src/superextra-landing`
-
-### Session commands
-
-Two sister command sets — `zx` for Mac/desktop (native scroll via ET), `tx` for mobile (tmux scroll via mosh). Both manage the same zmx sessions.
-
-**Mac (`~/.zshrc`) — use `zx`:**
-
-- `zx` / `zx <name>` — create session running Claude (Cmd+Shift+X in VS Code)
-- `zxl` — list sessions, pick to join
-- `zxj <name>` — join session by name
-- `zxk <name>` — kill session · `zxK` — kill all
-
-**Mobile/VM (`~/.bashrc`) — use `tx` through mosh, `zx` through SSH/ET:**
-
-- `tx` / `tx <name>` — create session (tmux wrapping zmx)
-- `txl` — list sessions, pick to join
-- `txj <name>` — join session by name
-- `txk <name>` — kill session · `txK` — kill all
-- `zx` / `zxl` / `zxj` — same but direct zmx attach (for SSH/ET, not mosh)
-
-### Architecture
-
-```
-zmx session foo          ← owns the process (Claude), persists across all connections
-└── tmux session foo     ← scroll wrapper for mobile, auto-created
-    └── runs: zmx attach foo
-```
-
-- **zmx**: session manager (raw pty relay, no alternate screen = native scroll in VS Code). Built from source at `~/src/zmx`. Update with `zmx-update`.
-- **ET**: transport for Mac (TCP port 2022, auto-reconnects). Config: `/etc/et.cfg`.
-- **tmux**: scroll wrapper for mobile only (mouse on, status off). Not in the Mac path.
-- **Old `cv` command** still works (mosh + tmux, no native scroll) as fallback.
-
-### Other details
-
-- **Screenshots**: Cmd+Shift+7 on Mac captures, uploads via SCP, copies VM path to clipboard (see `docs/screenshot-to-vm-setup.md`)
-- Env files (`.env`, `agent/.env`) are gitignored — must be created manually on the VM
-- VM user `adam` has sudo (added via `usermod -aG sudo adam`)
+- **Always use Chrome DevTools MCP** for browser tasks — never Playwright (removed)
+- Configured with `--isolated` (temp profile per session). Dev server runs on **port 5199**.
+- **"browser is already running"**: `pkill -f "chrome.*chrome-devtools-mcp"` then `rm ~/.cache/chrome-devtools-mcp/chrome-profile/SingletonLock`
+- **CDP connection drops**: close Chrome DevTools (F12) — it kicks remote CDP clients
 
 ## Don'ts
 
