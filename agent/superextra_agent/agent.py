@@ -1,7 +1,8 @@
+import base64
+
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents import LlmAgent
-from google.adk.code_executors import BuiltInCodeExecutor
 from google.adk.models.google_llm import Gemini
 from google.adk.apps import App
 from google.adk.tools import google_search
@@ -66,6 +67,42 @@ def _make_enricher(name="context_enricher"):
     )
 
 
+def _inject_code_execution(callback_context, llm_request):
+    """Add code execution tool to the synthesizer's request.
+
+    We inject the tool manually instead of using BuiltInCodeExecutor so that
+    ADK's code execution post-processor doesn't strip inline_data images and
+    save them to an artifact service.  This lets _embed_chart_images convert
+    them to base64 data URIs that flow through as regular text.
+    """
+    llm_request.config = llm_request.config or types.GenerateContentConfig()
+    llm_request.config.tools = llm_request.config.tools or []
+    llm_request.config.tools.append(
+        types.Tool(code_execution=types.ToolCodeExecution())
+    )
+    return None
+
+
+def _embed_chart_images(*, callback_context, llm_response):
+    """Convert inline_data image parts to base64 data URI markdown images."""
+    if not llm_response.content or not llm_response.content.parts:
+        return llm_response
+    new_parts = []
+    for part in llm_response.content.parts:
+        if (
+            part.inline_data
+            and part.inline_data.mime_type
+            and part.inline_data.mime_type.startswith("image/")
+        ):
+            b64 = base64.b64encode(part.inline_data.data).decode("utf-8")
+            mime = part.inline_data.mime_type
+            new_parts.append(types.Part(text=f"\n\n![Chart](data:{mime};base64,{b64})\n\n"))
+        else:
+            new_parts.append(part)
+    llm_response.content.parts = new_parts
+    return llm_response
+
+
 def _make_synthesizer(name="synthesizer"):
     """Create a synthesizer instance."""
     return LlmAgent(
@@ -75,7 +112,8 @@ def _make_synthesizer(name="synthesizer"):
         description="Synthesizes findings from all specialist agents into a cohesive report.",
         output_key="final_report",
         generate_content_config=THINKING_CONFIG,
-        code_executor=BuiltInCodeExecutor(),
+        before_model_callback=_inject_code_execution,
+        after_model_callback=_embed_chart_images,
     )
 
 

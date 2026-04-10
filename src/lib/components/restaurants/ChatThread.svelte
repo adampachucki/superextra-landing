@@ -62,7 +62,13 @@
 			typewriterRaf = null;
 			return;
 		}
-		const nextLen = Math.min(displayText.length + 3, target.length);
+		let nextLen = Math.min(displayText.length + 3, target.length);
+		// Skip data URI images in one frame — they can be 200KB+ of base64
+		const upcoming = target.slice(displayText.length);
+		if (upcoming.startsWith('![')) {
+			const end = upcoming.indexOf(')\n');
+			if (end > 0) nextLen = displayText.length + end + 2;
+		}
 		displayText = target.slice(0, nextLen);
 		typewriterRaf = requestAnimationFrame(drain);
 	}
