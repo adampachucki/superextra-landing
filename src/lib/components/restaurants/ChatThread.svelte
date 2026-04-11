@@ -303,14 +303,27 @@
 		{/if}
 
 		{#if chatState.error}
+			{@const isTimeout = chatState.error === 'timeout'}
 			<div class="msg-appear flex justify-start">
 				<div
-					class="flex items-center gap-3 rounded-2xl border border-red-200/50 bg-red-50/50 px-5 py-3 dark:border-red-400/20 dark:bg-red-900/10"
+					class="flex items-center gap-3 rounded-2xl border px-5 py-3 {isTimeout
+						? 'border-amber-200/50 bg-amber-50/50 dark:border-amber-400/20 dark:bg-amber-900/10'
+						: 'border-red-200/50 bg-red-50/50 dark:border-red-400/20 dark:bg-red-900/10'}"
 				>
-					<span class="text-[13px] text-red-600/80 dark:text-red-400/80">{chatState.error}</span>
+					<span
+						class="text-[13px] {isTimeout
+							? 'text-amber-600/80 dark:text-amber-400/80'
+							: 'text-red-600/80 dark:text-red-400/80'}"
+					>
+						{isTimeout
+							? 'The analysis took longer than expected and was cut short.'
+							: chatState.error}
+					</span>
 					<button
 						onclick={retryLast}
-						class="cursor-pointer rounded-full border border-red-200/50 px-3 py-1 text-[12px] whitespace-nowrap text-red-600/60 transition-colors hover:bg-red-100/50 dark:border-red-400/20 dark:text-red-400/60 dark:hover:bg-red-900/20"
+						class="cursor-pointer rounded-full border px-3 py-1 text-[12px] whitespace-nowrap transition-colors {isTimeout
+							? 'border-amber-200/50 text-amber-600/60 hover:bg-amber-100/50 dark:border-amber-400/20 dark:text-amber-400/60 dark:hover:bg-amber-900/20'
+							: 'border-red-200/50 text-red-600/60 hover:bg-red-100/50 dark:border-red-400/20 dark:text-red-400/60 dark:hover:bg-red-900/20'}"
 					>
 						Try again
 					</button>

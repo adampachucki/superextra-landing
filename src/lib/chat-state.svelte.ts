@@ -42,6 +42,7 @@ interface ChatMessage {
 	text: string;
 	timestamp: number;
 	sources?: ChatSource[];
+	partial?: boolean;
 }
 
 interface PlaceContext {
@@ -286,7 +287,20 @@ async function send(text: string) {
 					}
 				},
 				onError(err) {
-					if (currentId === sendingConvId && !pageHidden) {
+					if (currentId !== sendingConvId || pageHidden) return;
+					if (err === 'timeout' && streamingText.trim()) {
+						// Pipeline timed out but we have partial text — promote it
+						messages.push({
+							role: 'agent',
+							text: streamingText,
+							timestamp: Date.now(),
+							partial: true
+						});
+						streamingText = '';
+						error = 'timeout';
+					} else if (err === 'timeout') {
+						error = 'timeout';
+					} else {
 						error = err;
 					}
 				},

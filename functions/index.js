@@ -343,7 +343,7 @@ async function generateTitle(message) {
 	return undefined;
 }
 
-export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, res) => {
+export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async (req, res) => {
 	if (req.method !== 'POST') {
 		res.status(405).json({ ok: false, error: 'Method not allowed' });
 		return;
@@ -438,9 +438,9 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 		// Title generation in parallel (first message only)
 		const titlePromise = isFirstMessage ? generateTitle(message) : null;
 
-		// Call ADK with streaming — 240s timeout leaves 60s buffer for completion handling
+		// Call ADK with streaming — 440s timeout leaves 60s buffer for completion handling
 		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] calling run_sse (aborted=${ac.signal.aborted})`);
-		const adkTimeout = AbortSignal.timeout(240_000);
+		const adkTimeout = AbortSignal.timeout(440_000);
 		const adkResponse = await fetch(`${ADK_SERVICE_URL}/run_sse`, {
 			method: 'POST',
 			headers: { ...headers, 'Content-Type': 'application/json' },
@@ -499,7 +499,14 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 300 }, async 
 		});
 	} catch (err) {
 		if (err.name === 'AbortError') {
-			console.warn('Agent stream aborted (client disconnect or timeout)');
+			if (ac.signal.aborted) {
+				// Client disconnected — nothing to send
+				console.warn('Agent stream aborted (client disconnect)');
+			} else {
+				// ADK timeout — tell the client gracefully
+				console.warn('Agent stream aborted (pipeline timeout)');
+				sendSSE(res, 'error', { error: 'timeout' });
+			}
 		} else {
 			console.error('Agent stream error:', err.message || err);
 			sendSSE(res, 'error', { error: 'Agent unavailable. Please try again.' });
@@ -651,11 +658,11 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		const reply = session.state?.final_report || session.state?.router_response || null;
 
 		if (!reply) {
-			// Detect stuck sessions: if no reply after 5 minutes, the pipeline is dead
+			// Detect stuck sessions: if no reply after 9 minutes, the pipeline is dead
 			// createdAt may be a Firestore Timestamp (.toMillis()) or a plain epoch ms number
 			const createdMs = typeof createdAt === 'number' ? createdAt : createdAt?.toMillis?.() ?? Date.now();
 			const ageMs = Date.now() - createdMs;
-			if (ageMs > 5 * 60 * 1000) {
+			if (ageMs > 9 * 60 * 1000) {
 				res.json({ ok: false, reason: 'timed_out' });
 				return;
 			}
