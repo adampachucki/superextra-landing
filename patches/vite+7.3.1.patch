@@ -1,0 +1,16 @@
+diff --git a/node_modules/vite/dist/client/client.mjs b/node_modules/vite/dist/client/client.mjs
+index 977c527..18a4941 100644
+--- a/node_modules/vite/dist/client/client.mjs
++++ b/node_modules/vite/dist/client/client.mjs
+@@ -867,7 +867,10 @@ async function handleMessage(payload) {
+ 					const url = new URL(socket.url);
+ 					url.search = "";
+ 					await waitForSuccessfulPing(url.href);
+-					location.reload();
++					console.log(`[vite] server is reachable. Reconnecting without reload.`);
++					// Skipping location.reload() — if the server actually restarted,
++					// it will send a "full-reload" message on reconnect. If it was
++					// just a flaky WebSocket (e.g. Mobile Safari), no reload is needed.
+ 				}
+ 			}
+ 			break;
