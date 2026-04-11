@@ -50,7 +50,7 @@ These exist because we hit each problem at least once.
 9. **Agents are sycophantic by default.** LLMs agree with the user's framing unless explicitly told not to. Permission alone is not enough — you need structural forcing functions that make objectivity a mandatory output, not an optional behavior. Three checkpoints enforce this:
    - **Orchestrator:** Must list each assumption in the question with a verdict (SUPPORTED / QUESTIONABLE / CONTRADICTED / UNTESTED) in its plan summary. This forces conscious evaluation before research begins.
    - **Specialists:** Must end every response with a "Brief alignment" statement — one sentence stating whether findings SUPPORT, PARTIALLY SUPPORT, CONTRADICT, or are INDEPENDENT OF the brief's framing. This prevents silent confirmation.
-   - **Synthesizer:** Must cross-check orchestrator verdicts and specialist alignment statements, and lead with corrections when any assumption is QUESTIONABLE or CONTRADICTED. Must also evaluate independently — even if upstream layers flagged no concerns.
+   - **Synthesizer:** Must read orchestrator verdicts and specialist alignment signals, but translate them into natural analyst language — never echo the internal labels (SUPPORTED, CONTRADICTED, etc.) in the user-facing report. Leads with what the data shows when it differs from the question's assumptions. Must also evaluate independently — even if upstream layers flagged no concerns.
      Without these structural checkpoints, each layer defaults to confirming whatever it received from the layer above.
 
 ## Instruction structure
