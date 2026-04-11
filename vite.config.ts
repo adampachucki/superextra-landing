@@ -3,16 +3,22 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit()],
+	plugins: [sveltekit(), tailwindcss()],
 	server: {
 		host: true,
 		port: 5199,
 		allowedHosts: true,
 		// No hmr.host — client auto-adapts to page hostname (works on both localhost and IP).
-		// Longer timeout reduces reload loops from mobile Safari dropping WebSocket connections.
+		// timeout doubles as the keepalive ping interval. Mobile Safari kills idle
+		// WebSockets after ~30-60s, and Vite does an unconditional location.reload()
+		// on reconnect. 5s pings keep the socket alive.
 		hmr: {
-			timeout: 60000,
+			timeout: 5000,
 			overlay: false
+		},
+		watch: {
+			// Exclude non-frontend dirs so changes there don't trigger full-page reloads
+			ignored: ['**/agent/**', '**/functions/**', '**/docs/**', '**/.firebase/**']
 		},
 		proxy: {
 			'/api/intake': 'https://superextra-landing.web.app',
