@@ -1,4 +1,5 @@
 import base64
+import re
 
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.agents.parallel_agent import ParallelAgent
@@ -84,10 +85,18 @@ def _inject_code_execution(callback_context, llm_request):
 
 
 def _embed_chart_images(*, callback_context, llm_response):
-    """Convert inline_data image parts to base64 data URI markdown images."""
+    """Convert inline_data image parts to base64 data URI markdown images.
+
+    When the model places inline markdown references like
+    ![alt](code_execution_image_N_...) in its text, replace those references
+    with the actual base64 data URIs so charts render where the model intended.
+    Fall back to appending standalone image parts when no references are found.
+    """
     if not llm_response.content or not llm_response.content.parts:
         return llm_response
-    new_parts = []
+
+    # Collect base64 data URIs for each inline_data image, in order.
+    images: list[str] = []
     for part in llm_response.content.parts:
         if (
             part.inline_data
@@ -96,9 +105,38 @@ def _embed_chart_images(*, callback_context, llm_response):
         ):
             b64 = base64.b64encode(part.inline_data.data).decode("utf-8")
             mime = part.inline_data.mime_type
-            new_parts.append(types.Part(text=f"\n\n![Chart](data:{mime};base64,{b64})\n\n"))
+            images.append(f"data:{mime};base64,{b64}")
+
+    if not images:
+        return llm_response
+
+    # Try to replace code_execution_image references in text parts.
+    # Pattern: ![alt text](code_execution_image_N_timestamp.ext)
+    _IMG_REF = re.compile(r"!\[([^\]]*)\]\(code_execution_image_(\d+)_[^)]+\)")
+    replaced = set()
+
+    def _replace_ref(m):
+        alt = m.group(1)
+        idx = int(m.group(2)) - 1  # code_execution_image is 1-indexed
+        if 0 <= idx < len(images):
+            replaced.add(idx)
+            return f"![{alt}]({images[idx]})"
+        return m.group(0)
+
+    new_parts = []
+    for part in llm_response.content.parts:
+        if part.text and _IMG_REF.search(part.text):
+            new_parts.append(types.Part(text=_IMG_REF.sub(_replace_ref, part.text)))
+        elif part.inline_data and part.inline_data.mime_type and part.inline_data.mime_type.startswith("image/"):
+            continue  # drop standalone inline_data — handled via text refs
         else:
             new_parts.append(part)
+
+    # If some images weren't referenced in text, append them as fallback.
+    for idx, uri in enumerate(images):
+        if idx not in replaced:
+            new_parts.append(types.Part(text=f"\n\n![Chart]({uri})\n\n"))
+
     llm_response.content.parts = new_parts
     return llm_response
 
