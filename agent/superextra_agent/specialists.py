@@ -124,9 +124,32 @@ benchmarks and baselines, then add local detail from any credible source.
 """
 
 
+_SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
+
+_ROLE_TITLES = {
+    "market_landscape": "Market Landscape research agent",
+    "menu_pricing": "Menu & Pricing research agent",
+    "revenue_sales": "Revenue & Sales research agent",
+    "guest_intelligence": "Guest Intelligence research agent",
+    "location_traffic": "Location & Traffic research agent",
+    "operations": "Operations research agent",
+    "marketing_digital": "Marketing & Digital research agent",
+    "review_analyst": "Review Analyst",
+    "dynamic_researcher": "flexible research agent",
+}
+
+_NO_BASE = {"gap_researcher"}
+
+
 def _make_instruction(name: str, brief_key: str | None = None):
     """Create an InstructionProvider that injects places_context and brief into the template."""
-    template = (INSTRUCTIONS_DIR / f"{name}.md").read_text()
+    body = (INSTRUCTIONS_DIR / f"{name}.md").read_text()
+    if name in _NO_BASE:
+        template = body
+    else:
+        template = (_SPECIALIST_BASE
+                    .replace("{specialist_body}", body)
+                    .replace("{role_title}", _ROLE_TITLES.get(name, name)))
     _brief_key = brief_key or name
 
     def provider(ctx):
