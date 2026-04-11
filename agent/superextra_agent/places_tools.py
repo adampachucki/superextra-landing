@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import httpx
@@ -135,6 +136,29 @@ async def find_nearby_restaurants(latitude: float, longitude: float, radius: flo
         return {"status": "success", "results": resp.json().get("places", [])}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}
+
+
+async def get_batch_restaurant_details(place_ids: list[str]) -> dict:
+    """Get full Google Places profiles for multiple restaurants at once.
+    Much faster than calling get_restaurant_details one at a time.
+
+    Args:
+        place_ids: List of Google Places IDs to fetch (max 10).
+    """
+    if not place_ids:
+        return {"status": "error", "error_message": "No place_ids provided"}
+    place_ids = place_ids[:10]
+    results = await asyncio.gather(
+        *(get_restaurant_details(pid) for pid in place_ids),
+        return_exceptions=True,
+    )
+    places = []
+    for pid, result in zip(place_ids, results):
+        if isinstance(result, Exception):
+            places.append({"place_id": pid, "status": "error", "error_message": str(result)})
+        else:
+            places.append(result)
+    return {"status": "success", "places": places}
 
 
 async def search_restaurants(query: str, latitude: float = 0.0, longitude: float = 0.0, radius: float = 5000.0) -> dict:

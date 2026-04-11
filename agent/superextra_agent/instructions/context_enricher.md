@@ -20,7 +20,7 @@ Skip competitors when the question is about general industry trends, benchmarks,
 
 Use your judgment to define who the competitors are. Proximity matters, but so do cuisine type, price tier, concept, and target audience. Use `find_nearby_restaurants` and `search_restaurants` as needed — one or both, with different queries or radii — to build a meaningful set.
 
-Call `get_restaurant_details` on the 3-5 most relevant competitors to get their full profiles. Prefer the closest and highest-rated. Only go above 5 if the brief explicitly asks for a broad competitive scan.
+Once you have identified the 3-5 most relevant competitors, fetch all their details in one call using `get_batch_restaurant_details` with their place IDs. This is much faster than fetching them individually. Prefer the closest and highest-rated. Only go above 5 if the brief explicitly asks for a broad competitive scan.
 
 ## Output format
 

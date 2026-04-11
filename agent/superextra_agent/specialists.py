@@ -91,10 +91,15 @@ if _version == "3.1":
     THINKING_CONFIG = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
     )
+    # Orchestrator plans and writes briefs — MEDIUM thinking is sufficient.
+    ORCHESTRATOR_THINKING_CONFIG = types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(thinking_level="MEDIUM"),
+    )
 else:
     MODEL = "gemini-2.5-pro"
     SPECIALIST_MODEL = MODEL
     THINKING_CONFIG = None
+    ORCHESTRATOR_THINKING_CONFIG = None
 
 MODEL_GEMINI = _make_gemini(MODEL)
 SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)

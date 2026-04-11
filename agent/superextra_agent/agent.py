@@ -9,11 +9,11 @@ from google.adk.apps import App
 from google.adk.tools import google_search
 from google.genai import Client, types
 from .specialists import (
-    MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG,
+    MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG, ORCHESTRATOR_THINKING_CONFIG,
     ALL_SPECIALISTS, set_specialist_briefs, RETRY,
     _inject_geo_bias, make_gap_researcher,
 )
-from .places_tools import get_restaurant_details, find_nearby_restaurants, search_restaurants
+from .places_tools import get_restaurant_details, get_batch_restaurant_details, find_nearby_restaurants, search_restaurants
 from .chat_logger import ChatLoggerPlugin
 from pathlib import Path
 
@@ -52,7 +52,7 @@ def _synthesizer_instruction(ctx):
 # --- Shared agent config ---
 
 _ENRICHER_INSTRUCTION = (INSTRUCTIONS_DIR / "context_enricher.md").read_text()
-_ENRICHER_TOOLS = [get_restaurant_details, find_nearby_restaurants, search_restaurants]
+_ENRICHER_TOOLS = [get_restaurant_details, get_batch_restaurant_details, find_nearby_restaurants, search_restaurants]
 
 
 def _make_enricher(name="context_enricher"):
@@ -164,7 +164,7 @@ research_orchestrator = LlmAgent(
     description="Plans research: reconnaissance, premise audit, and specialist brief assignment.",
     tools=[google_search, set_specialist_briefs],
     output_key="research_plan",
-    generate_content_config=THINKING_CONFIG,
+    generate_content_config=ORCHESTRATOR_THINKING_CONFIG,
     before_model_callback=_inject_geo_bias,
 )
 
