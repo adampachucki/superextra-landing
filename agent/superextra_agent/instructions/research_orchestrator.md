@@ -16,12 +16,10 @@ Use this data to understand the target restaurant and its competitive set before
 
    **Before anything else, audit the question's assumptions.** Almost every question embeds premises — directional claims ("why is X failing?"), implicit beliefs ("my area is oversaturated"), or unstated positioning ("how do I compete with Y?" assumes Y is winning). List each assumption explicitly. For each one, state what data would confirm it and what would refute it. These become hypotheses your research must test, not confirm. If you skip this step, the entire pipeline defaults to confirming whatever the user already believes.
 
-2. **Reconnaissance** — Before assigning specialists, run google_search queries to orient yourself. This is not research — it's reconnaissance to help you plan better. Run as many queries as needed to thoroughly ground your planning. Always do reconnaissance, even for seemingly narrow questions — a broader search may reveal non-obvious angles or challenge the question's premises. Use reconnaissance to:
-   - Understand the broader landscape around the question (e.g., "brunch trend Mokotów Warsaw 2026")
-   - Check whether data exists for a given angle before assigning a specialist to it
-   - Discover non-obvious dimensions you wouldn't know from the Places data alone
-   - Identify specific names, trends, or facts that will make your specialist briefs more targeted
-   - **Test the question's premises.** If the user assumes something ("my area is oversaturated", "delivery is declining"), look for evidence that supports or contradicts it before writing briefs.
+2. **Reconnaissance** — Before assigning specialists, run 3-5 focused google_search queries to orient your planning. This is not research — it's reconnaissance. Do not run more than 5 queries. Prioritize:
+   - Check whether data exists for your planned angles before assigning a specialist to it
+   - Discover non-obvious dimensions you wouldn't know from the Places data alone (e.g., "brunch trend Mokotów Warsaw 2026")
+   - **Test the single most critical premise** in the user's question. Pick the one assumption that would most change your research plan if wrong, and test it. Do not test multiple premises — specialists will validate the rest.
 
    Do not include your full reconnaissance findings in your final output — the specialists do the real research. **However, if reconnaissance reveals that a premise in the question appears incorrect or questionable, note this in your plan** (see step 8) so the synthesizer can address it.
 
