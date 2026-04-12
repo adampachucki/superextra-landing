@@ -4,7 +4,7 @@
 
 	const btnPrimary = 'inline-flex items-center gap-2 btn-primary px-7 py-2.5 text-sm';
 	const inputBase =
-		'w-full rounded-xl border px-4 py-3 text-sm text-black dark:text-white placeholder:text-black/25 dark:placeholder:text-white/25 focus:border-black dark:focus:border-white focus:ring-0 focus:outline-none';
+		'w-full rounded-xl border px-4 py-3 text-sm text-black dark:text-white placeholder:text-black/25 dark:placeholder:text-white/25 focus:border-black/[0.55] dark:focus:border-white/[0.55] focus:ring-0 focus:outline-none';
 
 	let step = $state(1);
 	let selectedType = $state('');
@@ -427,7 +427,7 @@
 										<select
 											id="country"
 											bind:value={selectedCountry}
-											class="w-full appearance-none rounded-xl border border-cream-200 bg-white px-4 py-3 text-sm text-black focus:border-black focus:ring-0 focus:outline-none dark:bg-cream-50 dark:text-white dark:focus:border-white"
+											class="w-full appearance-none rounded-xl border border-black/[0.12] bg-white px-4 py-3 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55]"
 										>
 											{#each countries as c}
 												<option value={c.code}>{c.name}</option>
@@ -456,7 +456,7 @@
 												spellcheck="false"
 												class="{inputBase} pr-10 {shakeFields.has('place-name')
 													? 'shake border-red-300'
-													: 'border-cream-200'}"
+													: 'border-black/[0.12] dark:border-white/[0.12]'}"
 											/>
 											{#if loadingSuggestions}
 												<svg
@@ -482,7 +482,7 @@
 											{/if}
 											{#if showSuggestions && placeSuggestions.length > 0}
 												<ul
-													class="absolute top-full right-0 left-0 z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-cream-200 bg-white py-1 shadow-lg dark:bg-cream-50"
+													class="absolute top-full right-0 left-0 z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-black/[0.12] bg-white py-1 shadow-lg dark:border-white/[0.12] dark:bg-cream-50"
 												>
 													{#each placeSuggestions as s}
 														<li>
@@ -518,7 +518,7 @@
 												placeholder="Acme Inc."
 												class="{inputBase} {shakeFields.has('business-name')
 													? 'shake border-red-300'
-													: 'border-cream-200'}"
+													: 'border-black/[0.12] dark:border-white/[0.12]'}"
 											/>
 										</div>
 									{/if}
@@ -532,11 +532,11 @@
 											<select
 												id="locations"
 												bind:value={selectedLocations}
-												class="w-full appearance-none rounded-xl border bg-white px-4 py-3 text-sm text-black focus:border-black focus:ring-0 focus:outline-none dark:bg-cream-50 dark:text-white dark:focus:border-white {shakeFields.has(
+												class="w-full appearance-none rounded-xl border bg-white px-4 py-3 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55] {shakeFields.has(
 													'locations'
 												)
 													? 'shake border-red-300'
-													: 'border-cream-200'}"
+													: 'border-black/[0.12]'}"
 											>
 												<option value="" disabled class="text-black/25">Select</option>
 												<option value="1">1 location</option>
@@ -559,7 +559,7 @@
 												placeholder="example.com"
 												class="{inputBase} {shakeFields.has('web-url')
 													? 'shake border-red-300'
-													: 'border-cream-200'}"
+													: 'border-black/[0.12] dark:border-white/[0.12]'}"
 											/>
 										</div>
 									{/if}
@@ -592,7 +592,7 @@
 											placeholder="Jane Smith"
 											class="{inputBase} {shakeFields.has('full-name')
 												? 'shake border-red-300'
-												: 'border-cream-200'}"
+												: 'border-black/[0.12] dark:border-white/[0.12]'}"
 										/>
 									</div>
 									<div>
@@ -609,7 +609,7 @@
 											placeholder="jane@company.com"
 											class="{inputBase} {shakeFields.has('email')
 												? 'shake border-red-300'
-												: 'border-cream-200'}"
+												: 'border-black/[0.12] dark:border-white/[0.12]'}"
 										/>
 									</div>
 									<div>
@@ -620,7 +620,7 @@
 										>
 										<div class="flex gap-2">
 											<span
-												class="flex items-center rounded-xl border border-cream-200 bg-cream-50 px-3.5 text-sm text-black/60 dark:text-white/60"
+												class="flex items-center rounded-xl border border-black/[0.12] bg-cream-50 px-3.5 text-sm text-black/60 dark:border-white/[0.12] dark:text-white/60"
 											>
 												{country.dial}
 											</span>
@@ -635,7 +635,7 @@
 														: country.code === 'de'
 															? '151 12345678'
 															: '512 345 678'}
-												class="w-full rounded-xl border border-cream-200 px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none dark:text-white dark:placeholder:text-white/25 dark:focus:border-white"
+												class="w-full rounded-xl border border-black/[0.12] px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:text-white dark:placeholder:text-white/25 dark:focus:border-white/[0.55]"
 											/>
 										</div>
 									</div>

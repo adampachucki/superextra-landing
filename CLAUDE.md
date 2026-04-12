@@ -11,9 +11,20 @@ AI-native market intelligence and competitor benchmarking for the restaurant ind
 - Agent UI routes: `agent.superextra.ai/` (agent landing) and `agent.superextra.ai/chat`
 - `landing.superextra.ai/agent` 301-redirects to `agent.superextra.ai`
 
+## Dev server (port 5199)
+
+The Vite dev server is managed by a **systemd user service** — it runs automatically and restarts on crash.
+
+- **Service**: `superextra-dev.service` (`~/.config/systemd/user/superextra-dev.service`)
+- **Config**: `Restart=always`, `RestartSec=3` — killing the process directly just respawns it 3s later
+- **Restart**: `systemctl --user restart superextra-dev.service`
+- **Status/logs**: `systemctl --user status superextra-dev.service`
+- **Never run `npm run dev` manually** — it creates a duplicate instance on port 5200/5201, leading to stale HMR and confusion about which server the browser is hitting
+- **Never `kill` the vite process directly** — use `systemctl --user restart` instead
+- Port 5199, exposed on local network (`host: true`) for mobile testing
+
 ## Commands
 
-- `npm run dev` — port 5199, exposed on local network (`host: true`) for mobile testing
 - `npm run build` / `npm run check`
 - `npm run lint` — Prettier check + ESLint
 - `npm run format` — auto-format all files
@@ -128,3 +139,4 @@ For deployment gotchas (ADK, SSE streaming, debugging): @docs/deployment-gotchas
 - No Tailwind v3 config (`tailwind.config.js`, `@apply` in components)
 - No duplicating mobile/desktop blocks — use visibility classes
 - No killing processes on other ports — ask if 5199 is occupied
+- No running `npm run dev` or killing vite processes — use `systemctl --user restart superextra-dev.service`

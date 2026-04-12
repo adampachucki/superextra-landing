@@ -119,7 +119,7 @@
 							name="email"
 							placeholder="Email address"
 							autocomplete="email"
-							class="w-full rounded-full border border-cream-200 bg-white py-3 pr-12 pl-4 text-[15px] text-black placeholder:text-black/25 focus:border-black focus:outline-none dark:bg-cream-50 dark:text-white dark:placeholder:text-white/25 dark:focus:border-white"
+							class="w-full rounded-full border border-black/[0.12] bg-white py-3 pr-12 pl-4 text-[15px] text-black placeholder:text-black/25 focus:border-black/[0.55] focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:placeholder:text-white/25 dark:focus:border-white/[0.55]"
 						/>
 						<button
 							type="submit"
@@ -179,7 +179,7 @@
 							value={digit}
 							oninput={(e) => handleCodeInput(i, e)}
 							onkeydown={(e) => handleCodeKeydown(i, e)}
-							class="code-digit h-14 w-full rounded-xl border border-cream-200 bg-white text-center text-[22px] font-medium text-black focus:border-black focus:outline-none dark:bg-cream-50 dark:text-white dark:focus:border-white"
+							class="code-digit h-14 w-full rounded-xl border border-black/[0.12] bg-white text-center text-[22px] font-medium text-black focus:border-black/[0.55] focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55]"
 							style="animation-delay: {i * 40}ms"
 						/>
 					{/each}
