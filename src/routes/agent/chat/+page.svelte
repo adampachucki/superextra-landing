@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import ChatThread from '$lib/components/restaurants/ChatThread.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { theme } from '$lib/theme.svelte';
@@ -148,7 +148,7 @@
 		}
 		sidebarOpen = window.matchMedia('(min-width: 1024px)').matches;
 		prevSidebarOpen = sidebarOpen;
-		requestAnimationFrame(() => {
+		tick().then(() => {
 			mounted = true;
 		});
 
@@ -1277,8 +1277,8 @@
 		opacity: 0;
 		transform: scale(0.97);
 		transition:
-			opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-			transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+			opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+			transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
 	.chat-enter.is-mounted {
@@ -1290,8 +1290,8 @@
 		opacity: 0;
 		transform: translateY(12px);
 		transition:
-			opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s,
-			transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s;
+			opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.05s,
+			transform 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.05s;
 	}
 
 	.chat-thread-enter.is-mounted {
@@ -1303,8 +1303,8 @@
 		opacity: 0;
 		transform: translateY(24px);
 		transition:
-			opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.25s,
-			transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.25s;
+			opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.1s,
+			transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.1s;
 	}
 
 	.chat-input-enter.is-mounted {

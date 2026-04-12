@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
-	import { goto } from '$app/navigation';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { dictation } from '$lib/dictation.svelte';
 
@@ -87,6 +86,8 @@
 		};
 	});
 
+	let { onleave }: { onleave?: () => void } = $props();
+
 	let placeNudge = $state(false);
 	let leaving = $state(false);
 
@@ -104,19 +105,9 @@
 		if (leaving) return;
 		placeNudge = false;
 		leaving = true;
-		if (import.meta.env.DEV) {
-			chatState.start(userQuery.trim(), selectedPlace);
-			setTimeout(() => goto('/agent/chat'), 400);
-		} else {
-			const url = new URL('https://agent.superextra.ai/chat');
-			url.searchParams.set('q', userQuery.trim());
-			if (selectedPlace) {
-				url.searchParams.set('placeName', selectedPlace.name);
-				url.searchParams.set('placeSecondary', selectedPlace.secondary);
-				url.searchParams.set('placeId', selectedPlace.placeId);
-			}
-			setTimeout(() => (window.location.href = url.toString()), 400);
-		}
+		inputEl?.blur();
+		chatState.start(userQuery.trim(), selectedPlace);
+		onleave?.();
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -778,9 +769,9 @@
 	/* Exit transition */
 	.page-exit-content {
 		transition:
-			opacity 0.4s cubic-bezier(0.4, 0, 1, 1),
-			transform 0.4s cubic-bezier(0.4, 0, 1, 1),
-			filter 0.4s cubic-bezier(0.4, 0, 1, 1);
+			opacity 0.25s cubic-bezier(0.4, 0, 1, 1),
+			transform 0.25s cubic-bezier(0.4, 0, 1, 1),
+			filter 0.25s cubic-bezier(0.4, 0, 1, 1);
 	}
 
 	.page-exit-content.is-leaving {
@@ -795,7 +786,7 @@
 		inset: 0;
 		z-index: 9999;
 		background: var(--color-cream);
-		animation: overlayFadeIn 0.4s cubic-bezier(0.4, 0, 1, 1) both;
+		animation: overlayFadeIn 0.25s cubic-bezier(0.4, 0, 1, 1) both;
 	}
 
 	@keyframes overlayFadeIn {

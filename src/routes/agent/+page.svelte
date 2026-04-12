@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import AccessForm from '$lib/components/AccessForm.svelte';
@@ -8,6 +9,13 @@
 	import UseCases from '$lib/components/UseCases.svelte';
 	import DataSources from '$lib/components/DataSources.svelte';
 	import RestaurantCTA from '$lib/components/restaurants/RestaurantCTA.svelte';
+
+	let leaving = $state(false);
+
+	function handleLeave() {
+		leaving = true;
+		setTimeout(() => goto('/agent/chat'), 250);
+	}
 
 	const agentUseCases = [
 		{
@@ -61,28 +69,46 @@
 	<meta property="og:url" content="https://agent.superextra.ai" />
 </svelte:head>
 
-<Navbar minimal />
+<div class="page-exit" class:is-leaving={leaving}>
+	<Navbar minimal />
 
-<main>
-	<RestaurantHero />
-	<About
-		headline="The market view your restaurant has been missing"
-		intro="Restaurant operators make critical decisions every day — where to open, how to price, when to hire — too often without a clear view of the market around them at all. Superextra changes that."
-		description="Our AI models synthesize competitor, pricing, guest, delivery, and market signals into an external intelligence layer for your restaurant. Better context behind better decisions."
-		class="border-t border-cream-200 md:border-t-0"
-	/>
-	<UseCases
-		items={agentUseCases}
-		title="The questions you've been asking – answered"
-		titleClass="max-w-2xl"
-		subtitleClass="text-xs"
-	/>
-	<DataSources
-		title="Only credible data sources"
-		subtitle="Reviewed and validated information you can rely on."
-	/>
-	<RestaurantCTA />
-</main>
+	<main>
+		<RestaurantHero onleave={handleLeave} />
+		<About
+			headline="The market view your restaurant has been missing"
+			intro="Restaurant operators make critical decisions every day — where to open, how to price, when to hire — too often without a clear view of the market around them at all. Superextra changes that."
+			description="Our AI models synthesize competitor, pricing, guest, delivery, and market signals into an external intelligence layer for your restaurant. Better context behind better decisions."
+			class="border-t border-cream-200 md:border-t-0"
+		/>
+		<UseCases
+			items={agentUseCases}
+			title="The questions you've been asking – answered"
+			titleClass="max-w-2xl"
+			subtitleClass="text-xs"
+		/>
+		<DataSources
+			title="Only credible data sources"
+			subtitle="Reviewed and validated information you can rely on."
+		/>
+		<RestaurantCTA />
+	</main>
 
-<Footer borderless />
-<AccessForm />
+	<Footer borderless />
+	<AccessForm />
+</div>
+
+<style>
+	.page-exit {
+		transition:
+			opacity 0.25s cubic-bezier(0.4, 0, 1, 1),
+			transform 0.25s cubic-bezier(0.4, 0, 1, 1),
+			filter 0.25s cubic-bezier(0.4, 0, 1, 1);
+	}
+
+	.page-exit.is-leaving {
+		opacity: 0;
+		transform: scale(0.98) translateY(-8px);
+		filter: blur(4px);
+		pointer-events: none;
+	}
+</style>
