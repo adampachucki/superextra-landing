@@ -18,7 +18,7 @@ export default defineConfig({
 		},
 		watch: {
 			// Exclude non-frontend dirs so changes there don't trigger full-page reloads
-			ignored: ['**/agent/**', '**/functions/**', '**/docs/**', '**/.firebase/**']
+			ignored: ['agent/**', 'functions/**', 'docs/**', '.firebase/**']
 		},
 		proxy: {
 			'/api/intake': 'https://superextra-landing.web.app',
