@@ -27,38 +27,37 @@
 
 	const agentUseCases = [
 		{
-			title: 'Down month',
-			description: `Sales dropped 12% and the team is second-guessing the new menu. Is it you or is everyone down? Separate your performance from the market trend.`
+			title: 'Market context',
+			description: `Know whether a slow month is yours or the market's. Separate performance from the trend so every decision is based on signal, not noise.`
 		},
 		{
-			title: 'Expansion risk',
-			description: `Opening a second location is the biggest bet you'll make. See foot traffic, competition, demographics, and rent before you sign.`
+			title: 'Site selection',
+			description: `Foot traffic, competition density, demographics, and rent — side by side. Every new location decision grounded in real data.`
 		},
 		{
-			title: 'Unproven concept',
-			description: `You're betting a buildout on a concept that "feels right." Find out what's actually working nearby and whether local demand supports the idea.`
+			title: 'Concept validation',
+			description: `See what's actually working nearby and whether local demand supports the idea — before committing to a buildout.`
 		},
 		{
-			title: 'Staffing gaps',
-			description: `Lost two line cooks this month. Is your pay off or is the whole market tight? Benchmark what nearby restaurants actually pay for every role.`
+			title: 'Wage benchmarking',
+			description: `See what nearby restaurants actually pay for every role. Set compensation that attracts talent without overspending.`
 		},
 		{
-			title: 'Pricing blind spots',
-			description: `The place across the street undercut your lunch deal last week and you only noticed by accident. Know where your menu sits against every comparable venue.`
+			title: 'Price positioning',
+			description: `Know exactly where every menu item sits against comparable venues. Adjust with confidence, not guesswork.`
 		},
 		{
-			title: 'Review overload',
-			description: `Every review feels urgent but which complaints are real patterns? Surface the sentiment trends that individual reviews never reveal.`
+			title: 'Sentiment trends',
+			description: `Surface the patterns individual reviews never reveal. See which themes are growing, fading, or unique to a single location.`
 		},
 		{
-			title: 'Late to know',
+			title: 'Competitor tracking',
 			description:
-				'They changed their menu and adjusted prices. You heard about it months later from a supplier. Track every competitor move as it happens.'
+				'Menu changes, price moves, new launches — tracked as they happen. Stay current without relying on word of mouth.'
 		},
 		{
-			title: 'New competition',
-			description:
-				'A new spot opened two streets over and started pulling your weekday crowd. Get alerted to openings, closures, and market shifts early.'
+			title: 'Market shifts',
+			description: `New openings, closures, and format changes in the area — flagged early so there's time to respond.`
 		}
 	];
 </script>
