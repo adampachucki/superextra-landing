@@ -107,9 +107,9 @@
 		<div class="flex items-center gap-3 md:hidden">
 			<a
 				href="/login"
-				class="cursor-pointer rounded-full border p-2 {over
-					? 'border-white/15 text-white/40'
-					: 'border-black/10 text-black/30 dark:border-white/10 dark:text-white/30'}"
+				class="cursor-pointer rounded-full border p-2 transition-all duration-200 {over
+					? 'border-white/[0.12] text-white/55 hover:border-white/[0.30] hover:text-white/75'
+					: 'border-black/[0.12] text-black/55 hover:border-black/[0.30] hover:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75'}"
 				aria-label="Log In"
 			>
 				<svg
@@ -117,12 +117,7 @@
 					fill="none"
 					viewBox="0 0 24 24"
 					stroke="currentColor"
-					stroke-width="1.5"
-					><path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3-3h-9m9 0l-3-3m3 3l-3 3"
-					/></svg
+					stroke-width="1.5"><circle cx="12" cy="8" r="4" /><path d="M4 23a8 8 0 0 1 16 0" /></svg
 				>
 			</a>
 			<button

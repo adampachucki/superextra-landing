@@ -8,6 +8,7 @@
 	let sending = $state(false);
 	let shake = $state(false);
 	let codeInputs: HTMLInputElement[] = $state([]);
+	let emailInput: HTMLInputElement | undefined = $state();
 
 	function handleEmailSubmit(e: SubmitEvent) {
 		e.preventDefault();
@@ -78,6 +79,10 @@
 	});
 
 	onMount(() => {
+		if (window.matchMedia('(min-width: 768px)').matches) {
+			setTimeout(() => emailInput?.focus(), 300);
+		}
+
 		const onPopState = () => {
 			if (step === 'code') {
 				step = 'email';
@@ -98,16 +103,23 @@
 	<div class="flex flex-1 items-center justify-center px-6">
 		<div class="w-full max-w-xs">
 			{#if step === 'email'}
-				<form onsubmit={handleEmailSubmit} class="stagger-1">
+				<h1
+					class="stagger-1 mb-6 text-center text-2xl font-semibold tracking-tight text-black dark:text-white"
+				>
+					Log in
+				</h1>
+				<form onsubmit={handleEmailSubmit} class="stagger-2">
 					<div class="relative">
 						<input
+							bind:this={emailInput}
 							id="email"
 							type="email"
 							required
 							bind:value={email}
+							name="email"
 							placeholder="Email address"
 							autocomplete="email"
-							class="w-full rounded-full border border-black/[0.08] bg-white py-3 pr-12 pl-4 text-[15px] text-black placeholder:text-black/25 focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-cream-50 dark:text-white dark:placeholder:text-white/25 dark:focus:border-white/25"
+							class="w-full rounded-full border border-cream-200 bg-white py-3 pr-12 pl-4 text-[15px] text-black placeholder:text-black/25 focus:border-black focus:outline-none dark:bg-cream-50 dark:text-white dark:placeholder:text-white/25 dark:focus:border-white"
 						/>
 						<button
 							type="submit"
@@ -152,7 +164,12 @@
 					</div>
 				</form>
 			{:else}
-				<div class="stagger-1 flex gap-2 {shake ? 'shake' : ''}" onpaste={handlePaste}>
+				<h1
+					class="mb-6 text-center text-2xl font-semibold tracking-tight text-black dark:text-white"
+				>
+					Log in
+				</h1>
+				<div class="flex gap-2 {shake ? 'shake' : ''}" onpaste={handlePaste}>
 					{#each code as digit, i}
 						<input
 							bind:this={codeInputs[i]}
@@ -162,12 +179,13 @@
 							value={digit}
 							oninput={(e) => handleCodeInput(i, e)}
 							onkeydown={(e) => handleCodeKeydown(i, e)}
-							class="h-14 w-full rounded-xl border border-black/[0.08] bg-white text-center text-[22px] font-medium text-black focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-cream-50 dark:text-white dark:focus:border-white/25"
+							class="code-digit h-14 w-full rounded-xl border border-cream-200 bg-white text-center text-[22px] font-medium text-black focus:border-black focus:outline-none dark:bg-cream-50 dark:text-white dark:focus:border-white"
+							style="animation-delay: {i * 40}ms"
 						/>
 					{/each}
 				</div>
 
-				<p class="stagger-2 mt-6 text-center text-[13px] text-black/25 dark:text-white/25">
+				<p class="code-hint mt-6 text-center text-[13px] text-black/25 dark:text-white/25">
 					Code sent to <span class="text-black/50 dark:text-white/50">{email}</span>
 				</p>
 			{/if}
@@ -239,19 +257,55 @@
 </div>
 
 <style>
-	.stagger-1,
-	.stagger-2 {
-		animation: fadeUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-	}
+	/* Email step entrance */
 	.stagger-1 {
-		animation-delay: 0ms;
+		animation: headingIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
 	}
 	.stagger-2 {
-		animation-delay: 120ms;
+		animation: scaleIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+	}
+
+	/* Code step entrance */
+	.code-digit {
+		animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+	.code-hint {
+		animation: fadeIn 0.6s ease 0.3s both;
 	}
 
 	.shake {
 		animation: shake 0.4s ease-in-out;
+	}
+
+	@keyframes headingIn {
+		from {
+			opacity: 0;
+			transform: translateY(8px) scale(0.97);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+
+	@keyframes scaleIn {
+		from {
+			opacity: 0;
+			transform: scale(0.95);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
 	}
 
 	@keyframes shake {
@@ -270,17 +324,6 @@
 		}
 		80% {
 			transform: translateX(4px);
-		}
-	}
-
-	@keyframes fadeUp {
-		from {
-			opacity: 0;
-			transform: translateY(12px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
 		}
 	}
 </style>
