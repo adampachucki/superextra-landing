@@ -21,17 +21,8 @@
 		place: { name: string; secondary: string; placeId: string };
 	}) {
 		leaving = true;
-		if (import.meta.env.DEV) {
-			chatState.start(query, place);
-			setTimeout(() => goto('/agent/chat'), 250);
-		} else {
-			const url = new URL('https://agent.superextra.ai/chat');
-			url.searchParams.set('q', query);
-			url.searchParams.set('placeName', place.name);
-			url.searchParams.set('placeSecondary', place.secondary);
-			url.searchParams.set('placeId', place.placeId);
-			setTimeout(() => (window.location.href = url.toString()), 250);
-		}
+		chatState.start(query, place);
+		setTimeout(() => goto('/agent/chat'), 250);
 	}
 
 	const agentUseCases = [
