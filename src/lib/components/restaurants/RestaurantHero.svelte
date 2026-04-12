@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
-	import { chatState } from '$lib/chat-state.svelte';
 	import { dictation } from '$lib/dictation.svelte';
 
 	const PREFIX = 'Ask Superextra ';
@@ -86,7 +85,14 @@
 		};
 	});
 
-	let { onleave }: { onleave?: () => void } = $props();
+	let {
+		onleave
+	}: {
+		onleave?: (detail: {
+			query: string;
+			place: { name: string; secondary: string; placeId: string };
+		}) => void;
+	} = $props();
 
 	let placeNudge = $state(false);
 	let leaving = $state(false);
@@ -106,8 +112,7 @@
 		placeNudge = false;
 		leaving = true;
 		inputEl?.blur();
-		chatState.start(userQuery.trim(), selectedPlace);
-		onleave?.();
+		onleave?.({ query: userQuery.trim(), place: selectedPlace });
 	}
 
 	function handleKeydown(e: KeyboardEvent) {

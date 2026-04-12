@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { chatState } from '$lib/chat-state.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import AccessForm from '$lib/components/AccessForm.svelte';
@@ -12,9 +13,25 @@
 
 	let leaving = $state(false);
 
-	function handleLeave() {
+	function handleLeave({
+		query,
+		place
+	}: {
+		query: string;
+		place: { name: string; secondary: string; placeId: string };
+	}) {
 		leaving = true;
-		setTimeout(() => goto('/agent/chat'), 250);
+		if (import.meta.env.DEV) {
+			chatState.start(query, place);
+			setTimeout(() => goto('/agent/chat'), 250);
+		} else {
+			const url = new URL('https://agent.superextra.ai/chat');
+			url.searchParams.set('q', query);
+			url.searchParams.set('placeName', place.name);
+			url.searchParams.set('placeSecondary', place.secondary);
+			url.searchParams.set('placeId', place.placeId);
+			setTimeout(() => (window.location.href = url.toString()), 250);
+		}
 	}
 
 	const agentUseCases = [
