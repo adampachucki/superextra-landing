@@ -165,7 +165,7 @@ def _make_instruction(name: str, brief_key: str | None = None):
     return provider
 
 
-def _inject_geo_bias(callback_context, llm_request):
+def _inject_geo_bias(*, callback_context, llm_request):
     """Bias google_search results toward the target restaurant's location."""
     lat = callback_context.state.get("_target_lat")
     lng = callback_context.state.get("_target_lng")
@@ -181,7 +181,7 @@ def _inject_geo_bias(callback_context, llm_request):
 
 def _make_skip_callback(name: str):
     """Skip the specialist if the orchestrator didn't assign it a brief."""
-    def callback(callback_context):
+    def callback(*, callback_context):
         briefs = callback_context.state.get("specialist_briefs", {})
         if name not in briefs:
             return types.Content(role="model", parts=[types.Part(text="NOT_RELEVANT")])
@@ -189,7 +189,7 @@ def _make_skip_callback(name: str):
     return callback
 
 
-def _on_model_error(callback_context, llm_request, error):
+def _on_model_error(*, callback_context, llm_request, error):
     """Return a graceful fallback when the LLM call fails."""
     return LlmResponse(
         content=types.Content(
@@ -199,7 +199,7 @@ def _on_model_error(callback_context, llm_request, error):
     )
 
 
-def _on_tool_error(tool, args, tool_context, error):
+def _on_tool_error(*, tool, args, tool_context, error):
     """Return a fallback dict when a tool (e.g., google_search) fails."""
     return {"error": f"Tool {tool.name} failed: {type(error).__name__}"}
 

@@ -9,7 +9,7 @@ from superextra_agent.specialists import _on_model_error, _on_tool_error
 class TestOnModelError:
     def test_returns_llm_response_with_error_type(self):
         """Should return a valid LlmResponse with the exception type name."""
-        result = _on_model_error(None, None, ValueError("test error"))
+        result = _on_model_error(callback_context=None, llm_request=None, error=ValueError("test error"))
         assert isinstance(result, LlmResponse)
         assert result.content is not None
         assert len(result.content.parts) == 1
@@ -17,7 +17,7 @@ class TestOnModelError:
 
     def test_returns_llm_response_for_timeout(self):
         """Should handle timeout errors gracefully."""
-        result = _on_model_error(None, None, TimeoutError("deadline exceeded"))
+        result = _on_model_error(callback_context=None, llm_request=None, error=TimeoutError("deadline exceeded"))
         assert isinstance(result, LlmResponse)
         assert "TimeoutError" in result.content.parts[0].text
 
@@ -29,7 +29,7 @@ class TestOnToolError:
         class FakeTool:
             name = "google_search"
 
-        result = _on_tool_error(FakeTool(), {}, None, RuntimeError("search failed"))
+        result = _on_tool_error(tool=FakeTool(), args={}, tool_context=None, error=RuntimeError("search failed"))
         assert isinstance(result, dict)
         assert "error" in result
         assert "google_search" in result["error"]

@@ -7,11 +7,13 @@ import { getFirestore } from 'firebase-admin/firestore';
 import {
 	esc, row, confirmationHtml, stripMarkdown, extractSourcesFromText,
 	sendSSE, checkRateLimit, parseADKStream,
+	validatePlaceContext, validateHistory,
 	SPECIALIST_RESULT_KEYS,
 } from './utils.js';
 
 initializeApp();
 const db = getFirestore();
+
 
 const relayKey = defineSecret('RELAY_KEY');
 const elevenlabsKey = defineSecret('ELEVENLABS_API_KEY');
@@ -146,7 +148,9 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 		return;
 	}
 
-	const { message, sessionId, placeContext, history } = req.body || {};
+	const { message, sessionId } = req.body || {};
+	const placeContext = validatePlaceContext(req.body?.placeContext);
+	const history = validateHistory(req.body?.history);
 
 	if (!message || typeof message !== 'string' || !sessionId) {
 		res.status(400).json({ ok: false, error: 'message and sessionId are required' });
@@ -353,7 +357,9 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async 
 		return;
 	}
 
-	const { message, sessionId, placeContext, history } = req.body || {};
+	const { message, sessionId } = req.body || {};
+	const placeContext = validatePlaceContext(req.body?.placeContext);
+	const history = validateHistory(req.body?.history);
 
 	if (!message || typeof message !== 'string' || !sessionId) {
 		res.status(400).json({ ok: false, error: 'message and sessionId are required' });
@@ -687,47 +693,3 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 	}
 });
 
-// --- Agent debug endpoint (retrieves full ADK session by frontend sessionId) ---
-
-export const agentDebug = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
-	if (req.method !== 'GET') {
-		res.status(405).json({ ok: false, error: 'Method not allowed' });
-		return;
-	}
-
-	const sid = req.query.sid;
-	if (!sid) {
-		res.status(400).json({ ok: false, error: 'sid query parameter is required' });
-		return;
-	}
-
-	try {
-		const doc = await db.collection('sessions').doc(sid).get();
-		if (!doc.exists) {
-			res.status(404).json({ ok: false, error: 'Session not found' });
-			return;
-		}
-
-		const { adkSessionId, userId } = doc.data();
-		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
-		const headers = await client.getRequestHeaders();
-
-		const adkRes = await fetch(
-			`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(adkSessionId)}`,
-			{ headers }
-		);
-
-		if (!adkRes.ok) {
-			const errText = await adkRes.text().catch(() => '');
-			console.error('ADK session fetch failed:', adkRes.status, errText);
-			res.status(502).json({ ok: false, error: 'Could not retrieve session from agent' });
-			return;
-		}
-
-		const session = await adkRes.json();
-		res.json({ ok: true, session });
-	} catch (err) {
-		console.error('Debug endpoint error:', err.message || err);
-		res.status(500).json({ ok: false, error: 'Failed to retrieve session' });
-	}
-});

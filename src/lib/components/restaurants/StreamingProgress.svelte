@@ -64,6 +64,7 @@
 	}
 
 	$effect(() => {
+		const activeIds = new Set(dataItems.map((a) => a.id));
 		for (const item of dataItems) {
 			if (item.detail && dataTargets[item.id] !== item.detail) {
 				const oldTarget = dataTargets[item.id] || '';
@@ -76,8 +77,18 @@
 				dataRafs[item.id] = requestAnimationFrame(() => drainData(item.id));
 			}
 		}
+		// Prune stale entries for items that no longer exist
+		for (const id of Object.keys(dataRafs)) {
+			if (!activeIds.has(id)) {
+				cancelAnimationFrame(dataRafs[id]);
+				delete dataRafs[id];
+				delete dataTargets[id];
+				delete dataDisplay[id];
+			}
+		}
 		return () => {
 			for (const raf of Object.values(dataRafs)) cancelAnimationFrame(raf);
+			dataRafs = {};
 		};
 	});
 
@@ -136,6 +147,7 @@
 	}
 
 	$effect(() => {
+		const activeIds = new Set(analyzeItems.map((a) => a.id));
 		for (const item of analyzeItems) {
 			if (item.detail && excerptTargets[item.id] !== item.detail) {
 				excerptTargets[item.id] = item.detail;
@@ -144,8 +156,17 @@
 				excerptRafs[item.id] = requestAnimationFrame(() => drainExcerpt(item.id));
 			}
 		}
+		for (const id of Object.keys(excerptRafs)) {
+			if (!activeIds.has(id)) {
+				cancelAnimationFrame(excerptRafs[id]);
+				delete excerptRafs[id];
+				delete excerptTargets[id];
+				delete excerptDisplay[id];
+			}
+		}
 		return () => {
 			for (const raf of Object.values(excerptRafs)) cancelAnimationFrame(raf);
+			excerptRafs = {};
 		};
 	});
 
@@ -186,6 +207,7 @@
 
 	// Typewriter only runs for visible (revealed) items
 	$effect(() => {
+		const activeIds = new Set(visibleReadItems.map((a) => a.id));
 		for (const item of visibleReadItems) {
 			const fullLabel = formatReadUrl(item.url || item.label);
 			if (readTargets[item.id] !== fullLabel) {
@@ -195,8 +217,17 @@
 				readRafs[item.id] = requestAnimationFrame(() => drainRead(item.id));
 			}
 		}
+		for (const id of Object.keys(readRafs)) {
+			if (!activeIds.has(id)) {
+				cancelAnimationFrame(readRafs[id]);
+				delete readRafs[id];
+				delete readTargets[id];
+				delete readDisplay[id];
+			}
+		}
 		return () => {
 			for (const raf of Object.values(readRafs)) cancelAnimationFrame(raf);
+			readRafs = {};
 		};
 	});
 

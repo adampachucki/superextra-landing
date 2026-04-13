@@ -19,7 +19,7 @@ class TestInjectGeoBias:
         ctx = MockCallbackContext(state={"_target_lat": 52.2297, "_target_lng": 21.0122})
         req = MockLlmRequest()
 
-        result = _inject_geo_bias(ctx, req)
+        result = _inject_geo_bias(callback_context=ctx, llm_request=req)
 
         assert result is None
         assert req.config.tool_config.retrieval_config.lat_lng.latitude == 52.2297
@@ -29,7 +29,7 @@ class TestInjectGeoBias:
         ctx = MockCallbackContext(state={})
         req = MockLlmRequest()
 
-        result = _inject_geo_bias(ctx, req)
+        result = _inject_geo_bias(callback_context=ctx, llm_request=req)
 
         assert result is None
         assert req.config is None
@@ -41,7 +41,7 @@ class TestInjectGeoBias:
             thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
         )
 
-        _inject_geo_bias(ctx, req)
+        _inject_geo_bias(callback_context=ctx, llm_request=req)
 
         assert req.config.thinking_config.thinking_level == "HIGH"
         assert req.config.tool_config.retrieval_config.lat_lng.latitude == 52.2297

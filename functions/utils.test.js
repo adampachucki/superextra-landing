@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
 	esc, row, confirmationHtml, stripMarkdown, extractSourcesFromText,
 	sendSSE, checkRateLimit, parseADKStream, extractLastSentence,
+	validatePlaceContext, validateHistory,
 	SPECIALIST_RESULT_KEYS, SPECIALIST_KEYS, TOOL_LABELS, PLACES_TOOL_LABELS,
 } from './utils.js';
 
@@ -208,6 +209,48 @@ describe('checkRateLimit', () => {
 		}
 		assert.equal(checkRateLimit(map, '1.1.1.1', now, 600000, 20), false);
 		assert.equal(checkRateLimit(map, '2.2.2.2', now, 600000, 20), true);
+	});
+
+	it('evicts expired entries when map exceeds 1000, keeps fresh ones', () => {
+		const map = new Map();
+		const now = Date.now();
+		for (let i = 0; i < 500; i++) map.set(`old-${i}`, { start: now - 700000, count: 1 });
+		for (let i = 0; i < 502; i++) map.set(`fresh-${i}`, { start: now - 100, count: 1 });
+		assert.equal(map.size, 1002);
+		checkRateLimit(map, 'trigger-ip', now, 600000, 20);
+		assert.equal(map.size, 503); // 502 fresh + trigger-ip
+		assert.ok(map.has('fresh-0'));
+		assert.ok(!map.has('old-0'));
+	});
+});
+
+// --- validatePlaceContext / validateHistory ---
+
+describe('validatePlaceContext', () => {
+	it('sanitizes valid input and rejects invalid input', () => {
+		// Valid
+		assert.deepEqual(
+			validatePlaceContext({ name: 'Test', placeId: 'abc', secondary: 'NY' }),
+			{ name: 'Test', placeId: 'abc', secondary: 'NY' }
+		);
+		// Defaults missing optional fields
+		assert.deepEqual(validatePlaceContext({ name: 'Test' }), { name: 'Test', placeId: '', secondary: '' });
+		// Truncates long name
+		assert.equal(validatePlaceContext({ name: 'A'.repeat(200) }).name.length, 100);
+		// Rejects missing/invalid
+		for (const bad of [null, undefined, 'str', [1], { placeId: 'x' }, { name: '' }, { name: 123 }]) {
+			assert.equal(validatePlaceContext(bad), null, `expected null for ${JSON.stringify(bad)}`);
+		}
+	});
+});
+
+describe('validateHistory', () => {
+	it('passes arrays through (capped at 50) and rejects non-arrays', () => {
+		assert.deepEqual(validateHistory([1, 2]), [1, 2]);
+		assert.equal(validateHistory(Array.from({ length: 60 })).length, 50);
+		for (const bad of [null, 'str', {}, undefined]) {
+			assert.deepEqual(validateHistory(bad), []);
+		}
 	});
 });
 

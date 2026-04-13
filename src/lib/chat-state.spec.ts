@@ -332,6 +332,54 @@ describe('chatState', () => {
 			expect(chatState.activeId).toBe(id);
 			expect(chatState.messages.length).toBe(1);
 		});
+
+		it('aborts active stream and resets streaming state when switching while loading', async () => {
+			expect.assertions(5);
+
+			// Start conv1 — hangs (loading stays true)
+			const stream1 = hangingStream();
+			chatState.start('conv1', null);
+
+			// Inject some streaming state
+			stream1.cbs.onToken('partial text');
+			stream1.cbs.onActivity!({
+				id: 'data-0',
+				category: 'data',
+				status: 'running',
+				label: 'Loading'
+			});
+
+			expect(chatState.loading).toBe(true);
+			expect(chatState.streamingActivities.length).toBe(1);
+
+			// Start a second conversation (also hangs)
+			const stream2 = hangingStream();
+			chatState.start('conv2', null);
+			const conv2Id = chatState.activeId!;
+			stream2.cbs.onComplete('reply2', []);
+			stream2.resolve();
+			await waitUntil(() => !chatState.loading);
+
+			// Switch back to conv1 — was loading, streaming state should be cleared
+			// (switchTo only aborts if loading is true at switch time; since conv1's
+			// stream was left hanging, its finally block already cleared loading.
+			// The real scenario is switching away FROM a loading conversation.)
+
+			// Better test: start hanging stream, then switch away while it's still loading
+			const stream3 = hangingStream();
+			chatState.start('conv3', null);
+			stream3.cbs.onToken('streaming text');
+			expect(chatState.loading).toBe(true);
+
+			// Switch to conv2 — should abort the stream and reset streaming state
+			chatState.switchTo(conv2Id);
+
+			// Streaming state should be cleared immediately
+			expect(chatState.streamingText).toBe('');
+			expect(chatState.streamingActivities.length).toBe(0);
+
+			stream3.resolve();
+		});
 	});
 
 	// ----------------------------------------------------------------

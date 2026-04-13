@@ -1,5 +1,31 @@
 // Pure utility functions extracted from index.js for testability.
 
+// --- Input validation ---
+
+/**
+ * Validate and sanitize placeContext from request body.
+ * Returns a sanitized object or null if invalid/missing.
+ */
+export function validatePlaceContext(pc) {
+	if (!pc || typeof pc !== 'object' || Array.isArray(pc)) return null;
+	const name = typeof pc.name === 'string' ? pc.name.slice(0, 100) : '';
+	if (!name) return null;
+	return {
+		name,
+		placeId: typeof pc.placeId === 'string' ? pc.placeId.slice(0, 100) : '',
+		secondary: typeof pc.secondary === 'string' ? pc.secondary.slice(0, 200) : '',
+	};
+}
+
+/**
+ * Validate history array from request body.
+ * Returns a trimmed array or empty array if invalid.
+ */
+export function validateHistory(h) {
+	if (!Array.isArray(h)) return [];
+	return h.slice(0, 50);
+}
+
 // --- HTML helpers (email templates) ---
 
 export function esc(s) {
@@ -79,6 +105,12 @@ export function sendSSE(res, event, data) {
  * @returns {boolean} true if request is allowed, false if rate limited
  */
 export function checkRateLimit(map, ip, now, windowMs, maxRequests) {
+	// Evict expired entries when map grows large to prevent unbounded memory growth
+	if (map.size > 1000) {
+		for (const [key, entry] of map) {
+			if (now - entry.start >= windowMs) map.delete(key);
+		}
+	}
 	const entry = map.get(ip);
 	if (entry && now - entry.start < windowMs) {
 		if (entry.count >= maxRequests) return false;

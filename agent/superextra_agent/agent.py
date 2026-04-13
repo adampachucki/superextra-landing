@@ -68,7 +68,7 @@ def _make_enricher(name="context_enricher"):
     )
 
 
-def _inject_code_execution(callback_context, llm_request):
+def _inject_code_execution(*, callback_context, llm_request):
     """Add code execution tool to the synthesizer's request.
 
     We inject the tool manually instead of using BuiltInCodeExecutor so that

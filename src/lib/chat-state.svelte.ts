@@ -78,6 +78,8 @@ let streamingText = $state('');
 let streamingProgress = $state<StreamingStep[]>([]);
 let streamingActivities = $state<ActivityItem[]>([]);
 let abortController: AbortController | null = null;
+let handleReturnPoll: ReturnType<typeof setInterval> | null = null;
+let handleReturnTimeout: ReturnType<typeof setTimeout> | null = null;
 let pageHidden = $state(false);
 
 // All conversations
@@ -395,6 +397,13 @@ function reset() {
 
 function switchTo(id: string) {
 	if (id === currentId) return;
+	if (loading) {
+		abortController?.abort();
+		loading = false;
+		streamingText = '';
+		streamingProgress = [];
+		streamingActivities = [];
+	}
 	syncCurrentToList();
 	const conv = conversations.find((c) => c.id === id);
 	if (!conv) return;
@@ -500,27 +509,32 @@ function handleReturn(hiddenMs = Infinity) {
 
 		// Stream was in-flight when the tab was backgrounded — connection is dead
 		abortController?.abort();
+		// Clear any previous handleReturn poll/timeout to prevent accumulation
+		if (handleReturnPoll) clearInterval(handleReturnPoll);
+		if (handleReturnTimeout) clearTimeout(handleReturnTimeout);
 		// Poll until send()'s finally block clears loading, then recover.
 		// A fixed 300ms delay isn't enough — iOS process resumption can be slow.
-		const poll = setInterval(() => {
+		handleReturnPoll = setInterval(() => {
 			if (!loading) {
-				clearInterval(poll);
-				error = '';
+				clearInterval(handleReturnPoll!);
+				handleReturnPoll = null;
+				if (handleReturnTimeout) clearTimeout(handleReturnTimeout);
+				handleReturnTimeout = null;
 				recover();
 			}
 		}, 100);
 		// Safety: if loading never clears after 2s, force it and recover anyway
-		setTimeout(() => {
-			clearInterval(poll);
+		handleReturnTimeout = setTimeout(() => {
+			if (handleReturnPoll) clearInterval(handleReturnPoll);
+			handleReturnPoll = null;
+			handleReturnTimeout = null;
 			if (loading) loading = false;
-			error = '';
 			recover();
 		}, 2000);
 	} else {
 		// Stream already ended (with error or silently) — try to recover the response
 		// Delay for iOS 18 networking stack reinitialization (WebKit Bug 284946)
 		setTimeout(() => {
-			error = '';
 			recover();
 		}, 300);
 	}
