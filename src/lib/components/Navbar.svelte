@@ -109,7 +109,7 @@
 						stroke="currentColor"
 						stroke-width="1.5"
 					>
-						<path d="M2 2h20v14H14l-2 4-2-4H2z" />
+						<path d="M2 2h20v14H10l-2 4-2-4H2z" />
 					</svg>
 					{#if chatCount > 0}
 						<span
@@ -149,7 +149,7 @@
 						stroke="currentColor"
 						stroke-width="1.5"
 					>
-						<path d="M2 2h20v14H14l-2 4-2-4H2z" />
+						<path d="M2 2h20v14H10l-2 4-2-4H2z" />
 					</svg>
 					{#if chatCount > 0}
 						<span
