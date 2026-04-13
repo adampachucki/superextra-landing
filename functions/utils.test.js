@@ -361,6 +361,69 @@ describe('parseADKStream', () => {
 		assert.equal(token.d.text, 'Analyzing');
 	});
 
+	it('filters out thought parts from synthesizer tokens', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ text: 'Let me analyze the specialist findings...', thought: true }] },
+				author: 'synthesizer',
+				partial: true,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ text: '# Market Analysis' }] },
+				author: 'synthesizer',
+				partial: true,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const tokens = events.filter(ev => ev.e === 'token');
+		assert.equal(tokens.length, 1);
+		assert.equal(tokens[0].d.text, '# Market Analysis');
+	});
+
+	it('filters out executableCode and codeExecutionResult parts from synthesizer tokens', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ text: 'Here is a chart:' }] },
+				author: 'synthesizer',
+				partial: true,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ executableCode: { code: 'import matplotlib.pyplot as plt\nplt.show()', language: 'PYTHON' } }] },
+				author: 'synthesizer',
+				partial: true,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ codeExecutionResult: { output: '', outcome: 'OUTCOME_OK' } }] },
+				author: 'synthesizer',
+				partial: true,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ inline_data: { mime_type: 'image/png', data: 'base64data' } }] },
+				author: 'synthesizer',
+				partial: true,
+			})}\n\n`,
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ text: 'As shown above...' }] },
+				author: 'synthesizer',
+				partial: true,
+			})}\n\n`,
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const tokens = events.filter(ev => ev.e === 'token');
+		assert.equal(tokens.length, 2);
+		assert.equal(tokens[0].d.text, 'Here is a chart:');
+		assert.equal(tokens[1].d.text, 'As shown above...');
+	});
+
 	it('extracts sources from specialist result text', async () => {
 		const result = 'Analysis here.\n\n## Sources\n- [NYT](https://nyt.com){nyt.com}\n- [CNN](https://cnn.com)';
 		const reader = mockReader([

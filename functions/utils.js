@@ -553,8 +553,12 @@ export async function parseADKStream(reader, emit) {
 								agent: 'synthesizer',
 							});
 						}
-						const text = parts.find(p => p.text)?.text;
-						if (text) emit('token', { text });
+						// Only emit visible text — skip thinking (thought: true),
+						// code execution, execution results, and inline image data.
+						if (!parts.some(p => p.executableCode || p.codeExecutionResult || p.inline_data)) {
+							const text = parts.find(p => p.text && !p.thought)?.text;
+							if (text) emit('token', { text });
+						}
 					}
 
 					// 7. Final report
