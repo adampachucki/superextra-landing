@@ -12,6 +12,10 @@ export default defineConfig({
 		// timeout doubles as the keepalive ping interval. Mobile Safari kills idle
 		// WebSockets after ~30-60s, and Vite does an unconditional location.reload()
 		// on reconnect. 5s pings keep the socket alive.
+		// Companion patch: patches/vite+7.3.1.patch removes the unconditional
+		// reload on reconnect entirely — only genuine server restarts (which send
+		// a "full-reload" message) trigger reloads. Without the patch, every
+		// Mobile Safari reconnect causes a full page reload.
 		hmr: {
 			timeout: 5000,
 			overlay: false
@@ -32,11 +36,6 @@ export default defineConfig({
 				changeOrigin: true,
 				rewrite: (path: string) => path.replace(/^\/api\/agent\/stream/, '/agentStream'),
 				timeout: 0
-			},
-			'/api/agent/debug': {
-				target: 'https://us-central1-superextra-site.cloudfunctions.net',
-				changeOrigin: true,
-				rewrite: (path: string) => path.replace(/^\/api\/agent\/debug/, '/agentDebug')
 			},
 			'/api/agent': {
 				target: 'https://us-central1-superextra-site.cloudfunctions.net',

@@ -5,6 +5,17 @@
 			"public": "build",
 			"ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
 			"cleanUrls": true,
+			"headers": [
+				{
+					"source": "**",
+					"headers": [
+						{ "key": "X-Content-Type-Options", "value": "nosniff" },
+						{ "key": "X-Frame-Options", "value": "DENY" },
+						{ "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+						{ "key": "Permissions-Policy", "value": "camera=(), microphone=(self), geolocation=()" }
+					]
+				}
+			],
 			"redirects": [
 				{
 					"source": "/agent/chat{,/**}",
@@ -41,6 +52,17 @@
 			"public": "build",
 			"ignore": ["firebase.json", "**/.*", "**/node_modules/**", "index.html"],
 			"cleanUrls": true,
+			"headers": [
+				{
+					"source": "**",
+					"headers": [
+						{ "key": "X-Content-Type-Options", "value": "nosniff" },
+						{ "key": "X-Frame-Options", "value": "DENY" },
+						{ "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+						{ "key": "Permissions-Policy", "value": "camera=(), microphone=(self), geolocation=()" }
+					]
+				}
+			],
 			"redirects": [
 				{
 					"source": "/agent/chat",
@@ -57,10 +79,6 @@
 				{
 					"source": "/api/agent/check",
 					"function": "agentCheck"
-				},
-				{
-					"source": "/api/agent/debug",
-					"function": "agentDebug"
 				},
 				{
 					"source": "/api/agent/stream",

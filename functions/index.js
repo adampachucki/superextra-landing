@@ -5,15 +5,21 @@ import { GoogleAuth } from 'google-auth-library';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
-	esc, row, confirmationHtml, stripMarkdown, extractSourcesFromText,
-	sendSSE, checkRateLimit, parseADKStream,
-	validatePlaceContext, validateHistory,
-	SPECIALIST_RESULT_KEYS,
+	esc,
+	row,
+	confirmationHtml,
+	stripMarkdown,
+	extractSourcesFromText,
+	sendSSE,
+	checkRateLimit,
+	parseADKStream,
+	validatePlaceContext,
+	validateHistory,
+	SPECIALIST_RESULT_KEYS
 } from './utils.js';
 
 initializeApp();
 const db = getFirestore();
-
 
 const relayKey = defineSecret('RELAY_KEY');
 const elevenlabsKey = defineSecret('ELEVENLABS_API_KEY');
@@ -72,14 +78,15 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 		});
 	} catch (err) {
 		console.error('Resend fetch failed:', err);
-		res.status(500).json({ ok: false, error: 'Email service unreachable' });
+		res.status(503).json({ ok: false, error: 'Email service unreachable' });
 		return;
 	}
 
 	if (!result.ok) {
 		const body = await result.text().catch(() => '');
 		console.error('Resend error:', result.status, body);
-		const error = result.status === 401 ? 'Email API key invalid' : `Email service error (${result.status})`;
+		const error =
+			result.status === 401 ? 'Email API key invalid' : `Email service error (${result.status})`;
 		res.status(502).json({ ok: false, error });
 		return;
 	}
@@ -113,7 +120,6 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 const ADK_SERVICE_URL = 'https://superextra-agent-907466498524.us-central1.run.app';
 const auth = new GoogleAuth();
 
-
 const rateLimitMap = new Map();
 
 // Maps frontend sessionId → ADK session ID (resets on cold start)
@@ -122,13 +128,17 @@ const sessionMap = new Map();
 async function persistSession(sessionId, adkSessionId, userId) {
 	try {
 		await db.collection('sessions').doc(sessionId).set({
-			adkSessionId, userId, createdAt: Date.now()
+			adkSessionId,
+			userId,
+			createdAt: Date.now()
 		});
 	} catch (e) {
 		console.warn('Firestore session write failed, retrying:', e.message);
 		try {
 			await db.collection('sessions').doc(sessionId).set({
-				adkSessionId, userId, createdAt: Date.now()
+				adkSessionId,
+				userId,
+				createdAt: Date.now()
 			});
 		} catch (e2) {
 			console.error('Firestore session write failed permanently:', e2.message);
@@ -182,11 +192,14 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 			}
 		}
 		if (!adkSessionId) {
-			const createRes = await fetch(`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(ip)}/sessions`, {
-				method: 'POST',
-				headers: { ...headers, 'Content-Type': 'application/json' },
-				body: JSON.stringify({})
-			});
+			const createRes = await fetch(
+				`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(ip)}/sessions`,
+				{
+					method: 'POST',
+					headers: { ...headers, 'Content-Type': 'application/json' },
+					body: JSON.stringify({})
+				}
+			);
 			if (!createRes.ok) {
 				console.error('Session creation failed:', createRes.status);
 				res.status(502).json({ ok: false, error: 'Agent unavailable. Please try again.' });
@@ -200,7 +213,11 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 		}
 
 		// Build the query text with date and optional place context
-		const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+		const today = new Date().toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'long',
+			day: 'numeric'
+		});
 		let queryText = `[Date: ${today}] ${message}`;
 		if (placeContext && placeContext.name) {
 			const isFirstMessage = !history || history.length === 0;
@@ -249,7 +266,7 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 				for (const key of SPECIALIST_RESULT_KEYS) {
 					if (stateDelta?.[key]) {
 						for (const s of extractSourcesFromText(stateDelta[key])) {
-							if (!sources.some(x => x.url === s.url)) {
+							if (!sources.some((x) => x.url === s.url)) {
 								sources.push(s);
 							}
 						}
@@ -261,7 +278,7 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 		}
 
 		if (!reply) {
-			reply = 'I wasn\'t able to generate a response. Please try rephrasing your question.';
+			reply = "I wasn't able to generate a response. Please try rephrasing your question.";
 		}
 
 		// Generate a short title for new conversations
@@ -272,21 +289,29 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 				const vertexAI = new VertexAI({ project: PROJECT, location: LOCATION });
 				const flashModel = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 				const titleResult = await flashModel.generateContent({
-					contents: [{ role: 'user', parts: [{ text:
-						`Summarize this message into a short title, max 4 words.\n` +
-						`Rules:\n` +
-						`- Use the SAME LANGUAGE as the message\n` +
-						`- No markdown, no quotes, no punctuation, no numbering\n` +
-						`- Do not answer the question — just label the topic\n` +
-						`- Reply with ONLY the title, nothing else\n\n` +
-						`Message: "${message}"`
-					}] }]
+					contents: [
+						{
+							role: 'user',
+							parts: [
+								{
+									text:
+										`Summarize this message into a short title, max 4 words.\n` +
+										`Rules:\n` +
+										`- Use the SAME LANGUAGE as the message\n` +
+										`- No markdown, no quotes, no punctuation, no numbering\n` +
+										`- Do not answer the question — just label the topic\n` +
+										`- Reply with ONLY the title, nothing else\n\n` +
+										`Message: "${message}"`
+								}
+							]
+						}
+					]
 				});
 				const raw = titleResult.response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 				if (raw) {
 					const cleaned = raw
 						.replace(/^["']|["']$/g, '')
-						.replace(/[*#_`~>\-]/g, '')
+						.replace(/[*#_`~>-]/g, '')
 						.replace(/^\d+\.\s*/, '')
 						.trim();
 					const words = cleaned.split(/\s+/);
@@ -302,12 +327,11 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 		res.json({ ok: true, reply, sources, ...(title && { title }) });
 	} catch (err) {
 		console.error('Agent error:', err.message || err);
-		res.status(500).json({ ok: false, error: 'Agent unavailable. Please try again.' });
+		res.status(502).json({ ok: false, error: 'Agent unavailable. Please try again.' });
 	}
 });
 
 // --- Streaming agent endpoint (SSE progress + token streaming) ---
-
 
 async function generateTitle(message) {
 	try {
@@ -315,23 +339,33 @@ async function generateTitle(message) {
 		const flashModel = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 		const titleResult = await Promise.race([
 			flashModel.generateContent({
-				contents: [{ role: 'user', parts: [{ text:
-					`Summarize this message into a short title, max 4 words.\n` +
-					`Rules:\n` +
-					`- Use the SAME LANGUAGE as the message\n` +
-					`- No markdown, no quotes, no punctuation, no numbering\n` +
-					`- Do not answer the question — just label the topic\n` +
-					`- Reply with ONLY the title, nothing else\n\n` +
-					`Message: "${message}"`
-				}] }]
+				contents: [
+					{
+						role: 'user',
+						parts: [
+							{
+								text:
+									`Summarize this message into a short title, max 4 words.\n` +
+									`Rules:\n` +
+									`- Use the SAME LANGUAGE as the message\n` +
+									`- No markdown, no quotes, no punctuation, no numbering\n` +
+									`- Do not answer the question — just label the topic\n` +
+									`- Reply with ONLY the title, nothing else\n\n` +
+									`Message: "${message}"`
+							}
+						]
+					}
+				]
 			}),
-			new Promise((_, reject) => setTimeout(() => reject(new Error('Title generation timed out')), 8000))
+			new Promise((_, reject) =>
+				setTimeout(() => reject(new Error('Title generation timed out')), 8000)
+			)
 		]);
 		const raw = titleResult.response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 		if (raw) {
 			const cleaned = raw
 				.replace(/^["']|["']$/g, '')
-				.replace(/[*#_`~>\-]/g, '')
+				.replace(/[*#_`~>-]/g, '')
 				.replace(/^\d+\.\s*/, '')
 				.trim();
 			const words = cleaned.split(/\s+/);
@@ -378,7 +412,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async 
 	res.writeHead(200, {
 		'Content-Type': 'text/event-stream',
 		'Cache-Control': 'no-cache',
-		'X-Accel-Buffering': 'no',
+		'X-Accel-Buffering': 'no'
 	});
 	res.write(': ok\n\n');
 
@@ -387,7 +421,8 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async 
 	const ac = new AbortController();
 	res.on('close', () => {
 		const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-		if (!res.writableEnded) console.warn(`Client disconnected at +${elapsed}s (before stream completed)`);
+		if (!res.writableEnded)
+			console.warn(`Client disconnected at +${elapsed}s (before stream completed)`);
 		ac.abort();
 		clearInterval(keepalive);
 	});
@@ -409,14 +444,19 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async 
 				sessionMap.set(sessionId, { adkSessionId, userId });
 			}
 		}
-		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] session lookup: ${adkSessionId ? 'found' : 'new'}`);
+		console.log(
+			`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] session lookup: ${adkSessionId ? 'found' : 'new'}`
+		);
 
 		if (!adkSessionId) {
-			const createRes = await fetch(`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(ip)}/sessions`, {
-				method: 'POST',
-				headers: { ...headers, 'Content-Type': 'application/json' },
-				body: JSON.stringify({})
-			});
+			const createRes = await fetch(
+				`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(ip)}/sessions`,
+				{
+					method: 'POST',
+					headers: { ...headers, 'Content-Type': 'application/json' },
+					body: JSON.stringify({})
+				}
+			);
 			if (!createRes.ok) {
 				sendSSE(res, 'error', { error: 'Agent unavailable. Please try again.' });
 				res.end();
@@ -428,11 +468,17 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async 
 			userId = ip;
 			sessionMap.set(sessionId, { adkSessionId, userId });
 			await persistSession(sessionId, adkSessionId, ip);
-			console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] session created: ${adkSessionId}`);
+			console.log(
+				`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] session created: ${adkSessionId}`
+			);
 		}
 
 		// Build query
-		const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+		const today = new Date().toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'long',
+			day: 'numeric'
+		});
 		let queryText = `[Date: ${today}] ${message}`;
 		const isFirstMessage = !history || history.length === 0;
 		if (placeContext && placeContext.name && isFirstMessage) {
@@ -443,7 +489,9 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async 
 		const titlePromise = isFirstMessage ? generateTitle(message) : null;
 
 		// Call ADK with streaming — 440s timeout leaves 60s buffer for completion handling
-		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] calling run_sse (aborted=${ac.signal.aborted})`);
+		console.log(
+			`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] calling run_sse (aborted=${ac.signal.aborted})`
+		);
 		const adkTimeout = AbortSignal.timeout(440_000);
 		const adkResponse = await fetch(`${ADK_SERVICE_URL}/run_sse`, {
 			method: 'POST',
@@ -468,7 +516,9 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async 
 		// Stream-parse ADK SSE events and emit frontend SSE events
 		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] run_sse connected`);
 		const reader = adkResponse.body.getReader();
-		const { reply, routerResponse, sources } = await parseADKStream(reader, (event, data) => sendSSE(res, event, data));
+		const { reply, routerResponse, sources } = await parseADKStream(reader, (event, data) =>
+			sendSSE(res, event, data)
+		);
 
 		// Fallback: fetch sources from session state specialist results
 		if (sources.length === 0 && (reply || routerResponse)) {
@@ -482,7 +532,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async 
 					for (const key of SPECIALIST_RESULT_KEYS) {
 						if (session.state?.[key]) {
 							for (const s of extractSourcesFromText(session.state[key])) {
-								if (!sources.some(x => x.url === s.url)) {
+								if (!sources.some((x) => x.url === s.url)) {
 									sources.push(s);
 								}
 							}
@@ -495,11 +545,14 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async 
 		}
 
 		const title = titlePromise ? await titlePromise : undefined;
-		const finalReply = reply || routerResponse || 'I wasn\'t able to generate a response. Please try rephrasing your question.';
+		const finalReply =
+			reply ||
+			routerResponse ||
+			"I wasn't able to generate a response. Please try rephrasing your question.";
 		sendSSE(res, 'complete', {
 			reply: finalReply,
 			sources,
-			...(title && { title }),
+			...(title && { title })
 		});
 	} catch (err) {
 		if (err.name === 'AbortError') {
@@ -554,7 +607,7 @@ export const sttToken = onRequest({ cors: true, secrets: [elevenlabsKey] }, asyn
 		res.json({ ok: true, token: data.token });
 	} catch (err) {
 		console.error('ElevenLabs token fetch failed:', err);
-		res.status(500).json({ ok: false, error: 'Speech service unreachable' });
+		res.status(503).json({ ok: false, error: 'Speech service unreachable' });
 	}
 });
 
@@ -595,7 +648,7 @@ export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (re
 			headers: {
 				'xi-api-key': elevenlabsKey.value(),
 				'Content-Type': 'application/json',
-				'Accept': 'audio/mpeg'
+				Accept: 'audio/mpeg'
 			},
 			body: JSON.stringify({
 				text: plainText,
@@ -619,7 +672,7 @@ export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (re
 		res.send(Buffer.from(arrayBuffer));
 	} catch (err) {
 		console.error('ElevenLabs TTS fetch failed:', err);
-		res.status(500).json({ ok: false, error: 'Speech service unreachable' });
+		res.status(503).json({ ok: false, error: 'Speech service unreachable' });
 	}
 });
 
@@ -654,6 +707,9 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		);
 
 		if (!adkRes.ok) {
+			// agentCheck returns 200 even on errors — the frontend polls this
+			// endpoint and retries on non-ok. HTTP error codes would trigger
+			// fetch error handling instead of graceful retry.
 			res.json({ ok: false, reason: 'agent_unavailable' });
 			return;
 		}
@@ -664,7 +720,8 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		if (!reply) {
 			// Detect stuck sessions: if no reply after 9 minutes, the pipeline is dead
 			// createdAt may be a Firestore Timestamp (.toMillis()) or a plain epoch ms number
-			const createdMs = typeof createdAt === 'number' ? createdAt : createdAt?.toMillis?.() ?? Date.now();
+			const createdMs =
+				typeof createdAt === 'number' ? createdAt : (createdAt?.toMillis?.() ?? Date.now());
 			const ageMs = Date.now() - createdMs;
 			if (ageMs > 9 * 60 * 1000) {
 				res.json({ ok: false, reason: 'timed_out' });
@@ -679,17 +736,21 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		for (const key of SPECIALIST_RESULT_KEYS) {
 			if (session.state?.[key]) {
 				for (const s of extractSourcesFromText(session.state[key])) {
-					if (!sources.some(x => x.url === s.url)) {
+					if (!sources.some((x) => x.url === s.url)) {
 						sources.push(s);
 					}
 				}
 			}
 		}
 
-		res.json({ ok: true, reply, sources: sources.length ? sources : undefined, status: 'complete' });
+		res.json({
+			ok: true,
+			reply,
+			sources: sources.length ? sources : undefined,
+			status: 'complete'
+		});
 	} catch (err) {
 		console.error('Agent check error:', err.message || err);
 		res.json({ ok: false, reason: 'agent_unavailable' });
 	}
 });
-

@@ -1,33 +1,12 @@
 <script lang="ts">
-	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
 	import { formState } from '$lib/form-state.svelte';
+	import { fetchPlaceSuggestions, type PlaceSuggestion } from '$lib/google-places';
+
+	// --- Shared constants ---
 
 	const btnPrimary = 'inline-flex items-center gap-2 btn-primary px-7 py-2.5 text-sm';
 	const inputBase =
 		'w-full rounded-xl border px-4 py-3 text-sm text-black dark:text-white placeholder:text-black/25 dark:placeholder:text-white/25 focus:border-black/[0.55] dark:focus:border-white/[0.55] focus:ring-0 focus:outline-none';
-
-	let step = $state(1);
-	let selectedType = $state('');
-	let selectedCountry = $state('de');
-	let submitting = $state(false);
-	let submitted = $state(false);
-	let submitError = $state(false);
-	let backdropVisible = $state(false);
-	let modalVisible = $state(false);
-	let contentEl: HTMLDivElement | undefined = $state();
-	let modalEl: HTMLDivElement | undefined = $state();
-	let contentHeight = $state<number | undefined>();
-
-	$effect(() => {
-		// Track state changes that affect content height
-		step;
-		submitted;
-		submitError;
-		if (!contentEl) return;
-		requestAnimationFrame(() => {
-			if (contentEl) contentHeight = contentEl.scrollHeight;
-		});
-	});
 
 	const businessTypes = [
 		'Single venue',
@@ -48,21 +27,63 @@
 		{ code: 'us', name: 'United States', dial: '+1' }
 	];
 
+	// --- Modal state ---
+
+	let backdropVisible = $state(false);
+	let modalVisible = $state(false);
+	let contentEl: HTMLDivElement | undefined = $state();
+	let modalEl: HTMLDivElement | undefined = $state();
+	let contentHeight = $state<number | undefined>();
+
+	// --- Form state ---
+
+	let step = $state(1);
+	let submitting = $state(false);
+	let submitted = $state(false);
+	let submitError = $state(false);
+	let submitErrorDetail = $state('');
+	let shakeFields = $state<Set<string>>(new Set());
+
+	// Step 1
+	let selectedType = $state('');
+
+	// Step 2
+	let selectedCountry = $state('de');
 	let placeName = $state('');
+	let selectedPlaceId = $state('');
 	let businessName = $state('');
 	let selectedLocations = $state('');
 	let webUrl = $state('');
+	let placeSuggestions = $state<PlaceSuggestion[]>([]);
+	let showSuggestions = $state(false);
+	let loadingSuggestions = $state(false);
+	let debounceTimer: ReturnType<typeof setTimeout>;
+
+	// Step 3
 	let fullName = $state('');
 	let email = $state('');
 	let phone = $state('');
+	let emailEl: HTMLInputElement | undefined = $state();
+
+	// --- Derived ---
 
 	let country = $derived(countries.find((c) => c.code === selectedCountry) ?? countries[0]);
 	let isVenue = $derived(
 		['Single venue', 'Chain operator', 'Hotel operator'].includes(selectedType)
 	);
-
-	let emailEl: HTMLInputElement | undefined = $state();
 	let emailValid = $derived(email.trim() !== '' && (emailEl?.validity.valid ?? false));
+
+	// --- Effects ---
+
+	$effect(() => {
+		step;
+		submitted;
+		submitError;
+		if (!contentEl) return;
+		requestAnimationFrame(() => {
+			if (contentEl) contentHeight = contentEl.scrollHeight;
+		});
+	});
 
 	$effect(() => {
 		if (selectedType === 'Single venue') {
@@ -70,84 +91,11 @@
 		}
 	});
 
-	// --- Google Places Autocomplete ---
-	let mapsPromise: Promise<void> | null = null;
-	let placeSuggestions = $state<Array<{ name: string; secondary: string; placeId: string }>>([]);
-	let selectedPlaceId = $state('');
-	let showSuggestions = $state(false);
-	let loadingSuggestions = $state(false);
-	let debounceTimer: ReturnType<typeof setTimeout>;
-
-	function loadGoogleMaps(): Promise<void> {
-		if (mapsPromise) return mapsPromise;
-		mapsPromise = new Promise<void>((resolve, reject) => {
-			if (typeof google !== 'undefined' && google.maps?.places) {
-				resolve();
-				return;
-			}
-			const script = document.createElement('script');
-			script.src = `https://maps.googleapis.com/maps/api/js?key=${PUBLIC_GOOGLE_PLACES_KEY}&libraries=places`;
-			script.async = true;
-			script.onload = () => resolve();
-			script.onerror = reject;
-			document.head.appendChild(script);
-		});
-		return mapsPromise;
-	}
-
-	async function fetchPlaceSuggestions(input: string) {
-		if (input.length < 2) {
-			placeSuggestions = [];
-			loadingSuggestions = false;
-			return;
-		}
-		loadingSuggestions = true;
-		try {
-			await loadGoogleMaps();
-			const { suggestions } = await (
-				google.maps.places.AutocompleteSuggestion as any
-			).fetchAutocompleteSuggestions({
-				input,
-				includedPrimaryTypes: ['restaurant', 'cafe', 'bar', 'hotel', 'food'],
-				includedRegionCodes: [selectedCountry]
-			});
-			placeSuggestions = suggestions.map((s: any) => ({
-				name: s.placePrediction.mainText.text,
-				secondary: s.placePrediction.secondaryText?.text ?? '',
-				placeId: s.placePrediction.placeId
-			}));
-		} catch {
-			placeSuggestions = [];
-		}
-		loadingSuggestions = false;
-	}
-
-	function onPlaceInput(e: Event) {
-		const value = (e.target as HTMLInputElement).value;
-		placeName = value;
-		selectedPlaceId = '';
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => fetchPlaceSuggestions(value), 300);
-		showSuggestions = true;
-	}
-
-	function selectPlace(s: { name: string; secondary: string; placeId: string }) {
-		placeName = s.name;
-		selectedPlaceId = s.placeId;
-		placeSuggestions = [];
-		showSuggestions = false;
-		if (document.activeElement instanceof HTMLElement) {
-			document.activeElement.blur();
-		}
-	}
-
-	// Lock body scroll when modal is open
 	$effect(() => {
 		if (formState.visible) {
 			const scrollY = window.scrollY;
 			document.body.style.overflow = 'hidden';
 			document.documentElement.style.overflow = 'hidden';
-
 			return () => {
 				document.body.style.overflow = '';
 				document.documentElement.style.overflow = '';
@@ -156,10 +104,8 @@
 		}
 	});
 
-	// Animate in when formState.visible becomes true
 	$effect(() => {
 		if (formState.visible) {
-			// Trigger backdrop first, then modal
 			requestAnimationFrame(() => {
 				backdropVisible = true;
 				requestAnimationFrame(() => {
@@ -169,12 +115,13 @@
 		}
 	});
 
-	// Focus modal when it becomes visible
 	$effect(() => {
 		if (modalVisible && modalEl) {
 			modalEl.focus();
 		}
 	});
+
+	// --- Actions ---
 
 	function close() {
 		modalVisible = false;
@@ -199,8 +146,6 @@
 			}, 200);
 		}, 150);
 	}
-
-	let shakeFields = $state<Set<string>>(new Set());
 
 	function shake(fields: string[]) {
 		shakeFields = new Set(fields);
@@ -239,7 +184,32 @@
 		if (step > 1) step--;
 	}
 
-	let submitErrorDetail = $state('');
+	function onPlaceInput(e: Event) {
+		const value = (e.target as HTMLInputElement).value;
+		placeName = value;
+		selectedPlaceId = '';
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(async () => {
+			loadingSuggestions = true;
+			try {
+				placeSuggestions = await fetchPlaceSuggestions(value, selectedCountry);
+			} catch {
+				placeSuggestions = [];
+			}
+			loadingSuggestions = false;
+		}, 300);
+		showSuggestions = true;
+	}
+
+	function selectPlace(s: PlaceSuggestion) {
+		placeName = s.name;
+		selectedPlaceId = s.placeId;
+		placeSuggestions = [];
+		showSuggestions = false;
+		if (document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
+	}
 
 	async function submit() {
 		const invalid = getInvalidFields();
@@ -281,6 +251,295 @@
 		submitted = true;
 	}
 </script>
+
+<!-- Step snippets -->
+
+{#snippet successStep()}
+	<div class="step-content flex flex-col items-center py-8 text-center">
+		<div
+			class="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10"
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="h-7 w-7 text-emerald-500"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+			</svg>
+		</div>
+		<h2 class="mb-2 text-xl font-medium tracking-tight text-black dark:text-white">Request sent</h2>
+		<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40 dark:text-white/40">
+			We'll get back to you within 24 hours
+		</p>
+		<button
+			onclick={close}
+			class="rounded-full border border-cream-200 px-7 py-2.5 text-sm text-black transition-colors hover:bg-cream-50 dark:text-white"
+		>
+			Done
+		</button>
+	</div>
+{/snippet}
+
+{#snippet step1()}
+	<div class="step-content">
+		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
+			What kind of business do you run?
+		</h2>
+		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
+			Select the option that best describes you
+		</p>
+
+		<div class="grid grid-cols-3 gap-2.5 {shakeFields.has('type-grid') ? 'shake' : ''}">
+			{#each businessTypes as type}
+				<button
+					onclick={() => (selectedType = selectedType === type ? '' : type)}
+					class="cursor-pointer rounded-xl border px-3 py-3 text-sm transition-all duration-200
+					{selectedType === type
+						? 'border-black bg-black text-white dark:border-white dark:bg-white dark:text-black'
+						: 'border-cream-200 bg-white text-black/60 hover:border-cream-300 hover:text-black dark:bg-cream-50 dark:text-white/60 dark:hover:text-white'}"
+				>
+					{type}
+				</button>
+			{/each}
+		</div>
+	</div>
+{/snippet}
+
+{#snippet step2()}
+	<div class="step-content">
+		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
+			Tell us about your business
+		</h2>
+		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
+			Help us tailor the experience to your needs
+		</p>
+
+		<div class="space-y-4">
+			<div>
+				<label
+					for="country"
+					class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Country</label
+				>
+				<select
+					id="country"
+					bind:value={selectedCountry}
+					class="w-full appearance-none rounded-xl border border-black/[0.12] bg-white px-4 py-3 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55]"
+				>
+					{#each countries as c}
+						<option value={c.code}>{c.name}</option>
+					{/each}
+				</select>
+			</div>
+			{#if isVenue}
+				<div class="relative">
+					<label
+						for="place-name"
+						class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
+						>Place name</label
+					>
+					<input
+						id="place-name"
+						type="text"
+						value={placeName}
+						oninput={onPlaceInput}
+						onfocus={() => {
+							if (placeSuggestions.length) showSuggestions = true;
+						}}
+						onblur={() => setTimeout(() => (showSuggestions = false), 150)}
+						placeholder="The Corner Bistro"
+						autocomplete="off"
+						autocorrect="off"
+						spellcheck="false"
+						class="{inputBase} pr-10 {shakeFields.has('place-name')
+							? 'shake border-red-300'
+							: 'border-black/[0.12] dark:border-white/[0.12]'}"
+					/>
+					{#if loadingSuggestions}
+						<svg
+							class="absolute right-3 bottom-3 h-4 w-4 animate-spin text-black/25 dark:text-white/25"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+						>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="3"
+							></circle>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+							></path>
+						</svg>
+					{/if}
+					{#if showSuggestions && placeSuggestions.length > 0}
+						<ul
+							class="absolute top-full right-0 left-0 z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-black/[0.12] bg-white py-1 shadow-lg dark:border-white/[0.12] dark:bg-cream-50"
+						>
+							{#each placeSuggestions as s}
+								<li>
+									<button
+										type="button"
+										class="w-full px-4 py-2 text-left text-sm hover:bg-cream-50"
+										onpointerdown={(e) => e.preventDefault()}
+										onclick={() => selectPlace(s)}
+									>
+										<span class="text-black dark:text-white">{s.name}</span>
+										{#if s.secondary}
+											<span class="ml-1 text-black/45 dark:text-white/45">{s.secondary}</span>
+										{/if}
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+			{:else}
+				<div>
+					<label
+						for="business-name"
+						class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
+						>Business name</label
+					>
+					<input
+						id="business-name"
+						type="text"
+						bind:value={businessName}
+						placeholder="Acme Inc."
+						class="{inputBase} {shakeFields.has('business-name')
+							? 'shake border-red-300'
+							: 'border-black/[0.12] dark:border-white/[0.12]'}"
+					/>
+				</div>
+			{/if}
+			{#if isVenue}
+				<div>
+					<label
+						for="locations"
+						class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
+						>Number of locations</label
+					>
+					<select
+						id="locations"
+						bind:value={selectedLocations}
+						class="w-full appearance-none rounded-xl border bg-white px-4 py-3 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55] {shakeFields.has(
+							'locations'
+						)
+							? 'shake border-red-300'
+							: 'border-black/[0.12]'}"
+					>
+						<option value="" disabled class="text-black/25">Select</option>
+						<option value="1">1 location</option>
+						<option value="2-5">2 – 5 locations</option>
+						<option value="6-20">6 – 20 locations</option>
+						<option value="20+">20+ locations</option>
+					</select>
+				</div>
+			{:else}
+				<div>
+					<label
+						for="web-url"
+						class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Web URL</label
+					>
+					<input
+						id="web-url"
+						type="text"
+						bind:value={webUrl}
+						placeholder="example.com"
+						class="{inputBase} {shakeFields.has('web-url')
+							? 'shake border-red-300'
+							: 'border-black/[0.12] dark:border-white/[0.12]'}"
+					/>
+				</div>
+			{/if}
+		</div>
+	</div>
+{/snippet}
+
+{#snippet step3()}
+	<div class="step-content">
+		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
+			How can we reach you?
+		</h2>
+		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
+			We'll get back to you within 24 hours
+		</p>
+
+		<div class="space-y-4">
+			<div>
+				<label
+					for="full-name"
+					class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Full name</label
+				>
+				<input
+					id="full-name"
+					type="text"
+					bind:value={fullName}
+					placeholder="Jane Smith"
+					class="{inputBase} {shakeFields.has('full-name')
+						? 'shake border-red-300'
+						: 'border-black/[0.12] dark:border-white/[0.12]'}"
+				/>
+			</div>
+			<div>
+				<label for="email" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
+					>Work email</label
+				>
+				<input
+					id="email"
+					type="email"
+					bind:this={emailEl}
+					bind:value={email}
+					placeholder="jane@company.com"
+					class="{inputBase} {shakeFields.has('email')
+						? 'shake border-red-300'
+						: 'border-black/[0.12] dark:border-white/[0.12]'}"
+				/>
+			</div>
+			<div>
+				<label for="phone" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
+					>Phone <span class="text-black/25 dark:text-white/25">(optional)</span></label
+				>
+				<div class="flex gap-2">
+					<span
+						class="flex items-center rounded-xl border border-black/[0.12] bg-cream-50 px-3.5 text-sm text-black/60 dark:border-white/[0.12] dark:text-white/60"
+					>
+						{country.dial}
+					</span>
+					<input
+						id="phone"
+						type="tel"
+						bind:value={phone}
+						placeholder={country.code === 'us'
+							? '(555) 000-0000'
+							: country.code === 'gb'
+								? '7911 123456'
+								: country.code === 'de'
+									? '151 12345678'
+									: '512 345 678'}
+						class="w-full rounded-xl border border-black/[0.12] px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:text-white dark:placeholder:text-white/25 dark:focus:border-white/[0.55]"
+					/>
+				</div>
+			</div>
+		</div>
+
+		{#if submitError}
+			<p class="mt-4 text-sm text-red-500">
+				Something went wrong, please try again{#if submitErrorDetail}
+					({submitErrorDetail}){/if}
+			</p>
+		{/if}
+	</div>
+{/snippet}
+
+<!-- Main template -->
 
 <svelte:window
 	onkeydown={(e) => {
@@ -334,36 +593,8 @@
 				style={contentHeight ? `height:${contentHeight}px` : ''}
 			>
 				<div bind:this={contentEl}>
-					<!-- Success state -->
 					{#if submitted}
-						<div class="step-content flex flex-col items-center py-8 text-center">
-							<div
-								class="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10"
-							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									class="h-7 w-7 text-emerald-500"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-								</svg>
-							</div>
-							<h2 class="mb-2 text-xl font-medium tracking-tight text-black dark:text-white">
-								Request sent
-							</h2>
-							<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40 dark:text-white/40">
-								We'll get back to you within 24 hours
-							</p>
-							<button
-								onclick={close}
-								class="rounded-full border border-cream-200 px-7 py-2.5 text-sm text-black transition-colors hover:bg-cream-50 dark:text-white"
-							>
-								Done
-							</button>
-						</div>
+						{@render successStep()}
 					{:else}
 						<!-- Step indicator -->
 						<div class="mb-8 flex items-center justify-center gap-2">
@@ -378,276 +609,12 @@
 							{/each}
 						</div>
 
-						<!-- Step 1: Business Type -->
 						{#if step === 1}
-							<div class="step-content">
-								<h2
-									class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white"
-								>
-									What kind of business do you run?
-								</h2>
-								<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
-									Select the option that best describes you
-								</p>
-
-								<div class="grid grid-cols-3 gap-2.5 {shakeFields.has('type-grid') ? 'shake' : ''}">
-									{#each businessTypes as type}
-										<button
-											onclick={() => (selectedType = selectedType === type ? '' : type)}
-											class="cursor-pointer rounded-xl border px-3 py-3 text-sm transition-all duration-200
-										{selectedType === type
-												? 'border-black bg-black text-white dark:border-white dark:bg-white dark:text-black'
-												: 'border-cream-200 bg-white text-black/60 hover:border-cream-300 hover:text-black dark:bg-cream-50 dark:text-white/60 dark:hover:text-white'}"
-										>
-											{type}
-										</button>
-									{/each}
-								</div>
-							</div>
-
-							<!-- Step 2: Business Details -->
+							{@render step1()}
 						{:else if step === 2}
-							<div class="step-content">
-								<h2
-									class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white"
-								>
-									Tell us about your business
-								</h2>
-								<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
-									Help us tailor the experience to your needs
-								</p>
-
-								<div class="space-y-4">
-									<div>
-										<label
-											for="country"
-											class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-											>Country</label
-										>
-										<select
-											id="country"
-											bind:value={selectedCountry}
-											class="w-full appearance-none rounded-xl border border-black/[0.12] bg-white px-4 py-3 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55]"
-										>
-											{#each countries as c}
-												<option value={c.code}>{c.name}</option>
-											{/each}
-										</select>
-									</div>
-									{#if isVenue}
-										<div class="relative">
-											<label
-												for="place-name"
-												class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-												>Place name</label
-											>
-											<input
-												id="place-name"
-												type="text"
-												value={placeName}
-												oninput={onPlaceInput}
-												onfocus={() => {
-													if (placeSuggestions.length) showSuggestions = true;
-												}}
-												onblur={() => setTimeout(() => (showSuggestions = false), 150)}
-												placeholder="The Corner Bistro"
-												autocomplete="off"
-												autocorrect="off"
-												spellcheck="false"
-												class="{inputBase} pr-10 {shakeFields.has('place-name')
-													? 'shake border-red-300'
-													: 'border-black/[0.12] dark:border-white/[0.12]'}"
-											/>
-											{#if loadingSuggestions}
-												<svg
-													class="absolute right-3 bottom-3 h-4 w-4 animate-spin text-black/25 dark:text-white/25"
-													xmlns="http://www.w3.org/2000/svg"
-													fill="none"
-													viewBox="0 0 24 24"
-												>
-													<circle
-														class="opacity-25"
-														cx="12"
-														cy="12"
-														r="10"
-														stroke="currentColor"
-														stroke-width="3"
-													></circle>
-													<path
-														class="opacity-75"
-														fill="currentColor"
-														d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-													></path>
-												</svg>
-											{/if}
-											{#if showSuggestions && placeSuggestions.length > 0}
-												<ul
-													class="absolute top-full right-0 left-0 z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-black/[0.12] bg-white py-1 shadow-lg dark:border-white/[0.12] dark:bg-cream-50"
-												>
-													{#each placeSuggestions as s}
-														<li>
-															<button
-																type="button"
-																class="w-full px-4 py-2 text-left text-sm hover:bg-cream-50"
-																onpointerdown={(e) => e.preventDefault()}
-																onclick={() => selectPlace(s)}
-															>
-																<span class="text-black dark:text-white">{s.name}</span>
-																{#if s.secondary}
-																	<span class="ml-1 text-black/45 dark:text-white/45"
-																		>{s.secondary}</span
-																	>
-																{/if}
-															</button>
-														</li>
-													{/each}
-												</ul>
-											{/if}
-										</div>
-									{:else}
-										<div>
-											<label
-												for="business-name"
-												class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-												>Business name</label
-											>
-											<input
-												id="business-name"
-												type="text"
-												bind:value={businessName}
-												placeholder="Acme Inc."
-												class="{inputBase} {shakeFields.has('business-name')
-													? 'shake border-red-300'
-													: 'border-black/[0.12] dark:border-white/[0.12]'}"
-											/>
-										</div>
-									{/if}
-									{#if isVenue}
-										<div>
-											<label
-												for="locations"
-												class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-												>Number of locations</label
-											>
-											<select
-												id="locations"
-												bind:value={selectedLocations}
-												class="w-full appearance-none rounded-xl border bg-white px-4 py-3 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55] {shakeFields.has(
-													'locations'
-												)
-													? 'shake border-red-300'
-													: 'border-black/[0.12]'}"
-											>
-												<option value="" disabled class="text-black/25">Select</option>
-												<option value="1">1 location</option>
-												<option value="2-5">2 – 5 locations</option>
-												<option value="6-20">6 – 20 locations</option>
-												<option value="20+">20+ locations</option>
-											</select>
-										</div>
-									{:else}
-										<div>
-											<label
-												for="web-url"
-												class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-												>Web URL</label
-											>
-											<input
-												id="web-url"
-												type="text"
-												bind:value={webUrl}
-												placeholder="example.com"
-												class="{inputBase} {shakeFields.has('web-url')
-													? 'shake border-red-300'
-													: 'border-black/[0.12] dark:border-white/[0.12]'}"
-											/>
-										</div>
-									{/if}
-								</div>
-							</div>
-
-							<!-- Step 3: Contact Info -->
+							{@render step2()}
 						{:else}
-							<div class="step-content">
-								<h2
-									class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white"
-								>
-									How can we reach you?
-								</h2>
-								<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
-									We'll get back to you within 24 hours
-								</p>
-
-								<div class="space-y-4">
-									<div>
-										<label
-											for="full-name"
-											class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-											>Full name</label
-										>
-										<input
-											id="full-name"
-											type="text"
-											bind:value={fullName}
-											placeholder="Jane Smith"
-											class="{inputBase} {shakeFields.has('full-name')
-												? 'shake border-red-300'
-												: 'border-black/[0.12] dark:border-white/[0.12]'}"
-										/>
-									</div>
-									<div>
-										<label
-											for="email"
-											class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-											>Work email</label
-										>
-										<input
-											id="email"
-											type="email"
-											bind:this={emailEl}
-											bind:value={email}
-											placeholder="jane@company.com"
-											class="{inputBase} {shakeFields.has('email')
-												? 'shake border-red-300'
-												: 'border-black/[0.12] dark:border-white/[0.12]'}"
-										/>
-									</div>
-									<div>
-										<label
-											for="phone"
-											class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-											>Phone <span class="text-black/25 dark:text-white/25">(optional)</span></label
-										>
-										<div class="flex gap-2">
-											<span
-												class="flex items-center rounded-xl border border-black/[0.12] bg-cream-50 px-3.5 text-sm text-black/60 dark:border-white/[0.12] dark:text-white/60"
-											>
-												{country.dial}
-											</span>
-											<input
-												id="phone"
-												type="tel"
-												bind:value={phone}
-												placeholder={country.code === 'us'
-													? '(555) 000-0000'
-													: country.code === 'gb'
-														? '7911 123456'
-														: country.code === 'de'
-															? '151 12345678'
-															: '512 345 678'}
-												class="w-full rounded-xl border border-black/[0.12] px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:text-white dark:placeholder:text-white/25 dark:focus:border-white/[0.55]"
-											/>
-										</div>
-									</div>
-								</div>
-
-								{#if submitError}
-									<p class="mt-4 text-sm text-red-500">
-										Something went wrong, please try again{#if submitErrorDetail}
-											({submitErrorDetail}){/if}
-									</p>
-								{/if}
-							</div>
+							{@render step3()}
 						{/if}
 					{/if}
 				</div>

@@ -9,9 +9,11 @@ bun.lockb
 .svelte-kit/
 build/
 
-# Firebase (separate codebase)
-functions/
+# Firebase (separate codebase — has its own formatting via ESLint)
 .firebase/
+
+# Agent (Python — not formatted by Prettier)
+agent/
 
 # Miscellaneous
 /static/

@@ -1,3 +1,4 @@
+import atexit
 import asyncio
 import logging
 import os
@@ -64,6 +65,19 @@ def _get_client() -> httpx.AsyncClient:
     return _client
 
 
+def _cleanup_client():
+    global _client
+    if _client is not None:
+        try:
+            asyncio.run(_client.aclose())
+        except RuntimeError:
+            pass
+        _client = None
+
+
+atexit.register(_cleanup_client)
+
+
 def _get_api_key() -> str:
     key = os.environ.get("GOOGLE_PLACES_API_KEY", "")
     if not key:
@@ -91,6 +105,8 @@ async def get_restaurant_details(place_id: str, tool_context=None) -> dict:
         if resp.status_code != 200:
             return {"status": "error", "error_message": f"Places API error {resp.status_code}: {resp.text}"}
         place = resp.json()
+        if not isinstance(place, dict):
+            return {"status": "error", "error_message": "Unexpected response format from Places API"}
         # Store coordinates for geo-biased search
         if tool_context:
             loc = place.get("location", {})
@@ -133,7 +149,8 @@ async def find_nearby_restaurants(latitude: float, longitude: float, radius: flo
         )
         if resp.status_code != 200:
             return {"status": "error", "error_message": f"Places API error {resp.status_code}: {resp.text}"}
-        return {"status": "success", "results": resp.json().get("places", [])}
+        data = resp.json()
+        return {"status": "success", "results": data.get("places", []) if isinstance(data, dict) else []}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}
 
@@ -191,6 +208,7 @@ async def search_restaurants(query: str, latitude: float = 0.0, longitude: float
         )
         if resp.status_code != 200:
             return {"status": "error", "error_message": f"Places API error {resp.status_code}: {resp.text}"}
-        return {"status": "success", "results": resp.json().get("places", [])}
+        data = resp.json()
+        return {"status": "success", "results": data.get("places", []) if isinstance(data, dict) else []}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}

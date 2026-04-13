@@ -103,7 +103,7 @@ jobs:
       - run: cd functions && npm ci
 
       - name: Deploy Cloud Functions
-        run: npx firebase-tools deploy --only functions --project superextra-site
+        run: npx firebase-tools deploy --only functions --project superextra-site --force
 
   deploy-agent:
     needs: [detect-changes, test]

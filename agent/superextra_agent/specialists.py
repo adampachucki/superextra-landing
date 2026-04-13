@@ -1,12 +1,17 @@
+import logging
+import os
+from pathlib import Path
+from urllib.parse import urlparse
+
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_response import LlmResponse
 from google.adk.tools import google_search
 from google.genai import Client, types
-from pathlib import Path
-from urllib.parse import urlparse
+
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
-import os
+
+logger = logging.getLogger(__name__)
 
 INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
@@ -204,6 +209,13 @@ def _on_tool_error(*, tool, args, tool_context, error):
     return {"error": f"Tool {tool.name} failed: {type(error).__name__}"}
 
 
+VALID_BRIEF_KEYS = {
+    "market_landscape", "menu_pricing", "revenue_sales",
+    "guest_intelligence", "location_traffic", "operations",
+    "marketing_digital", "review_analyst", "dynamic_researcher_1",
+}
+
+
 async def set_specialist_briefs(briefs: dict, tool_context) -> str:
     """Assign research briefs to specialist agents.
 
@@ -219,8 +231,12 @@ async def set_specialist_briefs(briefs: dict, tool_context) -> str:
     the profile. guest_intelligence uses only google_search for independent
     cross-platform research — do not assign both to the same platform.
     """
-    tool_context.state["specialist_briefs"] = briefs
-    return f"Briefs set for: {', '.join(briefs.keys())}"
+    invalid = set(briefs.keys()) - VALID_BRIEF_KEYS
+    if invalid:
+        logger.warning("Unknown specialist brief keys ignored: %s", invalid)
+    valid_briefs = {k: v for k, v in briefs.items() if k in VALID_BRIEF_KEYS}
+    tool_context.state["specialist_briefs"] = valid_briefs
+    return f"Briefs set for: {', '.join(valid_briefs.keys())}"
 
 
 def _make_specialist(name, description, output_key, tools=None, instruction_name=None):
