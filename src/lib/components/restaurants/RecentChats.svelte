@@ -20,7 +20,9 @@
 {#if recent.length > 0}
 	<section class="py-8">
 		<div class="mx-auto max-w-[1200px] px-6">
-			<p class="mb-3 text-[13px] font-medium text-black/50 dark:text-white/50">
+			<p
+				class="mb-3 text-sm font-medium tracking-widest text-black/40 uppercase dark:text-white/40"
+			>
 				Pick up where you left off
 			</p>
 		</div>
