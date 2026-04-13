@@ -47,7 +47,7 @@ When findings include numerical data for comparison, generate charts using matpl
 
 Place each chart inline where it supports the narrative — generate immediately when presenting the finding, not batched at end. Bar charts for comparisons, pie charts for market share, line charts for trends.
 
-Keep charts clean: labeled axes, clear title, `seaborn.set_style("whitegrid")`, `plt.tight_layout()`, `plt.show()`. Skip only if genuinely no numerical data exists.
+Keep charts clean: labeled axes, clear title, `seaborn.set_style("whitegrid")`, `fig.patch.set_facecolor('#fefdf9')`, `ax.set_facecolor('#fefdf9')`, `plt.tight_layout()`, `plt.show()`. Skip only if genuinely no numerical data exists.
 
 ## What you do NOT do
 
