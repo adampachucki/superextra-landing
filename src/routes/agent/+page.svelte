@@ -5,6 +5,7 @@
 	import Footer from '$lib/components/Footer.svelte';
 	import AccessForm from '$lib/components/AccessForm.svelte';
 	import RestaurantHero from '$lib/components/restaurants/RestaurantHero.svelte';
+	import RecentChats from '$lib/components/restaurants/RecentChats.svelte';
 	import About from '$lib/components/About.svelte';
 
 	import UseCases from '$lib/components/UseCases.svelte';
@@ -81,6 +82,7 @@
 
 	<main>
 		<RestaurantHero onleave={handleLeave} />
+		<RecentChats />
 		<About
 			headline="The market view your restaurant has been missing"
 			intro="Restaurant operators make critical decisions every day — where to open, how to price, when to hire — too often without a clear view of the market around them at all. Superextra changes that."

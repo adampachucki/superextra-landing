@@ -422,6 +422,12 @@
 
 	let confirmDeleteId = $state<string | null>(null);
 
+	function handleWindowClick(e: MouseEvent) {
+		if (!confirmDeleteId) return;
+		const target = e.target as HTMLElement;
+		if (!target.closest('.sb-item')) confirmDeleteId = null;
+	}
+
 	function formatRelativeTime(ts: number): string {
 		const diff = Date.now() - ts;
 		const minutes = Math.floor(diff / 60000);
@@ -436,6 +442,8 @@
 	}
 </script>
 
+<svelte:window onclick={handleWindowClick} />
+
 <svelte:head>
 	<title>Chat - Superextra</title>
 	<meta
@@ -449,7 +457,7 @@
 	onclick={toggleSidebar}
 	onanimationend={() => (toggleBtnAnim = 'idle')}
 	aria-label="Open sidebar"
-	class="toggle-float fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/80 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white dark:bg-white/20 dark:text-white/70 dark:backdrop-blur-md dark:hover:bg-white/30 dark:hover:text-white
+	class="toggle-float fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80
 	{sidebarOpen ? 'pointer-events-none' : ''}
 	{toggleBtnAnim === 'fade-out'
 		? 'toggle-out'
@@ -468,7 +476,7 @@
 {#if !isDesktop && sidebarOpen}
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
-		class="fixed inset-0 z-40 touch-none bg-black/20"
+		class="fixed inset-0 z-40 touch-none bg-[var(--color-cream)]/60"
 		onclick={() => (sidebarOpen = false)}
 	></div>
 {/if}
@@ -551,6 +559,8 @@
 					>
 						<button
 							onclick={() => {
+								if (confirmDeleteId && confirmDeleteId !== conv.id) confirmDeleteId = null;
+								if (confirmDeleteId === conv.id) return;
 								chatState.switchTo(conv.id);
 								if (!isDesktop) sidebarOpen = false;
 							}}
@@ -568,16 +578,67 @@
 							>
 								{conv.title}
 							</p>
-							<div class="mt-0.5 flex items-center gap-1.5">
-								{#if conv.placeContext}
-									<span class="truncate text-[11px] text-black/40 dark:text-white/40"
-										>{conv.placeContext.name}</span
-									>
-									<span class="text-[11px] text-black/20 dark:text-white/20">&middot;</span>
-								{/if}
-								<span class="shrink-0 text-[11px] text-black/30 dark:text-white/30"
-									>{formatRelativeTime(conv.updatedAt)}</span
+							<div class="relative mt-0.5 text-[11px]">
+								<div
+									class="flex items-center gap-1.5 transition-opacity duration-150 {confirmDeleteId ===
+									conv.id
+										? 'pointer-events-none opacity-0'
+										: 'opacity-100'}"
 								>
+									{#if conv.placeContext}
+										<span class="truncate text-black/40 dark:text-white/40"
+											>{conv.placeContext.name}</span
+										>
+										<span class="text-black/20 dark:text-white/20">&middot;</span>
+									{/if}
+									<span class="shrink-0 text-black/30 dark:text-white/30"
+										>{formatRelativeTime(conv.updatedAt)}</span
+									>
+								</div>
+								<div
+									class="absolute inset-0 flex items-center gap-1.5 transition-all duration-150 {confirmDeleteId ===
+									conv.id
+										? 'translate-x-0 opacity-100'
+										: 'pointer-events-none -translate-x-1.5 opacity-0'}"
+								>
+									<span
+										role="button"
+										tabindex="0"
+										onclick={(e) => {
+											e.stopPropagation();
+											chatState.deleteConversation(conv.id);
+											confirmDeleteId = null;
+										}}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												e.stopPropagation();
+												chatState.deleteConversation(conv.id);
+												confirmDeleteId = null;
+											}
+										}}
+										class="cursor-pointer text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+										>Delete</span
+									>
+									<span class="text-black/20 dark:text-white/20">&middot;</span>
+									<span
+										role="button"
+										tabindex="0"
+										onclick={(e) => {
+											e.stopPropagation();
+											confirmDeleteId = null;
+										}}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												e.stopPropagation();
+												confirmDeleteId = null;
+											}
+										}}
+										class="cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+										>Cancel</span
+									>
+								</div>
 							</div>
 						</button>
 						<button
@@ -586,7 +647,9 @@
 							class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] dark:hover:bg-white/[0.06] {confirmDeleteId ===
 							conv.id
 								? 'hidden'
-								: 'lg:opacity-0 lg:group-hover:opacity-100'}"
+								: conv.id === chatState.activeId
+									? 'lg:opacity-0 lg:group-hover:opacity-100'
+									: 'max-lg:hidden lg:opacity-0 lg:group-hover:opacity-100'}"
 						>
 							<svg
 								class="h-3 w-3 text-black/30 dark:text-white/30"
@@ -599,56 +662,6 @@
 								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 							</svg>
 						</button>
-						<div class="delete-reveal" class:open={confirmDeleteId === conv.id}>
-							<div class="min-h-0 overflow-hidden">
-								<div
-									class="mt-1 flex w-full items-center justify-between rounded-lg bg-red-50 px-3 py-1.5 dark:bg-red-950/30"
-								>
-									<span class="text-[12px] text-red-600 dark:text-red-400">Delete?</span>
-									<div class="flex items-center gap-1">
-										<button
-											onclick={() => (confirmDeleteId = null)}
-											aria-label="Cancel delete"
-											class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-black/40 transition-colors hover:bg-black/[0.06] dark:text-white/40 dark:hover:bg-white/[0.06]"
-										>
-											<svg
-												class="h-3.5 w-3.5"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="2"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													d="M6 18L18 6M6 6l12 12"
-												/>
-											</svg>
-										</button>
-										<button
-											onclick={() => {
-												chatState.deleteConversation(conv.id);
-												confirmDeleteId = null;
-											}}
-											aria-label="Confirm delete"
-											class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-100 dark:hover:bg-red-900/30"
-										>
-											<svg
-												class="h-3.5 w-3.5"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="2.5"
-											>
-												<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-											</svg>
-										</button>
-									</div>
-								</div>
-							</div>
-						</div>
 					</div>
 				{/each}
 			</div>
@@ -1176,20 +1189,6 @@
 	.sb-item.visible {
 		opacity: 1;
 		transform: translateY(0);
-	}
-
-	.delete-reveal {
-		display: grid;
-		grid-template-rows: 0fr;
-		opacity: 0;
-		transition:
-			grid-template-rows 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-			opacity 0.15s ease;
-	}
-
-	.delete-reveal.open {
-		grid-template-rows: 1fr;
-		opacity: 1;
 	}
 
 	.sidebar.animated {

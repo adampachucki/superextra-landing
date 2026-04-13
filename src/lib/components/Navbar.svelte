@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formState } from '$lib/form-state.svelte';
+	import { chatState } from '$lib/chat-state.svelte';
 	import { onMount } from 'svelte';
 
 	let {
@@ -18,6 +19,7 @@
 	onMount(() => handleScroll());
 
 	let over = $derived(transparent && !scrolled && !mobileOpen);
+	let chatCount = $derived(minimal ? chatState.conversations.length : 0);
 
 	function smoothScroll(e: MouseEvent) {
 		const href = (e.currentTarget as HTMLAnchorElement).getAttribute('href');
@@ -92,34 +94,88 @@
 		{/if}
 
 		<div class="hidden items-center gap-3 md:flex">
-			<a
-				href="/login"
-				class="cursor-pointer rounded-full border px-5 py-2 text-sm font-medium transition-all {over
-					? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90'
-					: 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}"
-				>Log In</a
-			>
+			{#if minimal}
+				<a
+					href="/agent/chat"
+					class="relative cursor-pointer rounded-full border p-2 transition-all duration-200 {over
+						? 'border-white/[0.12] text-white/55 hover:border-white/[0.30] hover:text-white/75'
+						: 'border-black/[0.12] text-black/55 hover:border-black/[0.30] hover:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75'}"
+					aria-label="Chat history"
+				>
+					<svg
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="1.5"
+					>
+						<path d="M2 2h20v14H14l-2 4-2-4H2z" />
+					</svg>
+					{#if chatCount > 0}
+						<span
+							class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-black px-0.5 text-[10px] font-medium text-white dark:bg-white dark:text-black"
+							>{chatCount}</span
+						>
+					{/if}
+				</a>
+			{/if}
+			{#if !minimal}
+				<a
+					href="/login"
+					class="cursor-pointer rounded-full border px-5 py-2 text-sm font-medium transition-all {over
+						? 'border-white/15 text-white/70 hover:border-white/25 hover:text-white/90'
+						: 'border-black/10 text-black/70 hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90'}"
+					>Log In</a
+				>
+			{/if}
 			<button onclick={() => formState.open()} class="cursor-pointer btn-primary px-5 py-2 text-sm"
 				>Contact Us</button
 			>
 		</div>
 
 		<div class="flex items-center gap-3 md:hidden">
-			<a
-				href="/login"
-				class="cursor-pointer rounded-full border p-2 transition-all duration-200 {over
-					? 'border-white/[0.12] text-white/55 hover:border-white/[0.30] hover:text-white/75'
-					: 'border-black/[0.12] text-black/55 hover:border-black/[0.30] hover:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75'}"
-				aria-label="Log In"
-			>
-				<svg
-					class="h-4 w-4"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					stroke-width="1.5"><circle cx="12" cy="8" r="4" /><path d="M4 23a8 8 0 0 1 16 0" /></svg
+			{#if minimal}
+				<a
+					href="/agent/chat"
+					class="relative cursor-pointer rounded-full border p-2 transition-all duration-200 {over
+						? 'border-white/[0.12] text-white/55 hover:border-white/[0.30] hover:text-white/75'
+						: 'border-black/[0.12] text-black/55 hover:border-black/[0.30] hover:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75'}"
+					aria-label="Chat history"
 				>
-			</a>
+					<svg
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="1.5"
+					>
+						<path d="M2 2h20v14H14l-2 4-2-4H2z" />
+					</svg>
+					{#if chatCount > 0}
+						<span
+							class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-black px-0.5 text-[10px] font-medium text-white dark:bg-white dark:text-black"
+							>{chatCount}</span
+						>
+					{/if}
+				</a>
+			{/if}
+			{#if !minimal}
+				<a
+					href="/login"
+					class="cursor-pointer rounded-full border p-2 transition-all duration-200 {over
+						? 'border-white/[0.12] text-white/55 hover:border-white/[0.30] hover:text-white/75'
+						: 'border-black/[0.12] text-black/55 hover:border-black/[0.30] hover:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75'}"
+					aria-label="Log In"
+				>
+					<svg
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="1.5"><circle cx="12" cy="8" r="4" /><path d="M4 23a8 8 0 0 1 16 0" /></svg
+					>
+				</a>
+			{/if}
 			<button
 				onclick={() => formState.open()}
 				class="cursor-pointer btn-primary px-4 py-1.5 text-sm">Contact Us</button
