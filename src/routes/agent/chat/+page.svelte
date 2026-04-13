@@ -370,14 +370,17 @@
 		loadingSuggestions = true;
 		try {
 			await loadGoogleMaps();
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AutocompleteSuggestion lacks types
 			const opts: any = {
 				input,
 				includedPrimaryTypes: ['restaurant', 'cafe', 'bar', 'hotel', 'food']
 			};
 			if (browserCountry) opts.region = browserCountry;
 			const { suggestions } = await (
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				google.maps.places.AutocompleteSuggestion as any
 			).fetchAutocompleteSuggestions(opts);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			placeSuggestions = suggestions.map((s: any) => ({
 				name: s.placePrediction.mainText.text,
 				secondary: s.placePrediction.secondaryText?.text ?? '',

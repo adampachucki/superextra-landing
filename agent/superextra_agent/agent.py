@@ -1,4 +1,5 @@
 import base64
+import logging
 import re
 
 from google.adk.agents.sequential_agent import SequentialAgent
@@ -8,6 +9,10 @@ from google.adk.models.google_llm import Gemini
 from google.adk.apps import App
 from google.adk.tools import google_search
 from google.genai import Client, types
+logger = logging.getLogger(__name__)
+
+MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2 MB
+
 from .specialists import (
     MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG, ORCHESTRATOR_THINKING_CONFIG,
     ALL_SPECIALISTS, set_specialist_briefs, RETRY,
@@ -103,6 +108,13 @@ def _embed_chart_images(*, callback_context, llm_response):
             and part.inline_data.mime_type
             and part.inline_data.mime_type.startswith("image/")
         ):
+            if len(part.inline_data.data) > MAX_IMAGE_BYTES:
+                logger.warning(
+                    "Skipping oversized chart image: %d bytes (limit %d)",
+                    len(part.inline_data.data),
+                    MAX_IMAGE_BYTES,
+                )
+                continue
             b64 = base64.b64encode(part.inline_data.data).decode("utf-8")
             mime = part.inline_data.mime_type
             images.append(f"data:{mime};base64,{b64}")

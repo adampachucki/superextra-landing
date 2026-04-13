@@ -12,8 +12,6 @@
 >
 	{subtitle}
 </p>
-<h2
-	class="text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-normal tracking-[-0.02em] text-black dark:text-white {titleClass}"
->
+<h2 class="heading-display text-black dark:text-white {titleClass}">
 	{title}
 </h2>

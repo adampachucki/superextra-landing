@@ -32,6 +32,13 @@
 	color-scheme: dark;
 }
 
+@utility heading-display {
+	font-size: clamp(2rem, 4vw, 3.25rem);
+	line-height: 1.1;
+	font-weight: 400;
+	letter-spacing: -0.02em;
+}
+
 @utility btn-ghost {
 	border-radius: 9999px;
 	border: 1px solid rgb(0 0 0 / 0.1);

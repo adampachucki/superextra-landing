@@ -121,6 +121,29 @@
 		}
 	});
 
+	$effect(() => {
+		if (!modalVisible || !modalEl) return;
+		const el = modalEl;
+		function handleKeydown(e: KeyboardEvent) {
+			if (e.key !== 'Tab') return;
+			const focusable = el.querySelectorAll<HTMLElement>(
+				'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+			);
+			if (focusable.length === 0) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (e.shiftKey && document.activeElement === first) {
+				e.preventDefault();
+				last.focus();
+			} else if (!e.shiftKey && document.activeElement === last) {
+				e.preventDefault();
+				first.focus();
+			}
+		}
+		el.addEventListener('keydown', handleKeydown);
+		return () => el.removeEventListener('keydown', handleKeydown);
+	});
+
 	// --- Actions ---
 
 	function close() {
@@ -353,6 +376,10 @@
 						autocomplete="off"
 						autocorrect="off"
 						spellcheck="false"
+						role="combobox"
+						aria-autocomplete="list"
+						aria-expanded={showSuggestions && placeSuggestions.length > 0}
+						aria-controls="place-suggestions"
 						class="{inputBase} pr-10 {shakeFields.has('place-name')
 							? 'shake border-red-300'
 							: 'border-black/[0.12] dark:border-white/[0.12]'}"
@@ -381,10 +408,12 @@
 					{/if}
 					{#if showSuggestions && placeSuggestions.length > 0}
 						<ul
+							id="place-suggestions"
+							role="listbox"
 							class="absolute top-full right-0 left-0 z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-black/[0.12] bg-white py-1 shadow-lg dark:border-white/[0.12] dark:bg-cream-50"
 						>
 							{#each placeSuggestions as s}
-								<li>
+								<li role="option" aria-selected="false">
 									<button
 										type="button"
 										class="w-full px-4 py-2 text-left text-sm hover:bg-cream-50"

@@ -22,7 +22,7 @@ export default defineConfig(
 		rules: {
 			'no-undef': 'off',
 			'no-console': ['warn', { allow: ['warn', 'error'] }],
-			'@typescript-eslint/no-explicit-any': 'warn',
+			'@typescript-eslint/no-explicit-any': 'error',
 			'svelte/no-navigation-without-resolve': 'off',
 			'svelte/require-each-key': 'warn',
 			'svelte/no-at-html-tags': 'warn'
