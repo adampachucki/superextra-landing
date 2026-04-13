@@ -62,80 +62,80 @@ Deep review conducted April 2026 across all four layers: SvelteKit frontend, Clo
 
 ## Three-Sprint Refactor Plan
 
-### Sprint 1 — Safety & Stability
+### Sprint 1 — Safety & Stability ✓
 
 Fix the issues that can cause data loss, race conditions, or security exposure.
 
 **Chat system:**
 
-- [ ] Abort stream on conversation switch — call `abortController.abort()` in `switchTo()` when `loading` is true
-- [ ] Fix RAF cleanup in `ChatThread.svelte` — move cleanup out of early return path
-- [ ] Fix RAF map leaks in `StreamingProgress.svelte` — clear completed entries from `dataRafs`, `excerptRafs`, `readRafs`
-- [ ] Fix interval leak in `handleReturn()` — use flag to ensure single cleanup
+- [x] Abort stream on conversation switch — call `abortController.abort()` in `switchTo()` when `loading` is true
+- [x] Fix RAF cleanup in `ChatThread.svelte` — move cleanup out of early return path
+- [x] Fix RAF map leaks in `StreamingProgress.svelte` — clear completed entries from `dataRafs`, `excerptRafs`, `readRafs`
+- [x] Fix interval leak in `handleReturn()` — use flag to ensure single cleanup
 
 **Agent callbacks:**
 
-- [ ] Add `*,` keyword separator to `_inject_code_execution` in `agent.py:71`
-- [ ] Add `*,` to `_inject_geo_bias` in `specialists.py:168`
-- [ ] Add `*,` to `_make_skip_callback` inner fn in `specialists.py:182`
-- [ ] Fix `_on_tool_error` signature — add `*,`, rename `args` to `tool_args` in `specialists.py:202`
+- [x] Add `*,` keyword separator to `_inject_code_execution` in `agent.py:71`
+- [x] Add `*,` to `_inject_geo_bias` in `specialists.py:168`
+- [x] Add `*,` to `_make_skip_callback` inner fn in `specialists.py:182`
+- [x] Fix `_on_tool_error` signature — add `*,`, rename `args` to `tool_args` in `specialists.py:202`
 
 **Cloud Functions security:**
 
-- [ ] Add input validation for `message`, `sessionId`, `placeContext`, `history` in agent/agentStream endpoints
-- [ ] Add auth check to `agentDebug` endpoint (or remove it)
-- [ ] Add periodic cleanup to rate limit maps (evict expired entries when map exceeds threshold)
-- [ ] Fix error state recovery — only clear error after successful recover()
+- [x] Add input validation for `message`, `sessionId`, `placeContext`, `history` in agent/agentStream endpoints
+- [x] Add auth check to `agentDebug` endpoint (or remove it)
+- [x] Add periodic cleanup to rate limit maps (evict expired entries when map exceeds threshold)
+- [x] Fix error state recovery — only clear error after successful recover()
 
-### Sprint 2 — Code Quality
+### Sprint 2 — Code Quality ✓
 
 Reduce complexity, improve maintainability, enable linting across all code.
 
 **Component architecture:**
 
-- [ ] Break `AccessForm.svelte` (765 lines) into step components + shared state:
+- [x] Break `AccessForm.svelte` (765 lines) into step components + shared state:
   - `AccessFormStep1.svelte` (business type)
   - `AccessFormStep2.svelte` (business details + Google Places)
   - `AccessFormStep3.svelte` (contact info)
   - `AccessFormSuccess.svelte`
-- [ ] Add Google Maps script deduplication check in AccessForm
-- [ ] Create `+error.svelte` with branded error page
+- [x] Add Google Maps script deduplication check in AccessForm
+- [x] Create `+error.svelte` with branded error page
 
 **Configuration & linting:**
 
-- [ ] Remove `functions/` from ESLint ignores, add separate config if needed
-- [ ] Document Vite HMR patch in a comment in `vite.config.ts`
-- [ ] Standardize Cloud Function error codes (4xx for client errors, 5xx for server)
-- [ ] Add Firebase security headers to `firebase.json`
+- [x] Remove `functions/` from ESLint ignores, add separate config if needed
+- [x] Document Vite HMR patch in a comment in `vite.config.ts`
+- [x] Standardize Cloud Function error codes (4xx for client errors, 5xx for server)
+- [x] Add Firebase security headers to `firebase.json`
 
 **Agent hardening:**
 
-- [ ] Add explicit JSON parsing error handling in `places_tools.py` and `tripadvisor_tools.py`
-- [ ] Add `httpx.AsyncClient` cleanup function for graceful shutdown
-- [ ] Add pagination incomplete indicator in TripAdvisor reviews response
-- [ ] Validate specialist brief keys against allowed set
+- [x] Add explicit JSON parsing error handling in `places_tools.py` and `tripadvisor_tools.py`
+- [x] Add `httpx.AsyncClient` cleanup function for graceful shutdown
+- [x] Add pagination incomplete indicator in TripAdvisor reviews response
+- [x] Validate specialist brief keys against allowed set
 
-### Sprint 3 — Hardening & Polish
+### Sprint 3 — Hardening & Polish ✓
 
 Expand test coverage, improve accessibility, handle edge cases.
 
 **Test coverage:**
 
-- [ ] Add Cloud Function endpoint tests (mock Resend, ElevenLabs, Vertex AI, ADK)
-- [ ] Add agent tests for malformed JSON responses and concurrent tool calls
-- [ ] Add `onActivity` to shared test mock factories in chat-state and sse-client specs
-- [ ] Add test for malformed progress/token SSE events
+- [x] Add Cloud Function endpoint tests (mock Resend, ElevenLabs, Vertex AI, ADK)
+- [x] Add agent tests for malformed JSON responses and concurrent tool calls
+- [x] Add `onActivity` to shared test mock factories in chat-state and sse-client specs
+- [x] Add test for malformed progress/token SSE events
 
 **Accessibility & SEO:**
 
-- [ ] Add focus trap to AccessForm modal
-- [ ] Add ARIA attributes to suggestion dropdown (`role="listbox"`, `aria-selected`, `aria-autocomplete`)
-- [ ] Add `loading="lazy"` to DataSources logo images
-- [ ] Add `robots.txt` and `sitemap.xml`
+- [x] Add focus trap to AccessForm modal
+- [x] Add ARIA attributes to suggestion dropdown (`role="listbox"`, `aria-selected`, `aria-autocomplete`)
+- [x] Add `loading="lazy"` to DataSources logo images
+- [x] Add `robots.txt` and `sitemap.xml`
 
 **Developer experience:**
 
-- [ ] Create `.env.example` files for root and `agent/`
-- [ ] Change `@typescript-eslint/no-explicit-any` from warn to error
-- [ ] Extract heading typography as Tailwind utility (used in 4+ components)
-- [ ] Add image size validation before base64 encoding in agent
+- [x] Create `.env.example` files for root and `agent/`
+- [x] Change `@typescript-eslint/no-explicit-any` from warn to error
+- [x] Extract heading typography as Tailwind utility (used in 4+ components)
+- [x] Add image size validation before base64 encoding in agent
