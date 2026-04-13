@@ -250,7 +250,7 @@ export async function parseADKStream(reader, emit) {
 										category: 'data',
 										status: 'running',
 										label: counterLabel,
-										detail: discoveredPlaceNames.length > 0 ? discoveredPlaceNames.join(', ') : undefined,
+										detail: knownName || (discoveredPlaceNames.length > 0 ? discoveredPlaceNames[discoveredPlaceNames.length - 1] : undefined),
 										agent: 'context_enricher',
 									});
 								}
@@ -313,7 +313,7 @@ export async function parseADKStream(reader, emit) {
 											id: 'data-check',
 											category: 'data',
 											status: 'running',
-											detail: discoveredPlaceNames.length > 0 ? discoveredPlaceNames.join(', ') : undefined,
+											detail: placeDetail || (discoveredPlaceNames.length > 0 ? discoveredPlaceNames[discoveredPlaceNames.length - 1] : undefined),
 											agent: 'context_enricher',
 										});
 									}

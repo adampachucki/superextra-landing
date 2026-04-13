@@ -911,7 +911,7 @@ describe('parseADKStream activity events', () => {
 		assert.equal(reads.length, 1); // deduplicated
 	});
 
-	it('accumulates place names in detail across multiple get_restaurant_details calls', async () => {
+	it('sends latest place name in detail (not accumulated) for get_restaurant_details calls', async () => {
 		const reader = mockReader([
 			`data: ${JSON.stringify({
 				actions: { stateDelta: {} },
@@ -944,9 +944,11 @@ describe('parseADKStream activity events', () => {
 		const events = [];
 		await parseADKStream(reader, (e, d) => events.push({ e, d }));
 		const checks = events.filter(ev => ev.e === 'activity' && ev.d.id === 'data-check');
+		// Each event has only the latest place name, not accumulated
+		const firstDetail = checks.find(c => c.d.detail === 'Shake Shack');
+		assert.ok(firstDetail, 'first detail should be Shake Shack');
 		const lastCheck = checks[checks.length - 1];
-		assert.ok(lastCheck.d.detail.includes('Shake Shack'));
-		assert.ok(lastCheck.d.detail.includes('Five Guys'));
+		assert.strictEqual(lastCheck.d.detail, 'Five Guys');
 	});
 
 	it('emits search activities from _web_search_queries in stateDelta', async () => {

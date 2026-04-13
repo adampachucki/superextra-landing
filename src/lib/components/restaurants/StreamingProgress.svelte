@@ -17,16 +17,9 @@
 		analyzeItems.some((a) => a.id === 'analyze-synthesizer' && a.status === 'complete')
 	);
 
-	// Section done state
+	// Section done state (for data + analyze sections in the generic loop)
 	function isSectionDone(key: ActivityCategory): boolean {
-		const items =
-			key === 'data'
-				? dataItems
-				: key === 'search'
-					? searchItems
-					: key === 'read'
-						? readItems
-						: analyzeItemsVisible;
+		const items = key === 'data' ? dataItems : analyzeItemsVisible;
 		if (items.length === 0) return false;
 		if (!items.every((a) => a.status === 'complete')) return false;
 		// Data section: don't show Done until data-check is complete (when it exists)
@@ -85,6 +78,43 @@
 		}
 		return () => {
 			for (const raf of Object.values(dataRafs)) cancelAnimationFrame(raf);
+		};
+	});
+
+	// --- Typewriter for search queries (cycling, replacing each other) ---
+	let searchDisplay = $state('');
+	let searchTarget = $state('');
+	let searchRaf: number | undefined;
+
+	function drainSearch() {
+		if (searchDisplay.length < searchTarget.length) {
+			searchDisplay = searchTarget.slice(0, searchDisplay.length + 2);
+			searchRaf = requestAnimationFrame(drainSearch);
+		} else {
+			searchRaf = undefined;
+		}
+	}
+
+	// Track the latest running search query
+	let latestSearchQuery = $derived(
+		(() => {
+			const queries = searchItems.filter((a) => a.id !== 'search-web');
+			// Find last running, or last item overall
+			const running = queries.filter((a) => a.status === 'running');
+			return running.length > 0 ? running[running.length - 1] : queries[queries.length - 1];
+		})()
+	);
+
+	$effect(() => {
+		const query = latestSearchQuery;
+		if (query?.label && query.label !== searchTarget) {
+			searchTarget = query.label;
+			searchDisplay = '';
+			if (searchRaf) cancelAnimationFrame(searchRaf);
+			searchRaf = requestAnimationFrame(drainSearch);
+		}
+		return () => {
+			if (searchRaf) cancelAnimationFrame(searchRaf);
 		};
 	});
 
@@ -180,14 +210,19 @@
 		}
 	}
 
-	// Sections for the generic loop (read excluded — rendered separately)
+	// Search items without the aggregate search-web item
+	let searchQueries = $derived(searchItems.filter((a) => a.id !== 'search-web'));
+	let searchDone = $derived(
+		searchItems.length > 0 && searchItems.every((a) => a.status === 'complete')
+	);
+
+	// Sections for the generic loop (search + read excluded — rendered separately)
 	const SECTION_CONFIG: {
 		key: ActivityCategory;
 		label: string;
 		items: () => ActivityItem[];
 	}[] = [
 		{ key: 'data', label: 'Gathering data', items: () => dataItems },
-		{ key: 'search', label: 'Searching', items: () => searchItems },
 		{ key: 'analyze', label: 'Analyzing', items: () => analyzeItemsVisible }
 	];
 </script>
@@ -218,48 +253,8 @@
 							></span>
 						{/if}
 
-						<!-- Content varies by category -->
-						{#if section.key === 'data' || section.key === 'analyze'}
-							<!-- Data + Analyze: label with detail below in smaller font -->
-							<div class="flex flex-col">
-								<span
-									class={[
-										item.status === 'complete'
-											? 'text-black/40 dark:text-white/40'
-											: 'text-black/60 dark:text-white/60'
-									]}
-								>
-									{item.label}
-								</span>
-								{#if section.key === 'data' && dataDisplay[item.id]}
-									<span class="text-[12px] text-black/30 dark:text-white/30">
-										{dataDisplay[item.id]}
-									</span>
-								{:else if section.key === 'analyze' && excerptDisplay[item.id]}
-									<span class="text-[12px] text-black/30 dark:text-white/30">
-										{excerptDisplay[item.id]}
-									</span>
-								{/if}
-							</div>
-						{:else if section.key === 'search' && item.id === 'search-web'}
-							<!-- Aggregate search: label + specialist detail below -->
-							<div class="flex flex-col">
-								<span
-									class={[
-										item.status === 'complete'
-											? 'text-black/40 dark:text-white/40'
-											: 'text-black/60 dark:text-white/60'
-									]}
-								>
-									{item.label}
-								</span>
-								{#if item.detail}
-									<span class="text-[12px] text-black/30 dark:text-white/30">
-										{item.detail}
-									</span>
-								{/if}
-							</div>
-						{:else if section.key === 'search'}
+						<!-- Data + Analyze: label with cycling detail below -->
+						<div class="flex flex-col">
 							<span
 								class={[
 									item.status === 'complete'
@@ -267,14 +262,57 @@
 										: 'text-black/60 dark:text-white/60'
 								]}
 							>
-								"{item.label}"
+								{item.label}
 							</span>
-						{/if}
+							{#if section.key === 'data' && dataDisplay[item.id]}
+								<span class="text-[12px] text-black/30 dark:text-white/30">
+									{dataDisplay[item.id]}
+								</span>
+							{:else if section.key === 'analyze' && excerptDisplay[item.id]}
+								<span class="text-[12px] text-black/30 dark:text-white/30">
+									{excerptDisplay[item.id]}
+								</span>
+							{/if}
+						</div>
 					</div>
 				{/each}
 			</div>
 		{/if}
 	{/each}
+
+	<!-- Searching section: single cycling query line -->
+	{#if searchQueries.length > 0}
+		<div class="section-appear flex flex-col gap-0.5">
+			<span class="text-[13px] text-black/30 dark:text-white/30">
+				{#if searchDone}
+					Searching – Done
+				{:else}
+					Searching{getDots(dotPhase)}
+				{/if}
+			</span>
+			<div class="activity-appear flex items-start gap-2 text-[13px] leading-snug">
+				{#if searchDone}
+					<span class="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
+				{:else}
+					<span class="stage-pulse mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"></span>
+				{/if}
+				<div class="flex flex-col">
+					<span
+						class={searchDone
+							? 'text-black/40 dark:text-white/40'
+							: 'text-black/60 dark:text-white/60'}
+					>
+						Web search
+					</span>
+					{#if searchDisplay}
+						<span class="text-[12px] text-black/30 dark:text-white/30">
+							{searchDisplay}
+						</span>
+					{/if}
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Reading section: counter + staggered children -->
 	{#if readItems.length > 0}
