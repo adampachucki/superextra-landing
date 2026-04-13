@@ -99,10 +99,7 @@
 		</div>
 
 		<div class="mt-10 flex justify-center">
-			<button
-				onclick={() => (expanded = !expanded)}
-				class="cursor-pointer rounded-full border border-black/10 px-6 py-2.5 text-sm font-medium text-black/70 transition-all hover:border-black/15 hover:text-black/90 dark:border-white/10 dark:text-white/70 dark:hover:border-white/15 dark:hover:text-white/90"
-			>
+			<button onclick={() => (expanded = !expanded)} class="cursor-pointer btn-ghost px-6 py-2.5">
 				{expanded ? 'Show less' : 'Show more'}
 			</button>
 		</div>

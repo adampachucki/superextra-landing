@@ -7,7 +7,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import {
 	esc, row, confirmationHtml, stripMarkdown, extractSourcesFromText,
 	sendSSE, checkRateLimit, parseADKStream,
-	SPECIALIST_RESULT_KEYS, SPECIALIST_KEYS, TOOL_LABELS,
+	SPECIALIST_RESULT_KEYS,
 } from './utils.js';
 
 initializeApp();
@@ -111,7 +111,6 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 const ADK_SERVICE_URL = 'https://superextra-agent-907466498524.us-central1.run.app';
 const auth = new GoogleAuth();
 
-// SPECIALIST_RESULT_KEYS, extractSourcesFromText imported from ./utils.js
 
 const rateLimitMap = new Map();
 
@@ -305,7 +304,6 @@ export const agent = onRequest({ cors: true, timeoutSeconds: 300 }, async (req, 
 
 // --- Streaming agent endpoint (SSE progress + token streaming) ---
 
-// TOOL_LABELS, SPECIALIST_KEYS, sendSSE imported from ./utils.js
 
 async function generateTitle(message) {
 	try {
