@@ -31,6 +31,7 @@ Audit Phase 1 coverage before running any searches:
 1. For each specialist output, check whether it **addressed its brief with evidence** (3+ sources, quantified claims). Mark as COVERED / WEAK / MISSED.
 2. Identify **contradictions** between specialists and **surprising findings** that deserve follow-up.
 3. Only investigate WEAK or MISSED angles. Do not re-research COVERED angles.
+4. Check **source diversity** across all outputs. If findings rely entirely on one source type (e.g., only news articles, no community perspectives), flag as a gap worth investigating.
 
 **If no meaningful gaps exist, say so briefly.** Do not invent work. "No significant gaps — Phase 1 coverage was comprehensive" is a valid response.
 

@@ -1,5 +1,6 @@
 import atexit
 import os
+import re
 import httpx
 
 BASE_URL = "https://serpapi.com/search.json"
@@ -35,16 +36,35 @@ def _get_api_key() -> str:
     return key
 
 
-async def find_tripadvisor_restaurant(name: str, area: str) -> dict:
+def _normalize_address(addr: str) -> str:
+    """Lowercase, strip punctuation, collapse whitespace for address comparison."""
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", "", addr.lower())).strip()
+
+
+def _address_match_score(a: str, b: str) -> float:
+    """Simple word-overlap score between two normalized addresses (0.0–1.0)."""
+    if not a or not b:
+        return 0.0
+    words_a = set(a.split())
+    words_b = set(b.split())
+    if not words_a or not words_b:
+        return 0.0
+    overlap = words_a & words_b
+    return len(overlap) / min(len(words_a), len(words_b))
+
+
+async def find_tripadvisor_restaurant(name: str, area: str, address: str = "") -> dict:
     """Find a restaurant on TripAdvisor and return its full profile.
 
     Searches TripAdvisor for the restaurant, then fetches detailed place data
     including ranking, cuisines, dining options, nearby restaurants, and sample
-    reviews. Costs 2 SerpAPI calls.
+    reviews. Returns up to 3 search candidates so you can verify the match.
+    Costs 2 SerpAPI calls.
 
     Args:
         name: Restaurant name (e.g. 'Umami P-Berg').
         area: City or neighborhood for search context (e.g. 'Prenzlauer Berg Berlin').
+        address: Optional full street address from Google Places for matching confidence.
     """
     try:
         client = _get_client()
@@ -64,12 +84,25 @@ async def find_tripadvisor_restaurant(name: str, area: str) -> dict:
         if not places:
             return {"status": "error", "error_message": f"No TripAdvisor results found for '{name} {area}'"}
 
-        match = places[0]
+        # Build candidate list from top 3 results
+        candidates = []
+        for p in places[:3]:
+            candidates.append({
+                "title": p.get("title"),
+                "place_id": p.get("place_id"),
+                "rating": p.get("rating"),
+                "reviews": p.get("reviews"),
+                "location": p.get("location"),
+            })
+
+        # Default to first result
+        selected_index = 0
+        match = candidates[selected_index]
         place_id = match.get("place_id")
         if not place_id:
-            return {"status": "error", "error_message": "First search result has no place_id"}
+            return {"status": "error", "error_message": "Selected search result has no place_id"}
 
-        # Step 2: Get full place details
+        # Step 2: Get full place details for selected match
         place_resp = await client.get(BASE_URL, params={
             "engine": "tripadvisor_place",
             "place_id": place_id,
@@ -79,6 +112,18 @@ async def find_tripadvisor_restaurant(name: str, area: str) -> dict:
             return {"status": "error", "error_message": f"SerpAPI place error {place_resp.status_code}: {place_resp.text}"}
 
         place_data = place_resp.json().get("place_result", {})
+
+        # Determine match confidence using the detailed address
+        ta_address = place_data.get("address", "")
+        if address and ta_address:
+            score = _address_match_score(
+                _normalize_address(address), _normalize_address(ta_address)
+            )
+            match_confidence = "high" if score >= 0.4 else "low"
+        elif len(candidates) == 1:
+            match_confidence = "high"
+        else:
+            match_confidence = "low"
 
         # Extract nearby restaurants (compact)
         nearby = []
@@ -107,6 +152,9 @@ async def find_tripadvisor_restaurant(name: str, area: str) -> dict:
 
         return {
             "status": "success",
+            "candidates": candidates,
+            "selected_index": selected_index,
+            "match_confidence": match_confidence,
             "place_id": place_id,
             "name": place_data.get("name"),
             "rating": place_data.get("rating"),

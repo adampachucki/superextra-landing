@@ -20,7 +20,26 @@ SEARCH_RESPONSE = {
             "place_id": "6796040",
             "rating": 4.1,
             "reviews": 886,
-        }
+            "location": "Berlin, Germany",
+        },
+        {
+            "position": 2,
+            "title": "Umami Restaurant",
+            "place_type": "EATERY",
+            "place_id": "9999999",
+            "rating": 3.8,
+            "reviews": 120,
+            "location": "Berlin, Germany",
+        },
+        {
+            "position": 3,
+            "title": "Umami Sushi",
+            "place_type": "EATERY",
+            "place_id": "8888888",
+            "rating": 4.0,
+            "reviews": 55,
+            "location": "Berlin, Germany",
+        },
     ]
 }
 
@@ -129,6 +148,74 @@ class TestFindTripadvisorRestaurant:
         assert len(result["nearby_restaurants"]) == 1
         assert result["nearby_restaurants"][0]["name"] == "Pasternak"
         assert len(result["sample_reviews"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_returns_candidates_list(self):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            result = await find_tripadvisor_restaurant("Umami", "Prenzlauer Berg Berlin")
+
+        assert len(result["candidates"]) == 3
+        assert result["candidates"][0]["title"] == "Umami P-Berg"
+        assert result["candidates"][1]["title"] == "Umami Restaurant"
+        assert result["candidates"][2]["title"] == "Umami Sushi"
+        assert result["selected_index"] == 0
+
+    @pytest.mark.asyncio
+    async def test_address_matching_high_confidence(self):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            # PLACE_RESPONSE has address "Knaackstr. 16-18, 10405 Berlin"
+            result = await find_tripadvisor_restaurant(
+                "Umami", "Berlin", address="Knaackstr. 16-18, 10405 Berlin"
+            )
+
+        assert result["match_confidence"] == "high"
+
+    @pytest.mark.asyncio
+    async def test_address_matching_low_confidence_when_no_match(self):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            result = await find_tripadvisor_restaurant(
+                "Umami", "Berlin", address="Completely Different Street 99, 99999 Munich"
+            )
+
+        assert result["match_confidence"] == "low"
+
+    @pytest.mark.asyncio
+    async def test_backward_compatible_without_address(self):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            # Call without address — should still work, select first result
+            result = await find_tripadvisor_restaurant("Umami", "Berlin")
+
+        assert result["status"] == "success"
+        assert result["selected_index"] == 0
+        assert "candidates" in result
 
     @pytest.mark.asyncio
     async def test_no_results_returns_error(self):

@@ -37,6 +37,7 @@ DETAIL_FIELDS = ",".join([
     "businessStatus",
     "googleMapsUri",
     "reviews",
+    "reviewSummary",
     "regularOpeningHours",
     "editorialSummary",
     "dineIn",

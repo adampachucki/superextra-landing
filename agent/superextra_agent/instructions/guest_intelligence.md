@@ -20,7 +20,7 @@ Quantify when possible. "18 of the last 50 reviews mention slow service" beats "
 
 ## Independent research — multiple sources required
 
-You do NOT have TripAdvisor API tools — a separate specialist (review_analyst) handles structured TripAdvisor analysis. Search for reviews on at least 2-3 sources beyond Google Places: TheFork, delivery platform reviews (Wolt, Pyszne.pl, Uber Eats), food blogs, Reddit, local forums, newspaper reviews. Do not duplicate review_analyst's TripAdvisor work.
+You do NOT have TripAdvisor API tools — a separate specialist (review_analyst) handles structured TripAdvisor and Google Reviews analysis. Search for reviews on at least 2-3 sources beyond Google Places: TheFork, delivery platform reviews (Wolt, Pyszne.pl, Uber Eats), food blogs, Reddit, local forums, newspaper reviews. Use `fetch_web_content(url)` to read the full content of promising search results. Do not duplicate review_analyst's TripAdvisor or Google Reviews work.
 
 ## Restaurant context from Google Places
 

@@ -9,6 +9,8 @@ from google.adk.models.google_llm import Gemini
 from google.adk.apps import App
 from google.adk.tools import google_search
 from google.genai import Client, types
+
+from .web_tools import fetch_web_content
 logger = logging.getLogger(__name__)
 
 MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2 MB
@@ -174,7 +176,7 @@ research_orchestrator = LlmAgent(
     model=MODEL_GEMINI,
     instruction=_orchestrator_instruction,
     description="Plans research: reconnaissance, premise audit, and specialist brief assignment.",
-    tools=[google_search, set_specialist_briefs],
+    tools=[google_search, set_specialist_briefs, fetch_web_content],
     output_key="research_plan",
     generate_content_config=ORCHESTRATOR_THINKING_CONFIG,
     before_model_callback=_inject_geo_bias,

@@ -9,7 +9,9 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.tools import google_search
 from google.genai import Client, types
 
+from .apify_tools import get_google_reviews
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
+from .web_tools import fetch_web_content
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +248,7 @@ def _make_specialist(name, description, output_key, tools=None, instruction_name
         model=SPECIALIST_GEMINI,
         description=description,
         instruction=_make_instruction(instruction_name or name, brief_key=name),
-        tools=tools or [google_search],
+        tools=tools or [google_search, fetch_web_content],
         output_key=output_key,
         generate_content_config=THINKING_CONFIG,
         before_agent_callback=_make_skip_callback(name),
@@ -273,7 +275,7 @@ ALL_SPECIALISTS.append(_make_specialist(
     "review_analyst",
     "Quantitative review analysis from structured API sources: tourist/local breakdown, rating trends, owner engagement, rankings.",
     "review_result",
-    tools=[find_tripadvisor_restaurant, get_tripadvisor_reviews],
+    tools=[find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
 ))
 
 ALL_SPECIALISTS.append(_make_specialist(
@@ -318,7 +320,7 @@ def make_gap_researcher():
         model=SPECIALIST_GEMINI,
         description="Analyzes Phase 1 specialist outputs for gaps, contradictions, and underexplored angles.",
         instruction=_gap_researcher_instruction,
-        tools=[google_search],
+        tools=[google_search, fetch_web_content],
         output_key="dynamic_result_2",
         generate_content_config=THINKING_CONFIG,
         before_agent_callback=_skip_if_no_outputs,
