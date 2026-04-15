@@ -10,6 +10,7 @@ from superextra_agent.specialists import (
     set_specialist_briefs,
     VALID_BRIEF_KEYS,
 )
+from superextra_agent.agent import _skip_enricher_if_cached
 
 
 class FakeCallbackContext:
@@ -89,3 +90,18 @@ async def test_set_specialist_briefs_all_invalid():
         tool_context,
     )
     assert tool_context.state["specialist_briefs"] == {}
+
+
+def test_skip_enricher_returns_cached_context():
+    """Enricher skips and returns cached places_context when it exists."""
+    ctx = FakeCallbackContext(state={"places_context": "Cached restaurant data"})
+    result = _skip_enricher_if_cached(callback_context=ctx)
+    assert result is not None
+    assert result.parts[0].text == "Cached restaurant data"
+
+
+def test_skip_enricher_runs_when_no_cache():
+    """Enricher runs normally when no places_context in state."""
+    ctx = FakeCallbackContext(state={})
+    result = _skip_enricher_if_cached(callback_context=ctx)
+    assert result is None

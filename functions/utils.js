@@ -630,21 +630,21 @@ export async function parseADKStream(reader, emit) {
 						}
 					}
 
-					// 6. Synthesizer streaming tokens
-					if (author === 'synthesizer' && evt.partial === true) {
+					// 6. Synthesizer or follow-up streaming tokens
+					if ((author === 'synthesizer' || author === 'follow_up') && evt.partial === true) {
 						if (!synthesisStarted) {
 							synthesisStarted = true;
 							emit('progress', {
 								stage: 'synthesis',
 								status: 'running',
-								label: 'Synthesizing findings'
+								label: author === 'follow_up' ? 'Answering follow-up' : 'Synthesizing findings'
 							});
 							emit('activity', {
-								id: 'analyze-synthesizer',
+								id: author === 'follow_up' ? 'analyze-followup' : 'analyze-synthesizer',
 								category: 'analyze',
 								status: 'running',
-								label: 'Synthesizing findings',
-								agent: 'synthesizer'
+								label: author === 'follow_up' ? 'Answering follow-up' : 'Synthesizing findings',
+								agent: author
 							});
 						}
 						// Only emit visible text — skip thinking (thought: true),
@@ -659,11 +659,11 @@ export async function parseADKStream(reader, emit) {
 					if (delta.final_report) {
 						reply = delta.final_report;
 						emit('activity', {
-							id: 'analyze-synthesizer',
+							id: author === 'follow_up' ? 'analyze-followup' : 'analyze-synthesizer',
 							category: 'analyze',
 							status: 'complete',
 							label: 'Research complete',
-							agent: 'synthesizer'
+							agent: author || 'synthesizer'
 						});
 					}
 

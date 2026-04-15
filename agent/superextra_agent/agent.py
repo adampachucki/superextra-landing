@@ -38,10 +38,30 @@ INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
 _ORCHESTRATOR_TEMPLATE = (INSTRUCTIONS_DIR / "research_orchestrator.md").read_text()
 
+_SPECIALIST_RESULT_KEYS = {
+    "market_result": "Market Landscape", "pricing_result": "Menu & Pricing",
+    "revenue_result": "Revenue & Sales", "guest_result": "Guest Intelligence",
+    "location_result": "Location & Traffic", "ops_result": "Operations",
+    "marketing_result": "Marketing & Digital", "review_result": "Review Analysis",
+    "dynamic_result_1": "Dynamic Research",
+}
+
 def _orchestrator_instruction(ctx):
-    """Inject places_context into the orchestrator's instructions."""
+    """Inject places_context and existing results into the orchestrator's instructions."""
     places_context = ctx.state.get("places_context", "No Google Places data available.")
-    return _ORCHESTRATOR_TEMPLATE.format(places_context=places_context)
+    existing = [label for key, label in _SPECIALIST_RESULT_KEYS.items()
+                if ctx.state.get(key) and ctx.state.get(key) != "Agent did not produce output."]
+    follow_up_note = ""
+    if existing:
+        prior_plan = ctx.state.get("research_plan", "Not available.")
+        follow_up_note = (
+            f"\n\n## Existing research from prior turn\n\n"
+            f"Specialists with existing results: {', '.join(existing)}.\n\n"
+            f"Prior research plan:\n{prior_plan}\n\n"
+            f"Only assign specialists for angles NOT already covered, "
+            f"unless the follow-up explicitly needs to update or deepen an existing area."
+        )
+    return _ORCHESTRATOR_TEMPLATE.format(places_context=places_context) + follow_up_note
 
 _SYNTHESIZER_TEMPLATE = (INSTRUCTIONS_DIR / "synthesizer.md").read_text()
 _SYNTHESIZER_KEYS = [
@@ -62,6 +82,14 @@ _ENRICHER_INSTRUCTION = (INSTRUCTIONS_DIR / "context_enricher.md").read_text()
 _ENRICHER_TOOLS = [get_restaurant_details, get_batch_restaurant_details, find_nearby_restaurants, search_restaurants]
 
 
+def _skip_enricher_if_cached(*, callback_context):
+    """Skip context enricher if places_context already populated from a prior turn."""
+    existing = callback_context.state.get("places_context")
+    if existing:
+        return types.Content(role="model", parts=[types.Part(text=existing)])
+    return None
+
+
 def _make_enricher(name="context_enricher"):
     """Create a context enricher instance."""
     return LlmAgent(
@@ -72,6 +100,7 @@ def _make_enricher(name="context_enricher"):
         tools=_ENRICHER_TOOLS,
         output_key="places_context",
         generate_content_config=THINKING_CONFIG,
+        before_agent_callback=_skip_enricher_if_cached,
     )
 
 
@@ -169,6 +198,44 @@ def _make_synthesizer(name="synthesizer"):
     )
 
 
+# --- Follow-up agent (answers from existing research, no tools) ---
+
+_FOLLOW_UP_TEMPLATE = (INSTRUCTIONS_DIR / "follow_up.md").read_text()
+
+def _follow_up_instruction(ctx):
+    """Inject prior report and context into the follow-up agent's instructions."""
+    replacements = {
+        "final_report": ctx.state.get("final_report", "No prior report available."),
+        "places_context": ctx.state.get("places_context", "No restaurant data available."),
+        "research_plan": ctx.state.get("research_plan", "No research plan available."),
+    }
+    # Use replace() instead of .format() — LLM output may contain curly braces.
+    result = _FOLLOW_UP_TEMPLATE
+    for key, value in replacements.items():
+        result = result.replace(f"{{{key}}}", value)
+    return result
+
+follow_up = LlmAgent(
+    name="follow_up",
+    model=_FAST_MODEL,
+    instruction=_follow_up_instruction,
+    description="Answers simple follow-up questions using existing research data. No tools.",
+    output_key="final_report",
+)
+
+# --- Router instruction provider ---
+
+_ROUTER_TEMPLATE = (INSTRUCTIONS_DIR / "router.md").read_text()
+
+def _router_instruction(ctx):
+    """Append session state info so the router knows whether a report exists."""
+    has_report = bool(ctx.state.get("final_report"))
+    if has_report:
+        note = "\n\n## Session state\n\nA research report has already been delivered in this conversation."
+    else:
+        note = "\n\n## Session state\n\nNo research has been done yet in this conversation."
+    return _ROUTER_TEMPLATE + note
+
 # --- Agent definitions ---
 
 research_orchestrator = LlmAgent(
@@ -201,9 +268,9 @@ research_pipeline = SequentialAgent(
 _router = LlmAgent(
     name="router",
     model=_FAST_MODEL,
-    instruction=(INSTRUCTIONS_DIR / "router.md").read_text(),
-    description="Routes user questions to research or asks for clarification.",
-    sub_agents=[research_pipeline],
+    instruction=_router_instruction,
+    description="Routes user questions to research, follow-up, or asks for clarification.",
+    sub_agents=[research_pipeline, follow_up],
     output_key="router_response",
 )
 

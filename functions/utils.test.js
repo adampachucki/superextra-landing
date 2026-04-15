@@ -1389,4 +1389,41 @@ describe('parseADKStream activity events', () => {
 		assert.equal(reads[0].d.label, 'Yelp Review');
 		assert.ok(!reads[0].d.label.includes('vertexaisearch'));
 	});
+
+	it('emits follow-up progress and tokens for follow_up agent', async () => {
+		const reader = mockReader([
+			`data: ${JSON.stringify({
+				actions: { stateDelta: {} },
+				content: { parts: [{ text: 'Based on the prior report' }] },
+				author: 'follow_up',
+				partial: true
+			})}\n\n`
+		]);
+		const events = [];
+		await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		const progress = events.find((ev) => ev.e === 'progress' && ev.d.stage === 'synthesis');
+		assert.ok(progress);
+		assert.equal(progress.d.label, 'Answering follow-up');
+		const activity = events.find((ev) => ev.e === 'activity' && ev.d.id === 'analyze-followup');
+		assert.ok(activity);
+		assert.equal(activity.d.label, 'Answering follow-up');
+		const token = events.find((ev) => ev.e === 'token');
+		assert.ok(token);
+		assert.equal(token.d.text, 'Based on the prior report');
+	});
+
+	it('emits follow-up complete activity on final_report from follow_up', async () => {
+		const reader = mockReader([
+			`data: ${adkEvent({
+				actions: { stateDelta: { final_report: 'Follow-up answer here.' } },
+				author: 'follow_up'
+			})}\n\n`
+		]);
+		const events = [];
+		const result = await parseADKStream(reader, (e, d) => events.push({ e, d }));
+		assert.equal(result.reply, 'Follow-up answer here.');
+		const complete = events.find((ev) => ev.e === 'activity' && ev.d.id === 'analyze-followup');
+		assert.ok(complete);
+		assert.equal(complete.d.status, 'complete');
+	});
 });

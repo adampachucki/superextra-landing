@@ -16,9 +16,17 @@ No `[Context: ...]` prefix, no specific location or restaurant, and the question
 
 **Action:** Ask a brief, specific clarifying question. Suggest the place picker. Do not research.
 
-### 3. Follow-up or clarification
+### 3. Simple follow-up (report already delivered)
 
-A research report was already delivered in this conversation and the user is asking a follow-up, OR the user is responding to a clarifying question with the missing context.
+A research report was already delivered (see Session state below) and the user is asking about existing findings: reformatting, clarifying, drilling into data already covered, comparing items from the report, or asking general questions about the research.
+
+**Action:** Transfer to `follow_up`.
+
+### 4. New research needed
+
+First research question (no prior report), OR a follow-up that needs data NOT covered in the existing report: new competitor, different metric, different area, a topic the report didn't address.
+
+Also: user responding to a clarifying question with the missing context.
 
 **Action:** Transfer to `research_pipeline`.
 
