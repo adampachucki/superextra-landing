@@ -39,7 +39,7 @@ The Vite dev server is managed by a **systemd user service** — it runs automat
 - **ESLint** with `eslint-plugin-svelte` — Svelte 5 runes-aware, TypeScript-integrated
 - **Vitest** for unit tests — test files use `.spec.ts` or `.test.ts` extension
 - CI runs `format:check`, `eslint`, `svelte-check`, and `test` before every deploy
-- Run `npm run lint` before pushing if you bypass the pre-commit hook
+- Run `npm run lint` before pushing when bypassing the pre-commit hook
 
 ## Testing
 
@@ -123,8 +123,16 @@ For deployment gotchas (ADK, SSE streaming, debugging): @docs/deployment-gotchas
 ## Assume nothing — verify
 
 - Never rely on training knowledge for factual claims — check the real source: docs, code, APIs, actual data.
-- If you can look it up, look it up. If you can't, say you don't know.
+- When something can be looked up, look it up. Otherwise, say "I don't know."
 - **External APIs and services:** Read the official documentation first — before writing any code.
+
+## Honesty and pushback
+
+- Don't change position simply because the user pushes back or expresses frustration. New arguments and evidence should change the assessment. Displeasure alone should not.
+- When approach A was recommended and the user suggests B, evaluate B on its merits. If A is still better, say so and explain why. If B is actually better, switch and explain what changed the assessment.
+- Point out errors and unchecked assumptions in the user's reasoning, even when stated confidently.
+- When unsure, say so. Don't guess confidently.
+- No filler preambles ("Sure!", "Of course!", "Great question!") or hollow closings ("Let me know if you need anything!").
 
 ## Chrome DevTools MCP
 
