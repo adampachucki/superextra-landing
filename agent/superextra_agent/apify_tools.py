@@ -6,7 +6,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 APIFY_BASE = "https://api.apify.com/v2"
-ACTOR_ID = "automation-lab~google-maps-reviews-scraper"
+ACTOR_ID = "compass~google-maps-reviews-scraper"
 
 _client: httpx.AsyncClient | None = None
 
@@ -40,25 +40,15 @@ def _get_api_key() -> str:
     return key
 
 
-def _build_maps_url(name: str, address: str) -> str:
-    """Build a Google Maps place URL from name and address."""
-    query = f"{name}, {address}".replace(" ", "+")
-    return f"https://www.google.com/maps/place/{query}/"
-
-
-async def get_google_reviews(
-    name: str, address: str, max_reviews: int = 50
-) -> dict:
-    """Fetch Google Maps reviews for a restaurant.
+async def get_google_reviews(place_id: str, max_reviews: int = 50) -> dict:
+    """Fetch Google Maps reviews for a restaurant using its Place ID.
 
     Returns structured reviews with text, ratings, dates, and reviewer info.
-    Uses the restaurant name and full address from Places context — no matching needed.
+    Uses the Google Maps Place ID directly — no name matching needed.
 
     Args:
-        name: Restaurant name (e.g. 'Wanderlust Speciality Coffee').
-              Found in the Places context displayName.
-        address: Full street address (e.g. 'Ząbkowska 27/29, 03-736 Warszawa, Poland').
-                 Found in the Places context formattedAddress.
+        place_id: Google Places ID (e.g. 'ChIJMRpv9_HNHkcRdzbAYDXx7fc').
+                  Found in the Places context data.
         max_reviews: Maximum number of reviews to fetch (default 50, max 200).
     """
     try:
@@ -66,16 +56,14 @@ async def get_google_reviews(
         api_key = _get_api_key()
         max_reviews = min(max_reviews, 200)
 
-        place_url = _build_maps_url(name, address)
-
         # Use synchronous run endpoint — waits for completion and returns dataset
         resp = await client.post(
             f"{APIFY_BASE}/acts/{ACTOR_ID}/run-sync-get-dataset-items",
             params={"token": api_key},
             json={
-                "placeUrls": [place_url],
-                "maxReviewsPerPlace": max_reviews,
-                "sortBy": "newest",
+                "placeIds": [place_id],
+                "maxReviews": max_reviews,
+                "reviewsSort": "newest",
             },
             timeout=120.0,
         )
@@ -95,7 +83,7 @@ async def get_google_reviews(
         if not items:
             return {
                 "status": "error",
-                "error_message": f"No Google reviews found for '{name}'",
+                "error_message": f"No Google reviews found for place {place_id}",
             }
 
         reviews = []
@@ -103,7 +91,7 @@ async def get_google_reviews(
             review = {
                 "text": item.get("text") or item.get("textTranslated", ""),
                 "rating": item.get("stars"),
-                "date": item.get("publishedAt", ""),
+                "date": item.get("publishedAtDate") or item.get("publishAt", ""),
                 "language": item.get("originalLanguage") or item.get("language", ""),
                 "is_local_guide": item.get("isLocalGuide", False),
                 "likes": item.get("likesCount", 0),
@@ -115,7 +103,7 @@ async def get_google_reviews(
 
         return {
             "status": "success",
-            "name": name,
+            "place_id": place_id,
             "total_fetched": len(reviews),
             "reviews": reviews,
         }

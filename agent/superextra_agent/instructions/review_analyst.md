@@ -12,7 +12,7 @@ Quantitative analysis from structured review API sources (Google Reviews and Tri
 
 ## Your tools
 
-**`get_google_reviews(name, address, max_reviews=50)`** — Fetches Google Maps reviews using the restaurant name and address from Places context (no matching needed). Returns structured reviews with text, rating, date, language, is_local_guide, likes, and owner responses.
+**`get_google_reviews(place_id, max_reviews=50)`** — Fetches Google Maps reviews using the Place ID directly (no matching needed). Returns structured reviews with text, rating, date, language, is_local_guide, likes, and owner responses. Place IDs are in the Places context below.
 
 **`find_tripadvisor_restaurant(name, area, address="")`** — Searches TripAdvisor and returns up to 3 candidates with the best match pre-selected. Pass the full street address from Places context for confident matching. Returns the selected restaurant's full profile: rating, ranking, cuisines, dining options, nearby restaurants with ratings, and sample reviews.
 
@@ -24,20 +24,20 @@ You do NOT have google_search. A separate specialist (guest_intelligence) handle
 
 **Target restaurant:**
 
-1. Call `get_google_reviews` with the restaurant name and full address from the Places context below — no matching needed
+1. Call `get_google_reviews` with the Place ID from the Places context below — no matching needed
 2. Call `find_tripadvisor_restaurant` with restaurant name, area, AND full address from the Places context
 3. Check `match_confidence` — if "low", review the `candidates` list and only retry with a different name phrasing if none of the candidate addresses match the Places address
 4. If TripAdvisor match is confident, call `get_tripadvisor_reviews` with place_id — use 3 pages (30 reviews) by default
 5. Compute quantitative breakdowns from structured fields — don't just read the text
 6. Cross-reference findings between platforms — different audiences use each platform
 
-**Additional restaurants:** If your brief lists competitors or other restaurants to analyze, call `get_google_reviews` for each (names and addresses are in the Places context). Use `max_reviews=30` per additional restaurant to keep scope manageable.
+**Additional restaurants:** If your brief lists competitors or other restaurants to analyze, call `get_google_reviews` for each (Place IDs are in the Places context). Use `max_reviews=30` per additional restaurant to keep scope manageable.
 
 ## Restaurant context from Google Places
 
 {places_context}
 
-Use name and address for `get_google_reviews` and restaurant name + address for TripAdvisor lookup.
+Use Place ID for `get_google_reviews` and restaurant name + address for TripAdvisor lookup.
 
 ## Answer specifics
 
