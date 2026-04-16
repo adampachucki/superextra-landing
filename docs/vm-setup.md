@@ -161,12 +161,39 @@ Environment variables in VM `~/.bashrc`:
 
 Session manager that replaced tmux for the Mac path. Raw pty relay — doesn't use alternate screen, so native scroll works in VS Code.
 
-- **Binary**: `/usr/local/bin/zmx`
-- **Source**: `~/src/zmx` (built from main branch for leader resize policy, not yet in a release)
+- **Binary**: `/usr/local/bin/zmx` (root-owned, installed via `sudo install`)
+- **Source**: `~/src/zmx` — upstream `github.com/neurosnap/zmx` (no GitHub fork)
 - **Build requires**: Zig 0.15.2 (installed at `/opt/zig/`)
-- **Update**: run `zmx-update` (pulls, builds, installs)
 - **Logs**: `/run/user/1001/zmx/logs/`
-- **Leader policy**: whoever typed last controls terminal resize (handles Mac + mobile different sizes)
+- **Leader policy**: upstream uses `util.isUserInput()` (libghostty ANSI parser) to promote on deliberate user input — typing, arrow keys, etc. — and intentionally excludes focus / mouse events to avoid leader-thrashing. Plus a local patch (see below) that also promotes on _resize_, so switching devices without typing still resizes the pty to match the new window.
+
+### Local fork state
+
+- `main` tracks `origin/main` clean.
+- `local-leader-fixes` = `main` + one commit: `local: promote to leader on resize`. Before rebase on new upstream, we also had an "extra leader triggers" patch (focus-in / ESC / space); it was dropped because upstream's `util.isUserInput()` covers the same ground better — and deliberately excludes focus events. Do not re-introduce.
+- Belt-and-braces backup of the patch: `~/zmx-local-leader-patch.diff`.
+
+### Update procedure
+
+No `zmx-update` command exists — build manually:
+
+```bash
+cd ~/src/zmx
+git checkout main && git pull --ff-only
+git checkout local-leader-fixes && git rebase main   # resolve conflicts if upstream touched the resize block
+zig build -Doptimize=ReleaseSafe
+sudo cp /usr/local/bin/zmx /usr/local/bin/zmx.bak-$(date +%Y%m%d)
+sudo install -m 755 -o root -g root zig-out/bin/zmx /usr/local/bin/zmx
+```
+
+Replacing the binary does **not** kill running zmx daemons — only new `zmx attach` invocations pick up the new binary. Safe mid-session.
+
+### Rollback
+
+```bash
+sudo cp /usr/local/bin/zmx.bak-v042-patched /usr/local/bin/zmx
+# or any other timestamped backup under /usr/local/bin/zmx.bak-*
+```
 
 ## tmux config (`~/.tmux.conf` on VM)
 
@@ -265,7 +292,7 @@ Cmd+Shift+7 on Mac captures screenshot, uploads via SCP to `/home/adam/screensho
 | **mosh exits immediately**      | Check UDP ports 60000-61000 in GCP firewall. Verify locale: `locale -a \| grep en_US.utf8`                                                                                                                                                                                                        |
 | **Stale SSH sockets**           | `rm ~/.ssh/sockets/*` (or just run `zx` — auto-clears)                                                                                                                                                                                                                                            |
 | **Typing feels slow**           | ~65ms ping is normal. Check `CLAUDE_CODE_NO_FLICKER=1` is set. ET has no local echo — this is the hard floor                                                                                                                                                                                      |
-| **zmx needs rebuilding**        | Run `zmx-update` on VM. Requires Zig 0.15.2 at `/opt/zig/`                                                                                                                                                                                                                                        |
+| **zmx needs rebuilding**        | See `## zmx → Update procedure`. Requires Zig 0.15.2 at `/opt/zig/`                                                                                                                                                                                                                               |
 | **zmx session lost**            | If zmx crashes, the Claude session dies (SIGHUP). Git-committed work is safe. Restart with `zx`                                                                                                                                                                                                   |
 | **Mobile shows Mouse OFF**      | Stale tmux config. Kill tmux session (`txk <name>`), rejoin (`txj <name>`)                                                                                                                                                                                                                        |
 | **VS Code SSH can't connect**   | Try `ssh superextra-vm` first. If VS Code updated, `rm -rf ~/.vscode-server/` on VM and reconnect                                                                                                                                                                                                 |
