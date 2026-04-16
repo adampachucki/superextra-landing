@@ -28,43 +28,43 @@
 	const agentUseCases = [
 		{
 			title: 'Market context',
-			graphicIndex: 4,
+			graphicIndex: 2,
 			description: `Know whether a slow month is yours or the market's. Separate performance from the trend so every decision is based on signal, not noise.`
 		},
 		{
-			title: 'Site selection',
+			title: 'Expansion strategy',
 			graphicIndex: 1,
-			description: `Foot traffic, competition density, demographics, and rent — side by side. Every new location decision grounded in real data.`
+			description: `Foot traffic, competition density, demographics, and rent — mapped around every site. Every expansion decision grounded in real data.`
 		},
 		{
 			title: 'Concept validation',
-			graphicIndex: 0,
+			graphicIndex: 7,
 			description: `See what's actually working nearby and whether local demand supports the idea — before committing to a buildout.`
 		},
 		{
-			title: 'Wage benchmarking',
+			title: 'Financial planning',
 			graphicIndex: 3,
-			description: `See what nearby restaurants actually pay for every role. Set compensation that attracts talent without overspending.`
+			description: `Project revenue, costs, and seasonality month by month against real local benchmarks. Every number grounded in the market, not assumptions.`
 		},
 		{
 			title: 'Price positioning',
-			graphicIndex: 2,
-			description: `Know exactly where every menu item sits against comparable venues. Adjust with confidence, not guesswork.`
+			graphicIndex: 4,
+			description: `Know exactly where every menu item sits on the local price curve. Adjust with confidence, not guesswork.`
 		},
 		{
 			title: 'Sentiment trends',
-			graphicIndex: 7,
+			graphicIndex: 5,
 			description: `Surface the patterns individual reviews never reveal. See which themes are growing, fading, or unique to a single location.`
 		},
 		{
 			title: 'Competitor tracking',
-			graphicIndex: 5,
+			graphicIndex: 6,
 			description:
-				'Menu changes, price moves, new launches — tracked as they happen. Stay current without relying on word of mouth.'
+				'Menu changes, price moves, new launches — on the radar as they happen. Stay current without relying on word of mouth.'
 		},
 		{
 			title: 'Market shifts',
-			graphicIndex: 6,
+			graphicIndex: 0,
 			description: `New openings, closures, and format changes in the area — flagged early so there's time to respond.`
 		}
 	];
