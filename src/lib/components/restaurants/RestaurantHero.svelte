@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
+	import { onMount } from 'svelte';
 	import { dictation } from '$lib/dictation.svelte';
 
 	const PREFIX = 'Ask Superextra ';
@@ -126,129 +127,153 @@
 		// Market context
 		{
 			label: 'Market sales shifts',
+			mobile: 'Sales shifts',
 			color: '#818cf8',
 			query: 'Is a slow month just us or is the whole neighbourhood pulling back?'
 		},
 		{
 			label: 'Seasonal demand patterns',
+			mobile: 'Demand cycles',
 			color: '#818cf8',
 			query: 'How does demand in my area shift across seasons — and how should I plan for it?'
 		},
 		{
 			label: 'Local market performance',
+			mobile: 'Market pulse',
 			color: '#818cf8',
 			query: 'How is the local food and drink market performing compared to six months ago?'
 		},
 		// Site selection
 		{
 			label: "Who's getting the traffic",
+			mobile: 'Foot traffic',
 			color: '#a78bfa',
 			query: 'What are the foot traffic patterns in my neighbourhood by day and daypart?'
 		},
 		{
 			label: 'Best streets to open on',
+			mobile: 'Best streets',
 			color: '#a78bfa',
 			query: 'Which streets or blocks near me have the highest foot traffic for hospitality?'
 		},
 		{
 			label: 'Competition density',
+			mobile: 'Competition',
 			color: '#a78bfa',
 			query: 'How saturated is the food and drink market within 1 km of this location?'
 		},
 		// Concept validation
 		{
 			label: 'Cuisine gaps in the area',
+			mobile: 'Cuisine gaps',
 			color: '#f472b6',
 			query: 'What cuisine types are underrepresented near me that locals are searching for?'
 		},
 		{
 			label: 'What concepts work here',
+			mobile: 'Concepts here',
 			color: '#f472b6',
 			query: 'Which formats and cuisines are thriving in this neighbourhood?'
 		},
 		{
 			label: 'Delivery demand signals',
+			mobile: 'Delivery trends',
 			color: '#f472b6',
 			query: 'What delivery categories are growing fastest in my area right now?'
 		},
 		// Wage benchmarking
 		{
 			label: 'Salary benchmarks',
+			mobile: 'Salaries',
 			color: '#6ee7b3',
 			query: 'What are restaurants near us actually paying for every role?'
 		},
 		{
 			label: 'Chef pay in my area',
+			mobile: 'Chef pay',
 			color: '#6ee7b3',
 			query: 'What are head chefs and sous chefs earning at comparable restaurants nearby?'
 		},
 		{
 			label: 'Server wage trends',
+			mobile: 'Server wages',
 			color: '#6ee7b3',
 			query: 'How have front-of-house wages changed in my area over the past year?'
 		},
 		// Price positioning
 		{
 			label: 'Menu price gaps',
+			mobile: 'Price gaps',
 			color: '#fbbf24',
 			query: 'How does our menu pricing compare to competitors within 1 km?'
 		},
 		{
 			label: 'Lunch price positioning',
+			mobile: 'Lunch pricing',
 			color: '#fbbf24',
 			query: 'Where does my lunch menu sit price-wise compared to nearby competitors?'
 		},
 		{
 			label: 'Drinks pricing landscape',
+			mobile: 'Drinks pricing',
 			color: '#fbbf24',
 			query: 'How do my cocktail and wine prices compare to similar bars in the area?'
 		},
 		// Sentiment trends
 		{
 			label: 'What guests are saying',
+			mobile: 'Guest reviews',
 			color: '#fb923c',
 			query: 'What are the real sentiment themes across our reviews and competitors?'
 		},
 		{
 			label: 'Service complaint trends',
+			mobile: 'Complaints',
 			color: '#fb923c',
 			query: 'What service issues keep coming up in reviews of places like mine?'
 		},
 		{
 			label: 'What earns 5 stars nearby',
+			mobile: '5-star formula',
 			color: '#fb923c',
 			query: 'What do the top-rated cafes near me have in common according to reviews?'
 		},
 		// Competitor tracking
 		{
 			label: 'Competitor menu changes',
+			mobile: 'Menu changes',
 			color: '#06b6d4',
 			query: 'Have any competitors near me changed their menu or pricing recently?'
 		},
 		{
 			label: 'New launches nearby',
+			mobile: 'New launches',
 			color: '#06b6d4',
 			query: 'What new concepts have launched in my area in the last 3 months?'
 		},
 		{
 			label: 'Who opened nearby',
+			mobile: 'New openings',
 			color: '#06b6d4',
 			query: 'What has opened or closed in my area recently?'
 		},
 		// Market shifts
 		{
 			label: 'Closures in the area',
+			mobile: 'Closures',
 			color: '#f87171',
 			query: 'What has closed nearby recently and what can I learn from it?'
 		},
 		{
 			label: 'Format shifts happening',
+			mobile: 'Format shifts',
 			color: '#f87171',
 			query:
 				'Are restaurants in my area shifting formats — dine-in to fast-casual, adding delivery?'
 		},
 		{
 			label: 'Emerging food trends',
+			mobile: 'Food trends',
 			color: '#f87171',
 			query: 'What food trends are gaining traction in my market right now?'
 		}
@@ -266,11 +291,31 @@
 	}
 
 	let pillGen = $state(0);
-	let topics = $state(shuffle(PILL_POOL).slice(0, VISIBLE_COUNT));
+
+	function pickPills(mobile = false) {
+		const picked = shuffle(PILL_POOL).slice(0, VISIBLE_COUNT);
+		// Pair short + long labels so flex-wrap rows fill evenly
+		const key = (p: (typeof PILL_POOL)[0]) => (mobile ? p.mobile : p.label).length;
+		picked.sort((a, b) => key(a) - key(b));
+		const ordered: typeof picked = [];
+		let lo = 0;
+		let hi = picked.length - 1;
+		while (lo <= hi) {
+			ordered.push(picked[lo++]);
+			if (lo <= hi) ordered.push(picked[hi--]);
+		}
+		return ordered;
+	}
+
+	let topics = $state<(typeof PILL_POOL)[number][]>([]);
+
+	onMount(() => {
+		topics = pickPills(isMobile);
+	});
 
 	function reshufflePills() {
 		pillGen++;
-		topics = shuffle(PILL_POOL).slice(0, VISIBLE_COUNT);
+		topics = pickPills(isMobile);
 	}
 
 	function resizeTextarea() {
@@ -794,16 +839,13 @@
 		</div>
 
 		<!-- Topic suggestion pills -->
-		{#key pillGen}
+		{#if pillGen === 0}
 			<div
 				class="mx-auto mt-12 flex flex-wrap justify-center gap-2 md:mt-12"
 				style="max-width: 750px;"
 			>
 				{#each topics as topic, i (topic.label)}
-					<div
-						class={pillGen === 0 ? 'topic-pill-wrap' : 'topic-pill-shuffle'}
-						style="animation-delay: {pillGen === 0 ? 380 + i * 40 : 150 + i * 100}ms"
-					>
+					<div class="hero-fade" style="animation-delay: {350 + i * 50}ms">
 						<button
 							onclick={() => selectTopic(topic.query)}
 							class="topic-pill inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] whitespace-nowrap text-black/55 transition-all duration-200 hover:border-black/[0.30] hover:text-black/75 active:border-black/[0.30] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75 dark:active:border-white/[0.30] dark:active:text-white/75"
@@ -812,16 +854,11 @@
 								class="h-1.5 w-1.5 shrink-0 rounded-full"
 								style="background-color: {topic.color}"
 							></span>
-							{topic.label}
+							{isMobile ? topic.mobile : topic.label}
 						</button>
 					</div>
 				{/each}
-				<div
-					class={pillGen === 0 ? 'topic-pill-wrap' : 'topic-pill-shuffle'}
-					style="animation-delay: {pillGen === 0
-						? 380 + VISIBLE_COUNT * 40
-						: 150 + VISIBLE_COUNT * 100}ms"
-				>
+				<div class="hero-fade" style="animation-delay: {350 + VISIBLE_COUNT * 50 + 50}ms">
 					<button
 						onclick={reshufflePills}
 						aria-label="Show different suggestions"
@@ -843,7 +880,50 @@
 					</button>
 				</div>
 			</div>
-		{/key}
+		{:else}
+			{#key pillGen}
+				<div
+					class="mx-auto mt-12 flex flex-wrap justify-center gap-2 md:mt-12"
+					style="max-width: 750px;"
+				>
+					{#each topics as topic, i (topic.label)}
+						<div class="topic-pill-shuffle" style="animation-delay: {150 + i * 100}ms">
+							<button
+								onclick={() => selectTopic(topic.query)}
+								class="topic-pill inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] whitespace-nowrap text-black/55 transition-all duration-200 hover:border-black/[0.30] hover:text-black/75 active:border-black/[0.30] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75 dark:active:border-white/[0.30] dark:active:text-white/75"
+							>
+								<span
+									class="h-1.5 w-1.5 shrink-0 rounded-full"
+									style="background-color: {topic.color}"
+								></span>
+								{isMobile ? topic.mobile : topic.label}
+							</button>
+						</div>
+					{/each}
+					<div class="topic-pill-shuffle" style="animation-delay: {150 + VISIBLE_COUNT * 100}ms">
+						<button
+							onclick={reshufflePills}
+							aria-label="Show different suggestions"
+							class="shuffle-btn group inline-flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full border border-black/[0.12] dark:border-white/[0.12]"
+						>
+							<svg
+								class="h-3.5 w-3.5 text-black opacity-30 transition-opacity duration-200 group-hover:opacity-55 dark:text-white"
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="square"
+								stroke-linejoin="miter"
+							>
+								<polyline points="23 4 23 10 17 10" />
+								<path d="M21.17 8A9 9 0 0012 3 9 9 0 003 12a9 9 0 0016.5 5" />
+							</svg>
+						</button>
+					</div>
+				</div>
+			{/key}
+		{/if}
 	</div>
 </section>
 
@@ -879,10 +959,6 @@
 		box-shadow:
 			0 1px 2px rgba(0, 0, 0, 0.1),
 			0 8px 32px rgba(0, 0, 0, 0.3);
-	}
-
-	.topic-pill-wrap {
-		animation: fadeIn 0.4s ease-out both;
 	}
 
 	.topic-pill-shuffle {
