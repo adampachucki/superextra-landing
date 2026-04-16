@@ -10,7 +10,7 @@
 		titleClass = 'max-w-2xl',
 		subtitleClass = ''
 	}: {
-		items?: { title: string; audience?: string; description: string }[];
+		items?: { title: string; audience?: string; description: string; graphicIndex?: number }[];
 		subtitle?: string;
 		title?: string;
 		titleClass?: string;
@@ -32,7 +32,12 @@
 
 	let effectiveHovered = $derived(isMobile && hoveredIndex === -1 ? activeIndex : hoveredIndex);
 
-	const defaultUseCases = [
+	const defaultUseCases: {
+		title: string;
+		audience?: string;
+		description: string;
+		graphicIndex?: number;
+	}[] = [
 		{
 			title: 'Marketing Strategy',
 			audience: 'Operators & Agencies',
@@ -192,7 +197,7 @@
 							? 'opacity-100'
 							: 'opacity-0'}"
 					/>
-					<UseCaseGraphics index={i} hovered={effectiveHovered === i} />
+					<UseCaseGraphics index={useCase.graphicIndex ?? i} hovered={effectiveHovered === i} />
 				</div>
 
 				{#if useCase.audience}<p class="mb-1 text-xs font-medium text-black/25 dark:text-white/25">
