@@ -29,43 +29,43 @@
 		{
 			title: 'Market context',
 			graphicIndex: 2,
-			description: `Know whether a slow month is yours or the market's. Separate performance from the trend so every decision is based on signal, not noise.`
+			description: `Track local market dynamics, demand cycles, and competitor momentum. Separate venue performance from the market trend — so every decision starts from signal, not noise.`
 		},
 		{
 			title: 'Expansion strategy',
 			graphicIndex: 1,
-			description: `Foot traffic, competition density, demographics, and rent — mapped around every site. Every expansion decision grounded in real data.`
+			description: `Evaluate locations with foot traffic, demographics, competition density, and rent data mapped around every site. De-risk every expansion decision.`
 		},
 		{
 			title: 'Concept validation',
 			graphicIndex: 7,
-			description: `See what's actually working nearby and whether local demand supports the idea — before committing to a buildout.`
+			description: `Validate new concepts against real local signals. See what's working nearby and whether demand supports the idea — before committing to a buildout.`
 		},
 		{
 			title: 'Financial planning',
 			graphicIndex: 3,
-			description: `Project revenue, costs, and seasonality month by month against real local benchmarks. Every number grounded in the market, not assumptions.`
+			description: `Project revenue, occupancy, and labor costs against real local benchmarks. Track how spend and staffing compare to the market — and spot inefficiencies before they hit margins.`
 		},
 		{
 			title: 'Price positioning',
 			graphicIndex: 4,
-			description: `Know exactly where every menu item sits on the local price curve. Adjust with confidence, not guesswork.`
+			description: `Benchmark pricing against local competitors on the price curve. Know which price points, channels, and promos are driving results — and adjust with confidence.`
 		},
 		{
 			title: 'Sentiment trends',
 			graphicIndex: 5,
-			description: `Surface the patterns individual reviews never reveal. See which themes are growing, fading, or unique to a single location.`
+			description: `Connect review signals across venues. See which themes are growing, fading, or unique to a single location — and catch shifts before they become ratings.`
 		},
 		{
 			title: 'Competitor tracking',
 			graphicIndex: 6,
 			description:
-				'Menu changes, price moves, new launches — on the radar as they happen. Stay current without relying on word of mouth.'
+				'Monitor competitor moves as they happen — menu changes, price shifts, new launches, and format pivots. Stay current without relying on word of mouth.'
 		},
 		{
 			title: 'Market shifts',
 			graphicIndex: 0,
-			description: `New openings, closures, and format changes in the area — flagged early so there's time to respond.`
+			description: `Track openings, closures, and format changes across the local market. Spot white spaces where demand meets thin competition — flagged early, with time to respond.`
 		}
 	];
 </script>
