@@ -89,6 +89,12 @@ When Claude exits (`/exit`, Ctrl+C, or crash), zmx session dies, tmux wrapper di
 - **Client**: `brew install MisterTea/et/et` on Mac
 - **GCP firewall**: rule `allow-et` (TCP 2022)
 - **Telemetry**: disabled in `/etc/et.cfg`
+- **Restart policy**: drop-in at `/etc/systemd/system/et.service.d/override.conf` sets `Restart=always`, `RestartSec=1s` so the service comes back within ~1 s on any exit.
+
+### sshd keepalives
+
+- **VM** `/etc/ssh/sshd_config.d/keepalive.conf`: `ClientAliveInterval 60`, `ClientAliveCountMax 3`, `TCPKeepAlive no`. Effective interval is 120 s (the vendor `50-cloudimg-settings.conf` drop-in sets 120 first and sshd is first-match-wins) — so dead peers are reaped in ~6 min.
+- **Mac** `~/.ssh/config` for `superextra-vm`: `ServerAliveInterval 15`, `ServerAliveCountMax 10`, `TCPKeepAlive no`. ControlMaster is torn down after ~150 s of unanswered keepalives — loose enough to survive laptop sleep / wifi hiccups, tight enough to not hang for hours.
 
 ### mosh
 
@@ -108,7 +114,7 @@ Host superextra-vm
     User adam
     AddressFamily inet
     ServerAliveInterval 15
-    ServerAliveCountMax 6000
+    ServerAliveCountMax 10
     TCPKeepAlive no
     ControlMaster auto
     ControlPath ~/.ssh/sockets/%r@%h-%p
@@ -133,7 +139,8 @@ Key optimizations: `ObscureKeystrokeTiming no` (disables 20ms delay), `Ciphers a
 - `net.ipv4.tcp_congestion_control=bbr` — better latency than cubic
 - `net.ipv4.tcp_autocorking=0` — sends keystrokes immediately
 - `net.ipv4.tcp_slow_start_after_idle=0` — keeps connection warm
-- BBR + Fair Queue qdisc: `tc qdisc replace dev ens4 root fq` (persistent via `fq-qdisc.service`)
+- `net.ipv4.tcp_mtu_probing=1` — survives PMTU blackholes without stalling
+- BBR + Fair Queue qdisc: persistent via `net.core.default_qdisc=fq` in `/etc/sysctl.conf` (applied at sysctl-load time; no separate systemd unit)
 
 ### macOS TCP
 
@@ -210,6 +217,10 @@ set -g focus-events on
 
 set-hook -g client-focus-out run-shell -b printf \"\\033[?25l\" > #{client_tty}
 set-hook -g client-focus-in run-shell -b printf \"\\033[?25h\" > #{client_tty}
+
+set -g default-terminal "tmux-256color"
+set -ga terminal-overrides ",*256col*:RGB,*256col*:Tc"
+set -g history-limit 50000
 ```
 
 ## VS Code
