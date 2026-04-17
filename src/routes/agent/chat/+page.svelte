@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
 	import { onMount, tick } from 'svelte';
 	import ChatThread from '$lib/components/restaurants/ChatThread.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { theme } from '$lib/theme.svelte';
 	import { dictation } from '$lib/dictation.svelte';
+	import { createPlaceSearch } from '$lib/place-search.svelte';
 
 	const PREFIX = 'Ask Superextra ';
 	const PROMPTS = [
@@ -127,7 +127,7 @@
 		const sid = params.get('sid');
 		const q = params.get('q');
 		if (q) {
-			const place =
+			const placeContext =
 				params.get('placeId') && params.get('placeName')
 					? {
 							placeId: params.get('placeId')!,
@@ -135,7 +135,7 @@
 							secondary: params.get('placeSecondary') ?? ''
 						}
 					: null;
-			chatState.start(q, place);
+			chatState.start(q, placeContext);
 			// Strip query params so reload doesn't re-send
 			const clean = new URL(window.location.href);
 			clean.searchParams.delete('q');
@@ -252,21 +252,20 @@
 
 	function handleNewChat() {
 		chatState.reset();
-		selectedPlace = null;
-		placeName = '';
-		placeSuggestions = [];
+		place.clear();
 		contextOpen = false;
 		placeNudge = false;
 		query = '';
 	}
 
 	// --- Place search (Google Places) ---
+	const place = createPlaceSearch();
 	let placeNudge = $state(false);
 	let contextOpen = $state(false);
-	let placeName = $state('');
-	let selectedPlace = $state<{ name: string; secondary: string; placeId: string } | null>(null);
+	let selectedPlace = $derived(place.selected);
 	let contextExpanded = $derived(contextOpen && !selectedPlace);
 	let contextOverflow = $state(false);
+	let placeInputEl: HTMLInputElement | undefined = $state();
 
 	$effect(() => {
 		if (contextExpanded) {
@@ -282,137 +281,17 @@
 		}
 	});
 
-	let placeSuggestions = $state<Array<{ name: string; secondary: string; placeId: string }>>([]);
-	let showSuggestions = $state(false);
-	let loadingSuggestions = $state(false);
-	let debounceTimer: ReturnType<typeof setTimeout>;
-	let placeInputEl: HTMLInputElement | undefined = $state();
-
-	let browserCountry = $state('');
-	$effect(() => {
-		try {
-			const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-			const tzCountryMap: Record<string, string> = {
-				'America/': 'us',
-				'US/': 'us',
-				'Europe/London': 'gb',
-				'Europe/Berlin': 'de',
-				'Europe/Warsaw': 'pl',
-				'Europe/Paris': 'fr',
-				'Europe/Rome': 'it',
-				'Europe/Madrid': 'es',
-				'Europe/Amsterdam': 'nl',
-				'Europe/Brussels': 'be',
-				'Europe/Vienna': 'at',
-				'Europe/Zurich': 'ch',
-				'Europe/Prague': 'cz',
-				'Europe/Stockholm': 'se',
-				'Europe/Copenhagen': 'dk',
-				'Europe/Oslo': 'no',
-				'Europe/Helsinki': 'fi',
-				'Europe/Dublin': 'ie',
-				'Europe/Lisbon': 'pt',
-				'Europe/Bucharest': 'ro',
-				'Europe/Budapest': 'hu',
-				'Europe/Athens': 'gr',
-				'Australia/': 'au',
-				'Pacific/Auckland': 'nz',
-				'Asia/Tokyo': 'jp',
-				'Asia/Seoul': 'kr',
-				'Asia/Singapore': 'sg'
-			};
-			for (const [prefix, code] of Object.entries(tzCountryMap)) {
-				if (tz.startsWith(prefix) || tz === prefix) {
-					browserCountry = code;
-					return;
-				}
-			}
-		} catch {
-			// ignore Intl formatting failures
-		}
-		const locales = navigator.languages || [navigator.language || ''];
-		for (const locale of locales) {
-			const parts = locale.split('-');
-			if (parts.length > 1) {
-				browserCountry = parts[parts.length - 1].toLowerCase();
-				return;
-			}
-		}
-	});
-
-	let mapsPromise: Promise<void> | null = null;
-	function loadGoogleMaps(): Promise<void> {
-		if (mapsPromise) return mapsPromise;
-		mapsPromise = new Promise<void>((resolve, reject) => {
-			if (typeof google !== 'undefined' && google.maps?.places) {
-				resolve();
-				return;
-			}
-			const script = document.createElement('script');
-			script.src = `https://maps.googleapis.com/maps/api/js?key=${PUBLIC_GOOGLE_PLACES_KEY}&libraries=places`;
-			script.async = true;
-			script.onload = () => resolve();
-			script.onerror = () => {
-				mapsPromise = null; // Allow retry on next call
-				reject(new Error('Failed to load Google Maps'));
-			};
-			document.head.appendChild(script);
-		});
-		return mapsPromise;
-	}
-
-	async function fetchPlaceSuggestions(input: string) {
-		if (input.length < 2) {
-			placeSuggestions = [];
-			loadingSuggestions = false;
-			return;
-		}
-		loadingSuggestions = true;
-		try {
-			await loadGoogleMaps();
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AutocompleteSuggestion lacks types
-			const opts: any = {
-				input,
-				includedPrimaryTypes: ['restaurant', 'cafe', 'bar', 'hotel', 'food']
-			};
-			if (browserCountry) opts.region = browserCountry;
-			const { suggestions } = await (
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				google.maps.places.AutocompleteSuggestion as any
-			).fetchAutocompleteSuggestions(opts);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			placeSuggestions = suggestions.map((s: any) => ({
-				name: s.placePrediction.mainText.text,
-				secondary: s.placePrediction.secondaryText?.text ?? '',
-				placeId: s.placePrediction.placeId
-			}));
-		} catch {
-			placeSuggestions = [];
-		}
-		loadingSuggestions = false;
-	}
-
 	function onPlaceInput(e: Event) {
-		const value = (e.target as HTMLInputElement).value;
-		placeName = value;
-		selectedPlace = null;
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => fetchPlaceSuggestions(value), 300);
-		showSuggestions = true;
+		place.setQuery((e.target as HTMLInputElement).value);
 	}
 
 	function selectPlaceSuggestion(s: { name: string; secondary: string; placeId: string }) {
-		placeName = s.name;
-		selectedPlace = s;
-		placeSuggestions = [];
-		showSuggestions = false;
+		place.select(s);
 		placeNudge = false;
 	}
 
 	function removePlace() {
-		selectedPlace = null;
-		placeName = '';
-		placeSuggestions = [];
+		place.clear();
 		contextOpen = false;
 	}
 
@@ -1101,19 +980,19 @@
 									<input
 										bind:this={placeInputEl}
 										type="text"
-										value={placeName}
+										value={place.query}
 										oninput={onPlaceInput}
 										onfocus={() => {
-											if (placeSuggestions.length) showSuggestions = true;
+											if (place.suggestions.length) place.setQuery(place.query);
 										}}
-										onblur={() => setTimeout(() => (showSuggestions = false), 150)}
+										onblur={() => setTimeout(() => place.hideSuggestions(), 150)}
 										placeholder="Restaurant name..."
 										autocomplete="off"
 										autocorrect="off"
 										spellcheck="false"
 										class="w-full rounded-xl border border-black/[0.08] bg-cream-50/50 px-4 py-2.5 pr-9 text-[13px] text-black placeholder:text-black/30 focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/25"
 									/>
-									{#if loadingSuggestions}
+									{#if place.loading}
 										<svg
 											class="absolute top-1/2 right-3 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-black/25 dark:text-white/25"
 											xmlns="http://www.w3.org/2000/svg"
@@ -1136,11 +1015,11 @@
 										</svg>
 									{/if}
 								</div>
-								{#if showSuggestions && placeSuggestions.length > 0}
+								{#if place.showSuggestions && place.suggestions.length > 0}
 									<ul
 										class="absolute right-0 bottom-full left-0 z-50 mb-1 max-h-48 overflow-auto rounded-xl border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50"
 									>
-										{#each placeSuggestions as s}
+										{#each place.suggestions as s}
 											<li>
 												<button
 													type="button"

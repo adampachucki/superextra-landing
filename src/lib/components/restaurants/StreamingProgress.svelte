@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ActivityItem, ActivityCategory } from '$lib/chat-state.svelte';
+	import { createTypewriter, createTypewriterGroup } from '$lib/typewriter';
 
 	let { activities, loading = false }: { activities: ActivityItem[]; loading?: boolean } = $props();
 
@@ -48,63 +49,31 @@
 
 	// --- Typewriter for data item details (place names cycling below labels) ---
 	let dataDisplay: Record<string, string> = $state({});
-	let dataTargets: Record<string, string> = {};
-	let dataRafs: Record<string, number> = {};
-
-	function drainData(id: string) {
-		const target = dataTargets[id];
-		if (!target) return;
-		const current = dataDisplay[id] || '';
-		if (current.length < target.length) {
-			dataDisplay[id] = target.slice(0, current.length + 2);
-			dataRafs[id] = requestAnimationFrame(() => drainData(id));
-		} else {
-			delete dataRafs[id];
+	const dataTypers = createTypewriterGroup({
+		onUpdate: (id, v) => {
+			dataDisplay[id] = v;
 		}
-	}
+	});
 
 	$effect(() => {
 		const activeIds = new Set(dataItems.map((a) => a.id));
 		for (const item of dataItems) {
-			if (item.detail && dataTargets[item.id] !== item.detail) {
-				const oldTarget = dataTargets[item.id] || '';
-				dataTargets[item.id] = item.detail;
-				// Only reset if the new target doesn't extend the old one
-				if (!item.detail.startsWith(oldTarget)) {
-					dataDisplay[item.id] = '';
-				}
-				if (dataRafs[item.id]) cancelAnimationFrame(dataRafs[item.id]);
-				dataRafs[item.id] = requestAnimationFrame(() => drainData(item.id));
-			}
+			if (item.detail) dataTypers.setTarget(item.id, item.detail, 'extend');
 		}
-		// Prune stale entries for items that no longer exist
-		for (const id of Object.keys(dataRafs)) {
-			if (!activeIds.has(id)) {
-				cancelAnimationFrame(dataRafs[id]);
-				delete dataRafs[id];
-				delete dataTargets[id];
-				delete dataDisplay[id];
-			}
+		dataTypers.prune(activeIds);
+		for (const id of Object.keys(dataDisplay)) {
+			if (!activeIds.has(id)) delete dataDisplay[id];
 		}
-		return () => {
-			for (const raf of Object.values(dataRafs)) cancelAnimationFrame(raf);
-			dataRafs = {};
-		};
+		return () => dataTypers.stopAll();
 	});
 
 	// --- Typewriter for search queries (cycling, replacing each other) ---
 	let searchDisplay = $state('');
-	let searchTarget = $state('');
-	let searchRaf: number | undefined;
-
-	function drainSearch() {
-		if (searchDisplay.length < searchTarget.length) {
-			searchDisplay = searchTarget.slice(0, searchDisplay.length + 2);
-			searchRaf = requestAnimationFrame(drainSearch);
-		} else {
-			searchRaf = undefined;
+	const searchTyper = createTypewriter({
+		onUpdate: (v) => {
+			searchDisplay = v;
 		}
-	}
+	});
 
 	// Track the latest running search query
 	let latestSearchQuery = $derived(
@@ -118,56 +87,28 @@
 
 	$effect(() => {
 		const query = latestSearchQuery;
-		if (query?.label && query.label !== searchTarget) {
-			searchTarget = query.label;
-			searchDisplay = '';
-			if (searchRaf) cancelAnimationFrame(searchRaf);
-			searchRaf = requestAnimationFrame(drainSearch);
-		}
-		return () => {
-			if (searchRaf) cancelAnimationFrame(searchRaf);
-		};
+		if (query?.label) searchTyper.setTarget(query.label);
+		return () => searchTyper.stop();
 	});
 
 	// --- Sentence-rotation typewriter for analyze excerpts ---
 	let excerptDisplay: Record<string, string> = $state({});
-	let excerptTargets: Record<string, string> = {};
-	let excerptRafs: Record<string, number> = {};
-
-	function drainExcerpt(id: string) {
-		const target = excerptTargets[id];
-		if (!target) return;
-		const current = excerptDisplay[id] || '';
-		if (current.length < target.length) {
-			excerptDisplay[id] = target.slice(0, current.length + 2);
-			excerptRafs[id] = requestAnimationFrame(() => drainExcerpt(id));
-		} else {
-			delete excerptRafs[id];
+	const excerptTypers = createTypewriterGroup({
+		onUpdate: (id, v) => {
+			excerptDisplay[id] = v;
 		}
-	}
+	});
 
 	$effect(() => {
 		const activeIds = new Set(analyzeItems.map((a) => a.id));
 		for (const item of analyzeItems) {
-			if (item.detail && excerptTargets[item.id] !== item.detail) {
-				excerptTargets[item.id] = item.detail;
-				excerptDisplay[item.id] = '';
-				if (excerptRafs[item.id]) cancelAnimationFrame(excerptRafs[item.id]);
-				excerptRafs[item.id] = requestAnimationFrame(() => drainExcerpt(item.id));
-			}
+			if (item.detail) excerptTypers.setTarget(item.id, item.detail, 'reset');
 		}
-		for (const id of Object.keys(excerptRafs)) {
-			if (!activeIds.has(id)) {
-				cancelAnimationFrame(excerptRafs[id]);
-				delete excerptRafs[id];
-				delete excerptTargets[id];
-				delete excerptDisplay[id];
-			}
+		excerptTypers.prune(activeIds);
+		for (const id of Object.keys(excerptDisplay)) {
+			if (!activeIds.has(id)) delete excerptDisplay[id];
 		}
-		return () => {
-			for (const raf of Object.values(excerptRafs)) cancelAnimationFrame(raf);
-			excerptRafs = {};
-		};
+		return () => excerptTypers.stopAll();
 	});
 
 	// --- Reading section: staggered reveal + typewriter ---
@@ -190,45 +131,24 @@
 	});
 
 	let readDisplay: Record<string, string> = $state({});
-	let readTargets: Record<string, string> = {};
-	let readRafs: Record<string, number> = {};
-
-	function drainRead(id: string) {
-		const target = readTargets[id];
-		if (!target) return;
-		const current = readDisplay[id] || '';
-		if (current.length < target.length) {
-			readDisplay[id] = target.slice(0, current.length + 2);
-			readRafs[id] = requestAnimationFrame(() => drainRead(id));
-		} else {
-			delete readRafs[id];
+	const readTypers = createTypewriterGroup({
+		onUpdate: (id, v) => {
+			readDisplay[id] = v;
 		}
-	}
+	});
 
 	// Typewriter only runs for visible (revealed) items
 	$effect(() => {
 		const activeIds = new Set(visibleReadItems.map((a) => a.id));
 		for (const item of visibleReadItems) {
 			const fullLabel = formatReadUrl(item.url || item.label);
-			if (readTargets[item.id] !== fullLabel) {
-				readTargets[item.id] = fullLabel;
-				readDisplay[item.id] = '';
-				if (readRafs[item.id]) cancelAnimationFrame(readRafs[item.id]);
-				readRafs[item.id] = requestAnimationFrame(() => drainRead(item.id));
-			}
+			readTypers.setTarget(item.id, fullLabel, 'reset');
 		}
-		for (const id of Object.keys(readRafs)) {
-			if (!activeIds.has(id)) {
-				cancelAnimationFrame(readRafs[id]);
-				delete readRafs[id];
-				delete readTargets[id];
-				delete readDisplay[id];
-			}
+		readTypers.prune(activeIds);
+		for (const id of Object.keys(readDisplay)) {
+			if (!activeIds.has(id)) delete readDisplay[id];
 		}
-		return () => {
-			for (const raf of Object.values(readRafs)) cancelAnimationFrame(raf);
-			readRafs = {};
-		};
+		return () => readTypers.stopAll();
 	});
 
 	function formatReadUrl(url: string): string {
