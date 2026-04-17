@@ -12,10 +12,7 @@ import {
 	extractLastSentence,
 	validatePlaceContext,
 	validateHistory,
-	SPECIALIST_RESULT_KEYS,
-	SPECIALIST_KEYS,
-	TOOL_LABELS,
-	PLACES_TOOL_LABELS
+	SPECIALIST_RESULT_KEYS
 } from './utils.js';
 
 // --- esc ---
@@ -298,20 +295,6 @@ describe('validateHistory', () => {
 describe('constants', () => {
 	it('SPECIALIST_RESULT_KEYS has 10 entries', () => {
 		assert.equal(SPECIALIST_RESULT_KEYS.length, 10);
-	});
-
-	it('SPECIALIST_KEYS is a Set matching SPECIALIST_RESULT_KEYS', () => {
-		assert.ok(SPECIALIST_KEYS instanceof Set);
-		assert.equal(SPECIALIST_KEYS.size, 10);
-		for (const key of SPECIALIST_RESULT_KEYS) {
-			assert.ok(SPECIALIST_KEYS.has(key), `Missing ${key}`);
-		}
-	});
-
-	it('TOOL_LABELS maps all specialist agent names', () => {
-		assert.equal(TOOL_LABELS.market_landscape, 'Market Landscape');
-		assert.equal(TOOL_LABELS.guest_intelligence, 'Guest Intelligence');
-		assert.equal(TOOL_LABELS.dynamic_researcher_1, 'Research');
 	});
 });
 

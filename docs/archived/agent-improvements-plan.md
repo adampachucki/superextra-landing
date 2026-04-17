@@ -1,5 +1,8 @@
 # Agent Improvements: Source Quality, Geo Bias, Two-Phase Research, Code Execution
 
+> **Status: archived — all five phases shipped.**
+> Verified in code as of 2026-04: Phase 1 (source quality guidance in specialist instructions), Phase 2 (`_inject_geo_bias` in `specialists.py`), Phase 3 (`make_gap_researcher` in `specialists.py`), Phase 4 (`_inject_code_execution` + `_embed_chart_images` in `agent.py`). Kept for historical context.
+
 ## What this is
 
 A plan to implement four improvements to the Superextra research agent. Each targets a specific weakness in how the agent researches and reports. The improvements are independent — implement them one at a time, test after each, only move on when results look good.

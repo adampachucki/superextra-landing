@@ -85,10 +85,6 @@
 					"function": "agentStream"
 				},
 				{
-					"source": "/api/agent",
-					"function": "agent"
-				},
-				{
 					"source": "/api/stt-token",
 					"function": "sttToken"
 				},

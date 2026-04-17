@@ -136,20 +136,7 @@ export const SPECIALIST_RESULT_KEYS = [
 	'dynamic_result_2'
 ];
 
-export const SPECIALIST_KEYS = new Set([
-	'guest_result',
-	'pricing_result',
-	'revenue_result',
-	'market_result',
-	'location_result',
-	'ops_result',
-	'marketing_result',
-	'review_result',
-	'dynamic_result_1',
-	'dynamic_result_2'
-]);
-
-export const TOOL_LABELS = {
+const TOOL_LABELS = {
 	market_landscape: 'Market Landscape',
 	menu_pricing: 'Menu & Pricing',
 	revenue_sales: 'Revenue & Sales',
@@ -161,7 +148,7 @@ export const TOOL_LABELS = {
 	dynamic_researcher_2: 'Research'
 };
 
-export const SPECIALIST_OUTPUT_KEYS = {
+const SPECIALIST_OUTPUT_KEYS = {
 	market_landscape: 'market_result',
 	menu_pricing: 'pricing_result',
 	revenue_sales: 'revenue_result',
@@ -173,7 +160,7 @@ export const SPECIALIST_OUTPUT_KEYS = {
 	dynamic_researcher_2: 'dynamic_result_2'
 };
 
-export const PLACES_TOOL_LABELS = {
+const PLACES_TOOL_LABELS = {
 	get_restaurant_details: 'Loading restaurant details',
 	find_nearby_restaurants: 'Finding nearby competitors',
 	search_restaurants: 'Searching restaurants'

@@ -54,7 +54,7 @@ mock.module('google-auth-library', {
 	}
 });
 
-const { intake, agent, agentStream, agentCheck, sttToken, tts } = await import('./index.js');
+const { intake, agentStream, agentCheck, sttToken, tts } = await import('./index.js');
 
 // ── Test helpers ──
 
@@ -299,79 +299,6 @@ describe('tts', () => {
 
 		const res = mockRes();
 		await tts(mockReq({ body: { text: 'Hello' } }), res);
-		assert.equal(res._status, 502);
-	});
-});
-
-// ══════════════════════════════════════════════════════
-// agent
-// ══════════════════════════════════════════════════════
-
-describe('agent', () => {
-	it('rejects non-POST with 405', async () => {
-		const res = mockRes();
-		await agent(mockReq({ method: 'GET' }), res);
-		assert.equal(res._status, 405);
-	});
-
-	it('returns 400 when message or sessionId missing', async () => {
-		const res = mockRes();
-		await agent(mockReq({ body: { message: 'hi' } }), res);
-		assert.equal(res._status, 400);
-
-		const res2 = mockRes();
-		await agent(mockReq({ body: { sessionId: 'abc' } }), res2);
-		assert.equal(res2._status, 400);
-	});
-
-	it('returns 400 when message exceeds 2000 chars', async () => {
-		const res = mockRes();
-		await agent(mockReq({ body: { message: 'a'.repeat(2001), sessionId: 'test' } }), res);
-		assert.equal(res._status, 400);
-		assert.match(res._json.error, /too long/i);
-	});
-
-	it('returns reply on success (new session)', async () => {
-		let fetchCallCount = 0;
-		globalThis.fetch = mock.fn(async (url) => {
-			fetchCallCount++;
-			// 1st call: create session
-			if (url.includes('/sessions') && !url.includes('/run_sse')) {
-				return {
-					ok: true,
-					json: async () => ({ id: 'adk-session-1' })
-				};
-			}
-			// 2nd call: run_sse
-			if (url.includes('/run_sse')) {
-				const sseBody = [
-					'data: {"actions":{"state_delta":{"final_report":"Here is the report."}}}',
-					''
-				].join('\n');
-				return { ok: true, text: async () => sseBody };
-			}
-			return { ok: true, json: async () => ({}) };
-		});
-
-		const res = mockRes();
-		await agent(
-			mockReq({ body: { message: 'Tell me about this place', sessionId: 'sess-1' } }),
-			res
-		);
-		assert.equal(res._json.ok, true);
-		assert.equal(res._json.reply, 'Here is the report.');
-	});
-
-	it('returns 502 when session creation fails', async () => {
-		globalThis.fetch = mock.fn(async (url) => {
-			if (url.includes('/sessions')) {
-				return { ok: false, status: 500 };
-			}
-			return { ok: true };
-		});
-
-		const res = mockRes();
-		await agent(mockReq({ body: { message: 'hi', sessionId: 'new-sess' } }), res);
 		assert.equal(res._status, 502);
 	});
 });
