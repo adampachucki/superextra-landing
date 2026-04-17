@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { dictation } from '$lib/dictation.svelte';
 	import { createPlaceSearch } from '$lib/place-search.svelte';
+	import TopicPills from './TopicPills.svelte';
+	import PlaceSearchWidget from './PlaceSearchWidget.svelte';
 
 	const PREFIX = 'Ask Superextra ';
 	const PROMPTS = [
@@ -123,201 +124,6 @@
 		}
 	}
 
-	const PILL_POOL = [
-		// Market context
-		{
-			label: 'Market sales shifts',
-			mobile: 'Sales shifts',
-			color: '#818cf8',
-			query: 'Is a slow month just us or is the whole neighbourhood pulling back?'
-		},
-		{
-			label: 'Seasonal demand patterns',
-			mobile: 'Demand cycles',
-			color: '#818cf8',
-			query: 'How does demand in my area shift across seasons — and how should I plan for it?'
-		},
-		{
-			label: 'Local market performance',
-			mobile: 'Market pulse',
-			color: '#818cf8',
-			query: 'How is the local food and drink market performing compared to six months ago?'
-		},
-		// Site selection
-		{
-			label: "Who's getting the traffic",
-			mobile: 'Foot traffic',
-			color: '#a78bfa',
-			query: 'What are the foot traffic patterns in my neighbourhood by day and daypart?'
-		},
-		{
-			label: 'Best streets to open on',
-			mobile: 'Best streets',
-			color: '#a78bfa',
-			query: 'Which streets or blocks near me have the highest foot traffic for hospitality?'
-		},
-		{
-			label: 'Competition density',
-			mobile: 'Competition',
-			color: '#a78bfa',
-			query: 'How saturated is the food and drink market within 1 km of this location?'
-		},
-		// Concept validation
-		{
-			label: 'Cuisine gaps in the area',
-			mobile: 'Cuisine gaps',
-			color: '#f472b6',
-			query: 'What cuisine types are underrepresented near me that locals are searching for?'
-		},
-		{
-			label: 'What concepts work here',
-			mobile: 'Concepts here',
-			color: '#f472b6',
-			query: 'Which formats and cuisines are thriving in this neighbourhood?'
-		},
-		{
-			label: 'Delivery demand signals',
-			mobile: 'Delivery trends',
-			color: '#f472b6',
-			query: 'What delivery categories are growing fastest in my area right now?'
-		},
-		// Wage benchmarking
-		{
-			label: 'Salary benchmarks',
-			mobile: 'Salaries',
-			color: '#6ee7b3',
-			query: 'What are restaurants near us actually paying for every role?'
-		},
-		{
-			label: 'Chef pay in my area',
-			mobile: 'Chef pay',
-			color: '#6ee7b3',
-			query: 'What are head chefs and sous chefs earning at comparable restaurants nearby?'
-		},
-		{
-			label: 'Server wage trends',
-			mobile: 'Server wages',
-			color: '#6ee7b3',
-			query: 'How have front-of-house wages changed in my area over the past year?'
-		},
-		// Price positioning
-		{
-			label: 'Menu price gaps',
-			mobile: 'Price gaps',
-			color: '#fbbf24',
-			query: 'How does our menu pricing compare to competitors within 1 km?'
-		},
-		{
-			label: 'Lunch price positioning',
-			mobile: 'Lunch pricing',
-			color: '#fbbf24',
-			query: 'Where does my lunch menu sit price-wise compared to nearby competitors?'
-		},
-		{
-			label: 'Drinks pricing landscape',
-			mobile: 'Drinks pricing',
-			color: '#fbbf24',
-			query: 'How do my cocktail and wine prices compare to similar bars in the area?'
-		},
-		// Sentiment trends
-		{
-			label: 'What guests are saying',
-			mobile: 'Guest reviews',
-			color: '#fb923c',
-			query: 'What are the real sentiment themes across our reviews and competitors?'
-		},
-		{
-			label: 'Service complaint trends',
-			mobile: 'Complaints',
-			color: '#fb923c',
-			query: 'What service issues keep coming up in reviews of places like mine?'
-		},
-		{
-			label: 'What earns 5 stars nearby',
-			mobile: '5-star formula',
-			color: '#fb923c',
-			query: 'What do the top-rated cafes near me have in common according to reviews?'
-		},
-		// Competitor tracking
-		{
-			label: 'Competitor menu changes',
-			mobile: 'Menu changes',
-			color: '#06b6d4',
-			query: 'Have any competitors near me changed their menu or pricing recently?'
-		},
-		{
-			label: 'New launches nearby',
-			mobile: 'New launches',
-			color: '#06b6d4',
-			query: 'What new concepts have launched in my area in the last 3 months?'
-		},
-		{
-			label: 'Who opened nearby',
-			mobile: 'New openings',
-			color: '#06b6d4',
-			query: 'What has opened or closed in my area recently?'
-		},
-		// Market shifts
-		{
-			label: 'Closures in the area',
-			mobile: 'Closures',
-			color: '#f87171',
-			query: 'What has closed nearby recently and what can I learn from it?'
-		},
-		{
-			label: 'Format shifts happening',
-			mobile: 'Format shifts',
-			color: '#f87171',
-			query:
-				'Are restaurants in my area shifting formats — dine-in to fast-casual, adding delivery?'
-		},
-		{
-			label: 'Emerging food trends',
-			mobile: 'Food trends',
-			color: '#f87171',
-			query: 'What food trends are gaining traction in my market right now?'
-		}
-	];
-
-	const VISIBLE_COUNT = 6;
-
-	function shuffle<T>(arr: T[]): T[] {
-		const a = [...arr];
-		for (let i = a.length - 1; i > 0; i--) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[a[i], a[j]] = [a[j], a[i]];
-		}
-		return a;
-	}
-
-	let pillGen = $state(0);
-
-	function pickPills(mobile = false) {
-		const picked = shuffle(PILL_POOL).slice(0, VISIBLE_COUNT);
-		// Pair short + long labels so flex-wrap rows fill evenly
-		const key = (p: (typeof PILL_POOL)[0]) => (mobile ? p.mobile : p.label).length;
-		picked.sort((a, b) => key(a) - key(b));
-		const ordered: typeof picked = [];
-		let lo = 0;
-		let hi = picked.length - 1;
-		while (lo <= hi) {
-			ordered.push(picked[lo++]);
-			if (lo <= hi) ordered.push(picked[hi--]);
-		}
-		return ordered;
-	}
-
-	let topics = $state<(typeof PILL_POOL)[number][]>([]);
-
-	onMount(() => {
-		topics = pickPills(isMobile);
-	});
-
-	function reshufflePills() {
-		pillGen++;
-		topics = pickPills(isMobile);
-	}
-
 	function resizeTextarea() {
 		if (inputEl) {
 			inputEl.style.height = 'auto';
@@ -356,6 +162,7 @@
 	}
 
 	// --- Context / Google Places ---
+
 	const place = createPlaceSearch();
 	let contextOpen = $state(false);
 	let selectedPlace = $derived(place.selected);
@@ -376,15 +183,6 @@
 			contextOverflow = false;
 		}
 	});
-
-	function onPlaceInput(e: Event) {
-		place.setQuery((e.target as HTMLInputElement).value);
-	}
-
-	function selectPlaceSuggestion(s: { name: string; secondary: string; placeId: string }) {
-		place.select(s);
-		placeNudge = false;
-	}
 
 	function removePlace() {
 		place.clear();
@@ -644,68 +442,11 @@
 								class:visible={contextExpanded}
 								onclick={(e) => e.stopPropagation()}
 							>
-								<div class="relative">
-									<input
-										bind:this={placeInputEl}
-										type="text"
-										value={place.query}
-										oninput={onPlaceInput}
-										onfocus={() => {
-											if (place.suggestions.length) place.setQuery(place.query);
-										}}
-										onblur={() => setTimeout(() => place.hideSuggestions(), 150)}
-										placeholder="Venue name..."
-										autocomplete="off"
-										autocorrect="off"
-										spellcheck="false"
-										class="w-full rounded-xl border border-black/[0.08] bg-cream-50/50 px-4 py-2.5 pr-9 text-[13px] text-black placeholder:text-black/30 focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/25"
-									/>
-									{#if place.loading}
-										<svg
-											class="absolute top-1/2 right-3 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-black/25 dark:text-white/25"
-											xmlns="http://www.w3.org/2000/svg"
-											fill="none"
-											viewBox="0 0 24 24"
-										>
-											<circle
-												class="opacity-25"
-												cx="12"
-												cy="12"
-												r="10"
-												stroke="currentColor"
-												stroke-width="3"
-											></circle>
-											<path
-												class="opacity-75"
-												fill="currentColor"
-												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-											></path>
-										</svg>
-									{/if}
-								</div>
-								{#if place.showSuggestions && place.suggestions.length > 0}
-									<ul
-										class="absolute top-full right-0 left-0 z-50 mt-1 max-h-48 overflow-auto rounded-xl border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50"
-									>
-										{#each place.suggestions as s (s.placeId)}
-											<li>
-												<button
-													type="button"
-													class="w-full cursor-pointer px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-cream-50 dark:hover:bg-white/[0.04]"
-													onpointerdown={(e) => e.preventDefault()}
-													onclick={() => selectPlaceSuggestion(s)}
-												>
-													<span class="text-black dark:text-white">{s.name}</span>
-													{#if s.secondary}
-														<span class="ml-1.5 text-black/45 dark:text-white/45"
-															>{s.secondary}</span
-														>
-													{/if}
-												</button>
-											</li>
-										{/each}
-									</ul>
-								{/if}
+								<PlaceSearchWidget
+									{place}
+									bind:inputEl={placeInputEl}
+									onSelect={() => (placeNudge = false)}
+								/>
 							</div>
 						</div>
 					</div>
@@ -714,91 +455,7 @@
 		</div>
 
 		<!-- Topic suggestion pills -->
-		{#if pillGen === 0}
-			<div
-				class="mx-auto mt-12 flex flex-wrap justify-center gap-2 md:mt-12"
-				style="max-width: 750px;"
-			>
-				{#each topics as topic, i (topic.label)}
-					<div class="hero-fade" style="animation-delay: {350 + i * 50}ms">
-						<button
-							onclick={() => selectTopic(topic.query)}
-							class="topic-pill inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] whitespace-nowrap text-black/55 transition-all duration-200 hover:border-black/[0.30] hover:text-black/75 active:border-black/[0.30] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75 dark:active:border-white/[0.30] dark:active:text-white/75"
-						>
-							<span
-								class="h-1.5 w-1.5 shrink-0 rounded-full"
-								style="background-color: {topic.color}"
-							></span>
-							{isMobile ? topic.mobile : topic.label}
-						</button>
-					</div>
-				{/each}
-				<div class="hero-fade" style="animation-delay: {350 + VISIBLE_COUNT * 50 + 50}ms">
-					<button
-						onclick={reshufflePills}
-						aria-label="Show different suggestions"
-						class="shuffle-btn group inline-flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full border border-black/[0.12] dark:border-white/[0.12]"
-					>
-						<svg
-							class="h-3.5 w-3.5 text-black opacity-30 transition-opacity duration-200 group-hover:opacity-55 dark:text-white"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="square"
-							stroke-linejoin="miter"
-						>
-							<polyline points="23 4 23 10 17 10" />
-							<path d="M21.17 8A9 9 0 0012 3 9 9 0 003 12a9 9 0 0016.5 5" />
-						</svg>
-					</button>
-				</div>
-			</div>
-		{:else}
-			{#key pillGen}
-				<div
-					class="mx-auto mt-12 flex flex-wrap justify-center gap-2 md:mt-12"
-					style="max-width: 750px;"
-				>
-					{#each topics as topic, i (topic.label)}
-						<div class="topic-pill-shuffle" style="animation-delay: {150 + i * 100}ms">
-							<button
-								onclick={() => selectTopic(topic.query)}
-								class="topic-pill inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] whitespace-nowrap text-black/55 transition-all duration-200 hover:border-black/[0.30] hover:text-black/75 active:border-black/[0.30] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75 dark:active:border-white/[0.30] dark:active:text-white/75"
-							>
-								<span
-									class="h-1.5 w-1.5 shrink-0 rounded-full"
-									style="background-color: {topic.color}"
-								></span>
-								{isMobile ? topic.mobile : topic.label}
-							</button>
-						</div>
-					{/each}
-					<div class="topic-pill-shuffle" style="animation-delay: {150 + VISIBLE_COUNT * 100}ms">
-						<button
-							onclick={reshufflePills}
-							aria-label="Show different suggestions"
-							class="shuffle-btn group inline-flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full border border-black/[0.12] dark:border-white/[0.12]"
-						>
-							<svg
-								class="h-3.5 w-3.5 text-black opacity-30 transition-opacity duration-200 group-hover:opacity-55 dark:text-white"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="square"
-								stroke-linejoin="miter"
-							>
-								<polyline points="23 4 23 10 17 10" />
-								<path d="M21.17 8A9 9 0 0012 3 9 9 0 003 12a9 9 0 0016.5 5" />
-							</svg>
-						</button>
-					</div>
-				</div>
-			{/key}
-		{/if}
+		<TopicPills onPick={selectTopic} {isMobile} />
 	</div>
 </section>
 
@@ -834,27 +491,6 @@
 		box-shadow:
 			0 1px 2px rgba(0, 0, 0, 0.1),
 			0 8px 32px rgba(0, 0, 0, 0.3);
-	}
-
-	.topic-pill-shuffle {
-		animation: pillShuffle 0.6s ease-out both;
-	}
-
-	@keyframes pillShuffle {
-		from {
-			opacity: 0;
-		}
-		to {
-			opacity: 1;
-		}
-	}
-
-	.shuffle-btn svg {
-		transition: transform 0.35s ease;
-	}
-
-	.shuffle-btn:active svg {
-		transform: rotate(180deg);
 	}
 
 	.context-slide {
