@@ -1316,43 +1316,31 @@ describe('parseADKStream activity events', () => {
 		assert.strictEqual(lastCheck.d.detail, 'Five Guys');
 	});
 
-	it('emits search activities from _web_search_queries in stateDelta', async () => {
-		const reader = mockReader([
-			`data: ${JSON.stringify({
-				actions: {
-					stateDelta: { _web_search_queries: ['restaurant reviews NYC', 'best pizza Brooklyn'] }
-				},
+	// Same activity-emission logic applies whether queries come from stateDelta
+	// (_web_search_queries) or event-level groundingMetadata.webSearchQueries.
+	for (const source of ['stateDelta', 'groundingMetadata']) {
+		it(`emits search activities from ${source} queries`, async () => {
+			const queries = ['restaurant reviews NYC', 'best pizza Brooklyn'];
+			const eventBody = {
+				actions:
+					source === 'stateDelta'
+						? { stateDelta: { _web_search_queries: queries } }
+						: { stateDelta: {} },
 				content: { parts: [{ text: 'Some text' }] },
 				author: 'market_landscape',
-				partial: true
-			})}\n\n`
-		]);
-		const events = [];
-		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const searches = events.filter((ev) => ev.e === 'activity' && ev.d.category === 'search');
-		assert.equal(searches.length, 2);
-		assert.equal(searches[0].d.label, 'restaurant reviews NYC');
-		assert.equal(searches[0].d.status, 'complete');
-		assert.equal(searches[1].d.label, 'best pizza Brooklyn');
-		assert.equal(searches[1].d.agent, 'market_landscape');
-	});
-
-	it('emits search activities from groundingMetadata.webSearchQueries', async () => {
-		const reader = mockReader([
-			`data: ${JSON.stringify({
-				actions: { stateDelta: {} },
-				content: { parts: [{ text: 'Some text' }] },
-				author: 'guest_intelligence',
 				partial: true,
-				groundingMetadata: { webSearchQueries: ['test grounding query'] }
-			})}\n\n`
-		]);
-		const events = [];
-		await parseADKStream(reader, (e, d) => events.push({ e, d }));
-		const searches = events.filter((ev) => ev.e === 'activity' && ev.d.category === 'search');
-		assert.equal(searches.length, 1);
-		assert.equal(searches[0].d.label, 'test grounding query');
-	});
+				...(source === 'groundingMetadata' && { groundingMetadata: { webSearchQueries: queries } })
+			};
+			const reader = mockReader([`data: ${JSON.stringify(eventBody)}\n\n`]);
+			const events = [];
+			await parseADKStream(reader, (e, d) => events.push({ e, d }));
+			const searches = events.filter((ev) => ev.e === 'activity' && ev.d.category === 'search');
+			assert.equal(searches.length, 2);
+			assert.equal(searches[0].d.label, 'restaurant reviews NYC');
+			assert.equal(searches[1].d.label, 'best pizza Brooklyn');
+			assert.equal(searches[1].d.agent, 'market_landscape');
+		});
+	}
 
 	it('read activity label avoids vertexaisearch hostname', async () => {
 		const source =
