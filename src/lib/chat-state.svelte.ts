@@ -1,4 +1,6 @@
 import { streamAgent, type ActivityEvent } from '$lib/sse-client';
+import { recoverStream } from '$lib/chat-recovery';
+import { handleReturnFromHidden, type IosVisibilityHandle } from '$lib/ios-sse-workaround';
 
 /** crypto.randomUUID() is only available in secure contexts (HTTPS / localhost).
  *  Fall back to crypto.getRandomValues() which works everywhere. */
@@ -78,8 +80,7 @@ let streamingText = $state('');
 let streamingProgress = $state<StreamingStep[]>([]);
 let streamingActivities = $state<ActivityItem[]>([]);
 let abortController: AbortController | null = null;
-let handleReturnPoll: ReturnType<typeof setInterval> | null = null;
-let handleReturnTimeout: ReturnType<typeof setTimeout> | null = null;
+let iosReturnHandle: IosVisibilityHandle | null = null;
 let pageHidden = $state(false);
 
 // All conversations
@@ -423,121 +424,48 @@ async function recover(): Promise<boolean> {
 	loading = true;
 	recovering = true;
 	error = '';
-
-	const checkUrl = import.meta.env.DEV
-		? `/api/agent/check?sid=${currentId}`
-		: `https://us-central1-superextra-site.cloudfunctions.net/agentCheck?sid=${currentId}`;
-
-	// Agent may still be processing — poll until we get a reply or give up
-	const MAX_ATTEMPTS = 60;
-	const INTERVAL_MS = 3000;
-
-	for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-		if (currentId !== recoveringConvId) {
-			loading = false;
-			recovering = false;
-			return false;
-		}
-		try {
-			const res = await fetch(checkUrl, { signal: AbortSignal.timeout(10_000) });
-			const data = await res.json();
-
-			// Terminal failures — stop polling immediately
-			if (!data.ok && data.reason === 'session_not_found') {
-				error = 'Session not found. Please start a new conversation.';
-				loading = false;
-				recovering = false;
-				return false;
-			}
-			if (!data.ok && data.reason === 'agent_unavailable') {
-				error = 'Agent unavailable. Please try again.';
-				loading = false;
-				recovering = false;
-				return false;
-			}
-			if (!data.ok && data.reason === 'timed_out') {
-				error = 'The request timed out. Please try again.';
-				loading = false;
-				recovering = false;
-				return false;
-			}
-
-			// Reply received — either new or already delivered via SSE
-			if (data.ok && data.reply) {
-				if (!messages.some((m) => m.role === 'agent' && m.text === data.reply)) {
-					const sources: ChatSource[] | undefined = data.sources?.length ? data.sources : undefined;
-					messages.push({ role: 'agent', text: data.reply, timestamp: Date.now(), sources });
-					persist();
-				}
-				loading = false;
-				recovering = false;
-				return true;
-			}
-			// Still processing — wait before retrying
-			if (attempt < MAX_ATTEMPTS - 1) {
-				await new Promise((r) => setTimeout(r, INTERVAL_MS));
-			}
-		} catch {
-			break;
-		}
+	try {
+		return await recoverStream({
+			getSessionId: () => recoveringConvId,
+			isCurrentSession: (sid) => currentId === sid,
+			onReply: (reply, sources) => {
+				messages.push({ role: 'agent', text: reply, timestamp: Date.now(), sources });
+				persist();
+			},
+			onError: (msg) => {
+				error = msg;
+			},
+			checkUrl: (sid) =>
+				import.meta.env.DEV
+					? `/api/agent/check?sid=${sid}`
+					: `https://us-central1-superextra-site.cloudfunctions.net/agentCheck?sid=${sid}`,
+			isDuplicateReply: (reply) => messages.some((m) => m.role === 'agent' && m.text === reply)
+		});
+	} finally {
+		loading = false;
+		recovering = false;
 	}
-
-	error = 'Could not retrieve the response. Please try again.';
-	loading = false;
-	recovering = false;
-	return false;
 }
 
-/**
- * Called on visibilitychange → 'visible' to recover from Safari killing SSE connections.
- *
- * iOS Safari fully suspends the WebContent process when backgrounded, killing TCP
- * connections (webkit.org/blog/8970/how-web-content-can-get-unloaded/). When the tab
- * returns, the pending reader.read() rejects or resolves with done=true.
- *
- * Desktop browsers keep connections alive during brief tab switches, so we only
- * abort + recover if the tab was hidden long enough for the connection to be dead
- * (>30s, i.e. two missed server keepalives at 15s intervals).
- */
 function handleReturn(hiddenMs = Infinity) {
-	if (!currentId) return;
-	if (messages.length === 0 || messages[messages.length - 1].role !== 'user') return;
-
-	if (loading) {
-		// If hidden briefly (<30s), the stream is likely still alive — don't interfere
-		if (hiddenMs < 30_000) return;
-
-		// Stream was in-flight when the tab was backgrounded — connection is dead
-		abortController?.abort();
-		// Clear any previous handleReturn poll/timeout to prevent accumulation
-		if (handleReturnPoll) clearInterval(handleReturnPoll);
-		if (handleReturnTimeout) clearTimeout(handleReturnTimeout);
-		// Poll until send()'s finally block clears loading, then recover.
-		// A fixed 300ms delay isn't enough — iOS process resumption can be slow.
-		handleReturnPoll = setInterval(() => {
-			if (!loading) {
-				clearInterval(handleReturnPoll!);
-				handleReturnPoll = null;
-				if (handleReturnTimeout) clearTimeout(handleReturnTimeout);
-				handleReturnTimeout = null;
+	// Clear any pending poll/timeout from a prior visibilitychange.
+	iosReturnHandle?.cancel();
+	iosReturnHandle = handleReturnFromHidden(
+		{
+			isLoading: () => loading,
+			setLoading: (v) => {
+				loading = v;
+			},
+			abortStream: () => abortController?.abort(),
+			recover: () => {
 				recover();
-			}
-		}, 100);
-		// Safety: if loading never clears after 2s, force it and recover anyway
-		handleReturnTimeout = setTimeout(() => {
-			if (handleReturnPoll) clearInterval(handleReturnPoll);
-			handleReturnPoll = null;
-			handleReturnTimeout = null;
-			if (loading) loading = false;
-			recover();
-		}, 2000);
-	} else {
-		// Stream already ended (with error or silently) — try to recover the response
-		// Delay for iOS 18 networking stack reinitialization (WebKit Bug 284946)
-		setTimeout(() => {
-			recover();
-		}, 300);
-	}
+			},
+			hasPendingUserMessage: () =>
+				messages.length > 0 && messages[messages.length - 1].role === 'user',
+			getSessionId: () => currentId
+		},
+		hiddenMs
+	);
 }
 
 function deleteConversation(id: string) {
