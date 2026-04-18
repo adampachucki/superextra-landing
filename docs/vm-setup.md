@@ -172,22 +172,19 @@ Session manager that replaced tmux for the Mac path. Raw pty relay — doesn't u
 - **Source**: `~/src/zmx` — upstream `github.com/neurosnap/zmx` (no GitHub fork)
 - **Build requires**: Zig 0.15.2 (installed at `/opt/zig/`)
 - **Logs**: `/run/user/1001/zmx/logs/`
-- **Leader policy**: upstream uses `util.isUserInput()` (libghostty ANSI parser) to promote on deliberate user input — typing, arrow keys, etc. — and intentionally excludes focus / mouse events to avoid leader-thrashing. Plus a local patch (see below) that also promotes on _resize_, so switching devices without typing still resizes the pty to match the new window.
+- **Leader policy**: upstream uses `util.isUserInput()` (libghostty ANSI parser) to promote on deliberate user input — typing, arrow keys, etc. — and intentionally excludes focus / mouse events to avoid leader-thrashing. **As of 2026-04-18 we run pure upstream — no local patches.** The previous local `promote-on-resize` patch was removed because it caused resize storms that degraded the multi-client experience without reliably delivering the "switch device without typing" outcome it was meant to enable.
+- **Known issues with scroll / device-switching artifacts**: see [zmx-scroll-and-device-switching.md](zmx-scroll-and-device-switching.md). Read before investigating the scroll / resize path.
 
-### Local fork state
+### Source state
 
-- `main` tracks `origin/main` clean.
-- `local-leader-fixes` = `main` + one commit: `local: promote to leader on resize`. Before rebase on new upstream, we also had an "extra leader triggers" patch (focus-in / ESC / space); it was dropped because upstream's `util.isUserInput()` covers the same ground better — and deliberately excludes focus events. Do not re-introduce.
-- Belt-and-braces backup of the patch: `~/zmx-local-leader-patch.diff`.
+- `main` tracks `origin/main`. **No local branches, no local patches.** Just keep it fast-forwarded.
+- Previous local branch `local-leader-fixes` and its standalone patch diff were removed on 2026-04-18 (see docs/zmx-scroll-and-device-switching.md for history).
 
 ### Update procedure
-
-No `zmx-update` command exists — build manually:
 
 ```bash
 cd ~/src/zmx
 git checkout main && git pull --ff-only
-git checkout local-leader-fixes && git rebase main   # resolve conflicts if upstream touched the resize block
 zig build -Doptimize=ReleaseSafe
 sudo cp /usr/local/bin/zmx /usr/local/bin/zmx.bak-$(date +%Y%m%d)
 sudo install -m 755 -o root -g root zig-out/bin/zmx /usr/local/bin/zmx
@@ -198,7 +195,7 @@ Replacing the binary does **not** kill running zmx daemons — only new `zmx att
 ### Rollback
 
 ```bash
-sudo cp /usr/local/bin/zmx.bak-v042-patched /usr/local/bin/zmx
+sudo cp /usr/local/bin/zmx.bak-v0.4.2-20260418 /usr/local/bin/zmx
 # or any other timestamped backup under /usr/local/bin/zmx.bak-*
 ```
 
@@ -297,16 +294,18 @@ Cmd+Shift+7 on Mac captures screenshot, uploads via SCP to `/home/adam/screensho
 
 ## Troubleshooting
 
-| Problem                         | Fix                                                                                                                                                                                                                                                                                               |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ET disconnected after sleep** | Usually auto-reconnects in 1-5s. If not, run `zxl` to rejoin — zmx session is still alive                                                                                                                                                                                                         |
-| **mosh exits immediately**      | Check UDP ports 60000-61000 in GCP firewall. Verify locale: `locale -a \| grep en_US.utf8`                                                                                                                                                                                                        |
-| **Stale SSH sockets**           | `rm ~/.ssh/sockets/*` (or just run `zx` — auto-clears)                                                                                                                                                                                                                                            |
-| **Typing feels slow**           | ~65ms ping is normal. Check `CLAUDE_CODE_NO_FLICKER=1` is set. ET has no local echo — this is the hard floor                                                                                                                                                                                      |
-| **zmx needs rebuilding**        | See `## zmx → Update procedure`. Requires Zig 0.15.2 at `/opt/zig/`                                                                                                                                                                                                                               |
-| **zmx session lost**            | If zmx crashes, the Claude session dies (SIGHUP). Git-committed work is safe. Restart with `zx`                                                                                                                                                                                                   |
-| **Mobile shows Mouse OFF**      | Stale tmux config. Kill tmux session (`txk <name>`), rejoin (`txj <name>`)                                                                                                                                                                                                                        |
-| **VS Code SSH can't connect**   | Try `ssh superextra-vm` first. If VS Code updated, `rm -rf ~/.vscode-server/` on VM and reconnect                                                                                                                                                                                                 |
-| **Claude not authenticated**    | Run `claude auth login` on VM                                                                                                                                                                                                                                                                     |
-| **Mutagen not syncing**         | `mutagen sync list` for status. `mutagen sync flush` to force. `mutagen daemon start` if daemon died                                                                                                                                                                                              |
-| **skhd not intercepting keys**  | macOS Accessibility won't list ad-hoc signed binaries. Wrap in .app: `/Applications/skhd.app/Contents/MacOS/skhd` (copy from brew cellar, add Info.plist with bundle ID `com.koekeishiya.skhd`). Update LaunchAgent to point to .app binary. Then add skhd.app in System Settings → Accessibility |
+| Problem                                                       | Fix                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ET disconnected after sleep**                               | Usually auto-reconnects in 1-5s. If not, run `zxl` to rejoin — zmx session is still alive                                                                                                                                                                                                         |
+| **mosh exits immediately**                                    | Check UDP ports 60000-61000 in GCP firewall. Verify locale: `locale -a \| grep en_US.utf8`                                                                                                                                                                                                        |
+| **Stale SSH sockets**                                         | `rm ~/.ssh/sockets/*` (or just run `zx` — auto-clears)                                                                                                                                                                                                                                            |
+| **Typing feels slow**                                         | ~65ms ping is normal. Check `CLAUDE_CODE_NO_FLICKER=1` is set. ET has no local echo — this is the hard floor                                                                                                                                                                                      |
+| **zmx needs rebuilding**                                      | See `## zmx → Update procedure`. Requires Zig 0.15.2 at `/opt/zig/`                                                                                                                                                                                                                               |
+| **zmx session lost**                                          | If zmx crashes, the Claude session dies (SIGHUP). Git-committed work is safe. Restart with `zx`                                                                                                                                                                                                   |
+| **Mobile shows Mouse OFF**                                    | Stale tmux config. Kill tmux session (`txk <name>`), rejoin (`txj <name>`)                                                                                                                                                                                                                        |
+| **VS Code SSH can't connect**                                 | Try `ssh superextra-vm` first. If VS Code updated, `rm -rf ~/.vscode-server/` on VM and reconnect                                                                                                                                                                                                 |
+| **Claude not authenticated**                                  | Run `claude auth login` on VM                                                                                                                                                                                                                                                                     |
+| **Mutagen not syncing**                                       | `mutagen sync list` for status. `mutagen sync flush` to force. `mutagen daemon start` if daemon died                                                                                                                                                                                              |
+| **Mac shows stale content from other device after switching** | Known Ink/SIGWINCH bug; see [zmx-scroll-and-device-switching.md](zmx-scroll-and-device-switching.md) §2. No clean zmx-layer fix — conversation content lives in Ink `<Static>` and cannot be safely wiped.                                                                                        |
+| **Mobile tmux shows duplicate session content**               | Same root cause as Mac artifact but accumulating in tmux scrollback. See doc §3.                                                                                                                                                                                                                  |
+| **skhd not intercepting keys**                                | macOS Accessibility won't list ad-hoc signed binaries. Wrap in .app: `/Applications/skhd.app/Contents/MacOS/skhd` (copy from brew cellar, add Info.plist with bundle ID `com.koekeishiya.skhd`). Update LaunchAgent to point to .app binary. Then add skhd.app in System Settings → Accessibility |
