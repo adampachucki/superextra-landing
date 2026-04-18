@@ -86,7 +86,10 @@ let pageHidden = $state(false);
 // All conversations
 let conversations = $state<Conversation[]>([]);
 
-// Restore from localStorage (or migrate from old single-conversation key)
+// Restore from localStorage (or migrate from old single-conversation key).
+// One-shot migration from se_chat (single-conv) to se_chats (multi-conv) +
+// merge of legacy `sessionId` field into `id`. Safe to delete this whole
+// block once no v1 clients remain (~6 months after rollout of multi-conv).
 if (typeof localStorage !== 'undefined') {
 	try {
 		const stored = localStorage.getItem(STORAGE_KEY);

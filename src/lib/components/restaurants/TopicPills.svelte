@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { pickPills, type TopicPillItem } from '$lib/topic-pills-shuffle';
 
 	let {
 		onPick,
@@ -9,7 +10,7 @@
 		isMobile?: boolean;
 	} = $props();
 
-	const PILL_POOL = [
+	const PILL_POOL: TopicPillItem[] = [
 		// Market context
 		{
 			label: 'Market sales shifts',
@@ -167,40 +168,16 @@
 
 	const VISIBLE_COUNT = 6;
 
-	function shuffle<T>(arr: T[]): T[] {
-		const a = [...arr];
-		for (let i = a.length - 1; i > 0; i--) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[a[i], a[j]] = [a[j], a[i]];
-		}
-		return a;
-	}
-
-	function pickPills(mobile = false) {
-		const picked = shuffle(PILL_POOL).slice(0, VISIBLE_COUNT);
-		// Pair short + long labels so flex-wrap rows fill evenly
-		const key = (p: (typeof PILL_POOL)[0]) => (mobile ? p.mobile : p.label).length;
-		picked.sort((a, b) => key(a) - key(b));
-		const ordered: typeof picked = [];
-		let lo = 0;
-		let hi = picked.length - 1;
-		while (lo <= hi) {
-			ordered.push(picked[lo++]);
-			if (lo <= hi) ordered.push(picked[hi--]);
-		}
-		return ordered;
-	}
-
 	let pillGen = $state(0);
-	let topics = $state<(typeof PILL_POOL)[number][]>([]);
+	let topics = $state<TopicPillItem[]>([]);
 
 	onMount(() => {
-		topics = pickPills(isMobile);
+		topics = pickPills(PILL_POOL, VISIBLE_COUNT, isMobile);
 	});
 
 	function reshuffle() {
 		pillGen++;
-		topics = pickPills(isMobile);
+		topics = pickPills(PILL_POOL, VISIBLE_COUNT, isMobile);
 	}
 </script>
 
