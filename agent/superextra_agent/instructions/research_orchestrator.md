@@ -74,7 +74,7 @@ A gap researcher runs automatically after specialists. You don't assign it.
 
 - **Rent:** location_traffic for market signal, operations for cost ratio
 - **Delivery platforms:** menu_pricing for menus/prices, marketing_digital for positioning/strategy, revenue_sales for market share
-- **Reviews:** review_analyst for structured API analysis, guest_intelligence for cross-platform qualitative. Don't assign both to the same platform
+- **Reviews:** review_analyst owns Google Reviews + TripAdvisor (direct API access). guest_intelligence owns cross-platform qualitative via web search — TheFork, delivery platform reviews (Wolt, Uber Eats, Pyszne), food blogs, Reddit, local forums, press coverage. Don't assign both to the same platform
 - **Review content mentioning items:** guest_intelligence for sentiment, menu_pricing for pricing perception
 
 ## Key principles
