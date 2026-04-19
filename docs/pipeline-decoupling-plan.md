@@ -226,8 +226,6 @@ service cloud.firestore {
 - Collection group `sessions`: `(status ASC, lastHeartbeat ASC)` — for watchdog running-sweep (heartbeat disjunct).
 - Collection group `sessions`: `(status ASC, lastEventAt ASC)` — for watchdog running-sweep (event-activity disjunct). Firestore can't serve an OR across different fields from a single composite index, so the watchdog runs two queries (one per disjunct) and merges results in code.
 
-Firestore also transparently creates a small extra internal index the first time a real `onSnapshot` listener is opened on the events query shape — observed once during spike D, one-time ~30 s build, no action needed.
-
 **Observable outcome:** nothing user-visible. Sessions gated to their creator; writes impossible from browser.
 
 ### Phase 2 — Python event mapper (1.5 days)
@@ -236,13 +234,14 @@ Firestore also transparently creates a small extra internal index the first time
 
 **Reference**: use `spikes/adk_event_taxonomy_dump.json` as a test fixture — it's a real capture of 27 Runner events from a full pipeline run. The mapper-rules table in the spike-results doc ("B — Event taxonomy") enumerates exactly which `(author, function_call, state_delta_keys)` combinations to handle.
 
-Maps ADK Runner events (structured Python objects from `runner.run_async()`) to Firestore event docs. Realistic scope after inspecting current `parseADKStream` in `functions/utils.js:200-678`:
+Maps ADK Runner events (structured Python objects from `runner.run_async()`) to Firestore event docs. Scope after inspecting current `parseADKStream` in `functions/utils.js:200-678` and Spike B's taxonomy:
 
-- Partial-text coalescing (synthesiser streaming).
-- Author/specialist tagging for `onActivity` (each event carries author).
-- Tool-call labelling (google_search, fetch_web_content, places APIs → UI-friendly activity IDs).
-- Source harvesting from `grounding_metadata.grounding_chunks` (current workaround in `specialists.py:_append_sources` — may need mirroring or removal now that we have direct access).
-- Synthesiser final-report detection (`is_final_response()`).
+- Author/specialist tagging for `onActivity` (each event carries `author`).
+- Tool-call labelling (`google_search`, `fetch_web_content`, Places APIs → UI-friendly activity IDs via a name→label map).
+- Source harvesting from `grounding_metadata.grounding_chunks` (replaces the current `_append_sources` workaround in `specialists.py` — we have direct access to grounding now).
+- Synthesiser final-report detection (`state_delta['final_report']` present on a final event from `author='synthesizer'`).
+
+**Out of scope for v1**: partial-text coalescing. Spike B verified that in-process Runner emits zero partial-text events under default `RunConfig`; synthesiser emits its full reply in a single final event. If we later enable `RunConfig(streaming_mode=SSE)` for UX reasons, partial-text handling becomes a follow-up task.
 
 Signature: `async def write_event(sid, user_id, run_id, attempt, seq_in_attempt, event_type, data, firestore_client)`. Event doc shape: `{userId, runId, attempt, seqInAttempt, type, data, ts: serverTimestamp(), expiresAt}`. `userId` is denormalized onto each event so Firestore rules can check it directly without a `get()` into the parent session doc (cheaper reads, simpler rules).
 
@@ -315,7 +314,7 @@ Single endpoint `POST /run`:
 7. **On successful completion**:
    - Reply sanity check (non-empty, length ≥ 100, doesn't start with `"Error:"`).
    - **Terminal write first** — fenced write `{reply, sources, status='complete'}` immediately. The user's answer is the product outcome; don't delay it behind cosmetic work.
-   - **Best-effort title** (first message only) — wrap Gemini 2.5 Flash call in a ≤5 s timeout + try/except. If it returns cleanly: fenced update `{title}` as a second write. If it fails, times out, or this isn't the first message: fall back to a deterministic title derived from the first 40 chars of the cleaned user query (strip `[Date: …]` / `[Context: …]` prefixes), written in the same fallback branch. Either way the title field lands on the session doc before returning `200`, but a flaky title API never blocks the primary completion write.
+   - **Best-effort title — first message only** — if `isFirstMessage=true`, wrap a Gemini 2.5 Flash call in a ≤5 s timeout + try/except. On success, fenced update `{title}` as a separate write. On failure/timeout, fall back to a deterministic title derived from the first 40 chars of the cleaned user query (strip `[Date: …]` / `[Context: …]` prefixes) and write that instead. **On follow-up turns (`isFirstMessage=false`), skip title work entirely** — the conversation already has a title from turn 1, and overwriting it with per-turn text would corrupt it. A flaky title API never blocks the primary completion write.
 
 8. **On caught pipeline exception**: fenced write `{status='error', error}`, return `200`.
 
@@ -372,9 +371,9 @@ Stops streaming. New flow:
      - **Reset per turn**: `currentRunId: runId`, `currentAttempt: 0`, `currentWorkerId: null`, `status: 'queued'`, `queuedAt: serverTimestamp()`, `lastHeartbeat: null`, `lastEventAt: null`, `reply: null`, `sources: null`, `error: null`.
      - **Extended on activity**: `expiresAt` — Firestore has no server-side scalar `max()`, so this is computed client-side inside the transaction: read the existing `expiresAt`, compute `new_expires = max(existing?.toMillis() ?? 0, Date.now() + 30*24*60*60*1000)`, write that value. Never shrinks, so active conversations stay alive past the original 30-day TTL.
 
-   - Any in-memory session cache (`sessionMap` in today's `functions/index.js`) must also gate cache hits on `cachedEntry.userId == decodedToken.uid`.
+   - **Drop the legacy in-memory `sessionMap` cache** from today's `functions/index.js`. Firestore is the only source of truth for `adkSessionId`. The ownership-check transaction above already reads the session doc; extract `adkSessionId` from that same read and pass it to the Cloud Task body. The cache saved one read per POST but at the cost of an ownership-gating code path and a second source of truth — not worth it in the new design. Revisit only if POST latency profiling shows real benefit.
 
-6. Ensure ADK session exists in Agent Engine (reuse existing session-cache logic from today's `functions/index.js`). One ADK session per conversation — shared across turns, which is how follow-up routing in `agent.py:230-237` works. **Note**: `VertexAiSessionService.create_session()` does not accept a user-provided `session_id` — Agent Engine assigns the ID. Capture the assigned ID from the returned `Session.id` and persist it as `adkSessionId` on our Firestore session doc (verified in spike A, finding A.1).
+6. Ensure ADK session exists in Agent Engine. One ADK session per conversation — shared across turns, which is how follow-up routing in `agent.py:230-237` works. If the Firestore session doc read in step 5 already has `adkSessionId`, reuse it (no new session creation). If absent (first turn), call `VertexAiSessionService.create_session(app_name, user_id)`, capture the service-assigned `Session.id`, and include it in the upsert as `adkSessionId`. **Note**: `create_session()` does not accept a user-provided `session_id` — Agent Engine assigns the ID (verified in spike A, finding A.1).
 7. **Enqueue Cloud Task**:
    - Target: `https://superextra-worker-{hash}.us-central1.run.app/run`
    - OIDC token audience: exactly the worker's `run.app` URL.
@@ -498,7 +497,7 @@ Two consecutive passes required before full rollout.
 11. **Firestore-blocked client**: block `firestore.googleapis.com` in DevTools → `chat-recovery.ts` delivers final reply via `agentCheck`.
 12. **Cross-session comeback**: start a query, close tab, wait 1 hour, reopen `?sid=…` URL → final report or error shown.
 13. **Stale-worker overwrite**: force a takeover scenario, verify stale worker's status write is rejected by ownership fencing.
-14. **Cross-user access attempt**: with user B's token, call `agentStream` and `agentCheck` against a `sid` owned by user A. Both must return 403. Repeat against the in-memory session cache (warm cache path).
+14. **Cross-user access attempt**: with user B's token, call `agentStream` and `agentCheck` against a `sid` owned by user A. Both must return 403.
 
 No feature flag; `git revert` is the rollback.
 
