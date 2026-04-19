@@ -61,10 +61,13 @@ evidence.
 
 ### Artifacts you can reuse
 
-- `spikes/adk_event_taxonomy_dump.json` — 27 real ADK Events from a full-pipeline run. **Use as Phase 2 mapper test input.** Exact shapes documented in "B — Event taxonomy" section below.
-- `spikes/cloudtasks_oidc/main.py` — minimal FastAPI + OIDC echo pattern. Phase 3's worker can reuse the `X-CloudTasks-*` header handling.
+- **`spikes/preflight_check.sh`** — run first. Green → safe to start. Catches every env-setup mistake we hit during validation.
+- **`spikes/skeletons/worker_main.py`** — reference FastAPI handler for Phase 3: takeover txn, fenced writes, heartbeat task, ADK Runner event loop, SIGTERM handler — all wired together. ~250 lines. TODOs mark fill-in points.
+- **`spikes/skeletons/firestore_events.py`** — reference event mapper for Phase 2: dispatcher by author + event type → Firestore event docs. Uses the taxonomy rules table below.
+- **`spikes/adk_event_taxonomy_dump.json`** — 27 real ADK Events from a full-pipeline run. **Use as Phase 2 mapper test fixture.** Exact shapes documented in "B — Event taxonomy" section below.
+- `spikes/cloudtasks_oidc/main.py` — minimal FastAPI + OIDC echo pattern. Phase 3's worker reuses the `X-CloudTasks-*` header handling.
 - `spikes/firestore_rules_test.js` — mocha test-file starter. Move to repo root, extend during Phase 1.
-- `spikes/adk_runner_spike.py` — reference invocation pattern for `Runner(app=app, ...)` + `VertexAiSessionService`. Copy the imports + instantiation.
+- `spikes/adk_runner_spike.py` — reference invocation pattern for `Runner(app=app, ...)` + `VertexAiSessionService`.
 
 ### Reference docs we actually read (not every doc Google has, just the ones that mattered)
 

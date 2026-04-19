@@ -45,6 +45,32 @@ cd agent && .venv/bin/pip install google-cloud-firestore google-cloud-tasks
 - `test_router_evals.py`: 2 failures. Some clarification messages transfer to `research_pipeline`.
 - `npm run lint` fails on un-Prettier-formatted markdown — run `npx prettier --write docs/pipeline-decoupling-plan.md` before committing edits.
 
+## Open questions — resolve before starting implementation
+
+Decisions the implementer will hit that weren't fully nailed in earlier conversation. Ask the product owner before guessing.
+
+1. **UID rate-limit threshold for Phase 4** — how many pipeline runs per anonymous UID per rolling hour? Plan says "UID-based rate-limit" but doesn't pin a number. Suggested starting point: 20/hour (generous for a design partner actively exploring; still bounds runaway abuse). Raise to 50 during active demo periods.
+
+2. **Phase 0 gate — representative query set** — Phase 0 requires a p99 across "10+ representative queries." What's the canonical set? Suggested (pending confirmation): 3 narrow ("service issues in reviews", "menu trends", "operational cost benchmarks"), 3 mid ("competitor analysis", "customer sentiment overview", "pricing positioning"), 4 broad ("full competitive analysis" on 4 different restaurants of varying scale). Capture in `agent/tests/fixtures/phase0_queries.json` for reproducibility.
+
+3. **Partial-text streaming as future work?** — Spike B observed zero partial-text events from in-process Runner (default `RunConfig`). We can enable streaming via `RunConfig(streaming_mode=SSE)` — would let the synthesiser reply stream in as a "typewriter" UX. Not required for correctness. **Is this desired for v1 of the new UX, or explicitly deferred?** If deferred, say so clearly so Phase 2's mapper stays simple.
+
+4. **Cross-device continuity** — plan says out of scope (anon auth = per-browser UID). If a design partner opens the same `/chat?sid=…` URL on laptop after starting on mobile, they'll see 403 (different UID). Acceptable silent fail, or should Phase 5 surface a specific "continue on the original device" error message?
+
+5. **`agentCheck` with stale `runId`** — user polls `agentCheck?sid=A&runId=X` while the conversation has moved to `runId=Y`. Return current `runId`'s state regardless, or 404 on mismatch? Plan's current silence implies return current state — confirm.
+
+6. **Watchdog threshold for pathological long queries** — if a legitimate query runs >22 min (rare deep analysis + Gemini slow day), watchdog flips to `error`, user retries. Accept that tradeoff, or bump the threshold for certain query shapes? Phase 0 measurements inform this.
+
+7. **Turn-error recovery UX** — if turn N fails (`status=error`), turn N+1's `send()` resets `status` to `queued`. localStorage still shows turn N errored. Does the UI leave the errored message visible (suggested: dimmed "this turn failed" record + new turn below), or replace it?
+
+8. **Agent Engine session cleanup cadence** — each `send()` creates an Agent Engine session that persists. No TTL on Agent Engine side. Schedule a weekly sweep to delete sessions for Firestore sessions in `status='error'` >7 days? Low priority; post-launch hygiene.
+
+## Reference skeletons + preflight
+
+- **`spikes/preflight_check.sh`** — run this first. Verifies gcloud auth, ADC cloud-platform scope, agent venv deps, live API access, and the Firestore composite index. Green → proceed.
+- **`spikes/skeletons/worker_main.py`** — reference FastAPI handler showing how takeover, fenced writes, heartbeat task, ADK Runner event loop, and SIGTERM handler fit together. Copy to `agent/worker_main.py` during Phase 3 and fill in TODOs.
+- **`spikes/skeletons/firestore_events.py`** — reference event-mapper dispatcher for Phase 2. Copy to `agent/superextra_agent/firestore_events.py` and extend.
+
 ---
 
 ## The product context
