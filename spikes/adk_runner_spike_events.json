@@ -1,0 +1,44 @@
+{
+	"summary": {
+		"session_id": "7890629116376907776",
+		"app_name": "superextra_agent",
+		"plugins_configured": ["ChatLoggerPlugin"],
+		"events_captured_n": 1,
+		"event_authors": ["router"],
+		"elapsed_s": 3.87,
+		"error": null,
+		"persisted_state_keys": ["router_response"],
+		"persisted_events_n": 2,
+		"plugin_log_file": "/home/adam/src/superextra-landing/agent/logs/2026-04-19_7890629116376907776.jsonl",
+		"plugin_log_fired": true,
+		"plugin_log_lines": 8,
+		"plugin_event_types_first20": [
+			"user_message",
+			"invocation_start",
+			"agent_start",
+			"model_request",
+			"model_response",
+			"adk_event",
+			"agent_end",
+			"invocation_end"
+		]
+	},
+	"events": [
+		{
+			"idx": 1,
+			"event_type": "Event",
+			"author": "router",
+			"partial": null,
+			"id": "1ad8f2f2-2ec3-4e70-ae86-3bbdcbf1598f",
+			"is_final": true,
+			"content_parts": [
+				{
+					"text_len": 140,
+					"text_preview": "Hi there! I can help you with market intelligence for the restaurant industry. What restaurant, neighborhood, or city ar"
+				}
+			],
+			"state_delta_keys": ["router_response"],
+			"t_since_start_s": 3.87
+		}
+	]
+}
