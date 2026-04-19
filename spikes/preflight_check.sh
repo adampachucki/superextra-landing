@@ -77,8 +77,9 @@ fi
 section "Python deps in agent venv"
 PYTHON="$REPO_ROOT/agent/.venv/bin/python"
 if [ -x "$PYTHON" ]; then
-  # Worker (Phase 3) uses google.cloud.firestore directly; no firebase-admin needed.
-  for pkg in google.adk google.cloud.firestore google.cloud.tasks_v2 fastapi uvicorn; do
+  # Worker (Phase 3) uses google.cloud.firestore directly; no firebase-admin
+  # and no google-cloud-tasks (enqueuing lives in the Node Cloud Function).
+  for pkg in google.adk google.cloud.firestore fastapi uvicorn; do
     if "$PYTHON" -c "import $pkg" 2>/dev/null; then
       ok "python can import $pkg"
     else

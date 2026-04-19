@@ -16,10 +16,7 @@ evidence.
   Fix: `export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/legacy_credentials/<user>/adc.json`
   (the file written by `gcloud auth login` — has broad user scopes including
   cloud-platform). Spike A finding A.2.
-- **Agent venv missing Firestore / Cloud Tasks libraries.** We pip-installed
-  `google-cloud-firestore` and `google-cloud-tasks` into `agent/.venv/` during
-  spikes; they are NOT yet in `agent/requirements.txt`. Add them as part of
-  Phase 3's Dockerfile work.
+- **Agent venv missing Firestore library.** Spike D pip-installed `google-cloud-firestore` into `agent/.venv/`; it's NOT yet in `agent/requirements.txt`. Add it as part of Phase 3's Dockerfile work. (Spike H also pip-installed `google-cloud-tasks` for local enqueue testing; Phase 3's worker does NOT need it — enqueuing lives in the Node Cloud Function.)
 - **Production dep change pending revert**: `package.json` picked up
   `"firebase": "^12.12.0"` from Spike G's `npm install --save`. Phase 1 adds
   this intentionally; the spike leak has been reverted on `main` before this
@@ -184,7 +181,7 @@ This is a ~150-line Python mapper. Testable with fixture events from this spike'
 
 **Finding D.1 (PLAN CHANGE REQUIRED)** — `COLLECTION_GROUP`-scoped composite indexes **do not** cover subcollection-scoped queries. Empirically: I created a `COLLECTION_GROUP`-scoped index on `events` with `(runId, attempt, seqInAttempt)`, confirmed it READY, and then ran `db.collection('sessions').document(sid).collection('events').where('runId','==',X).order_by('attempt').order_by('seqInAttempt')` — it returned `FAILED_PRECONDITION: The query requires an index`. The equivalent `collectionGroup()` query on the same data returned `SUCCESS`.
 
-This contradicts the plan's assumption that the plan's `events (runId, attempt, seqInAttempt) COLLECTION_GROUP` index in `firestore.indexes.json` covers the subcollection client query. Subcollection-scoped queries need `COLLECTION`-scoped indexes, which gcloud CLI can't create and must be pushed via `firebase.json`/`firestore.indexes.json`.
+This contradicts the plan's assumption that the plan's `events (runId, attempt, seqInAttempt) COLLECTION_GROUP` index in `firestore.indexes.json` covers the subcollection client query. Subcollection-scoped queries need `COLLECTION`-scoped indexes (which gcloud CLI can create via `--query-scope=collection`, or can be declared via `firestore.indexes.json` — see finding D.3 below).
 
 **Recommendation (simpler than juggling index scopes)**: use a **collection-group query** on the client:
 

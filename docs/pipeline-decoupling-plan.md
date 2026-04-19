@@ -33,8 +33,8 @@ export GOOGLE_CLOUD_PROJECT=superextra-site
 export GOOGLE_CLOUD_LOCATION=us-central1
 export GOOGLE_GENAI_USE_VERTEXAI=TRUE
 
-# 3. Agent venv (spikes installed these; requirements.txt doesn't yet — add in Phase 3)
-cd agent && .venv/bin/pip install google-cloud-firestore google-cloud-tasks
+# 3. Agent venv (spike D installed this; requirements.txt doesn't yet — add in Phase 3)
+cd agent && .venv/bin/pip install google-cloud-firestore
 
 # 4. If touching the frontend: `firebase` is not yet in package.json (intentional — Phase 1 adds it)
 ```
@@ -45,25 +45,23 @@ cd agent && .venv/bin/pip install google-cloud-firestore google-cloud-tasks
 - `test_router_evals.py`: 2 failures. Some clarification messages transfer to `research_pipeline`.
 - `npm run lint` fails on un-Prettier-formatted markdown — run `npx prettier --write docs/pipeline-decoupling-plan.md` before committing edits.
 
-## Open questions — resolve before starting implementation
+## Open product decisions — defaults to confirm
 
-Decisions the implementer will hit that weren't fully nailed in earlier conversation. Ask the product owner before guessing.
+None of these block starting implementation. Each has a suggested default the implementer can run with; flag them to the product owner when the relevant phase lands.
 
-1. **UID rate-limit threshold for Phase 4** — how many pipeline runs per anonymous UID per rolling hour? Plan says "UID-based rate-limit" but doesn't pin a number. Suggested starting point: 20/hour (generous for a design partner actively exploring; still bounds runaway abuse). Raise to 50 during active demo periods.
+**Only hard prerequisite — confirm before Phase 0 measurement:**
 
-2. **Phase 0 gate — representative query set** — Phase 0 requires a p99 across "10+ representative queries." What's the canonical set? Suggested (pending confirmation): 3 narrow ("service issues in reviews", "menu trends", "operational cost benchmarks"), 3 mid ("competitor analysis", "customer sentiment overview", "pricing positioning"), 4 broad ("full competitive analysis" on 4 different restaurants of varying scale). Capture in `agent/tests/fixtures/phase0_queries.json` for reproducibility.
+- **Phase 0 representative query set** — Phase 0 requires a p99 across "10+ representative queries" as the gate for committing to Cloud Tasks' 30-min ceiling. Suggested (pending confirmation): 3 narrow ("service issues in reviews", "menu trends", "operational cost benchmarks"), 3 mid ("competitor analysis", "customer sentiment overview", "pricing positioning"), 4 broad ("full competitive analysis" on 4 different restaurants of varying scale). Capture in `agent/tests/fixtures/phase0_queries.json` for reproducibility.
 
-3. **Partial-text streaming as future work?** — Spike B observed zero partial-text events from in-process Runner (default `RunConfig`). We can enable streaming via `RunConfig(streaming_mode=SSE)` — would let the synthesiser reply stream in as a "typewriter" UX. Not required for correctness. **Is this desired for v1 of the new UX, or explicitly deferred?** If deferred, say so clearly so Phase 2's mapper stays simple.
+**Defaults to confirm during each phase (non-blocking):**
 
-4. **Cross-device continuity** — plan says out of scope (anon auth = per-browser UID). If a design partner opens the same `/chat?sid=…` URL on laptop after starting on mobile, they'll see 403 (different UID). Acceptable silent fail, or should Phase 5 surface a specific "continue on the original device" error message?
-
-5. **`agentCheck` with stale `runId`** — user polls `agentCheck?sid=A&runId=X` while the conversation has moved to `runId=Y`. Return current `runId`'s state regardless, or 404 on mismatch? Plan's current silence implies return current state — confirm.
-
-6. **Watchdog threshold for pathological long queries** — if a legitimate query runs >22 min (rare deep analysis + Gemini slow day), watchdog flips to `error`, user retries. Accept that tradeoff, or bump the threshold for certain query shapes? Phase 0 measurements inform this.
-
-7. **Turn-error recovery UX** — if turn N fails (`status=error`), turn N+1's `send()` resets `status` to `queued`. localStorage still shows turn N errored. Does the UI leave the errored message visible (suggested: dimmed "this turn failed" record + new turn below), or replace it?
-
-8. **Agent Engine session cleanup cadence** — each `send()` creates an Agent Engine session that persists. No TTL on Agent Engine side. Schedule a weekly sweep to delete sessions for Firestore sessions in `status='error'` >7 days? Low priority; post-launch hygiene.
+- **UID rate-limit (Phase 4)** — default 20 pipeline runs per anonymous UID per rolling hour. Generous for a design partner actively exploring; still bounds runaway abuse. Raise to 50 during active demo periods.
+- **Partial-text streaming** — explicitly deferred. In-process Runner with default `RunConfig` emits no partials (spike B). Revisit only if "typewriter" UX becomes a requirement; Phase 2 mapper stays simple in the meantime.
+- **Cross-device continuity** — default: silent 403 on wrong-UID reads. If design partners complain, Phase 5 adds a "continue on the original device" error banner. No UX work pre-launch.
+- **`agentCheck` with stale `runId`** — default: return current `runId`'s state regardless of the caller's `runId` (ownership check still runs, so only the owner sees anything). Can tighten to 404-on-mismatch later if needed.
+- **Watchdog threshold for pathological long queries** — default: keep at 10 min heartbeat / 5 min lastEventAt. Only adjust if Phase 0 p99 data suggests real queries legitimately exceed these.
+- **Turn-error recovery UX** — default: keep the errored message visible as a dimmed "this turn failed" record; new turn appears below. Confirm during Phase 5 visual polish.
+- **Agent Engine session cleanup cadence** — default: no automated cleanup pre-launch (sessions are small). Add a weekly sweep of `status='error'` >7 days old if storage becomes a concern.
 
 ## Reference skeletons + preflight
 
@@ -251,7 +249,7 @@ Signature: `async def write_event(sid, user_id, run_id, attempt, seq_in_attempt,
 
 ### Phase 3 — Worker service: `superextra-worker` (3 days)
 
-**Files:** `agent/worker_main.py` (new FastAPI entrypoint), `agent/requirements.txt` update, `agent/Dockerfile` (new — ~20 lines: `python:3.12-slim` base, install `google-adk`, `fastapi`, `uvicorn[standard]`, `firebase-admin`, `google-cloud-firestore`, `google-cloud-tasks`, copy `agent/`, entrypoint `uvicorn worker_main:app --host 0.0.0.0 --port 8080`).
+**Files:** `agent/worker_main.py` (new FastAPI entrypoint), `agent/requirements.txt` update, `agent/Dockerfile` (new — ~20 lines: `python:3.12-slim` base, install only what the worker actually imports — `google-adk`, `fastapi`, `uvicorn[standard]`, `google-cloud-firestore`. Skip `firebase-admin` (Python worker uses `google-cloud-firestore` directly — Admin SDK bypasses rules either way) and `google-cloud-tasks` (the worker _receives_ tasks, doesn't enqueue them — the Node Cloud Function does that). Copy `agent/`, entrypoint `uvicorn worker_main:app --host 0.0.0.0 --port 8080`).
 
 **Reference**: `spikes/adk_runner_spike.py` shows the verified instantiation pattern. `spikes/cloudtasks_oidc/main.py` shows the minimal FastAPI + Cloud Tasks header-reading shape.
 

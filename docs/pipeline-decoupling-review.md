@@ -2,117 +2,106 @@
 
 Date: 2026-04-19
 
-Reviewed file: `docs/pipeline-decoupling-plan.md`
+Reviewed files:
+
+- `docs/pipeline-decoupling-plan.md`
+- `docs/pipeline-decoupling-spike-results.md`
+- `docs/pipeline-decoupling-validation-findings.md`
 
 ## Verdict
 
-The architecture is still right.
+The architecture is still the right one.
 
-Decoupling execution from the browser, running the agent in a dedicated worker, storing progress in Firestore, and letting the browser recover from durable state is still the correct solution shape for this repo's failure mode. The queue + worker + Firestore design remains proportionate and not overengineered.
+Queueing long-running work behind Cloud Tasks, running ADK in-process in a dedicated worker, storing progress in Firestore, and recovering browser state from durable data is still the correct fix for this repo's failure mode. That part is not overengineered.
 
-The plan is close to implementation-ready, but two P1 correctness issues remain in the current draft.
+The major correctness issues from earlier review rounds are now addressed in the current plan. I do not see a remaining blocking design bug. What remains is mostly doc hygiene and a small amount of scope tightening.
+
+**Scope of this document**: this file shows the current review state only. "What Is Correct" summarises items settled across prior rounds (each was a finding once, now resolved). "Findings" below lists only issues still open against the current plan. Prior rounds' raw finding text is preserved in git history — the commit log is the historical record.
 
 ## What Is Correct
 
-The current draft gets the main design decisions right:
+The current draft gets the important design calls right:
 
-- long-running execution is moved behind Cloud Tasks
-- ADK runs in-process in the worker instead of through `/run_sse`
-- Firestore is the durable browser-facing progress channel
-- browser Firestore access is read-only
-- `sid` and `runId` are separated correctly
-- timeout/deadline alignment is correct
-- ownership fencing is present
-- worker auth is simplified to private Cloud Run IAM
-- queued-session timeout uses `queuedAt`, not `createdAt`
-- `agentStream` and `agentCheck` have explicit ownership checks
-- events now denormalize `userId` for simpler and cheaper rules
-- the watchdog query split and indexes are directionally correct
+- stable conversation `sid` plus fresh per-turn `runId`
+- Cloud Tasks as the durability boundary
+- worker-side in-process ADK `Runner(app=app, ...)`
+- stale-run guard in worker takeover
+- ownership fencing on worker-owned writes
+- Firestore as the browser-facing progress channel
+- read-only browser rules with Admin SDK writes only
+- explicit ownership checks in `agentStream` and `agentCheck`
+- `queuedAt` instead of `createdAt` for queued-turn timeout logic
+- per-attempt sequencing instead of a hot-doc global counter
+- watchdog split across `queuedAt`, `lastHeartbeat`, and `lastEventAt`
+- collection-group event query with explicit index
+- live-validated Cloud Tasks IAM recipe for OIDC delivery
+- title generation moved off the primary completion path
+- legacy `sessionMap` reuse dropped from the new design
+- partial-text handling correctly deferred out of v1
 
-These are the changes that matter for your stated goals: no stuck sessions, safe refresh during long runs, same-browser continuity, and automatic retry on infrastructure failures.
-
-## Repo Facts That Matter
-
-Two current codebase facts still shape the correct design:
-
-1. `src/lib/chat-state.svelte.ts` reuses a stable conversation ID as `sessionId` across multiple `send()` calls.
-2. `agent/superextra_agent/agent.py` uses persistent ADK session state to decide whether a report already exists in the current conversation.
-
-That means the system must keep:
-
-- one stable conversation/session identity
-- one fresh per-turn run identity
-- serialized turns on the same conversation
-
-That part of the plan is justified by the repo and by ADK session behavior. It is not accidental complexity.
+Those choices are proportionate to the problem and aligned with the repo's actual conversation model.
 
 ## Findings
 
 ### Finding 1
 
-#### [P1] New sessions still do not explicitly initialize `userId` and `createdAt`
+#### [P2] Spike log still contains the old, wrong `gcloud` limitation
 
-The transaction now checks ownership on existing sessions, but the create path still only lists `userId` and `createdAt` under "Preserved if existing".
+File: `docs/pipeline-decoupling-spike-results.md:187-188`
 
-If implemented literally, a brand-new `sessions/{sid}` document can be created without those fields. That breaks the Phase 1 read rule:
+Finding D.1 still says COLLECTION-scoped indexes "gcloud CLI can't create", but Finding D.3 in the same file corrects that, and the current `gcloud firestore indexes composite create` docs expose `--query-scope=collection`.
 
-- `request.auth.uid == resource.data.userId`
+That leaves the spike log internally contradictory and can send implementers back toward a false tooling constraint.
 
-on the first turn, and it also weakens later owner checks and the watchdog backfill assumptions.
+Recommended fix:
 
-This is a blocking issue.
-
-Pragmatic correction:
-
-- if the doc does not exist, explicitly set:
-  - `userId = decodedToken.uid`
-  - `createdAt = serverTimestamp()`
-- only preserve those fields on later turns when the doc already exists
+- remove or rewrite the stale sentence in D.1
+- keep the file's final position consistent: collection-group is a design choice, not a CLI limitation
 
 ### Finding 2
 
-#### [P1] Event writes no longer match the new `userId`-denormalized rules contract
+#### [P2] Review history doc is now stale against the current plan
 
-The denormalization change is correct in principle, but the Phase 3 event-write call still invokes `write_event` without `userId` even though Phase 2 changed the mapper contract to require it and the Firestore rule for `events/{eid}` now checks `resource.data.userId` directly.
+File: `docs/pipeline-decoupling-review.md:1-999`
 
-If implemented as written, one of two things happens:
+This review doc previously still said the current draft had unresolved cleanup findings around title overwrites, partial-text mapper scope, legacy `sessionMap` reuse, and the Firestore "internal index" note.
 
-- the mapper API does not match the call site
-- or event documents are written without `userId`
+The latest plan revision has already fixed those. Because the main plan tells implementers to read this file early, stale findings here push them back into already-resolved work and weaken confidence in the docs set.
 
-In the second case, the browser will be denied access to progress events, which breaks the core refresh/reconnect goal.
+Recommended fix:
 
-This is a blocking issue.
+- update this file to reflect the current plan state
+- if old findings are worth keeping, label them clearly as historical review context rather than current blockers
 
-Pragmatic correction:
+### Finding 3
 
-- pass `user_id` into every `write_event(...)` call in the worker
-- make the event doc contract and the worker call site agree exactly
+#### [P3] 'Resolve before starting implementation' is stricter than the remaining questions justify
 
-## Non-Blocking Cleanup
+File: `docs/pipeline-decoupling-plan.md:48-66`
 
-Two cleanup items remain, but neither changes the architecture recommendation:
+The architecture is now settled, but this section still frames several non-load-bearing product choices as preconditions to start.
 
-1. The risk table still references the old Phase 0 threshold (`< 25 min`) even though the main plan now uses `< 22 min`.
-2. The Firebase bundle-size figure is a planning estimate, not something independently verified from a repo build here.
+Items like cross-device error wording, stale-`runId` fallback semantics, turn-error rendering, and Agent Engine cleanup cadence are defaults or deferred work, not blockers for the transport refactor.
 
-## Recommended Changes Before Implementation
+Recommended fix:
 
-Update the plan with these concrete changes:
+- rename the section to something like `Open product decisions` or `Defaults to confirm`
+- keep only true implementation blockers under a hard pre-start heading
 
-1. Make the create path explicit for brand-new sessions.
-   - if `sessions/{sid}` does not exist:
-   - set `userId = decodedToken.uid`
-   - set `createdAt = serverTimestamp()`
-   - then set the per-run fields
+### Finding 4
 
-2. Make the event-write contract consistent.
-   - pass `user_id` to `write_event(...)` from the worker stream loop
-   - ensure every event doc includes `userId`
+#### [P3] Worker image dependency list is broader than the worker design needs
 
-3. Clean up stale wording.
-   - update the risk table to the new `< 22 min` gate
-   - keep bundle-size language clearly as an estimate unless measured
+File: `docs/pipeline-decoupling-plan.md:254-256`
+
+The worker plan currently installs `firebase-admin` and `google-cloud-tasks` into the Python image, but the worker does not enqueue tasks and its Firestore writes can be handled by `google-cloud-firestore` alone.
+
+Carrying unused libraries makes the image heavier and widens the maintenance surface without improving stability.
+
+Recommended fix:
+
+- keep the worker dependency set aligned with what `worker_main.py` actually imports
+- add extra libraries later only if the implementation ends up needing them
 
 ## Pragmatic Assessment
 
@@ -120,48 +109,61 @@ Update the plan with these concrete changes:
 
 No.
 
-Given the current SSE-coupled implementation, Cloud Run request behavior, Cloud Tasks delivery semantics, Firestore listener behavior, and ADK session behavior, the queue + worker + Firestore design is the right amount of system for this problem.
+The old design failed at the wrong boundary. Queue + worker + Firestore is the correct boundary shift for this app.
 
-The old design failed because execution was still coupled to the browser connection. This plan fixes that at the correct boundary.
+### Are the previous high-severity findings now addressed?
 
-### Is there unnecessary complexity left?
+Yes.
 
-Very little.
+The current plan now correctly incorporates the earlier load-bearing fixes:
 
-The remaining issues are not architectural churn. They are implementation-contract mismatches: one around first-session initialization, and one around the event schema used by Firestore rules.
+- `sid`/`runId` separation
+- explicit owner checks
+- `queuedAt`
+- per-attempt sequencing
+- collection-group query
+- explicit indexes
+- double IAM binding
+- stale-run guard
+- title off the main completion path
+- first-turn session initialization
+- denormalized `userId` on event docs
 
-### Is the design stable after the current changes?
+### What still feels heavier than necessary?
 
-Almost.
+Only a little:
 
-Once the two blockers above are corrected, I would consider this design stable, proportionate, and ready to implement.
+- the pre-implementation questions are framed too strictly
+- the worker dependency list is broader than needed
+- the spike log still carries one stale corrected statement
+
+These are simplifications, not architecture changes.
 
 ## Final Recommendation
 
 Keep this architecture.
 
-Do not reopen the queue + worker + Firestore decision. That part is justified by the codebase and by the documented behavior of the Google/Firebase components involved.
+Do not reopen the queue + worker + Firestore decision. That is the right solution shape.
 
-Revise the plan first to:
+The plan is implementation-ready as a design. Before treating the docs set as fully clean and authoritative, make one more pass to:
 
-- explicitly initialize `userId` and `createdAt` on first session creation
-- pass `userId` into event writes so the new rules contract is actually satisfied
+- remove the stale `gcloud` limitation from the spike log
+- keep this review file aligned with the latest draft
+- soften the "resolve before starting implementation" heading
+- trim the worker dependency list to what the worker actually uses
 
-After those changes, this is a proper long-term fix rather than another temporary workaround.
+After that, the docs should be in strong shape for execution.
 
 ## Verified References
 
-- Cloud Tasks overview: <https://docs.cloud.google.com/tasks/docs/dual-overview>
+- Cloud Tasks issues and limitations: <https://cloud.google.com/tasks/docs/common-pitfalls>
 - Create HTTP target tasks: <https://docs.cloud.google.com/tasks/docs/creating-http-target-tasks>
 - Cloud Tasks OIDC token reference: <https://docs.cloud.google.com/tasks/docs/reference/rest/v2/OidcToken>
 - Cloud Run authentication overview: <https://docs.cloud.google.com/run/docs/authenticating/overview>
-- Cloud Run general development tips: <https://docs.cloud.google.com/run/docs/tips/general>
-- Firestore security rules conditions: <https://firebase.google.com/docs/firestore/security/rules-conditions>
-- Firestore secure query guidance: <https://firebase.google.com/docs/firestore/security/rules-query>
-- Firestore pricing: <https://firebase.google.com/docs/firestore/pricing>
-- Firestore realtime listeners: <https://firebase.google.com/docs/firestore/query-data/listen>
-- Firestore index overview: <https://firebase.google.com/docs/firestore/query-data/index-overview>
 - Firestore TTL: <https://firebase.google.com/docs/firestore/ttl>
-- Firebase anonymous auth: <https://firebase.google.com/docs/auth/web/anonymous-auth>
+- Firestore indexing: <https://firebase.google.com/docs/firestore/query-data/indexing>
+- gcloud Firestore composite indexes: <https://cloud.google.com/sdk/gcloud/reference/firestore/indexes/composite/create>
+- Firestore secure collection-group queries: <https://firebase.google.com/docs/firestore/security/rules-query>
+- Firestore realtime listeners: <https://firebase.google.com/docs/firestore/query-data/listen>
 - Firebase auth persistence: <https://firebase.google.com/docs/auth/web/auth-state-persistence>
 - ADK session state: <https://adk.dev/sessions/state/>
