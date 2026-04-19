@@ -209,7 +209,7 @@ Verified to work with a single COLLECTION_GROUP-scoped index on `(userId, runId,
 
 **Finding D.2** — `onSnapshot` delivers full current state in one callback (20/20 docs), in order `(attempt ASC, seqInAttempt ASC)`. Refresh-mid-pipeline recovery path confirmed feasible. First listener subscription transiently fails while an auto-generated internal index builds (~30 s one-time cost after first deploy); then works. Test code already handles — no plan change needed.
 
-**Finding D.3** — gcloud command `firestore indexes composite create --query-scope=COLLECTION` is **not supported**. gcloud only creates COLLECTION_GROUP. COLLECTION-scoped indexes must come from `firebase deploy --only firestore:indexes` reading `firestore.indexes.json`. This doesn't affect us given D.1 recommendation, but worth noting for `docs/deployment-gotchas.md`.
+**Finding D.3 (CORRECTED)** — earlier I claimed gcloud can't create COLLECTION-scoped indexes. That's **wrong**: `gcloud firestore indexes composite create --query-scope=collection ...` is supported and is in fact the CLI default (valid values: `collection`, `collection-group`, `collection-recursive`). The COLLECTION-scoped alternative to our collection-group design was viable. We chose collection-group queries because they give a cleaner unified index + rule shape (one index covers all sessions), not because of CLI limitations.
 
 **Verdicts**:
 
@@ -338,12 +338,9 @@ Once Phase 1 lands, move this file to the repo root and extend as the rules evol
 | A   | ADK `Runner(app=app)` in-process        | **PASS**                  | no plan change; small prose tweak to Phase 4                        |
 | B   | Event taxonomy mapping                  | **PASS**                  | simplifies plan (no partials)                                       |
 | C   | Cloud Tasks → Cloud Run OIDC            | **PASS**                  | no plan change                                                      |
-| H   | Cloud Tasks dispatch-deadline behaviour | **PASS**                  | confirms Cloud Run timeout < dispatch deadline is mandatory         |
-| I   | SIGTERM on revision rollout             | **PASS**                  | revision rollout lets in-flight requests finish                     |
 | D   | Firestore query + index + rules         | **PASS with plan change** | query goes collection-group; rules use `{path=**}` wildcard         |
-| G   | Firebase SDK bundle size                | **PASS**                  | bundle estimate in plan is 2x pessimistic (~97 kB actual gzipped)   |
 | E   | Phase 0 measurement (p99 gate)          | **PASS (preliminary)**    | 2 data points, both well under gate; needs more runs during Phase 0 |
 | F   | Rules emulator test suite               | **Starter written**       | file ready for Phase 1 TDD                                          |
-| G   | Firebase SDK bundle size                | pending                   | TBD                                                                 |
-| H   | Cloud Tasks dispatch-deadline behaviour | pending                   | TBD                                                                 |
-| I   | SIGTERM → asyncio cancellation timing   | pending                   | TBD                                                                 |
+| G   | Firebase SDK bundle size                | **PASS**                  | bundle estimate in plan is 2x pessimistic (~97 kB actual gzipped)   |
+| H   | Cloud Tasks dispatch-deadline behaviour | **PASS**                  | confirms Cloud Run timeout < dispatch deadline is mandatory         |
+| I   | SIGTERM on revision rollout             | **PASS**                  | revision rollout lets in-flight requests finish                     |

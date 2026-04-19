@@ -122,7 +122,8 @@ def _takeover_txn(
     """Returns a dict describing the outcome:
       {"action": "run", "attempt": N}  — we took over, start running
       {"action": "poll"}               — another worker active with fresh heartbeat
-      {"action": "noop_complete"}      — already complete/error for this runId
+      {"action": "noop_complete"}      — already complete/error for THIS runId
+      {"action": "noop_stale"}         — session has moved to a different (newer) runId; we're a stale redelivery
     """
     snap = session_ref.get(transaction=txn)
     if not snap.exists:
@@ -137,6 +138,14 @@ def _takeover_txn(
     status = data.get("status")
     current_run = data.get("currentRunId")
     last_hb = data.get("lastHeartbeat")
+
+    # Stale-run guard — critical for preventing an old Cloud Tasks redelivery
+    # from clobbering a newer turn's session state. If session's currentRunId
+    # differs from this task's runId, the conversation has moved on (user sent
+    # a follow-up turn). This worker is a stale redelivery; no-op and let
+    # Cloud Tasks mark the task done. See review finding #1.
+    if current_run is not None and current_run != run_id:
+        return {"action": "noop_stale"}
 
     if current_run == run_id and status in ("complete", "error"):
         return {"action": "noop_complete"}
@@ -162,7 +171,8 @@ def _takeover_txn(
 
 
 async def _poll_until_resolved(sid: str, run_id: str, worker_id: str) -> dict:
-    """Poll until: status becomes terminal, heartbeat goes stale (take over), or ceiling hit."""
+    """Poll until: status terminal, heartbeat stale (take over), session moves to a newer
+    runId (stale redelivery), or ceiling hit."""
     ref = _fs.collection("sessions").document(sid)
     start = asyncio.get_event_loop().time()
     while True:
@@ -172,7 +182,11 @@ async def _poll_until_resolved(sid: str, run_id: str, worker_id: str) -> dict:
             raise HTTPException(500, "poll_timeout — active worker still running after 7 min")
         snap = await asyncio.to_thread(ref.get)
         data = snap.to_dict() or {}
+        current_run = data.get("currentRunId")
         status = data.get("status")
+        # Session has moved to a different runId while we were polling — we're stale, bail.
+        if current_run is not None and current_run != run_id:
+            return {"action": "noop_stale"}
         if status in ("complete", "error"):
             return {"action": "noop_complete"}
         last_hb = data.get("lastHeartbeat")
@@ -280,10 +294,16 @@ async def run(body: RunRequest, request: Request) -> dict:
     if outcome["action"] == "noop_complete":
         return {"ok": True, "action": "noop"}
 
+    if outcome["action"] == "noop_stale":
+        log.info("noop_stale: session has moved to a newer runId sid=%s stale_run=%s", sid, run_id)
+        return {"ok": True, "action": "noop_stale"}
+
     if outcome["action"] == "poll":
         outcome = await _poll_until_resolved(sid, run_id, worker_id)
         if outcome["action"] == "noop_complete":
             return {"ok": True, "action": "noop_after_poll"}
+        if outcome["action"] == "noop_stale":
+            return {"ok": True, "action": "noop_stale_after_poll"}
 
     attempt = outcome["attempt"]
     _current_sid, _current_attempt, _current_worker_id = sid, attempt, worker_id
@@ -353,21 +373,40 @@ async def run(body: RunRequest, request: Request) -> dict:
             pass
         return {"ok": False, "reason": "sanity_check_failed"}
 
-    # TODO: title generation (Gemini 2.5 Flash, first message only) — small separate
-    # function; see functions/index.js:generateTitle for current reference.
-    title: str | None = None
-    if body.isFirstMessage:
-        title = None  # await _generate_title(body.queryText)
-
+    # Terminal write FIRST — don't delay completion behind title generation.
     try:
         await _fenced_update(sid, attempt, worker_id, {
             "status": "complete",
             "reply": final_reply,
             "sources": final_sources,
-            **({"title": title} if title else {}),
         })
     except OwnershipLost:
         log.warning("ownership lost before final write sid=%s", sid)
+        return {"ok": True, "action": "abandoned"}
+
+    # Best-effort title (first message only). Never blocks completion — terminal
+    # status was already written above.
+    if body.isFirstMessage:
+        title: str | None = None
+        try:
+            # TODO: _generate_title should wrap a Gemini 2.5 Flash call in a
+            # short timeout (~5s) and return str | None.
+            # title = await asyncio.wait_for(_generate_title(body.queryText), timeout=5.0)
+            pass
+        except Exception:  # noqa: BLE001
+            title = None
+        if not title:
+            # Deterministic fallback: strip [Date:]/[Context:] prefixes, take first 40 chars
+            cleaned = body.queryText
+            for prefix in ("[Date:", "[Context:"):
+                while cleaned.startswith(prefix):
+                    end = cleaned.find("] ")
+                    cleaned = cleaned[end + 2:] if end != -1 else cleaned[len(prefix):]
+            title = cleaned.strip()[:40] or "Untitled"
+        try:
+            await _fenced_update(sid, attempt, worker_id, {"title": title})
+        except OwnershipLost:
+            pass  # Completion write already landed; losing title here is OK.
 
     return {"ok": True, "action": "complete"}
 
