@@ -43,8 +43,13 @@ jobs:
       - run: npm run test:unit -- --run
 
       # Firestore rules emulator tests — protects against rule regressions
-      # on sessions + collection-group events. Uses the Firestore emulator
-      # (Java runtime is pre-installed on ubuntu-latest).
+      # on sessions + collection-group events. Runs the Firestore emulator
+      # via firebase-tools, which requires JDK 21+ (ubuntu-latest ships
+      # Java 17 by default, so we install 21 explicitly here).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - run: npm run test:rules
 
       - run: npm run build
