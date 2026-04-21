@@ -1,7 +1,8 @@
 // Stuck-session watchdog. Runs every 2 minutes; flips abandoned sessions to
 // status='error' with a specific reason. Firestore can't OR across different
 // fields from one composite index, so we run three bounded queries and merge
-// in code.
+// in code. (Deployed as `watchdog` Cloud Run function + Cloud Scheduler job
+// via firebase-functions v2 `onSchedule`.)
 //
 // Thresholds (plan §Phase 7.5):
 //   - queued > 30 min   → queue_dispatch_timeout
