@@ -617,6 +617,15 @@ async def run(body: RunRequest, request: Request) -> dict:
     # 2. Start the heartbeat pulse.
     _heartbeat_task = asyncio.create_task(_heartbeat_loop(sid, attempt, worker_id))
 
+    # 2.1. Fire title gen in parallel with the pipeline — depends only on
+    # queryText, so there's no reason to serialise it behind the pipeline.
+    # Awaited at the terminal write; merged into the same fenced txn.
+    title_task: "asyncio.Task[str] | None" = (
+        asyncio.create_task(_generate_title(body.queryText))
+        if body.isFirstMessage
+        else None
+    )
+
     # 2.5. Ensure an Agent Engine session exists. agentStream passes
     # `adkSessionId=null` on first turn — we create it here so the Cloud
     # Function stays out of the Agent Engine API surface. Follow-up turns
@@ -789,27 +798,27 @@ async def run(body: RunRequest, request: Request) -> dict:
             pass
         return {"ok": False, "action": reason}
 
-    # 5. Terminal write first — don't delay completion behind title gen.
+    # 5. Commit the terminal write. Title must land in the same fenced txn
+    # as status/reply/sources — a split write races the client onSnapshot
+    # observer, which unsubscribes on the first terminal snapshot (see
+    # firestore-stream.ts:165-174). Fall back to the deterministic title
+    # on task failure so a degraded title never costs the user their reply.
+    terminal_update: dict = {
+        "status": "complete",
+        "reply": final_reply,
+        "sources": final_sources,
+    }
+    if title_task is not None:
+        try:
+            terminal_update["title"] = await title_task
+        except Exception:  # noqa: BLE001
+            terminal_update["title"] = _fallback_title(body.queryText)
+
     try:
-        await _fenced_update(sid, attempt, worker_id, {
-            "status": "complete",
-            "reply": final_reply,
-            "sources": final_sources,
-        })
+        await _fenced_update(sid, attempt, worker_id, terminal_update)
     except OwnershipLost:
         log.warning("ownership lost before final write sid=%s", sid)
         return {"ok": True, "action": "abandoned_before_complete"}
-
-    # 6. Best-effort title (first message only, separate fenced write).
-    if body.isFirstMessage:
-        title = await _generate_title(body.queryText)
-        try:
-            await _fenced_update(sid, attempt, worker_id, {"title": title})
-        except OwnershipLost:
-            # Completion already landed; losing the title here is cosmetic.
-            pass
-        except Exception:  # noqa: BLE001
-            log.exception("title write failed sid=%s", sid)
 
     log.info(
         "run complete",

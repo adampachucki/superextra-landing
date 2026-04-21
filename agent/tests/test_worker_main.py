@@ -595,8 +595,10 @@ def _install_run_harness(monkeypatch, *, events, emissions):
     monkeypatch.setattr(worker_main, "_fenced_update", fake_fenced_update)
     monkeypatch.setattr(worker_main, "_cancel_heartbeat", fake_cancel_heartbeat)
     monkeypatch.setattr(worker_main, "_heartbeat_loop", lambda *a, **k: asyncio.sleep(0))
-    # Avoid the Gemini Flash title call in tests; deterministic fallback.
-    monkeypatch.setattr(worker_main, "_generate_title", lambda q: asyncio.sleep(0, result="test"))
+    # Avoid the Gemini Flash title call in tests; deterministic fake.
+    async def _fake_title(_q: str) -> str:
+        return "test"
+    monkeypatch.setattr(worker_main, "_generate_title", _fake_title)
 
     return fenced_writes, hb_cancel_calls
 
@@ -673,6 +675,102 @@ async def test_router_clarification_promotes_to_session_doc(monkeypatch):
     assert complete_writes[0]["reply"] == "Which location?"
     # No `status=error` anywhere — the old len<100 gate would have rejected.
     assert not any(u.get("status") == "error" for u in fenced_writes)
+
+
+@pytest.mark.asyncio
+async def test_title_lands_in_same_fenced_write_as_terminal_status(monkeypatch):
+    """First-message runs must bundle `title` into the `status='complete'`
+    fenced write — not a follow-up write. A split write race-loses the title
+    for the Firestore `onSnapshot` observer, which fires `onComplete` on the
+    first terminal snapshot and unsubscribes before the title snapshot lands.
+    """
+    events = [_mk_event({}, author="router")]
+    emissions = [
+        {"type": "complete", "data": {"reply": "Hello back.", "sources": []}},
+    ]
+
+    fenced_writes, _hb = _install_run_harness(monkeypatch, events=events, emissions=emissions)
+
+    from worker_main import RunRequest
+    body = RunRequest(
+        sessionId="sid-1",
+        runId="run-1",
+        adkSessionId="adk-1",
+        userId="alice",
+        queryText="[Date: 2026-04-20] hello",
+        isFirstMessage=True,
+    )
+    result = await __import__("worker_main").run(body, _fake_request())
+
+    assert result["ok"] is True
+    assert result["action"] == "complete"
+
+    complete_writes = [u for u in fenced_writes if u.get("status") == "complete"]
+    assert len(complete_writes) == 1
+    assert complete_writes[0]["title"] == "test"
+    # No follow-up title-only write.
+    assert not any("title" in u and "status" not in u for u in fenced_writes)
+
+
+@pytest.mark.asyncio
+async def test_title_task_failure_falls_back_and_completion_still_lands(monkeypatch):
+    """If the background title task raises (cancellation, API error, etc.),
+    the terminal write must still land with `_fallback_title(queryText)` — a
+    failed title must not cost the user their answer. Guards the
+    parallelisation: awaiting a failed task at the write site uses the
+    deterministic fallback instead of propagating."""
+    import worker_main as wm
+
+    events = [_mk_event({}, author="router")]
+    emissions = [
+        {"type": "complete", "data": {"reply": "Hello back.", "sources": []}},
+    ]
+
+    fenced_writes, _hb = _install_run_harness(monkeypatch, events=events, emissions=emissions)
+
+    async def _failing_title(_q: str) -> str:
+        raise RuntimeError("gemini flash unavailable")
+    monkeypatch.setattr(wm, "_generate_title", _failing_title)
+
+    from worker_main import RunRequest
+    body = RunRequest(
+        sessionId="sid-1",
+        runId="run-1",
+        adkSessionId="adk-1",
+        userId="alice",
+        queryText="[Date: 2026-04-20] What's going on at Noma?",
+        isFirstMessage=True,
+    )
+    result = await __import__("worker_main").run(body, _fake_request())
+
+    assert result["ok"] is True
+    assert result["action"] == "complete"
+
+    complete_writes = [u for u in fenced_writes if u.get("status") == "complete"]
+    assert len(complete_writes) == 1
+    # Fallback strips the `[Date: …]` prefix and truncates to ≤40 chars.
+    assert complete_writes[0]["title"] == wm._fallback_title(body.queryText)
+    assert complete_writes[0]["reply"] == "Hello back."
+
+
+@pytest.mark.asyncio
+async def test_title_absent_when_not_first_message(monkeypatch):
+    """Non-first-message runs must not carry a `title` field — title gen is
+    scoped to the first turn of a conversation."""
+    events = [_mk_event({}, author="router")]
+    emissions = [
+        {"type": "complete", "data": {"reply": "Follow-up.", "sources": []}},
+    ]
+
+    fenced_writes, _hb = _install_run_harness(monkeypatch, events=events, emissions=emissions)
+
+    body = _build_run_request()  # isFirstMessage=False
+    result = await __import__("worker_main").run(body, _fake_request())
+
+    assert result["ok"] is True
+    complete_writes = [u for u in fenced_writes if u.get("status") == "complete"]
+    assert len(complete_writes) == 1
+    assert "title" not in complete_writes[0]
 
 
 @pytest.mark.asyncio
