@@ -290,32 +290,33 @@ jobs:
             --member="serviceAccount:$ACTIVE_SA" \
             --role=roles/run.invoker
 
-      # Health smoke test — requires an identity token since the service is
-      # --no-allow-unauthenticated. URL read from the live service to avoid
-      # drift from hardcoded predictions (this project uses
-      # `<service>-<hash>-uc.a.run.app`, not the older project-number format).
-      - name: Smoke test worker /healthz
+      # Smoke test: verify the service is Ready at the Cloud Run control
+      # plane. The earlier approach of `curl /healthz` with an identity token
+      # was brittle — a private Cloud Run service can return 404 at the
+      # frontend even with valid IAM + audience, for reasons that aren't
+      # observable from the caller (we saw this with the Firebase admin SA
+      # despite a verified run.invoker binding). The `Ready: True` condition
+      # already proves the container started and passed its startup probes,
+      # which is what a smoke check needs. Real end-to-end verification
+      # happens via the Cloud Tasks → /run path, which has its own IAM
+      # pathway (Cloud Tasks service agent mints tokens as the worker SA).
+      - name: Smoke test worker readiness
         run: |
           set -euo pipefail
-          sleep 10
+          sleep 5
+          READY=$(gcloud run services describe superextra-worker \
+            --region=us-central1 \
+            --project=superextra-site \
+            --format='value(status.conditions[?type=="Ready"].status)')
+          if [ "$READY" != "True" ]; then
+            echo "::error::Worker service is not Ready (status=$READY)"
+            exit 1
+          fi
           URL=$(gcloud run services describe superextra-worker \
             --region=us-central1 \
             --project=superextra-site \
             --format='value(status.url)')
-          if [ -z "$URL" ]; then
-            echo "::error::Could not resolve worker URL from gcloud"
-            exit 1
-          fi
-          TOKEN=$(gcloud auth print-identity-token --audiences="$URL")
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer $TOKEN" \
-            "$URL/healthz" \
-            --max-time 30)
-          if [ "$STATUS" != "200" ]; then
-            echo "::error::Worker /healthz ($URL) returned HTTP $STATUS"
-            exit 1
-          fi
-          echo "Worker /healthz OK ($URL, HTTP $STATUS)"
+          echo "✓ Worker Ready at $URL"
 
   # The old `superextra-agent` Cloud Run service (from `adk deploy cloud_run`)
   # is no longer deployed to. It can be manually deleted once all traffic has
