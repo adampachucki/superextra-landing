@@ -311,6 +311,12 @@ def test_json_formatter_emits_correlation_keys():
     record.workerId = "w-1"
     record.cloudTaskName = "projects/p/locations/l/queues/q/tasks/run-123"
     record.trace = "projects/p/traces/t-1"
+    # `event` + `reason` are the synth telemetry fields emitted from
+    # _embed_chart_images. `reason` is in _STRUCTURED_LOG_KEYS so the
+    # formatter must surface it as a top-level jsonPayload field — that's
+    # what the Phase 2 Cloud Logging rate query depends on.
+    record.event = "synth_outcome"
+    record.reason = "MALFORMED_FUNCTION_CALL"
 
     payload = json.loads(formatter.format(record))
     assert payload["severity"] == "INFO"
@@ -321,6 +327,8 @@ def test_json_formatter_emits_correlation_keys():
     assert payload["workerId"] == "w-1"
     assert payload["cloudTaskName"].endswith("/tasks/run-123")
     assert payload["logging.googleapis.com/trace"] == "projects/p/traces/t-1"
+    assert payload["event"] == "synth_outcome"
+    assert payload["reason"] == "MALFORMED_FUNCTION_CALL"
 
 
 def test_json_formatter_omits_absent_correlation_keys():

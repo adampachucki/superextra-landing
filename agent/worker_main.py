@@ -41,6 +41,7 @@ from google.cloud import firestore
 from google.genai import Client as GenaiClient, types
 from pydantic import BaseModel, Field
 
+from superextra_agent.log_ctx import worker_sid as _worker_sid_ctx
 from superextra_agent.agent import app as adk_app
 from superextra_agent.firestore_events import (
     AUTHOR_TO_OUTPUT_KEY,
@@ -60,7 +61,7 @@ from superextra_agent.firestore_events import (
 # `extra={"trace": ...}` kwarg on the log call.
 
 
-_STRUCTURED_LOG_KEYS = ("sid", "runId", "attempt", "cloudTaskName", "workerId", "event")
+_STRUCTURED_LOG_KEYS = ("sid", "runId", "attempt", "cloudTaskName", "workerId", "event", "reason")
 
 
 class _JsonFormatter(logging.Formatter):
@@ -560,6 +561,9 @@ async def run(body: RunRequest, request: Request) -> dict:
 
     sid = body.sessionId
     run_id = body.runId
+    # Thread sid through to logs emitted inside ADK callbacks (_embed_chart_images
+    # synth_outcome events) so Phase 2 rate queries can filter load-test sids.
+    _worker_sid_ctx.set(sid)
     assert _fs is not None
     session_ref = _fs.collection("sessions").document(sid)
 

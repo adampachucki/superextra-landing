@@ -11,6 +11,7 @@ from google.adk.apps import App
 from google.adk.tools import google_search
 from google.genai import Client, types
 
+from .log_ctx import worker_sid
 from .web_tools import fetch_web_content
 logger = logging.getLogger(__name__)
 
@@ -145,11 +146,10 @@ def _build_fallback_report(state, error_code: str) -> str:
     never populated and the user sees nothing. This fallback guarantees a
     readable report from the specialist outputs already in session state.
     """
+    # `error_code` is for the structured synth_outcome log, not the user banner.
     parts = [
         "# Research findings\n\n",
-        f"_Note: final synthesis hit a model-level error ({error_code}) — typically "
-        "during chart generation. The detailed specialist findings below are the "
-        "raw research captured before synthesis failed._\n\n",
+        "_Charts couldn't be generated for this report. Full research findings below._\n\n",
     ]
     had_content = False
     for key, label in _FALLBACK_SECTIONS:
@@ -178,11 +178,14 @@ def _embed_chart_images(*, callback_context, llm_response):
     response with no parts / no text at all, produce a text-only fallback
     from the specialist outputs so final_report is always populated.
     """
+    # synth_outcome / reason / sid are surfaced by _STRUCTURED_LOG_KEYS in worker_main.py.
+    def _outcome_extra(reason: str) -> dict:
+        return {"event": "synth_outcome", "reason": reason, "sid": worker_sid.get()}
+
     error_code = getattr(llm_response, "error_code", None)
     if error_code:
         logger.warning(
-            "Synthesizer emitted %s — falling back to text-only report",
-            error_code,
+            "synth outcome %s", error_code, extra=_outcome_extra(error_code)
         )
         fallback = _build_fallback_report(callback_context.state, error_code)
         return LlmResponse(
@@ -196,7 +199,9 @@ def _embed_chart_images(*, callback_context, llm_response):
     # docs/pipeline-decoupling-implementation-review-2026-04-21.md P1).
     # Fallback mirrors the error_code branch so the reply is always usable.
     if not llm_response.content or not llm_response.content.parts:
-        logger.warning("Synthesizer returned empty response — falling back to text-only report")
+        logger.warning(
+            "synth outcome empty_response", extra=_outcome_extra("empty_response")
+        )
         fallback = _build_fallback_report(callback_context.state, "empty_response")
         return LlmResponse(
             content=types.Content(role="model", parts=[types.Part(text=fallback)])
@@ -205,11 +210,15 @@ def _embed_chart_images(*, callback_context, llm_response):
         getattr(p, "text", None) and p.text.strip() for p in llm_response.content.parts
     )
     if not has_text:
-        logger.warning("Synthesizer returned no text parts — falling back to text-only report")
+        logger.warning(
+            "synth outcome no_text_parts", extra=_outcome_extra("no_text_parts")
+        )
         fallback = _build_fallback_report(callback_context.state, "no_text_parts")
         return LlmResponse(
             content=types.Content(role="model", parts=[types.Part(text=fallback)])
         )
+
+    logger.info("synth outcome ok", extra=_outcome_extra("ok"))
 
     # Collect base64 data URIs for each inline_data image, in order.
     images: list[str] = []

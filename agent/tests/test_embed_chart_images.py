@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from google.genai import types
 
 from superextra_agent.agent import _embed_chart_images, MAX_IMAGE_BYTES, _build_fallback_report
+from superextra_agent.log_ctx import worker_sid
 
 
 def _make_llm_response(parts):
@@ -19,23 +20,54 @@ def _make_llm_response(parts):
     return FakeLlmResponse(parts)
 
 
-def test_empty_response_triggers_fallback():
-    """A response with no content (not just no parts) now falls back to a
-    text-only report from specialist state. Previously this path returned the
-    empty response unchanged — leading to `empty_or_malformed_reply` in the
-    worker. See docs/pipeline-decoupling-implementation-review-2026-04-21.md P1."""
+def _outcome_reason(records) -> str | None:
+    """Return the `reason` from the single synth_outcome record, or None."""
+    for r in records:
+        if getattr(r, "event", None) == "synth_outcome":
+            return getattr(r, "reason", None)
+    return None
+
+
+def test_synth_outcome_carries_sid_from_worker_context(caplog):
+    """Worker sets worker_sid contextvar at /run entry; the synth callback
+    picks it up so Phase 2 rate queries can filter load-test sids."""
+    token = worker_sid.set("sid-test-123")
+    try:
+        resp = _make_llm_response([types.Part(text="ok")])
+        with caplog.at_level(logging.INFO, logger="superextra_agent.agent"):
+            _embed_chart_images(callback_context=None, llm_response=resp)
+    finally:
+        worker_sid.reset(token)
+    record = next(r for r in caplog.records if getattr(r, "event", None) == "synth_outcome")
+    assert record.sid == "sid-test-123"
+
+
+def test_fallback_banner_is_neutral():
+    """User-facing banner must not leak the internal error_code."""
+    report = _build_fallback_report({"market_result": "x"}, "MALFORMED_FUNCTION_CALL")
+    assert "Charts couldn't be generated" in report
+    assert "MALFORMED_FUNCTION_CALL" not in report
+
+
+def test_empty_response_triggers_fallback(caplog):
+    """A response with no content falls back to a text-only report from
+    specialist state and emits synth_outcome/empty_response.
+    See docs/pipeline-decoupling-implementation-review-2026-04-21.md P1."""
     resp = _make_llm_response(None)
     ctx = SimpleNamespace(state={"market_result": "Market text."})
-    result = _embed_chart_images(callback_context=ctx, llm_response=resp)
-    text = result.content.parts[0].text
-    assert "empty_response" in text
-    assert "Market Landscape" in text
+    with caplog.at_level(logging.WARNING, logger="superextra_agent.agent"):
+        result = _embed_chart_images(callback_context=ctx, llm_response=resp)
+    assert "Market Landscape" in result.content.parts[0].text
+    assert _outcome_reason(caplog.records) == "empty_response"
 
 
-def test_no_images_unchanged():
+def test_no_images_unchanged(caplog):
+    """Pure success path emits synth_outcome/ok — the denominator signal."""
     resp = _make_llm_response([types.Part(text="Just text, no images.")])
-    result = _embed_chart_images(callback_context=None, llm_response=resp)
+    with caplog.at_level(logging.INFO, logger="superextra_agent.agent"):
+        result = _embed_chart_images(callback_context=None, llm_response=resp)
     assert result.content.parts[0].text == "Just text, no images."
+    assert _outcome_reason(caplog.records) == "ok"
 
 
 def test_valid_image_replacement():
@@ -102,33 +134,27 @@ def test_oversized_image_skipped(caplog):
 
 
 def test_empty_parts_triggers_fallback():
-    """An LlmResponse with content but an empty parts list also now falls
-    back to a specialist-state report. Same motivation as
-    test_empty_response_triggers_fallback."""
+    """An LlmResponse with content but empty parts also falls back.
+    Same branch as test_empty_response_triggers_fallback, different shape."""
     resp = _make_llm_response([])
     ctx = SimpleNamespace(state={"pricing_result": "Pricing text."})
     result = _embed_chart_images(callback_context=ctx, llm_response=resp)
-    text = result.content.parts[0].text
-    assert "empty_response" in text
-    assert "Menu & Pricing" in text
+    assert "Menu & Pricing" in result.content.parts[0].text
 
 
-def test_parts_without_text_triggers_fallback():
-    """A response whose parts exist but carry no usable text (all None /
-    whitespace) also falls back — mirrors the 'final event with no usable
-    text' failure mode that produced empty_or_malformed_reply in live runs."""
+def test_parts_without_text_triggers_fallback(caplog):
+    """Parts exist but carry no usable text — emits synth_outcome/no_text_parts."""
     resp = _make_llm_response([types.Part(text="   ")])
     ctx = SimpleNamespace(state={"market_result": "Market text."})
-    result = _embed_chart_images(callback_context=ctx, llm_response=resp)
-    text = result.content.parts[0].text
-    assert "no_text_parts" in text
-    assert "Market Landscape" in text
+    with caplog.at_level(logging.WARNING, logger="superextra_agent.agent"):
+        result = _embed_chart_images(callback_context=ctx, llm_response=resp)
+    assert "Market Landscape" in result.content.parts[0].text
+    assert _outcome_reason(caplog.records) == "no_text_parts"
 
 
-def test_error_code_triggers_fallback_with_state_outputs():
-    """When Gemini emits MALFORMED_FUNCTION_CALL (e.g. during code_execution),
-    the callback should build a text-only report from specialist outputs in state
-    so final_report is always populated."""
+def test_error_code_triggers_fallback_with_state_outputs(caplog):
+    """MALFORMED_FUNCTION_CALL builds a text-only report from specialist state
+    and emits synth_outcome/MALFORMED_FUNCTION_CALL."""
     resp = _make_llm_response(None)
     resp.error_code = "MALFORMED_FUNCTION_CALL"
     resp.error_message = "Malformed function call"
@@ -139,14 +165,15 @@ def test_error_code_triggers_fallback_with_state_outputs():
     }
     ctx = SimpleNamespace(state=state)
 
-    result = _embed_chart_images(callback_context=ctx, llm_response=resp)
+    with caplog.at_level(logging.WARNING, logger="superextra_agent.agent"):
+        result = _embed_chart_images(callback_context=ctx, llm_response=resp)
 
     text = result.content.parts[0].text
-    assert "MALFORMED_FUNCTION_CALL" in text
     assert "Market Landscape" in text and "Market landscape report text." in text
     assert "Menu & Pricing" in text and "Pricing report text." in text
     # Filtered-out default-sentinel outputs must not appear as sections
     assert "Guest Intelligence" not in text
+    assert _outcome_reason(caplog.records) == "MALFORMED_FUNCTION_CALL"
 
 
 def test_error_code_with_empty_state_returns_guidance():
@@ -157,7 +184,6 @@ def test_error_code_with_empty_state_returns_guidance():
     result = _embed_chart_images(callback_context=ctx, llm_response=resp)
 
     text = result.content.parts[0].text
-    assert "MALFORMED_FUNCTION_CALL" in text
     assert "No specialist outputs" in text or "rephrasing" in text
 
 
