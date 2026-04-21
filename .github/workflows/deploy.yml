@@ -258,15 +258,36 @@ jobs:
           fi
           echo "✓ New revision: $AFTER (was $BEFORE)"
 
-      # Worker SA needs run.invoker on the worker service itself so Cloud
-      # Tasks' OIDC tokens (minted as the worker SA, audience = worker URL)
-      # are accepted by Cloud Run. Binding is idempotent.
-      - name: Grant worker SA run.invoker on itself
+      # Two run.invoker bindings on the private worker service:
+      #
+      #  1. The worker SA itself — so Cloud Tasks' OIDC tokens (minted as
+      #     the worker SA, audience = worker URL) are accepted by Cloud Run
+      #     at request time.
+      #  2. The currently-active GitHub Actions SA — so the smoke-test
+      #     step below can call `/healthz` with its own identity token.
+      #     Without this, Cloud Run returns 404 (obscured 403) on the
+      #     smoke request. Resolving the active SA at runtime keeps the
+      #     workflow robust if the auth SA changes.
+      #
+      # Both bindings are idempotent.
+      - name: Grant run.invoker on the worker service
         run: |
+          set -euo pipefail
+          ACTIVE_SA=$(gcloud auth list --filter='status:ACTIVE' --format='value(account)' | head -1)
+          if [ -z "$ACTIVE_SA" ]; then
+            echo "::error::Could not determine active service account"
+            exit 1
+          fi
+          echo "Active SA: $ACTIVE_SA"
           gcloud run services add-iam-policy-binding superextra-worker \
             --region=us-central1 \
             --project=superextra-site \
             --member="serviceAccount:superextra-worker@superextra-site.iam.gserviceaccount.com" \
+            --role=roles/run.invoker
+          gcloud run services add-iam-policy-binding superextra-worker \
+            --region=us-central1 \
+            --project=superextra-site \
+            --member="serviceAccount:$ACTIVE_SA" \
             --role=roles/run.invoker
 
       # Health smoke test — requires an identity token since the service is
