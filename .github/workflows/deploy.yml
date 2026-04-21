@@ -4,6 +4,14 @@ on:
   push:
     branches: [main]
 
+# Opt JavaScript actions into Node 24 ahead of the 2026-06-02 forced switch.
+# Without this, GitHub emits deprecation warnings for every step that still
+# uses a Node-20-compiled action (checkout, paths-filter, setup-*, auth,
+# download/upload-artifact). The actions themselves run the same — only the
+# Node runtime invoking them changes.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
