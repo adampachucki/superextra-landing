@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "description": "Phase 0 p99 gate fixture. 10 runs: 3 narrow, 3 mid, 4 broad. Gate is p99 < 22 min.",
+  "places": {
+    "umami": {
+      "name": "Umami",
+      "secondary": "Berlin",
+      "place_id": "ChIJpYCQZztTUkYRFOE368Xs6kI",
+      "note": "Known Place ID from spike B."
+    },
+    "zeit_fur_brot": {
+      "name": "Zeit für Brot",
+      "secondary": "Berlin Mitte",
+      "place_id": "ChIJyTPda-JRqEcRFHRtJJAZIwE",
+      "resolved_name": "Zeit für Brot",
+      "resolved_addr": "Alte Schönhauser Str. 4, 10119 Berlin"
+    },
+    "round_and_edgy": {
+      "name": "Round and Edgy",
+      "secondary": "Berlin Mitte",
+      "place_id": "ChIJVRdbqGdRqEcR3nPaoWyBm_Q",
+      "resolved_name": "Round & Edgy",
+      "resolved_addr": "Rochstraße 3, 10178 Berlin"
+    },
+    "five_elephant": {
+      "name": "Five Elephant",
+      "secondary": "Berlin Mitte",
+      "place_id": "ChIJQSnqIeJRqEcRsZrGsz4BE7E",
+      "resolved_name": "Five Elephant Mitte",
+      "resolved_addr": "Alte Schönhauser Str. 14, 10119 Berlin"
+    },
+    "acid_coffee": {
+      "name": "Acid Coffee",
+      "secondary": "Prenzlauer Berg",
+      "place_id": "ChIJBcvkdQBRqEcRCeDrZ9_HW20",
+      "resolved_name": "ACID P-Berg",
+      "resolved_addr": "Christinenstraße 19a, 10119 Berlin"
+    }
+  },
+  "runs": [
+    { "id": "narrow_1", "tier": "narrow", "place_key": "umami", "query": "What service issues come up in reviews?" },
+    { "id": "narrow_2", "tier": "narrow", "place_key": "umami", "query": "What menu trends are emerging?" },
+    { "id": "narrow_3", "tier": "narrow", "place_key": "umami", "query": "What are operational cost benchmarks?" },
+    { "id": "mid_1", "tier": "mid", "place_key": "umami", "query": "Give me a competitor analysis" },
+    { "id": "mid_2", "tier": "mid", "place_key": "umami", "query": "Customer sentiment overview" },
+    { "id": "mid_3", "tier": "mid", "place_key": "umami", "query": "Pricing positioning for this restaurant" },
+    { "id": "broad_1", "tier": "broad", "place_key": "zeit_fur_brot", "query": "Full competitive analysis: market, pricing, revenue, sentiment, location, ops, marketing, reviews" },
+    { "id": "broad_2", "tier": "broad", "place_key": "round_and_edgy", "query": "Full competitive analysis: market, pricing, revenue, sentiment, location, ops, marketing, reviews" },
+    { "id": "broad_3", "tier": "broad", "place_key": "five_elephant", "query": "Full competitive analysis: market, pricing, revenue, sentiment, location, ops, marketing, reviews" },
+    { "id": "broad_4", "tier": "broad", "place_key": "acid_coffee", "query": "Full competitive analysis: market, pricing, revenue, sentiment, location, ops, marketing, reviews" }
+  ]
+}

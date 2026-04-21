@@ -6,6 +6,7 @@ from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
+from google.adk.models.llm_response import LlmResponse
 from google.adk.apps import App
 from google.adk.tools import google_search
 from google.genai import Client, types
@@ -16,7 +17,8 @@ logger = logging.getLogger(__name__)
 MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2 MB
 
 from .specialists import (
-    MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG, ORCHESTRATOR_THINKING_CONFIG,
+    MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG, MEDIUM_THINKING_CONFIG,
+    ORCHESTRATOR_THINKING_CONFIG,
     ALL_SPECIALISTS, set_specialist_briefs, RETRY,
     _inject_geo_bias, make_gap_researcher,
 )
@@ -99,7 +101,7 @@ def _make_enricher(name="context_enricher"):
         description="Fetches structured Google Places data for the target restaurant and its competitive set.",
         tools=_ENRICHER_TOOLS,
         output_key="places_context",
-        generate_content_config=THINKING_CONFIG,
+        generate_content_config=MEDIUM_THINKING_CONFIG,
         before_agent_callback=_skip_enricher_if_cached,
     )
 
@@ -120,6 +122,49 @@ def _inject_code_execution(*, callback_context, llm_request):
     return None
 
 
+_FALLBACK_SECTIONS = [
+    ("market_result", "Market Landscape"),
+    ("pricing_result", "Menu & Pricing"),
+    ("revenue_result", "Revenue & Sales"),
+    ("guest_result", "Guest Intelligence"),
+    ("location_result", "Location & Traffic"),
+    ("ops_result", "Operations"),
+    ("marketing_result", "Marketing & Digital"),
+    ("review_result", "Review Analysis"),
+    ("dynamic_result_1", "Additional Research"),
+    ("dynamic_result_2", "Gap Research"),
+]
+
+
+def _build_fallback_report(state, error_code: str) -> str:
+    """Concatenate specialist outputs when the synthesizer fails to produce a response.
+
+    The synthesizer occasionally emits MALFORMED_FUNCTION_CALL on its code_execution
+    tool (chart generation) — special characters in data, truncated JSON, etc.
+    When that happens the response has no text, so output_key='final_report' is
+    never populated and the user sees nothing. This fallback guarantees a
+    readable report from the specialist outputs already in session state.
+    """
+    parts = [
+        "# Research findings\n\n",
+        f"_Note: final synthesis hit a model-level error ({error_code}) — typically "
+        "during chart generation. The detailed specialist findings below are the "
+        "raw research captured before synthesis failed._\n\n",
+    ]
+    had_content = False
+    for key, label in _FALLBACK_SECTIONS:
+        val = state.get(key)
+        if not val or val == "Agent did not produce output.":
+            continue
+        had_content = True
+        parts.append(f"## {label}\n\n{val}\n\n")
+    if not had_content:
+        parts.append(
+            "_No specialist outputs were available in session state. Please try rephrasing your question._\n"
+        )
+    return "".join(parts)
+
+
 def _embed_chart_images(*, callback_context, llm_response):
     """Convert inline_data image parts to base64 data URI markdown images.
 
@@ -127,7 +172,22 @@ def _embed_chart_images(*, callback_context, llm_response):
     ![alt](code_execution_image_N_...) in its text, replace those references
     with the actual base64 data URIs so charts render where the model intended.
     Fall back to appending standalone image parts when no references are found.
+
+    If Gemini emitted an error_code instead of a usable response (e.g.
+    MALFORMED_FUNCTION_CALL from code_execution), produce a text-only fallback
+    from the specialist outputs so final_report is always populated.
     """
+    error_code = getattr(llm_response, "error_code", None)
+    if error_code:
+        logger.warning(
+            "Synthesizer emitted %s — falling back to text-only report",
+            error_code,
+        )
+        fallback = _build_fallback_report(callback_context.state, error_code)
+        return LlmResponse(
+            content=types.Content(role="model", parts=[types.Part(text=fallback)])
+        )
+
     if not llm_response.content or not llm_response.content.parts:
         return llm_response
 

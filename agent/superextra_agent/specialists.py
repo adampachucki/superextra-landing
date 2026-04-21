@@ -98,14 +98,15 @@ if _version == "3.1":
     THINKING_CONFIG = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
     )
-    # Orchestrator plans and writes briefs — MEDIUM thinking is sufficient.
-    ORCHESTRATOR_THINKING_CONFIG = types.GenerateContentConfig(
+    MEDIUM_THINKING_CONFIG = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level="MEDIUM"),
     )
+    ORCHESTRATOR_THINKING_CONFIG = MEDIUM_THINKING_CONFIG
 else:
     MODEL = "gemini-2.5-pro"
     SPECIALIST_MODEL = MODEL
     THINKING_CONFIG = None
+    MEDIUM_THINKING_CONFIG = None
     ORCHESTRATOR_THINKING_CONFIG = None
 
 MODEL_GEMINI = _make_gemini(MODEL)
@@ -241,7 +242,7 @@ async def set_specialist_briefs(briefs: dict, tool_context) -> str:
     return f"Briefs set for: {', '.join(valid_briefs.keys())}"
 
 
-def _make_specialist(name, description, output_key, tools=None, instruction_name=None):
+def _make_specialist(name, description, output_key, tools=None, instruction_name=None, thinking_config=None):
     """Create a specialist agent with standard callbacks and config."""
     return LlmAgent(
         name=name,
@@ -250,7 +251,7 @@ def _make_specialist(name, description, output_key, tools=None, instruction_name
         instruction=_make_instruction(instruction_name or name, brief_key=name),
         tools=tools or [google_search, fetch_web_content],
         output_key=output_key,
-        generate_content_config=THINKING_CONFIG,
+        generate_content_config=thinking_config if thinking_config is not None else THINKING_CONFIG,
         before_agent_callback=_make_skip_callback(name),
         before_model_callback=_inject_geo_bias,
         after_model_callback=_append_sources,
@@ -259,17 +260,19 @@ def _make_specialist(name, description, output_key, tools=None, instruction_name
     )
 
 
+# Phase 0: MEDIUM thinking on specialists whose task is pattern-matching / aggregation
+# rather than deep reasoning. HIGH stays on quantitative-inference + strategic specialists.
 _SPECIALIST_CONFIGS = [
-    ("market_landscape", "Analyzes restaurant market dynamics: openings, closings, competitor activity, cuisine trends, saturation, white space.", "market_result"),
-    ("menu_pricing", "Analyzes menus, pricing, delivery markups, promotions, trending dishes.", "pricing_result"),
-    ("revenue_sales", "Estimates revenue, check size, seasonality, channel splits, platform share.", "revenue_result"),
-    ("guest_intelligence", "Analyzes review sentiment, complaint/praise patterns, rating trends.", "guest_result"),
-    ("location_traffic", "Analyzes foot traffic, demographics, purchasing power, rent, trade areas.", "location_result"),
-    ("operations", "Analyzes labor market, salary benchmarks, rent, supplier pricing.", "ops_result"),
-    ("marketing_digital", "Analyzes social media, ads, delivery platform presence, web presence.", "marketing_result"),
+    ("market_landscape", "Analyzes restaurant market dynamics: openings, closings, competitor activity, cuisine trends, saturation, white space.", "market_result", THINKING_CONFIG),
+    ("menu_pricing", "Analyzes menus, pricing, delivery markups, promotions, trending dishes.", "pricing_result", THINKING_CONFIG),
+    ("revenue_sales", "Estimates revenue, check size, seasonality, channel splits, platform share.", "revenue_result", THINKING_CONFIG),
+    ("guest_intelligence", "Analyzes review sentiment, complaint/praise patterns, rating trends.", "guest_result", MEDIUM_THINKING_CONFIG),
+    ("location_traffic", "Analyzes foot traffic, demographics, purchasing power, rent, trade areas.", "location_result", MEDIUM_THINKING_CONFIG),
+    ("operations", "Analyzes labor market, salary benchmarks, rent, supplier pricing.", "ops_result", THINKING_CONFIG),
+    ("marketing_digital", "Analyzes social media, ads, delivery platform presence, web presence.", "marketing_result", MEDIUM_THINKING_CONFIG),
 ]
 
-ALL_SPECIALISTS = [_make_specialist(n, d, k) for n, d, k in _SPECIALIST_CONFIGS]
+ALL_SPECIALISTS = [_make_specialist(n, d, k, thinking_config=tc) for n, d, k, tc in _SPECIALIST_CONFIGS]
 
 ALL_SPECIALISTS.append(_make_specialist(
     "review_analyst",
@@ -322,7 +325,7 @@ def make_gap_researcher():
         instruction=_gap_researcher_instruction,
         tools=[google_search, fetch_web_content],
         output_key="dynamic_result_2",
-        generate_content_config=THINKING_CONFIG,
+        generate_content_config=MEDIUM_THINKING_CONFIG,
         before_agent_callback=_skip_if_no_outputs,
         before_model_callback=_inject_geo_bias,
         after_model_callback=_append_sources,
