@@ -412,7 +412,11 @@ describe('subscribeToSession', () => {
 		expect(cbs.activities).toHaveLength(1);
 	});
 
-	it('PERMISSION_DENIED on either observer fires onPermissionDenied', async () => {
+	it('PERMISSION_DENIED on either observer fires onPermissionDenied exactly once', async () => {
+		// Both session and events observers share a single handleErr; without
+		// the one-shot guard, both errors would double-fire the callback and
+		// the caller would race two concurrent `agentCheck` recovery polls.
+		// Per the `StreamCallbacks.onPermissionDenied` JSDoc contract.
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
 		await subscribeToSession('sid-1', 'run-1', cbs);
@@ -421,7 +425,7 @@ describe('subscribeToSession', () => {
 		expect(cbs.permDenied).toBe(1);
 
 		obs.events.onError({ code: 'permission-denied', message: 'denied' });
-		expect(cbs.permDenied).toBe(2);
+		expect(cbs.permDenied).toBe(1);
 	});
 
 	it('other snapshot errors do NOT call onPermissionDenied', async () => {

@@ -237,18 +237,18 @@ function appendToConversation(convId: string, msg: ChatMessage) {
 	};
 }
 
+// Same-origin rewrites for both dev and prod. `firebase.json` defines
+// `/api/agent/stream` → `agentStream` and `/api/agent/check` → `agentCheck`
+// under the `agent` hosting target, and the Vite dev proxy mirrors them.
+// Post-decoupling `agentStream` is a plain POST-returns-JSON enqueue (no
+// SSE), so the earlier `cloudfunctions.net` GFE-proxy SSE workaround is no
+// longer load-bearing — see docs/deployment-gotchas.md "Cloud Functions".
 function agentStreamUrl() {
-	// Cloud Run URL for `agentstream` Cloud Function in `superextra-site`.
-	// Project uses the hash-based URL format `<service>-<project-hash>-uc.a.run.app`;
-	// hash `22b3fxahka` is project-stable for superextra-site.
-	return import.meta.env.DEV ? '/api/agent/stream' : 'https://agentstream-22b3fxahka-uc.a.run.app';
+	return '/api/agent/stream';
 }
 
 function agentCheckUrl(sid: string, runId: string) {
-	const base = import.meta.env.DEV
-		? '/api/agent/check'
-		: 'https://us-central1-superextra-site.cloudfunctions.net/agentCheck';
-	return `${base}?sid=${encodeURIComponent(sid)}&runId=${encodeURIComponent(runId)}`;
+	return `/api/agent/check?sid=${encodeURIComponent(sid)}&runId=${encodeURIComponent(runId)}`;
 }
 
 function cleanupSubscription() {
@@ -427,6 +427,7 @@ async function send(text: string) {
 
 	currentRunId = runId;
 	appendedReplyForRunId = null;
+	recoveryStartedForRunId = null;
 
 	try {
 		const unsubscribe = await subscribeToSession(
@@ -557,6 +558,17 @@ async function resumeIfInFlight(sessionId: string): Promise<void> {
 						? (data.sources as ChatSource[])
 						: undefined
 				});
+				// Mirror the server-generated title. Firestore observer's
+				// `onComplete` already does this for fresh runs, but the
+				// resume-after-reload path missed it — so titles persisted
+				// for users who stayed on the tab and dropped for cold reloads.
+				const serverTitle = data.title as string | undefined;
+				if (serverTitle) {
+					const idx = conversations.findIndex((c) => c.id === sessionId);
+					if (idx >= 0) {
+						conversations[idx] = { ...conversations[idx], title: serverTitle };
+					}
+				}
 				persist();
 			}
 			loading = false;
@@ -577,6 +589,7 @@ async function resumeIfInFlight(sessionId: string): Promise<void> {
 		// status is queued or running — subscribe with the server-authoritative runId.
 		currentRunId = runId;
 		appendedReplyForRunId = null;
+		recoveryStartedForRunId = null;
 		const unsub = await subscribeToSession(
 			sessionId,
 			runId,
@@ -600,11 +613,21 @@ async function resumeIfInFlight(sessionId: string): Promise<void> {
 	}
 }
 
+// One-shot guard: `onPermissionDenied` can fire from both Firestore observers
+// (session doc + events collection-group) and `onFirstSnapshotTimeout` fires
+// independently. Without this guard two polls would race for the same run.
+// Reset per new subscription in `send()` / `resumeIfInFlight()`, and cleared
+// in `recover()`'s `finally` so a retry (e.g. from `handleReturnFromHidden`)
+// can kick off again after the first attempt exhausts or fails.
+let recoveryStartedForRunId: string | null = null;
+
 async function recover(): Promise<boolean> {
 	if (!currentId) return false;
 	const recoveringConvId = currentId;
 	const runId = currentRunId;
 	if (!runId) return false;
+	if (recoveryStartedForRunId === runId) return false;
+	recoveryStartedForRunId = runId;
 	if (!loading) loading = true;
 	recovering = true;
 	error = '';
@@ -612,12 +635,22 @@ async function recover(): Promise<boolean> {
 		return await recoverStream({
 			getSession: () => ({ sessionId: recoveringConvId, runId }),
 			isCurrentSession: (sid) => currentId === sid,
-			onReply: (reply, sources) => {
+			onReply: (reply, sources, title) => {
 				// Dedup by runId — buildStreamCallbacks' onComplete may have
 				// already appended this same reply via Firestore.
 				if (appendedReplyForRunId === runId) return;
 				appendedReplyForRunId = runId;
 				messages.push({ role: 'agent', text: reply, timestamp: Date.now(), sources });
+				// Sync server-generated title — mirrors the Firestore observer's
+				// onComplete path (chat-state `buildStreamCallbacks`). Without
+				// this, the REST-recovered conversation keeps its client
+				// placeholder instead of the worker-generated title.
+				if (title && recoveringConvId) {
+					const idx = conversations.findIndex((c) => c.id === recoveringConvId);
+					if (idx >= 0) {
+						conversations[idx] = { ...conversations[idx], title };
+					}
+				}
 				persist();
 			},
 			onError: (msg) => {
@@ -632,13 +665,18 @@ async function recover(): Promise<boolean> {
 				}
 			},
 			// `reply` is ignored — runId is the canonical dedup key. The
-			// signature still passes reply so `RecoveryContext` doesn't need
-			// widening.
+			// signature still passes reply for compatibility but we only use
+			// the runId-scoped closure flag here.
 			isDuplicateReply: () => appendedReplyForRunId === runId
 		});
 	} finally {
 		loading = false;
 		recovering = false;
+		// Clear so a retry (visibility-change, reconnect, etc.) can start again.
+		// Safe: concurrent double-fire from the same subscription is short-
+		// circuited by the sync check at the top of recover(); clearing here
+		// only affects calls that arrive after this recover() has resolved.
+		if (recoveryStartedForRunId === runId) recoveryStartedForRunId = null;
 	}
 }
 

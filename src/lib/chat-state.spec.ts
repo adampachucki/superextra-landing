@@ -154,6 +154,64 @@ describe('chatState (Firestore transport)', () => {
 			expect(okReplies).toBe(2);
 		});
 
+		it('onComplete syncs the server-generated title onto the conversation', async () => {
+			// P3a — the Firestore observer path already carried title through,
+			// but a regression here would silently drop the auto-generated title
+			// in favour of the user's client-side placeholder (the first 50 chars
+			// of their prompt). This test anchors the contract.
+			const stream = hangingStream();
+			chatState.start('generic question about pasta', null);
+			await waitUntil(() => !!stream.cbs);
+
+			stream.cbs.onComplete('agent reply', [], 'Weeknight Italian pricing');
+			await waitUntil(() => !chatState.loading);
+
+			expect(chatState.conversations[0].title).toBe('Weeknight Italian pricing');
+		});
+
+		it('onComplete without a title leaves the existing conversation title alone', async () => {
+			const stream = hangingStream();
+			chatState.start('my question', null);
+			await waitUntil(() => !!stream.cbs);
+			const initialTitle = chatState.conversations[0].title;
+
+			stream.cbs.onComplete('agent reply', [], undefined);
+			await waitUntil(() => !chatState.loading);
+
+			expect(chatState.conversations[0].title).toBe(initialTitle);
+		});
+
+		it('onPermissionDenied + onFirstSnapshotTimeout double-fire starts recovery only once', async () => {
+			// P3b — both fallback triggers share the same recover() path. The
+			// StreamCallbacks.onPermissionDenied JSDoc promises "Emitted once"
+			// (enforced at the firestore-stream layer), but as belt-and-braces
+			// against future regressions a closure-level guard in chat-state
+			// also ensures we never start two concurrent agentCheck polls for
+			// the same run.
+			const fetchMock = vi.fn(async () => ({
+				json: async () => ({ ok: true, status: 'running', reply: null })
+			}));
+			vi.stubGlobal('fetch', fetchMock);
+
+			const stream = hangingStream();
+			chatState.start('double fire', null);
+			await waitUntil(() => !!stream.cbs);
+
+			// Simulate a stream layer that DID double-fire (defence-in-depth
+			// test) plus an independent firstSnapshotTimeout:
+			stream.cbs.onPermissionDenied!();
+			stream.cbs.onPermissionDenied!();
+			stream.cbs.onFirstSnapshotTimeout!();
+
+			await new Promise((r) => setTimeout(r, 10));
+			// recover() makes exactly one fetch for this runId (it may poll
+			// again later if the first response is non-terminal, but the first
+			// call count should be 1, not 3).
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+
+			vi.unstubAllGlobals();
+		});
+
 		it('onError sets error and stops loading', async () => {
 			const stream = hangingStream();
 			chatState.start('test query', null);

@@ -99,6 +99,11 @@ export async function subscribeToSession(
 	let lastRenderedSeq = -1;
 	let firstSnapshotSeen = false;
 	let terminal = false;
+	// One-shot per subscription: both observers share `handleErr`, so a
+	// permission-denied on both would double-fire `onPermissionDenied` and
+	// start two recovery polls. JSDoc on `StreamCallbacks.onPermissionDenied`
+	// already promised "Emitted once" — this enforces it.
+	let permissionDeniedFired = false;
 
 	const firstSnapTimer = setTimeout(() => {
 		if (!firstSnapshotSeen && !terminal) {
@@ -115,6 +120,8 @@ export async function subscribeToSession(
 	function handleErr(err: { code?: string; message?: string } | unknown) {
 		const code = (err as { code?: string })?.code;
 		if (code === 'permission-denied') {
+			if (permissionDeniedFired) return;
+			permissionDeniedFired = true;
 			callbacks.onPermissionDenied?.();
 		} else {
 			// Other Firestore errors (`unavailable`, etc.) — log and let the

@@ -40,6 +40,63 @@ describe('recoverStream', () => {
 		expect(calls.reply).toEqual([['Hello', [{ url: 'u', title: 't' }]]]);
 	});
 
+	it('forwards the server-generated title to onReply when agentCheck returns one', async () => {
+		// P3a — `agentCheck` returns `title` on `status='complete'`
+		// (functions/index.js). Recovery must plumb it to the caller so the
+		// conversation title gets synced after REST fallback, not just after
+		// the Firestore observer path.
+		const calls = {
+			reply: [] as Array<[string, unknown, unknown]>,
+			error: [] as string[]
+		};
+		const ctx: RecoveryContext = {
+			getSession: () => ({ sessionId: 'sid-1', runId: 'run-1' }),
+			isCurrentSession: () => true,
+			onReply: (reply, sources, title) => calls.reply.push([reply, sources, title]),
+			onError: (msg) => calls.error.push(msg),
+			checkUrl: (sid, runId) => `https://example.test/check?sid=${sid}&runId=${runId}`
+		};
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => ({
+				json: async () => ({
+					ok: true,
+					reply: 'Hello',
+					sources: [{ url: 'u', title: 't' }],
+					title: 'Weeknight pasta menu review'
+				})
+			}))
+		);
+		const result = await recoverStream(ctx);
+		expect(result).toBe(true);
+		expect(calls.reply).toEqual([
+			['Hello', [{ url: 'u', title: 't' }], 'Weeknight pasta menu review']
+		]);
+	});
+
+	it('passes undefined title when agentCheck omits it', async () => {
+		const calls = {
+			reply: [] as Array<[string, unknown, unknown]>,
+			error: [] as string[]
+		};
+		const ctx: RecoveryContext = {
+			getSession: () => ({ sessionId: 'sid-1', runId: 'run-1' }),
+			isCurrentSession: () => true,
+			onReply: (reply, sources, title) => calls.reply.push([reply, sources, title]),
+			onError: (msg) => calls.error.push(msg),
+			checkUrl: (sid, runId) => `https://example.test/check?sid=${sid}&runId=${runId}`
+		};
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => ({
+				// no `title` field
+				json: async () => ({ ok: true, reply: 'Hello', sources: [] })
+			}))
+		);
+		await recoverStream(ctx);
+		expect(calls.reply[0][2]).toBeUndefined();
+	});
+
 	it('treats session_not_found as terminal failure', async () => {
 		vi.stubGlobal(
 			'fetch',
