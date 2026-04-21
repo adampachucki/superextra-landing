@@ -1593,5 +1593,170 @@ not a regression.
 - **Post-deploy smoke.** Run the 14 Phase 10 manual scenarios; pay
   particular attention to the four items in the checklist above.
 
+---
+
+## Follow-up triage (post-review cleanup)
+
+Added 2026-04-21, after the initial pipeline-decoupling refactor landed
+and the review in
+`docs/pipeline-decoupling-implementation-review-2026-04-21.md` verified
+six findings against code at HEAD. Fixes are grouped into three PRs so
+each can be reviewed and deployed independently:
+
+- **PR #1** — P5 + P1 (worker terminal-reply semantics, isolated so the
+  3-pass live E2E gate runs against a clean fixture).
+- **PR #2** — P3a + P3b + P4 (client-side recovery bundle).
+- **PR #3** — P2 (router instruction tightening, independent track).
+
+### PR #1 — P5 + P1 (branch `pipeline-fixes-p1-p5`, PR #6)
+
+Status: **pushed, awaiting review**.
+
+#### P5 — align E2E fixture to Noma, Copenhagen
+
+- `agent/tests/e2e_worker_live.py`: the place ID
+  `ChIJpYCQZztTUkYRFOE368Xs6kI` resolves to **Noma, Copenhagen**
+  (verified at authoring via Places API (New) v1
+  `GET /v1/places/{id}?fields=displayName,formattedAddress` →
+  `displayName.text="Noma"`, `formattedAddress="Refshalevej 96, 1432 København"`).
+  The fixture previously labeled it as Umami, Berlin — the pipeline
+  cross-checked name/secondary against placeId and the mismatch
+  polluted live-smoke signal.
+- Commit: `a8b46ac test(e2e): align live smoke fixture to Noma, Copenhagen`.
+
+#### P1 — guarantee durable terminal reply
+
+Three coordinated changes make the terminal-reply contract
+lower-bounded:
+
+1. **`_map_synthesizer` widening** (`agent/superextra_agent/firestore_events.py`):
+   when the final synthesizer or follow_up event has usable
+   `content.parts[*].text` but no `state_delta.final_report`, the text
+   is promoted to the `complete` event's `reply`. `final_report` still
+   wins when both are present (preserves format-normalization
+   semantics). Grounding metadata and in-text markdown sources are
+   merged and deduped by URL.
+2. **`_embed_chart_images` empty-response guard**
+   (`agent/superextra_agent/agent.py`): the `after_model_callback`
+   previously fell back to `_build_fallback_report` only when
+   `llm_response.error_code` was truthy. Now also covers:
+   - response with no `content`
+   - response with `content` but empty `parts` list
+   - response with `parts` but no usable text
+     Each path substitutes a `_build_fallback_report(state, <label>)`
+     output so `final_report` is always populated.
+3. **Worker `_build_degraded_reply`** (`agent/worker_main.py`):
+   last-resort stitching of the worker-accumulated `state_delta` dict
+   across the canonical specialist order (`market_result`,
+   `pricing_result`, `revenue_result`, `guest_result`,
+   `location_result`, `ops_result`, `marketing_result`, `review_result`,
+   `dynamic_result_1`, `dynamic_result_2`). Returns `""` when no
+   specialist produced usable output — caller falls through to
+   `status='error'`, since nothing-to-show is worse than an empty
+   placeholder.
+
+#### Tests added/updated
+
+- `agent/tests/test_firestore_events.py` (+4 tests, 2 renamed):
+  text-only final synth/follow_up events emit `complete`; `final_report`
+  preferred when both present; grounding + text sources merged/deduped;
+  whitespace-only `final_report` falls through to text parts.
+- `agent/tests/test_embed_chart_images.py` (2 existing tests updated,
+  +1 new): empty-response and empty-parts now trigger fallback;
+  parts-without-text triggers fallback.
+- `agent/tests/test_worker_main.py` (+2 tests): degraded reply builds
+  in canonical order, filters NOT_RELEVANT/whitespace; returns `""`
+  when no specialist output exists.
+
+#### Verification
+
+Local test gate:
+
+| Suite                                                                                  | Result                                                               |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `npm run test`                                                                         | 77/77                                                                |
+| `cd functions && npm test`                                                             | 47/47                                                                |
+| `npm run test:rules`                                                                   | 10/10                                                                |
+| `npm run check`                                                                        | 0 errors, 13 baseline warnings                                       |
+| `npm run lint`                                                                         | 0 errors, 22 baseline warnings                                       |
+| `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ --ignore=tests/test_router_evals.py` | 150 passed, 7 pre-existing live-Gemini ADC-scope failures (P2 scope) |
+
+Live E2E against real `superextra-worker`
+(`agent/tests/e2e_worker_live.py`, post-fix):
+
+- **PASS** — `status=complete`, `reply_len=300069`, `sources_n=15`,
+  `title='Service review issues'`, 1 `complete` event written, 319s
+  elapsed.
+- Compared to the **failing baseline** run on the same fixture pre-fix:
+  `status=error / empty_or_malformed_reply` after 314s, 0 `complete`
+  events.
+
+Commit: `7ba2872 fix(worker): guarantee durable terminal reply when synthesizer returns no final_report`.
+
+#### Remaining P1 work — handed to post-merge
+
+1. **3-consecutive-pass gate** per the review's exit criterion #1. One
+   live run has passed; two more required post-merge/post-deploy.
+2. Watch worker logs after deploy for `event: degraded_reply` — fires
+   only when the worker-side fallback path is exercised. Not expected
+   in normal operation; presence isn't fatal (reply is still durable)
+   but signals synth is silently returning empty.
+
+### PR #2 — P3a + P3b + P4 (pending)
+
+Scope (not yet started):
+
+- **P3a** — recovery/resume paths drop server-generated title.
+  `RecoveryContext.onReply` needs a `title?` parameter; `recover()` and
+  `resumeIfInFlight()` must plumb `data.title` through to conversation
+  state.
+- **P3b** — `onPermissionDenied` fires twice when both Firestore
+  observers error. Add a `permissionDeniedFired` closure guard in
+  `subscribeToSession`; update `firestore-stream.spec.ts:415-425` which
+  currently asserts the wrong count; add a `recoveryStarted` guard
+  around `recover()` calls in `chat-state.svelte.ts`.
+- **P4** — hardcoded production URLs. Switch `agentStreamUrl()` and
+  `agentCheckUrl()` to the same-origin rewrite paths
+  (`/api/agent/stream` and `/api/agent/check`). `firebase.json:78-86`
+  already defines the rewrites for the `agent` hosting target. Safe
+  now that `agentStream` no longer streams — post-decoupling it's a
+  plain POST-returns-JSON enqueue, so the `cloudfunctions.net` GFE
+  proxy SSE workaround is no longer load-bearing.
+
+### PR #3 — P2 (pending)
+
+Router instruction tightening — `agent/superextra_agent/instructions/router.md`
+needs explicit positive/negative examples for the four failing
+realistic multi-turn prompts in
+`agent/tests/test_follow_up_routing.py:124-158`:
+
+- → `follow_up`: "Summarize that in bullet points", "What did you find
+  about pricing?", "Can you compare restaurants A and B from the
+  report?"
+- → `research_pipeline`: "What about the delivery market in this
+  area?", "Now analyze Restaurant D in Krakow"
+
+Run `test_follow_up_routing.py` + `npm run test:evals` as a release
+gate. Independent of PR #1 / PR #2 — can run in parallel.
+
+### Updated exit criteria
+
+From the review doc, the gate to mark the pipeline-decoupling project
+fully finalized:
+
+1. `agent/tests/e2e_worker_live.py` passes 3 consecutive runs with
+   durable terminal reply (`status='complete'` and `reply_len > 0`).
+   _1/3 passed (PR #1)._
+2. `agent/tests/test_follow_up_routing.py` is green, OR team narrows
+   "finalized" to the transport layer only. _Pending PR #3._
+3. Refresh-after-complete and REST-fallback-after-complete preserve
+   titles. _Pending PR #2 P3a._
+4. Recovery fallback is one-shot per run. _Pending PR #2 P3b._
+5. Smoke fixture is internally consistent. _Done (PR #1 P5)._
+6. Optional: client uses same-origin rewrite paths in prod. _Pending
+   PR #2 P4._
+
+---
+
 This log is the final state record pre-deploy. No further code changes
 planned; next update should be post-deploy outcome.
