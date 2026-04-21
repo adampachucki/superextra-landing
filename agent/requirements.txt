@@ -1,2 +1,5 @@
 google-adk==1.28.0
 httpx==0.28.1
+fastapi==0.136.0
+uvicorn[standard]==0.39.0
+google-cloud-firestore==2.22.0

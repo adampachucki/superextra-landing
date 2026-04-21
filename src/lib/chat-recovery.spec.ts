@@ -7,11 +7,11 @@ function makeCtx(overrides: Partial<RecoveryContext> = {}): {
 } {
 	const calls = { reply: [] as Array<[string, unknown]>, error: [] as string[] };
 	const ctx: RecoveryContext = {
-		getSessionId: () => 'sid-1',
+		getSession: () => ({ sessionId: 'sid-1', runId: 'run-1' }),
 		isCurrentSession: () => true,
 		onReply: (reply, sources) => calls.reply.push([reply, sources]),
 		onError: (msg) => calls.error.push(msg),
-		checkUrl: (sid) => `https://example.test/check?sid=${sid}`,
+		checkUrl: (sid, runId) => `https://example.test/check?sid=${sid}&runId=${runId}`,
 		...overrides
 	};
 	return { ctx, calls };

@@ -2,10 +2,11 @@
 
 import base64
 import logging
+from types import SimpleNamespace
 
 from google.genai import types
 
-from superextra_agent.agent import _embed_chart_images, MAX_IMAGE_BYTES
+from superextra_agent.agent import _embed_chart_images, MAX_IMAGE_BYTES, _build_fallback_report
 
 
 def _make_llm_response(parts):
@@ -97,3 +98,50 @@ def test_empty_parts_unchanged():
     resp = _make_llm_response([])
     result = _embed_chart_images(callback_context=None, llm_response=resp)
     assert result is resp
+
+
+def test_error_code_triggers_fallback_with_state_outputs():
+    """When Gemini emits MALFORMED_FUNCTION_CALL (e.g. during code_execution),
+    the callback should build a text-only report from specialist outputs in state
+    so final_report is always populated."""
+    resp = _make_llm_response(None)
+    resp.error_code = "MALFORMED_FUNCTION_CALL"
+    resp.error_message = "Malformed function call"
+    state = {
+        "market_result": "Market landscape report text.",
+        "pricing_result": "Pricing report text.",
+        "guest_result": "Agent did not produce output.",  # filtered out
+    }
+    ctx = SimpleNamespace(state=state)
+
+    result = _embed_chart_images(callback_context=ctx, llm_response=resp)
+
+    text = result.content.parts[0].text
+    assert "MALFORMED_FUNCTION_CALL" in text
+    assert "Market Landscape" in text and "Market landscape report text." in text
+    assert "Menu & Pricing" in text and "Pricing report text." in text
+    # Filtered-out default-sentinel outputs must not appear as sections
+    assert "Guest Intelligence" not in text
+
+
+def test_error_code_with_empty_state_returns_guidance():
+    resp = _make_llm_response(None)
+    resp.error_code = "MALFORMED_FUNCTION_CALL"
+    ctx = SimpleNamespace(state={})
+
+    result = _embed_chart_images(callback_context=ctx, llm_response=resp)
+
+    text = result.content.parts[0].text
+    assert "MALFORMED_FUNCTION_CALL" in text
+    assert "No specialist outputs" in text or "rephrasing" in text
+
+
+def test_build_fallback_report_shape():
+    state = {
+        "market_result": "A",
+        "ops_result": "B",
+        "dynamic_result_2": "C",
+    }
+    report = _build_fallback_report(state, "MALFORMED_FUNCTION_CALL")
+    # Sections appear in the canonical order, not alphabetical / insertion order
+    assert report.index("Market Landscape") < report.index("Operations") < report.index("Gap Research")

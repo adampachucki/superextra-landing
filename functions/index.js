@@ -1,22 +1,20 @@
+import crypto from 'node:crypto';
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
-import { VertexAI } from '@google-cloud/vertexai';
-import { GoogleAuth } from 'google-auth-library';
+import { CloudTasksClient } from '@google-cloud/tasks';
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import {
 	esc,
 	row,
 	confirmationHtml,
 	stripMarkdown,
-	extractSourcesFromText,
-	sendSSE,
 	checkRateLimit,
-	parseADKStream,
 	validatePlaceContext,
-	validateHistory,
-	SPECIALIST_RESULT_KEYS
+	validateHistory
 } from './utils.js';
+export { watchdog } from './watchdog.js';
 
 initializeApp();
 const db = getFirestore();
@@ -25,9 +23,7 @@ const relayKey = defineSecret('RELAY_KEY');
 const elevenlabsKey = defineSecret('ELEVENLABS_API_KEY');
 const DEST = 'hello@superextra.ai';
 
-// --- Vertex AI config ---
 const PROJECT = 'superextra-site';
-const LOCATION = 'us-central1';
 
 export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req, res) => {
 	const RELAY_KEY = relayKey.value();
@@ -115,278 +111,235 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 
 // row, esc, confirmationHtml imported from ./utils.js
 
-// --- Agent chat endpoint (proxies to ADK Cloud Run) ---
-
-const ADK_SERVICE_URL = 'https://superextra-agent-907466498524.us-central1.run.app';
-const auth = new GoogleAuth();
+// --- Agent chat endpoint (enqueues work to Cloud Tasks → superextra-worker) ---
 
 const rateLimitMap = new Map();
+const uidRateLimitMap = new Map();
+const UID_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const UID_RATE_LIMIT_MAX = 20; // per-UID pipeline runs per hour (plan default)
 
-// Maps frontend sessionId → ADK session ID (resets on cold start)
-const sessionMap = new Map();
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-async function persistSession(sessionId, adkSessionId, userId) {
-	try {
-		await db.collection('sessions').doc(sessionId).set({
-			adkSessionId,
-			userId,
-			createdAt: Date.now()
-		});
-	} catch (e) {
-		console.warn('Firestore session write failed, retrying:', e.message);
-		try {
-			await db.collection('sessions').doc(sessionId).set({
-				adkSessionId,
-				userId,
-				createdAt: Date.now()
-			});
-		} catch (e2) {
-			console.error('Firestore session write failed permanently:', e2.message);
-		}
-	}
+// Cloud Tasks config. WORKER_URL is canonically set at deploy time: the
+// workflow describes the deployed `superextra-worker` Cloud Run service and
+// writes the URL into `functions/.env.superextra-site`, which
+// firebase-functions v2 loads into `process.env`. The fallback default uses
+// this project's observed Cloud Run URL pattern
+// (`<service>-<project-hash>-<region-short>.a.run.app`) as defense-in-depth
+// against a deploy that forgot to set the env var. The older project-number
+// URL pattern is NOT used by this project's Cloud Run services.
+const TASKS_LOCATION = 'us-central1';
+const TASKS_QUEUE = 'agent-dispatch';
+const WORKER_SA = 'superextra-worker@superextra-site.iam.gserviceaccount.com';
+const DISPATCH_DEADLINE_S = 1800; // plan-mandated — overrides 10-min default
+const DEFAULT_WORKER_URL = 'https://superextra-worker-22b3fxahka-uc.a.run.app';
+const WORKER_URL = () => process.env.WORKER_URL || DEFAULT_WORKER_URL;
+
+let _tasksClient;
+function getTasksClient() {
+	if (!_tasksClient) _tasksClient = new CloudTasksClient();
+	return _tasksClient;
 }
 
-// --- Streaming agent endpoint (SSE progress + token streaming) ---
-
-async function generateTitle(message) {
-	try {
-		const vertexAI = new VertexAI({ project: PROJECT, location: LOCATION });
-		const flashModel = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-		const titleResult = await Promise.race([
-			flashModel.generateContent({
-				contents: [
-					{
-						role: 'user',
-						parts: [
-							{
-								text:
-									`Summarize this message into a short title, max 4 words.\n` +
-									`Rules:\n` +
-									`- Use the SAME LANGUAGE as the message\n` +
-									`- No markdown, no quotes, no punctuation, no numbering\n` +
-									`- Do not answer the question — just label the topic\n` +
-									`- Reply with ONLY the title, nothing else\n\n` +
-									`Message: "${message}"`
-							}
-						]
-					}
-				]
-			}),
-			new Promise((_, reject) =>
-				setTimeout(() => reject(new Error('Title generation timed out')), 8000)
-			)
-		]);
-		const raw = titleResult.response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-		if (raw) {
-			const cleaned = raw
-				.replace(/^["']|["']$/g, '')
-				.replace(/[*#_`~>-]/g, '')
-				.replace(/^\d+\.\s*/, '')
-				.trim();
-			const words = cleaned.split(/\s+/);
-			if (words.length <= 8 && cleaned.length > 0) {
-				return words.slice(0, 4).join(' ');
+async function enqueueRunTask({ runId, body }) {
+	const workerUrl = WORKER_URL();
+	const client = getTasksClient();
+	const parent = client.queuePath(PROJECT, TASKS_LOCATION, TASKS_QUEUE);
+	await client.createTask({
+		parent,
+		task: {
+			// Name must be unique per runId so retries don't get new tasks and
+			// we get 24h dedup on accidental double-enqueues of the same turn.
+			name: `${parent}/tasks/${runId}`,
+			dispatchDeadline: { seconds: DISPATCH_DEADLINE_S, nanos: 0 },
+			httpRequest: {
+				httpMethod: 'POST',
+				url: `${workerUrl}/run`,
+				headers: { 'Content-Type': 'application/json' },
+				body: Buffer.from(JSON.stringify(body)).toString('base64'),
+				oidcToken: {
+					serviceAccountEmail: WORKER_SA,
+					audience: workerUrl
+				}
 			}
 		}
-	} catch (e) {
-		console.warn('Title generation failed:', e.message);
-	}
-	return undefined;
+	});
 }
 
-export const agentStream = onRequest({ cors: true, timeoutSeconds: 500 }, async (req, res) => {
+class AgentStreamError extends Error {
+	constructor(status, code) {
+		super(code);
+		this.status = status;
+		this.code = code;
+	}
+}
+
+export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
 	if (req.method !== 'POST') {
 		res.status(405).json({ ok: false, error: 'Method not allowed' });
 		return;
 	}
 
-	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-	if (!checkRateLimit(rateLimitMap, ip, Date.now(), 10 * 60 * 1000, 20)) {
-		res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+	// 1. Firebase ID token verification.
+	const authHeader = req.headers.authorization || '';
+	const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
+	if (!tokenMatch) {
+		res.status(401).json({ ok: false, error: 'Authorization header required' });
+		return;
+	}
+	let userId;
+	try {
+		const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
+		userId = decoded.uid;
+	} catch (e) {
+		console.warn('verifyIdToken rejected:', e.code || e.message);
+		res.status(401).json({ ok: false, error: 'Invalid auth token' });
 		return;
 	}
 
+	// 2. Rate limits — IP first (pre-UID) then UID (authenticated scope).
+	const now = Date.now();
+	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+	if (!checkRateLimit(rateLimitMap, ip, now, 10 * 60 * 1000, 20)) {
+		res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+		return;
+	}
+	if (!checkRateLimit(uidRateLimitMap, userId, now, UID_RATE_LIMIT_WINDOW_MS, UID_RATE_LIMIT_MAX)) {
+		res.status(429).json({ ok: false, error: 'Hourly pipeline limit reached.' });
+		return;
+	}
+
+	// 3. Input validation.
 	const { message, sessionId } = req.body || {};
 	const placeContext = validatePlaceContext(req.body?.placeContext);
 	const history = validateHistory(req.body?.history);
-
 	if (!message || typeof message !== 'string' || !sessionId) {
 		res.status(400).json({ ok: false, error: 'message and sessionId are required' });
 		return;
 	}
-
 	if (message.length > 2000) {
 		res.status(400).json({ ok: false, error: 'Message too long' });
 		return;
 	}
 
-	// SSE headers — write() immediately to flush headers to the client.
-	// writeHead() alone does NOT flush in Node.js; without an early write(),
-	// the client's fetch() stays pending and Cloud Run infrastructure may
-	// close the idle connection before the first keepalive at t+15s.
-	res.writeHead(200, {
-		'Content-Type': 'text/event-stream',
-		'Cache-Control': 'no-cache',
-		'X-Accel-Buffering': 'no'
-	});
-	res.write(': ok\n\n');
+	// 4. Server-generated runId — never trust a client-supplied one.
+	const runId = crypto.randomUUID();
+	const ref = db.collection('sessions').doc(sessionId);
 
-	const t0 = Date.now();
-	const keepalive = setInterval(() => res.write(': keepalive\n\n'), 15000);
-	const ac = new AbortController();
-	res.on('close', () => {
-		const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-		if (!res.writableEnded)
-			console.warn(`Client disconnected at +${elapsed}s (before stream completed)`);
-		ac.abort();
-		clearInterval(keepalive);
-	});
-
+	// 5. Atomic session upsert with ownership + in-flight + expiresAt logic.
+	// Transactions can re-run on contention, so we capture decision signals
+	// into outer-scope vars on every attempt; the last successful attempt
+	// wins and those are the values we use for the Cloud Task body.
+	let existingAdkSessionId = null;
+	let isFirstMessage = false;
 	try {
-		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
-		const headers = await client.getRequestHeaders();
-		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] auth ready`);
+		await db.runTransaction(async (t) => {
+			const snap = await t.get(ref);
+			const existing = snap.exists ? snap.data() : null;
 
-		// Session management (same as agent endpoint)
-		let cached = sessionMap.get(sessionId);
-		let adkSessionId = cached?.adkSessionId;
-		let userId = cached?.userId || ip;
-		if (!adkSessionId) {
-			const doc = await db.collection('sessions').doc(sessionId).get();
-			if (doc.exists) {
-				adkSessionId = doc.data().adkSessionId;
-				userId = doc.data().userId || ip;
-				sessionMap.set(sessionId, { adkSessionId, userId });
+			// Ownership check — Admin SDK bypasses Firestore rules, so this is
+			// the only guard keeping a caller with a known `sid` out of another
+			// user's conversation. Reject when `userId` is missing too: a
+			// legacy/malformed doc without `userId` must not silently pass the
+			// check (audit Finding 3).
+			if (existing && (!existing.userId || existing.userId !== userId)) {
+				throw new AgentStreamError(403, 'ownership_mismatch');
 			}
-		}
-		console.log(
-			`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] session lookup: ${adkSessionId ? 'found' : 'new'}`
-		);
-
-		if (!adkSessionId) {
-			const createRes = await fetch(
-				`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(ip)}/sessions`,
-				{
-					method: 'POST',
-					headers: { ...headers, 'Content-Type': 'application/json' },
-					body: JSON.stringify({})
-				}
-			);
-			if (!createRes.ok) {
-				sendSSE(res, 'error', { error: 'Agent unavailable. Please try again.' });
-				res.end();
-				clearInterval(keepalive);
-				return;
+			if (existing && (existing.status === 'queued' || existing.status === 'running')) {
+				throw new AgentStreamError(409, 'previous_turn_in_flight');
 			}
-			const sessionData = await createRes.json();
-			adkSessionId = sessionData.id;
-			userId = ip;
-			sessionMap.set(sessionId, { adkSessionId, userId });
-			await persistSession(sessionId, adkSessionId, ip);
-			console.log(
-				`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] session created: ${adkSessionId}`
-			);
-		}
 
-		// Build query
-		const today = new Date().toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'long',
-			day: 'numeric'
-		});
-		let queryText = `[Date: ${today}] ${message}`;
-		const isFirstMessage = !history || history.length === 0;
-		if (placeContext && placeContext.name && isFirstMessage) {
-			queryText = `[Context: asking about ${placeContext.name}, ${placeContext.secondary || ''} (Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
-		}
+			existingAdkSessionId = existing?.adkSessionId || null;
+			isFirstMessage = !existing;
 
-		// Title generation in parallel (first message only)
-		const titlePromise = isFirstMessage ? generateTitle(message) : null;
+			// expiresAt: never shrinks. Extend to max(existing, now + 30d).
+			const prevExpires = existing?.expiresAt?.toMillis?.() ?? existing?.expiresAt ?? 0;
+			const newExpiresAt = new Date(Math.max(prevExpires, now + SESSION_TTL_MS));
 
-		// Call ADK with streaming — 440s timeout leaves 60s buffer for completion handling
-		console.log(
-			`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] calling run_sse (aborted=${ac.signal.aborted})`
-		);
-		const adkTimeout = AbortSignal.timeout(440_000);
-		const adkResponse = await fetch(`${ADK_SERVICE_URL}/run_sse`, {
-			method: 'POST',
-			headers: { ...headers, 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				app_name: 'superextra_agent',
-				user_id: userId,
-				session_id: adkSessionId,
-				new_message: { role: 'user', parts: [{ text: queryText }] },
-				streaming: true
-			}),
-			signal: AbortSignal.any([ac.signal, adkTimeout])
-		});
+			const perTurn = {
+				currentRunId: runId,
+				currentAttempt: 0,
+				currentWorkerId: null,
+				status: 'queued',
+				queuedAt: FieldValue.serverTimestamp(),
+				lastHeartbeat: null,
+				lastEventAt: null,
+				reply: null,
+				sources: null,
+				error: null,
+				expiresAt: newExpiresAt
+			};
 
-		if (!adkResponse.ok) {
-			sendSSE(res, 'error', { error: 'Agent unavailable. Please try again.' });
-			res.end();
-			clearInterval(keepalive);
-			return;
-		}
-
-		// Stream-parse ADK SSE events and emit frontend SSE events
-		console.log(`[stream +${((Date.now() - t0) / 1000).toFixed(1)}s] run_sse connected`);
-		const reader = adkResponse.body.getReader();
-		const { reply, routerResponse, sources } = await parseADKStream(reader, (event, data) =>
-			sendSSE(res, event, data)
-		);
-
-		// Fallback: fetch sources from session state specialist results
-		if (sources.length === 0 && (reply || routerResponse)) {
-			try {
-				const sessionRes = await fetch(
-					`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(adkSessionId)}`,
-					{ headers }
-				);
-				if (sessionRes.ok) {
-					const session = await sessionRes.json();
-					for (const key of SPECIALIST_RESULT_KEYS) {
-						if (session.state?.[key]) {
-							for (const s of extractSourcesFromText(session.state[key])) {
-								if (!sources.some((x) => x.url === s.url)) {
-									sources.push(s);
-								}
-							}
-						}
-					}
-				}
-			} catch {
-				// sources unavailable — not critical
+			if (isFirstMessage) {
+				t.set(ref, {
+					userId,
+					createdAt: FieldValue.serverTimestamp(),
+					adkSessionId: null, // worker creates on first turn
+					placeContext: placeContext || null,
+					title: null,
+					...perTurn
+				});
+			} else {
+				// Preserve userId / createdAt / adkSessionId / placeContext / title.
+				t.update(ref, perTurn);
 			}
-		}
-
-		const title = titlePromise ? await titlePromise : undefined;
-		const finalReply =
-			reply ||
-			routerResponse ||
-			"I wasn't able to generate a response. Please try rephrasing your question.";
-		sendSSE(res, 'complete', {
-			reply: finalReply,
-			sources,
-			...(title && { title })
 		});
 	} catch (err) {
-		if (err.name === 'AbortError') {
-			if (ac.signal.aborted) {
-				// Client disconnected — nothing to send
-				console.warn('Agent stream aborted (client disconnect)');
-			} else {
-				// ADK timeout — tell the client gracefully
-				console.warn('Agent stream aborted (pipeline timeout)');
-				sendSSE(res, 'error', { error: 'timeout' });
-			}
+		if (err instanceof AgentStreamError) {
+			res.status(err.status).json({ ok: false, error: err.code });
 		} else {
-			console.error('Agent stream error:', err.message || err);
-			sendSSE(res, 'error', { error: 'Agent unavailable. Please try again.' });
+			console.error('agentStream transaction failed:', err.message || err);
+			res.status(500).json({ ok: false, error: 'session_upsert_failed' });
 		}
-	} finally {
-		clearInterval(keepalive);
-		res.end();
+		return;
 	}
+
+	// 6. Build the query text the worker feeds to the pipeline. Matches the
+	// shape the current pipeline expects; worker doesn't do any further
+	// mutation. [Context: ...] is only injected on the first message — after
+	// that the ADK session holds the context in state.
+	const today = new Date(now).toLocaleDateString('en-US', {
+		year: 'numeric',
+		month: 'long',
+		day: 'numeric'
+	});
+	let queryText = `[Date: ${today}] ${message}`;
+	if (isFirstMessage && placeContext && placeContext.name) {
+		queryText = `[Context: asking about ${placeContext.name}, ${placeContext.secondary || ''} (Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
+	}
+
+	// 7. Enqueue Cloud Task. On enqueue failure, flip the freshly-queued
+	// session to status=error so the watchdog doesn't sweep it, and surface
+	// a 502 so the client can retry deterministically.
+	try {
+		await enqueueRunTask({
+			runId,
+			body: {
+				sessionId,
+				runId,
+				adkSessionId: existingAdkSessionId,
+				userId,
+				queryText,
+				isFirstMessage,
+				placeContext: placeContext || null,
+				history
+			}
+		});
+	} catch (err) {
+		console.error('Cloud Tasks enqueue failed:', err.message || err);
+		try {
+			await ref.update({
+				status: 'error',
+				error: 'enqueue_failed'
+			});
+		} catch (e2) {
+			console.error('Post-enqueue status=error write failed:', e2.message || e2);
+		}
+		res.status(502).json({ ok: false, error: 'enqueue_failed' });
+		return;
+	}
+
+	res.status(202).json({ ok: true, sessionId, runId });
 });
 
 // --- STT token endpoint (mints single-use ElevenLabs Scribe tokens) ---
@@ -491,8 +444,22 @@ export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (re
 	}
 });
 
-// --- Agent check endpoint (recovers latest agent response if frontend missed it) ---
-
+// --- Agent check endpoint (REST fallback when Firestore snapshot is blocked) ---
+//
+// Post-migration: reads directly from the session doc (worker writes reply +
+// sources + status there on completion). No more calls into the ADK Cloud
+// Run service — that service is being retired in Phase 8.
+//
+// Security:
+//   - Firebase ID token required (same as agentStream).
+//   - Explicit `session.userId == decodedToken.uid` check — Admin SDK
+//     bypasses Firestore rules, so the browser-side read rule does NOT
+//     protect this path.
+//
+// `runId` is optional on the query. When provided, it's informational —
+// the response is always based on the session's `currentRunId` state.
+// This matches the plan's default for stale-runId semantics (ownership
+// check still runs, so only the owner sees anything).
 export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
 	if (req.method !== 'GET') {
 		res.status(405).json({ ok: false, error: 'Method not allowed' });
@@ -500,8 +467,25 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 	}
 
 	const sid = req.query.sid;
-	if (!sid) {
+	if (!sid || typeof sid !== 'string') {
 		res.status(400).json({ ok: false, error: 'sid query parameter is required' });
+		return;
+	}
+
+	// 1. Verify Firebase ID token.
+	const authHeader = req.headers.authorization || '';
+	const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
+	if (!tokenMatch) {
+		res.status(401).json({ ok: false, error: 'Authorization header required' });
+		return;
+	}
+	let uid;
+	try {
+		const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
+		uid = decoded.uid;
+	} catch (e) {
+		console.warn('agentCheck verifyIdToken rejected:', e.code || e.message);
+		res.status(401).json({ ok: false, error: 'Invalid auth token' });
 		return;
 	}
 
@@ -512,57 +496,46 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 			return;
 		}
 
-		const { adkSessionId, userId, createdAt } = doc.data();
-		const client = await auth.getIdTokenClient(ADK_SERVICE_URL);
-		const headers = await client.getRequestHeaders();
+		const data = doc.data() || {};
 
-		const adkRes = await fetch(
-			`${ADK_SERVICE_URL}/apps/superextra_agent/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(adkSessionId)}`,
-			{ headers }
-		);
-
-		if (!adkRes.ok) {
-			// agentCheck returns 200 even on errors — the frontend polls this
-			// endpoint and retries on non-ok. HTTP error codes would trigger
-			// fetch error handling instead of graceful retry.
-			res.json({ ok: false, reason: 'agent_unavailable' });
+		// 2. Explicit ownership check (Admin SDK bypasses Firestore rules).
+		// Rejects on missing `userId` too — a legacy/malformed doc without
+		// `userId` must not silently pass the check (audit Finding 3).
+		if (!data.userId || data.userId !== uid) {
+			res.status(403).json({ ok: false, reason: 'ownership_mismatch' });
 			return;
 		}
 
-		const session = await adkRes.json();
-		const reply = session.state?.final_report || session.state?.router_response || null;
+		const status = data.status || null;
+		const reply = data.reply || null;
 
-		if (!reply) {
-			// Detect stuck sessions: if no reply after 9 minutes, the pipeline is dead
-			// createdAt may be a Firestore Timestamp (.toMillis()) or a plain epoch ms number
-			const createdMs =
-				typeof createdAt === 'number' ? createdAt : (createdAt?.toMillis?.() ?? Date.now());
-			const ageMs = Date.now() - createdMs;
-			if (ageMs > 9 * 60 * 1000) {
-				res.json({ ok: false, reason: 'timed_out' });
-				return;
-			}
-			res.json({ ok: true, reply: null, status: 'processing' });
+		if (status === 'complete' && reply) {
+			res.json({
+				ok: true,
+				status: 'complete',
+				reply,
+				sources: data.sources && data.sources.length ? data.sources : undefined,
+				title: data.title || undefined
+			});
 			return;
 		}
 
-		// Extract sources from specialist result text (markdown links)
-		const sources = [];
-		for (const key of SPECIALIST_RESULT_KEYS) {
-			if (session.state?.[key]) {
-				for (const s of extractSourcesFromText(session.state[key])) {
-					if (!sources.some((x) => x.url === s.url)) {
-						sources.push(s);
-					}
-				}
-			}
+		if (status === 'error') {
+			res.json({
+				ok: false,
+				reason: 'pipeline_error',
+				error: data.error || null
+			});
+			return;
 		}
 
+		// status is 'queued' or 'running' — still processing. Return a soft
+		// "keep polling" shape. Frontend's chat-recovery treats this as
+		// "not yet" and will retry on the next interval.
 		res.json({
 			ok: true,
-			reply,
-			sources: sources.length ? sources : undefined,
-			status: 'complete'
+			status: status || 'processing',
+			reply: null
 		});
 	} catch (err) {
 		console.error('Agent check error:', err.message || err);

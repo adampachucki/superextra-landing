@@ -1,0 +1,23 @@
+rules_version = '2';
+
+// Pipeline decoupling:
+// - Browser is read-only. All writes go through Admin SDK (Cloud Function + worker).
+// - `userId` is denormalized onto every event doc so collection-group reads can
+//   enforce ownership without a get() into the parent session doc.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /sessions/{sid} {
+      allow read: if request.auth != null
+                  && request.auth.uid == resource.data.userId;
+      allow write: if false;
+    }
+
+    // Collection-group wildcard — required because the client uses
+    // collectionGroup('events') (see spike-results finding D.1).
+    match /{path=**}/events/{eid} {
+      allow read: if request.auth != null
+                  && request.auth.uid == resource.data.userId;
+      allow write: if false;
+    }
+  }
+}

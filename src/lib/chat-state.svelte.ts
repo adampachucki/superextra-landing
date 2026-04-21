@@ -1,4 +1,5 @@
-import { streamAgent, type ActivityEvent } from '$lib/sse-client';
+import { postAgentStream, subscribeToSession, type ActivityEvent } from '$lib/firestore-stream';
+import { ensureAnonAuth, getIdToken } from '$lib/firebase';
 import { recoverStream } from '$lib/chat-recovery';
 import { handleReturnFromHidden, type IosVisibilityHandle } from '$lib/ios-sse-workaround';
 
@@ -44,7 +45,6 @@ interface ChatMessage {
 	text: string;
 	timestamp: number;
 	sources?: ChatSource[];
-	partial?: boolean;
 }
 
 interface PlaceContext {
@@ -76,10 +76,16 @@ let placeContext = $state<PlaceContext | null>(null);
 let currentId = $state<string | null>(null);
 
 // Streaming state (ephemeral — never persisted to localStorage)
-let streamingText = $state('');
 let streamingProgress = $state<StreamingStep[]>([]);
 let streamingActivities = $state<ActivityItem[]>([]);
-let abortController: AbortController | null = null;
+let currentRunId = $state<string | null>(null);
+// Terminal-reply dedup key. Set to the runId the first time a reply lands
+// (via Firestore observer OR chat-recovery REST poll) so a second delivery
+// of the same turn's terminal is a no-op. Reset to null at the start of a
+// new subscription. Replaces the old text-equality dedup, which false-
+// rejected legitimately-new short replies across turns.
+let appendedReplyForRunId: string | null = null;
+let subscriptionUnsubscribe: (() => void) | null = null;
 let iosReturnHandle: IosVisibilityHandle | null = null;
 let pageHidden = $state(false);
 
@@ -231,132 +237,219 @@ function appendToConversation(convId: string, msg: ChatMessage) {
 	};
 }
 
+function agentStreamUrl() {
+	// Cloud Run URL for `agentstream` Cloud Function in `superextra-site`.
+	// Project uses the hash-based URL format `<service>-<project-hash>-uc.a.run.app`;
+	// hash `22b3fxahka` is project-stable for superextra-site.
+	return import.meta.env.DEV ? '/api/agent/stream' : 'https://agentstream-22b3fxahka-uc.a.run.app';
+}
+
+function agentCheckUrl(sid: string, runId: string) {
+	const base = import.meta.env.DEV
+		? '/api/agent/check'
+		: 'https://us-central1-superextra-site.cloudfunctions.net/agentCheck';
+	return `${base}?sid=${encodeURIComponent(sid)}&runId=${encodeURIComponent(runId)}`;
+}
+
+function cleanupSubscription() {
+	if (subscriptionUnsubscribe) {
+		subscriptionUnsubscribe();
+		subscriptionUnsubscribe = null;
+	}
+}
+
+function buildStreamCallbacks(sendingConvId: string | null, sendingRunId: string) {
+	return {
+		onProgress(
+			stage: string,
+			status: string,
+			label: string,
+			previews?: Array<{ name: string; preview: string }>
+		) {
+			if (currentId !== sendingConvId) return;
+			const step: StreamingStep = { stage, status, label, previews };
+			const idx = streamingProgress.findIndex((p) => p.stage === stage);
+			if (idx >= 0) {
+				streamingProgress[idx] = step;
+			} else {
+				streamingProgress = [...streamingProgress, step];
+			}
+		},
+		onActivity(activity: ActivityEvent) {
+			if (currentId !== sendingConvId) return;
+			if (activity.status === 'all-complete') {
+				streamingActivities = streamingActivities.map((a) =>
+					a.category === activity.category && a.status !== 'complete'
+						? { ...a, status: 'complete' as const }
+						: a
+				);
+				return;
+			}
+			const { status, id, category, label, detail, url, agent } = activity;
+			const idx = streamingActivities.findIndex((a) => a.id === id);
+			if (idx >= 0) {
+				const update: Partial<ActivityItem> = { status };
+				if (label !== undefined) update.label = label;
+				if (detail !== undefined) update.detail = detail;
+				if (url !== undefined) update.url = url;
+				if (agent !== undefined) update.agent = agent;
+				streamingActivities[idx] = { ...streamingActivities[idx], ...update };
+			} else {
+				streamingActivities = [
+					...streamingActivities,
+					{ id, category, status, label, detail, url, agent, timestamp: Date.now() }
+				];
+			}
+		},
+		onAttemptChange() {
+			if (currentId !== sendingConvId) return;
+			// Cloud Tasks retry — drop UI state from the failed attempt so it
+			// doesn't mingle with the retry's events. Seed a visible cue so
+			// the UI doesn't show a blank panel during the gap before the new
+			// attempt's first real event arrives (plan Phase 5 / Tier 2.1).
+			streamingActivities = [];
+			streamingProgress = [{ stage: 'retrying', status: 'running', label: 'Retrying…' }];
+		},
+		onComplete(reply: string, sources: ChatSource[] | undefined, title?: string) {
+			if (pageHidden) return;
+			// Dedup by runId — chat-recovery may surface the same turn's reply
+			// first if Firestore was briefly blocked. Old text-equality dedup
+			// false-rejected legitimately-new short replies across turns
+			// ("OK", "Yes"). Since the terminal is written once per turn and
+			// keyed on runId, the runId is the right dedup key.
+			if (appendedReplyForRunId === sendingRunId) {
+				// Already appended for this turn (recover() raced us).
+			} else {
+				appendedReplyForRunId = sendingRunId;
+				const msg: ChatMessage = {
+					role: 'agent',
+					text: reply,
+					timestamp: Date.now(),
+					sources: sources?.length ? sources : undefined
+				};
+				if (currentId === sendingConvId) {
+					messages.push(msg);
+				} else if (sendingConvId) {
+					const idx = conversations.findIndex((c) => c.id === sendingConvId);
+					if (idx >= 0) {
+						appendToConversation(sendingConvId, msg);
+					}
+				}
+			}
+			if (title && sendingConvId) {
+				const idx = conversations.findIndex((c) => c.id === sendingConvId);
+				if (idx >= 0) {
+					conversations[idx] = { ...conversations[idx], title };
+				}
+			}
+			if (currentId === sendingConvId) {
+				loading = false;
+				streamingProgress = [];
+			}
+			cleanupSubscription();
+			currentRunId = null;
+			persist();
+		},
+		onError(err: string) {
+			if (currentId !== sendingConvId || pageHidden) return;
+			error = err || 'unknown_error';
+			loading = false;
+			streamingProgress = [];
+			cleanupSubscription();
+			currentRunId = null;
+			persist();
+		},
+		onPermissionDenied() {
+			if (currentId !== sendingConvId) return;
+			// Fall back to the REST poll. Usually caused by ad-blockers on
+			// *.googleapis.com or corporate proxies killing the WebSocket
+			// channel used by Firestore.
+			console.warn('Firestore PERMISSION_DENIED — falling back to agentCheck poll');
+			recover().catch(() => {});
+		},
+		onFirstSnapshotTimeout() {
+			if (currentId !== sendingConvId) return;
+			// Same fallback shape as PERMISSION_DENIED. We keep the live
+			// subscription running in case it recovers; the poll just
+			// races it.
+			console.warn('Firestore first-snapshot timeout — falling back to agentCheck poll');
+			recover().catch(() => {});
+		}
+	};
+}
+
 async function send(text: string) {
 	const trimmed = text.trim();
 	if (!trimmed || loading) return;
 
 	const sendingConvId = currentId;
+	const sessionId = sendingConvId;
+	if (!sessionId) return;
 	const history = buildHistory();
+	const isFirstMessageForApi = messages.filter((m) => m.role === 'agent').length === 0;
 	messages.push({ role: 'user', text: trimmed, timestamp: Date.now() });
 	loading = true;
 	error = '';
-	streamingText = '';
 	streamingProgress = [];
 	streamingActivities = [];
+	cleanupSubscription();
 	persist();
 
-	abortController = new AbortController();
-
-	const agentUrl = import.meta.env.DEV
-		? '/api/agent/stream'
-		: 'https://agentstream-907466498524.us-central1.run.app';
-
+	let runId: string;
 	try {
-		await streamAgent(
-			agentUrl,
+		await ensureAnonAuth();
+		const idToken = await getIdToken();
+		const resp = await postAgentStream(
+			agentStreamUrl(),
 			{
 				message: trimmed,
-				sessionId: currentId,
+				sessionId,
 				placeContext,
-				history
+				history,
+				isFirstMessage: isFirstMessageForApi
 			},
-			{
-				onProgress(stage, status, label, previews) {
-					const step: StreamingStep = { stage, status, label, previews };
-					const idx = streamingProgress.findIndex((p) => p.stage === stage);
-					if (idx >= 0) {
-						streamingProgress[idx] = step;
-					} else {
-						streamingProgress = [...streamingProgress, step];
-					}
-				},
-				onToken(text) {
-					streamingText += text;
-				},
-				onComplete(reply, sources, title) {
-					const msg: ChatMessage = {
-						role: 'agent',
-						text: reply,
-						timestamp: Date.now(),
-						sources: sources?.length ? sources : undefined
-					};
-					if (currentId === sendingConvId) {
-						messages.push(msg);
-					} else if (sendingConvId) {
-						appendToConversation(sendingConvId, msg);
-					}
-					if (title && sendingConvId) {
-						const idx = conversations.findIndex((c) => c.id === sendingConvId);
-						if (idx >= 0) {
-							conversations[idx] = { ...conversations[idx], title };
-						}
-					}
-				},
-				onError(err) {
-					if (currentId !== sendingConvId || pageHidden) return;
-					if (err === 'timeout' && streamingText.trim()) {
-						// Pipeline timed out but we have partial text — promote it
-						messages.push({
-							role: 'agent',
-							text: streamingText,
-							timestamp: Date.now(),
-							partial: true
-						});
-						streamingText = '';
-						error = 'timeout';
-					} else if (err === 'timeout') {
-						error = 'timeout';
-					} else {
-						error = err;
-					}
-				},
-				onActivity(activity: ActivityEvent) {
-					if (currentId !== sendingConvId) return;
-					if (activity.status === 'all-complete') {
-						streamingActivities = streamingActivities.map((a) =>
-							a.category === activity.category && a.status !== 'complete'
-								? { ...a, status: 'complete' as const }
-								: a
-						);
-						return;
-					}
-					const { status, id, category, label, detail, url, agent } = activity;
-					const idx = streamingActivities.findIndex((a) => a.id === id);
-					if (idx >= 0) {
-						// Only overwrite fields that are defined in the incoming event
-						const update: Partial<ActivityItem> = { status };
-						if (label !== undefined) update.label = label;
-						if (detail !== undefined) update.detail = detail;
-						if (url !== undefined) update.url = url;
-						if (agent !== undefined) update.agent = agent;
-						streamingActivities[idx] = { ...streamingActivities[idx], ...update };
-					} else {
-						streamingActivities = [
-							...streamingActivities,
-							{ id, category, status, label, detail, url, agent, timestamp: Date.now() }
-						];
-					}
-				}
-			},
-			abortController.signal
+			idToken
 		);
+		runId = resp.runId;
 	} catch (e: unknown) {
-		if (
-			e instanceof Error &&
-			e.name !== 'AbortError' &&
-			currentId === sendingConvId &&
-			!pageHidden
-		) {
-			error = 'Could not reach the server. Please check your connection.';
-		}
-	} finally {
-		if (currentId === sendingConvId) {
+		const err = e as { status?: number; message?: string };
+		if (currentId === sendingConvId && !pageHidden) {
+			if (err.status === 401) error = 'auth_required';
+			else if (err.status === 403) error = 'ownership_mismatch';
+			else if (err.status === 409) error = 'previous_turn_in_flight';
+			else if (err.status === 429) error = err.message || 'rate_limited';
+			else error = 'Could not reach the server. Please check your connection.';
 			loading = false;
-			streamingText = '';
-			streamingProgress = [];
 		}
-		abortController = null;
 		persist();
+		return;
+	}
+
+	currentRunId = runId;
+	appendedReplyForRunId = null;
+
+	try {
+		const unsubscribe = await subscribeToSession(
+			sessionId,
+			runId,
+			buildStreamCallbacks(sendingConvId, runId)
+		);
+		// If the user already moved on, drop the subscription immediately.
+		if (currentId !== sendingConvId) {
+			unsubscribe();
+			return;
+		}
+		subscriptionUnsubscribe = unsubscribe;
+	} catch (e: unknown) {
+		if (currentId === sendingConvId && !pageHidden) {
+			const msg = e instanceof Error ? e.message : 'subscribe_failed';
+			console.warn('subscribeToSession failed, falling back to poll:', msg);
+			// Try REST polling as a last resort.
+			await recover().catch(() => {
+				error = 'Could not subscribe to progress. Please try again.';
+				loading = false;
+			});
+		}
 	}
 }
 
@@ -390,59 +483,158 @@ function start(query: string, place: PlaceContext | null) {
 
 function reset() {
 	syncCurrentToList();
+	cleanupSubscription();
 	messages = [];
 	loading = false;
 	error = '';
 	active = false;
 	placeContext = null;
 	currentId = null;
+	currentRunId = null;
 	persist();
 }
 
 function switchTo(id: string) {
 	if (id === currentId) return;
 	if (loading) {
-		abortController?.abort();
+		cleanupSubscription();
 		loading = false;
-		streamingText = '';
 		streamingProgress = [];
 		streamingActivities = [];
 	}
+	cleanupSubscription();
+	currentRunId = null;
 	syncCurrentToList();
 	const conv = conversations.find((c) => c.id === id);
 	if (!conv) return;
 	loadConversation(conv);
 	persist();
 
-	// If the last message was from the user, the agent response may still be pending
+	// If the last message was from the user, there's an in-flight turn to
+	// resume. Firestore is the source of truth for the current runId; read
+	// it, then either subscribe (queued/running) or render a terminal state.
 	const msgs = conv.messages;
 	if (msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
-		recover();
+		resumeIfInFlight(id).catch((err) => {
+			console.warn('resumeIfInFlight failed:', err);
+		});
 	}
 }
 
-async function recover(): Promise<boolean> {
-	if (!currentId || loading) return false;
-	const recoveringConvId = currentId;
+async function resumeIfInFlight(sessionId: string): Promise<void> {
+	if (currentId !== sessionId) return;
 	loading = true;
 	recovering = true;
 	error = '';
 	try {
+		await ensureAnonAuth();
+		const { db } = await import('$lib/firebase').then((m) => m.getFirebase());
+		const { doc, getDoc } = await import('firebase/firestore');
+		const snap = await getDoc(doc(db, 'sessions', sessionId));
+		if (currentId !== sessionId) return;
+		if (!snap.exists()) {
+			error = 'Session not found. Please start a new conversation.';
+			loading = false;
+			recovering = false;
+			return;
+		}
+		const data = snap.data() as Record<string, unknown>;
+		const status = data.status as string | undefined;
+		const runId = data.currentRunId as string | undefined;
+		if (status === 'complete') {
+			const reply = data.reply as string | undefined;
+			// RunId dedup — same contract as `buildStreamCallbacks.onComplete`
+			// and `recover().isDuplicateReply`. Text-equality dedup here was
+			// the last surviving spot that false-rejected legitimately-new
+			// short replies across turns on refresh-after-complete.
+			if (reply && runId && appendedReplyForRunId !== runId) {
+				appendedReplyForRunId = runId;
+				messages.push({
+					role: 'agent',
+					text: reply,
+					timestamp: Date.now(),
+					sources: (data.sources as ChatSource[] | undefined)?.length
+						? (data.sources as ChatSource[])
+						: undefined
+				});
+				persist();
+			}
+			loading = false;
+			recovering = false;
+			return;
+		}
+		if (status === 'error') {
+			error = (data.error as string) || 'pipeline_error';
+			loading = false;
+			recovering = false;
+			return;
+		}
+		if (!runId) {
+			loading = false;
+			recovering = false;
+			return;
+		}
+		// status is queued or running — subscribe with the server-authoritative runId.
+		currentRunId = runId;
+		appendedReplyForRunId = null;
+		const unsub = await subscribeToSession(
+			sessionId,
+			runId,
+			buildStreamCallbacks(sessionId, runId)
+		);
+		if (currentId !== sessionId) {
+			unsub();
+			return;
+		}
+		subscriptionUnsubscribe = unsub;
+		recovering = false;
+	} catch (err) {
+		console.warn('resumeIfInFlight error:', err);
+		if (currentId === sessionId) {
+			await recover().catch(() => {
+				error = 'Could not subscribe to progress. Please try again.';
+				loading = false;
+				recovering = false;
+			});
+		}
+	}
+}
+
+async function recover(): Promise<boolean> {
+	if (!currentId) return false;
+	const recoveringConvId = currentId;
+	const runId = currentRunId;
+	if (!runId) return false;
+	if (!loading) loading = true;
+	recovering = true;
+	error = '';
+	try {
 		return await recoverStream({
-			getSessionId: () => recoveringConvId,
+			getSession: () => ({ sessionId: recoveringConvId, runId }),
 			isCurrentSession: (sid) => currentId === sid,
 			onReply: (reply, sources) => {
+				// Dedup by runId — buildStreamCallbacks' onComplete may have
+				// already appended this same reply via Firestore.
+				if (appendedReplyForRunId === runId) return;
+				appendedReplyForRunId = runId;
 				messages.push({ role: 'agent', text: reply, timestamp: Date.now(), sources });
 				persist();
 			},
 			onError: (msg) => {
 				error = msg;
 			},
-			checkUrl: (sid) =>
-				import.meta.env.DEV
-					? `/api/agent/check?sid=${sid}`
-					: `https://us-central1-superextra-site.cloudfunctions.net/agentCheck?sid=${sid}`,
-			isDuplicateReply: (reply) => messages.some((m) => m.role === 'agent' && m.text === reply)
+			checkUrl: (sid, rid) => agentCheckUrl(sid, rid),
+			getIdToken: async () => {
+				try {
+					return await getIdToken();
+				} catch {
+					return null;
+				}
+			},
+			// `reply` is ignored — runId is the canonical dedup key. The
+			// signature still passes reply so `RecoveryContext` doesn't need
+			// widening.
+			isDuplicateReply: () => appendedReplyForRunId === runId
 		});
 	} finally {
 		loading = false;
@@ -459,7 +651,7 @@ function handleReturn(hiddenMs = Infinity) {
 			setLoading: (v) => {
 				loading = v;
 			},
-			abortStream: () => abortController?.abort(),
+			abortStream: () => cleanupSubscription(),
 			recover: () => {
 				recover();
 			},
@@ -474,12 +666,14 @@ function handleReturn(hiddenMs = Infinity) {
 function deleteConversation(id: string) {
 	conversations = conversations.filter((c) => c.id !== id);
 	if (id === currentId) {
+		cleanupSubscription();
 		messages = [];
 		loading = false;
 		error = '';
 		active = false;
 		placeContext = null;
 		currentId = null;
+		currentRunId = null;
 	}
 	persist();
 }
@@ -515,9 +709,6 @@ export const chatState = {
 	get activeId() {
 		return currentId;
 	},
-	get streamingText() {
-		return streamingText;
-	},
 	get streamingProgress() {
 		return streamingProgress;
 	},
@@ -525,12 +716,10 @@ export const chatState = {
 		return streamingActivities;
 	},
 	get isStreaming() {
-		return (
-			streamingText.length > 0 || streamingProgress.length > 0 || streamingActivities.length > 0
-		);
+		return streamingProgress.length > 0 || streamingActivities.length > 0;
 	},
 	abort() {
-		abortController?.abort();
+		cleanupSubscription();
 	},
 	send,
 	start,

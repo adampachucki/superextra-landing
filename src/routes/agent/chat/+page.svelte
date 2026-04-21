@@ -123,6 +123,16 @@
 	});
 
 	onMount(() => {
+		// Sign the visitor into Firebase anonymously in the background. Downstream
+		// phases (Firestore session/event reads, ID-token-verified Cloud Function
+		// calls) wait on the resolved UID via `ensureAnonAuth()`. Dynamic import
+		// keeps Firebase out of routes that don't need it.
+		import('$lib/firebase')
+			.then(({ ensureAnonAuth }) => ensureAnonAuth())
+			.catch((err) => {
+				console.warn('Anonymous auth bootstrap failed:', err);
+			});
+
 		const params = new URL(window.location.href).searchParams;
 		const sid = params.get('sid');
 		const q = params.get('q');

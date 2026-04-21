@@ -1,0 +1,39 @@
+{
+	"indexes": [
+		{
+			"collectionGroup": "events",
+			"queryScope": "COLLECTION_GROUP",
+			"fields": [
+				{ "fieldPath": "userId", "order": "ASCENDING" },
+				{ "fieldPath": "runId", "order": "ASCENDING" },
+				{ "fieldPath": "attempt", "order": "ASCENDING" },
+				{ "fieldPath": "seqInAttempt", "order": "ASCENDING" }
+			]
+		},
+		{
+			"collectionGroup": "sessions",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{ "fieldPath": "status", "order": "ASCENDING" },
+				{ "fieldPath": "queuedAt", "order": "ASCENDING" }
+			]
+		},
+		{
+			"collectionGroup": "sessions",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{ "fieldPath": "status", "order": "ASCENDING" },
+				{ "fieldPath": "lastHeartbeat", "order": "ASCENDING" }
+			]
+		},
+		{
+			"collectionGroup": "sessions",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{ "fieldPath": "status", "order": "ASCENDING" },
+				{ "fieldPath": "lastEventAt", "order": "ASCENDING" }
+			]
+		}
+	],
+	"fieldOverrides": []
+}

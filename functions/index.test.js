@@ -3,18 +3,56 @@ import assert from 'node:assert/strict';
 
 // ── Mock external modules before importing index.js ──
 
+// Firestore mock supports point-doc set/get/update AND runTransaction(cb).
+// The txn object exposes the same get/set/update surface as the real txn,
+// but without isolation semantics (tests drive sequences manually).
 const mockDb = {
 	collection: () => mockDb,
 	doc: () => mockDb,
 	get: mock.fn(async () => ({ exists: false })),
-	set: mock.fn(async () => {})
+	set: mock.fn(async () => {}),
+	update: mock.fn(async () => {}),
+	runTransaction: mock.fn(async (cb) => {
+		const txn = {
+			get: mockDb.get,
+			set: mockDb.set,
+			update: mockDb.update
+		};
+		return cb(txn);
+	})
+};
+
+// Cloud Tasks mock — captures the last createTask call for assertions.
+const tasksClient = {
+	queuePath: (project, location, queue) =>
+		`projects/${project}/locations/${location}/queues/${queue}`,
+	createTask: mock.fn(async (opts) => [opts.task])
+};
+
+// Firebase Auth mock — verifyIdToken returns { uid: 'user-<token>' } so tests
+// can pass different tokens to simulate different users.
+const authInstance = {
+	verifyIdToken: mock.fn(async (token) => {
+		if (token === 'bad-token') throw new Error('invalid token');
+		return { uid: `user-${token}` };
+	})
 };
 
 mock.module('firebase-admin/app', {
 	namedExports: { initializeApp: mock.fn() }
 });
 mock.module('firebase-admin/firestore', {
-	namedExports: { getFirestore: mock.fn(() => mockDb) }
+	namedExports: {
+		getFirestore: mock.fn(() => mockDb),
+		FieldValue: {
+			serverTimestamp: () => '__server_timestamp__'
+		}
+	}
+});
+mock.module('firebase-admin/auth', {
+	namedExports: {
+		getAuth: () => authInstance
+	}
 });
 mock.module('firebase-functions/v2/https', {
 	namedExports: {
@@ -29,30 +67,25 @@ mock.module('firebase-functions/params', {
 		})
 	}
 });
-mock.module('@google-cloud/vertexai', {
+// `@google-cloud/vertexai` and `google-auth-library` are no longer imported
+// by functions/index.js (Phase 7 cleanup removed the ADK Cloud Run hop and
+// title gen moved to the worker). Mocks deleted — `cd functions && npm test`
+// would silently accept a re-introduction otherwise.
+mock.module('@google-cloud/tasks', {
 	namedExports: {
-		VertexAI: class {
-			getGenerativeModel() {
-				return {
-					generateContent: async () => ({
-						response: {
-							candidates: [{ content: { parts: [{ text: 'Test Title' }] } }]
-						}
-					})
-				};
+		CloudTasksClient: class {
+			queuePath(...args) {
+				return tasksClient.queuePath(...args);
+			}
+			createTask(...args) {
+				return tasksClient.createTask(...args);
 			}
 		}
 	}
 });
-mock.module('google-auth-library', {
-	namedExports: {
-		GoogleAuth: class {
-			async getIdTokenClient() {
-				return { getRequestHeaders: async () => ({ Authorization: 'Bearer mock-token' }) };
-			}
-		}
-	}
-});
+
+// Set WORKER_URL before importing so the Cloud Task target resolves.
+process.env.WORKER_URL = 'https://worker-test.run.app';
 
 const { intake, agentStream, agentCheck, sttToken, tts } = await import('./index.js');
 
@@ -114,6 +147,11 @@ beforeEach(() => {
 	originalFetch = globalThis.fetch;
 	mockDb.get.mock.resetCalls();
 	mockDb.set.mock.resetCalls();
+	mockDb.update.mock.resetCalls();
+	mockDb.runTransaction.mock.resetCalls();
+	tasksClient.createTask.mock.resetCalls();
+	authInstance.verifyIdToken.mock.resetCalls();
+	mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
 });
 
 afterEach(() => {
@@ -308,61 +346,220 @@ describe('tts', () => {
 // ══════════════════════════════════════════════════════
 
 describe('agentStream', () => {
+	function authedReq(overrides = {}) {
+		const headers = { authorization: 'Bearer good-token', ...(overrides.headers || {}) };
+		return mockReq({
+			body: { message: 'What is the menu like?', sessionId: 'sess-1' },
+			...overrides,
+			headers
+		});
+	}
+
 	it('rejects non-POST with 405', async () => {
 		const res = mockRes();
 		await agentStream(mockReq({ method: 'GET' }), res);
 		assert.equal(res._status, 405);
 	});
 
+	it('returns 401 when Authorization header is missing', async () => {
+		const res = mockRes();
+		await agentStream(mockReq({ body: { message: 'hi', sessionId: 's' } }), res);
+		assert.equal(res._status, 401);
+	});
+
+	it('returns 401 when token verification fails', async () => {
+		const res = mockRes();
+		await agentStream(authedReq({ headers: { authorization: 'Bearer bad-token' } }), res);
+		assert.equal(res._status, 401);
+	});
+
 	it('returns 400 when message or sessionId missing', async () => {
 		const res = mockRes();
-		await agentStream(mockReq({ body: { message: 'hi' } }), res);
+		await agentStream(authedReq({ body: { sessionId: 'sess-1' } }), res);
 		assert.equal(res._status, 400);
 	});
 
-	it('writes SSE headers and streams events on success', async () => {
-		// Simulate a readable stream from ADK
-		function makeReadableStream(chunks) {
-			let index = 0;
-			return {
-				getReader() {
-					return {
-						async read() {
-							if (index >= chunks.length) return { done: true, value: undefined };
-							return { done: false, value: new TextEncoder().encode(chunks[index++]) };
-						}
-					};
-				}
-			};
-		}
+	it('returns 202 and enqueues a task on success (new session)', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+		const res = mockRes();
+		await agentStream(authedReq(), res);
 
-		globalThis.fetch = mock.fn(async (url) => {
-			if (url.includes('/sessions') && !url.includes('/run_sse')) {
-				return { ok: true, json: async () => ({ id: 'adk-stream-1' }) };
-			}
-			if (url.includes('/run_sse')) {
-				const chunk =
-					'data: {"content":{"parts":[{"text":"Hello"}]},"actions":{"state_delta":{"final_report":"Full report here."}}}\n\n';
-				return {
-					ok: true,
-					body: makeReadableStream([chunk])
-				};
-			}
-			// Session state fetch for sources fallback
-			return { ok: true, json: async () => ({ state: {} }) };
+		assert.equal(res._status, 202);
+		assert.equal(res._json.ok, true);
+		assert.equal(res._json.sessionId, 'sess-1');
+		assert.match(res._json.runId, /^[0-9a-f-]{36}$/);
+
+		// Exactly one transaction, one task enqueue.
+		assert.equal(mockDb.runTransaction.mock.callCount(), 1);
+		assert.equal(tasksClient.createTask.mock.callCount(), 1);
+		const taskArg = tasksClient.createTask.mock.calls[0].arguments[0];
+		assert.equal(
+			taskArg.parent,
+			'projects/superextra-site/locations/us-central1/queues/agent-dispatch'
+		);
+		assert.ok(taskArg.task.name.endsWith(`/tasks/${res._json.runId}`));
+		assert.equal(taskArg.task.dispatchDeadline.seconds, 1800);
+		assert.equal(taskArg.task.httpRequest.url, 'https://worker-test.run.app/run');
+		assert.equal(
+			taskArg.task.httpRequest.oidcToken.serviceAccountEmail,
+			'superextra-worker@superextra-site.iam.gserviceaccount.com'
+		);
+		assert.equal(taskArg.task.httpRequest.oidcToken.audience, 'https://worker-test.run.app');
+
+		// Body is base64'd JSON — decode and inspect.
+		const body = JSON.parse(Buffer.from(taskArg.task.httpRequest.body, 'base64').toString('utf8'));
+		assert.equal(body.sessionId, 'sess-1');
+		assert.equal(body.runId, res._json.runId);
+		assert.equal(body.userId, 'user-good-token');
+		assert.equal(body.isFirstMessage, true);
+		assert.equal(body.adkSessionId, null);
+		// Date prefix present, Context prefix also present for first message.
+		assert.match(body.queryText, /^\[Date: /);
+	});
+
+	it('returns 403 when sessionId is owned by a different user', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({ userId: 'user-other-token', status: 'complete' })
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 403);
+		assert.equal(tasksClient.createTask.mock.callCount(), 0);
+	});
+
+	it('returns 403 when existing session doc is missing userId (legacy/malformed)', async () => {
+		// Audit Finding 3 — old guard short-circuited when `userId` was
+		// missing. Legacy docs without `userId` must be rejected.
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({ status: 'complete' }) // no userId
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 403);
+		assert.equal(tasksClient.createTask.mock.callCount(), 0);
+	});
+
+	it('returns 409 when previous turn is still in flight', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({ userId: 'user-good-token', status: 'running', currentRunId: 'prior-run' })
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 409);
+		assert.equal(tasksClient.createTask.mock.callCount(), 0);
+	});
+
+	it('reuses adkSessionId + isFirstMessage=false on follow-up turns', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				status: 'complete',
+				adkSessionId: 'adk-existing',
+				placeContext: { name: 'Umami', secondary: 'Berlin', placeId: 'ChIJ...' },
+				title: 'Prior chat'
+			})
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
+
+		assert.equal(res._status, 202);
+		assert.equal(tasksClient.createTask.mock.callCount(), 1);
+		const body = JSON.parse(
+			Buffer.from(
+				tasksClient.createTask.mock.calls[0].arguments[0].task.httpRequest.body,
+				'base64'
+			).toString('utf8')
+		);
+		assert.equal(body.adkSessionId, 'adk-existing');
+		assert.equal(body.isFirstMessage, false);
+		// Follow-up turn must NOT re-inject [Context: ...] — state handles it.
+		assert.ok(!body.queryText.includes('[Context:'));
+	});
+
+	it('preserves existing expiresAt when it extends beyond now+30d (never shrinks)', async () => {
+		// Existing session with expiresAt 60 days in the future. A follow-up
+		// enqueue must NOT reset that to now+30d.
+		const farFutureMs = Date.now() + 60 * 24 * 60 * 60 * 1000;
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				status: 'complete',
+				adkSessionId: 'adk-existing',
+				expiresAt: { toMillis: () => farFutureMs }
+			})
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
+
+		assert.equal(res._status, 202);
+		assert.equal(mockDb.update.mock.callCount(), 1);
+		// Inside the txn, `t.update(ref, perTurn)` — arguments[0] is the ref,
+		// arguments[1] is the perTurn payload with expiresAt.
+		const perTurn = mockDb.update.mock.calls[0].arguments[1];
+		// `newExpiresAt = new Date(max(existing, now+30d))`. With existing at
+		// now+60d, result must be a Date whose ms equals the existing one.
+		assert.ok(perTurn.expiresAt instanceof Date, 'expiresAt should be a Date');
+		assert.equal(perTurn.expiresAt.getTime(), farFutureMs);
+	});
+
+	it('extends expiresAt to now+30d when existing is shorter', async () => {
+		// Existing session expires in 5 days — too short. Must extend to ~now+30d.
+		const soonMs = Date.now() + 5 * 24 * 60 * 60 * 1000;
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				status: 'complete',
+				expiresAt: { toMillis: () => soonMs }
+			})
+		}));
+
+		const before = Date.now();
+		const res = mockRes();
+		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
+		const after = Date.now();
+
+		assert.equal(res._status, 202);
+		const perTurn = mockDb.update.mock.calls[0].arguments[1];
+		const got = perTurn.expiresAt.getTime();
+		const THIRTY_D = 30 * 24 * 60 * 60 * 1000;
+		// now + 30d — allow a small window for the internal Date.now() inside
+		// the handler relative to the test's `before`/`after` measurements.
+		assert.ok(
+			got >= before + THIRTY_D - 100 && got <= after + THIRTY_D + 100,
+			`expected expiresAt near now+30d; got ${got - before}ms from test start`
+		);
+	});
+
+	it('writes status=error if Cloud Tasks enqueue fails', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+		tasksClient.createTask.mock.mockImplementationOnce(async () => {
+			throw new Error('quota exceeded');
 		});
 
 		const res = mockRes();
-		await agentStream(mockReq({ body: { message: 'test', sessionId: 'stream-sess' } }), res);
+		await agentStream(authedReq(), res);
 
-		// Should have written SSE headers
-		assert.equal(res._status, 200);
-		assert.equal(res._headers['Content-Type'], 'text/event-stream');
-		// Should have written `: ok\n\n` first
-		assert.ok(res._written.some((w) => w.includes(': ok')));
-		// Should have ended with a complete event
-		assert.ok(res._written.some((w) => w.includes('event: complete')));
-		assert.ok(res._ended);
+		assert.equal(res._status, 502);
+		assert.equal(res._json.error, 'enqueue_failed');
+		// Post-enqueue recovery: session should be flipped to status=error.
+		assert.equal(mockDb.update.mock.callCount(), 1);
+		const updateArg = mockDb.update.mock.calls[0].arguments[0];
+		assert.equal(updateArg.status, 'error');
+		assert.equal(updateArg.error, 'enqueue_failed');
 	});
 });
 
@@ -371,6 +568,14 @@ describe('agentStream', () => {
 // ══════════════════════════════════════════════════════
 
 describe('agentCheck', () => {
+	function authedCheck(sid, overrides = {}) {
+		return mockReq({
+			method: 'GET',
+			query: { sid, ...(overrides.query || {}) },
+			headers: { authorization: 'Bearer good-token', ...(overrides.headers || {}) }
+		});
+	}
+
 	it('rejects non-GET with 405', async () => {
 		const res = mockRes();
 		await agentCheck(mockReq({ method: 'POST' }), res);
@@ -384,79 +589,127 @@ describe('agentCheck', () => {
 		assert.match(res._json.error, /sid/);
 	});
 
+	it('returns 401 when Authorization header is missing', async () => {
+		const res = mockRes();
+		await agentCheck(mockReq({ method: 'GET', query: { sid: 'x' } }), res);
+		assert.equal(res._status, 401);
+	});
+
+	it('returns 401 when token verification fails', async () => {
+		const res = mockRes();
+		await agentCheck(
+			mockReq({
+				method: 'GET',
+				query: { sid: 'x' },
+				headers: { authorization: 'Bearer bad-token' }
+			}),
+			res
+		);
+		assert.equal(res._status, 401);
+	});
+
 	it('returns session_not_found when session does not exist', async () => {
 		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
-
 		const res = mockRes();
-		await agentCheck(mockReq({ method: 'GET', query: { sid: 'unknown' } }), res);
+		await agentCheck(authedCheck('unknown'), res);
 		assert.equal(res._json.ok, false);
 		assert.equal(res._json.reason, 'session_not_found');
 	});
 
-	it('returns complete reply when session has final_report', async () => {
+	it('returns 403 when session userId does not match caller', async () => {
 		mockDb.get.mock.mockImplementation(async () => ({
 			exists: true,
-			data: () => ({
-				adkSessionId: 'adk-1',
-				userId: 'user-1',
-				createdAt: Date.now()
-			})
+			data: () => ({ userId: 'user-other-token', status: 'complete', reply: 'r' })
 		}));
-
-		globalThis.fetch = mock.fn(async () => ({
-			ok: true,
-			json: async () => ({
-				state: { final_report: 'The final report.' }
-			})
-		}));
-
 		const res = mockRes();
-		await agentCheck(mockReq({ method: 'GET', query: { sid: 'known' } }), res);
-		assert.equal(res._json.ok, true);
-		assert.equal(res._json.reply, 'The final report.');
-		assert.equal(res._json.status, 'complete');
+		await agentCheck(authedCheck('sid-1'), res);
+		assert.equal(res._status, 403);
+		assert.equal(res._json.reason, 'ownership_mismatch');
 	});
 
-	it('returns processing when reply not ready yet', async () => {
+	it('returns 403 when session doc is missing userId (legacy/malformed)', async () => {
+		// Audit Finding 3 — old `data.userId && data.userId !== uid` let
+		// docs without `userId` slip through. New guard rejects.
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({ status: 'complete', reply: 'should not return' })
+		}));
+		const res = mockRes();
+		await agentCheck(authedCheck('sid-1'), res);
+		assert.equal(res._status, 403);
+		assert.equal(res._json.reason, 'ownership_mismatch');
+	});
+
+	it('returns complete reply + sources + title when status=complete', async () => {
 		mockDb.get.mock.mockImplementation(async () => ({
 			exists: true,
 			data: () => ({
-				adkSessionId: 'adk-1',
-				userId: 'user-1',
-				createdAt: Date.now()
+				userId: 'user-good-token',
+				status: 'complete',
+				reply: 'The final report.',
+				sources: [{ title: 'S1', url: 'https://s1.example' }],
+				title: 'Chat title'
 			})
 		}));
 
-		globalThis.fetch = mock.fn(async () => ({
-			ok: true,
-			json: async () => ({ state: {} })
+		const res = mockRes();
+		await agentCheck(authedCheck('known'), res);
+		assert.equal(res._json.ok, true);
+		assert.equal(res._json.status, 'complete');
+		assert.equal(res._json.reply, 'The final report.');
+		assert.deepEqual(res._json.sources, [{ title: 'S1', url: 'https://s1.example' }]);
+		assert.equal(res._json.title, 'Chat title');
+	});
+
+	it('returns pipeline_error when status=error', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				status: 'error',
+				error: 'synthesizer_failed'
+			})
 		}));
 
 		const res = mockRes();
-		await agentCheck(mockReq({ method: 'GET', query: { sid: 'pending' } }), res);
+		await agentCheck(authedCheck('errored'), res);
+		assert.equal(res._json.ok, false);
+		assert.equal(res._json.reason, 'pipeline_error');
+		assert.equal(res._json.error, 'synthesizer_failed');
+	});
+
+	it('returns status=running with null reply while pipeline is in flight', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				status: 'running',
+				currentRunId: 'run-1',
+				reply: null
+			})
+		}));
+
+		const res = mockRes();
+		await agentCheck(authedCheck('pending'), res);
 		assert.equal(res._json.ok, true);
-		assert.equal(res._json.status, 'processing');
+		assert.equal(res._json.status, 'running');
 		assert.equal(res._json.reply, null);
 	});
 
-	it('returns timed_out for old sessions without reply', async () => {
+	it('accepts (and ignores) a stale runId query param — returns current state', async () => {
 		mockDb.get.mock.mockImplementation(async () => ({
 			exists: true,
 			data: () => ({
-				adkSessionId: 'adk-1',
-				userId: 'user-1',
-				createdAt: Date.now() - 10 * 60 * 1000 // 10 minutes ago
+				userId: 'user-good-token',
+				status: 'complete',
+				reply: 'Latest reply.',
+				currentRunId: 'run-latest'
 			})
 		}));
 
-		globalThis.fetch = mock.fn(async () => ({
-			ok: true,
-			json: async () => ({ state: {} })
-		}));
-
 		const res = mockRes();
-		await agentCheck(mockReq({ method: 'GET', query: { sid: 'old' } }), res);
-		assert.equal(res._json.ok, false);
-		assert.equal(res._json.reason, 'timed_out');
+		await agentCheck(authedCheck('sid-1', { query: { runId: 'run-stale' } }), res);
+		assert.equal(res._json.ok, true);
+		assert.equal(res._json.reply, 'Latest reply.');
 	});
 });

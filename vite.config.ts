@@ -32,7 +32,10 @@ export default defineConfig({
 				rewrite: (path: string) => path.replace(/^\/api\/agent\/check/, '/agentCheck')
 			},
 			'/api/agent/stream': {
-				target: 'https://agentstream-907466498524.us-central1.run.app',
+				// Hash-based Cloud Run URL — matches the other services in the
+				// superextra-site project. Legacy project-number format still
+				// resolves but is not what new services are provisioned at.
+				target: 'https://agentstream-22b3fxahka-uc.a.run.app',
 				changeOrigin: true,
 				rewrite: (path: string) => path.replace(/^\/api\/agent\/stream/, '/agentStream'),
 				timeout: 0
