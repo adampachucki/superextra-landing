@@ -304,12 +304,18 @@ jobs:
         run: |
           set -euo pipefail
           sleep 5
-          READY=$(gcloud run services describe superextra-worker \
+          # Cloud Run's `Ready` condition sits at conditions[0] — the gcloud
+          # projection language supports positional indexing reliably; the
+          # JMESPath filter form `conditions[?type=="Ready"]` was silently
+          # rejected by `--format=value(...)` and produced an empty string.
+          READ_LINE=$(gcloud run services describe superextra-worker \
             --region=us-central1 \
             --project=superextra-site \
-            --format='value(status.conditions[?type=="Ready"].status)')
-          if [ "$READY" != "True" ]; then
-            echo "::error::Worker service is not Ready (status=$READY)"
+            --format='value(status.conditions[0].type,status.conditions[0].status)')
+          TYPE=$(echo "$READ_LINE" | cut -f1)
+          READY=$(echo "$READ_LINE" | cut -f2)
+          if [ "$TYPE" != "Ready" ] || [ "$READY" != "True" ]; then
+            echo "::error::Worker service conditions[0]=${TYPE}:${READY} (expected Ready:True)"
             exit 1
           fi
           URL=$(gcloud run services describe superextra-worker \
