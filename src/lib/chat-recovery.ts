@@ -27,8 +27,13 @@ export interface RecoveryContext {
 	getSession(): { sessionId: string; runId: string } | null;
 	/** Return false if the user switched conversations mid-poll. */
 	isCurrentSession(sessionId: string): boolean;
-	/** Called once per successful recovery with the delivered reply. */
-	onReply(reply: string, sources: ChatSource[] | undefined): void;
+	/** Called once per successful recovery with the delivered reply.
+	 *  `title` carries the server-generated conversation title when available —
+	 *  `agentCheck` returns it on `status='complete'`, and the caller should
+	 *  mirror it onto the conversation record so refresh-after-complete and
+	 *  REST-fallback-after-complete keep the auto-generated title instead of
+	 *  the client placeholder. */
+	onReply(reply: string, sources: ChatSource[] | undefined, title: string | undefined): void;
 	/** Called once on terminal failure with a user-facing error string. */
 	onError(message: string): void;
 	/** Build the check-endpoint URL for a (sessionId, runId) pair. */
@@ -101,7 +106,8 @@ export async function recoverStream(
 			if (data.ok && data.reply) {
 				if (!ctx.isDuplicateReply?.(data.reply)) {
 					const sources: ChatSource[] | undefined = data.sources?.length ? data.sources : undefined;
-					ctx.onReply(data.reply, sources);
+					const title: string | undefined = typeof data.title === 'string' ? data.title : undefined;
+					ctx.onReply(data.reply, sources, title);
 				}
 				return true;
 			}
