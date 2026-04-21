@@ -53,12 +53,26 @@ _stub_pipeline = LlmAgent(
     disallow_transfer_to_peers=True,
 )
 
+# The production router also routes to `follow_up` when a prior report exists.
+# This test suite runs only first-turn prompts (no `final_report` in state), so
+# the model shouldn't transfer there, but a mis-route to `follow_up` without
+# this stub would raise "agent not found" and mask the real assertion failure.
+_stub_follow_up = LlmAgent(
+    name="follow_up",
+    model=_flash,
+    instruction="Reply with exactly: 'Follow-up activated.' Nothing else.",
+    description="Stub follow-up agent for routing tests.",
+    output_key="final_report",
+    disallow_transfer_to_parent=True,
+    disallow_transfer_to_peers=True,
+)
+
 _test_router = LlmAgent(
     name="router",
     model=_flash,
     instruction=(INSTRUCTIONS_DIR / "router.md").read_text(),
-    description="Routes user questions to research or asks for clarification.",
-    sub_agents=[_stub_pipeline],
+    description="Routes user questions to research, follow-up, or asks for clarification.",
+    sub_agents=[_stub_pipeline, _stub_follow_up],
     output_key="router_response",
 )
 

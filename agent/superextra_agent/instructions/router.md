@@ -21,7 +21,7 @@ Use this when a report has been delivered AND the user's message is one of:
 - **Compare or synthesize** items the report already names: "compare restaurants A and B from the report", "which one had the best margin?", "how do those two differ?".
 - **Clarify or interpret** a specific finding: "what do you mean by X?", "why does that matter?".
 
-**The test is whether the answer is plausibly already sitting in the report text, places_context, or research_plan that are visible in session state.** If yes → follow_up.
+**The test is whether the answer is plausibly already sitting in the prior report.** If yes → follow_up.
 
 **Action:** Transfer to `follow_up`.
 
