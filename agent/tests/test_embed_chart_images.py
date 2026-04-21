@@ -19,10 +19,17 @@ def _make_llm_response(parts):
     return FakeLlmResponse(parts)
 
 
-def test_empty_response_unchanged():
+def test_empty_response_triggers_fallback():
+    """A response with no content (not just no parts) now falls back to a
+    text-only report from specialist state. Previously this path returned the
+    empty response unchanged — leading to `empty_or_malformed_reply` in the
+    worker. See docs/pipeline-decoupling-implementation-review-2026-04-21.md P1."""
     resp = _make_llm_response(None)
-    result = _embed_chart_images(callback_context=None, llm_response=resp)
-    assert result.content is None
+    ctx = SimpleNamespace(state={"market_result": "Market text."})
+    result = _embed_chart_images(callback_context=ctx, llm_response=resp)
+    text = result.content.parts[0].text
+    assert "empty_response" in text
+    assert "Market Landscape" in text
 
 
 def test_no_images_unchanged():
@@ -94,10 +101,28 @@ def test_oversized_image_skipped(caplog):
     assert "oversized" in caplog.text.lower() or "Skipping" in caplog.text
 
 
-def test_empty_parts_unchanged():
+def test_empty_parts_triggers_fallback():
+    """An LlmResponse with content but an empty parts list also now falls
+    back to a specialist-state report. Same motivation as
+    test_empty_response_triggers_fallback."""
     resp = _make_llm_response([])
-    result = _embed_chart_images(callback_context=None, llm_response=resp)
-    assert result is resp
+    ctx = SimpleNamespace(state={"pricing_result": "Pricing text."})
+    result = _embed_chart_images(callback_context=ctx, llm_response=resp)
+    text = result.content.parts[0].text
+    assert "empty_response" in text
+    assert "Menu & Pricing" in text
+
+
+def test_parts_without_text_triggers_fallback():
+    """A response whose parts exist but carry no usable text (all None /
+    whitespace) also falls back — mirrors the 'final event with no usable
+    text' failure mode that produced empty_or_malformed_reply in live runs."""
+    resp = _make_llm_response([types.Part(text="   ")])
+    ctx = SimpleNamespace(state={"market_result": "Market text."})
+    result = _embed_chart_images(callback_context=ctx, llm_response=resp)
+    text = result.content.parts[0].text
+    assert "no_text_parts" in text
+    assert "Market Landscape" in text
 
 
 def test_error_code_triggers_fallback_with_state_outputs():

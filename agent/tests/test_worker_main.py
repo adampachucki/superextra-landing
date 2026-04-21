@@ -20,6 +20,7 @@ from worker_main import (  # noqa: E402
     AGENT_ENGINE_ID,
     OwnershipLost,
     STALE_HEARTBEAT_S,
+    _build_degraded_reply,
     _extract_sources_from_state_delta,
     _fallback_title,
     _fenced_update_logic,
@@ -214,6 +215,42 @@ def test_extract_sources_skips_non_string_values():
     assert _extract_sources_from_state_delta(sd) == [
         {"title": "A", "url": "https://x.com"}
     ]
+
+
+# ── Degraded-reply fallback ────────────────────────────────────────────────
+
+
+def test_degraded_reply_builds_from_specialist_state():
+    """Last-resort fallback when synthesizer emits no usable final event.
+    Specialist outputs accumulated across the event loop are stitched into
+    a readable report so the session doesn't flip to
+    `empty_or_malformed_reply`. See
+    docs/pipeline-decoupling-implementation-review-2026-04-21.md P1."""
+    state = {
+        "market_result": "Market landscape body.",
+        "pricing_result": "Pricing body.",
+        "guest_result": "NOT_RELEVANT",  # filtered out
+        "review_result": "   ",  # whitespace-only filtered out
+        "dynamic_result_2": "Gap body.",
+    }
+    reply = _build_degraded_reply(state)
+    assert reply != ""
+    # Sections appear in canonical order, not dict/insertion order.
+    assert reply.index("Market Landscape") < reply.index("Menu & Pricing") < reply.index("Gap Research")
+    assert "Market landscape body." in reply
+    assert "Pricing body." in reply
+    assert "Gap body." in reply
+    assert "Guest Intelligence" not in reply
+    assert "Review Analysis" not in reply
+
+
+def test_degraded_reply_returns_empty_when_no_specialist_output():
+    """When no specialist produced usable output, fallback returns "" and
+    the caller falls through to status='error' — nothing to show is worse
+    than a bare section-less placeholder."""
+    assert _build_degraded_reply({}) == ""
+    assert _build_degraded_reply({"unrelated_key": "ignored"}) == ""
+    assert _build_degraded_reply({"market_result": "NOT_RELEVANT"}) == ""
 
 
 # ── Title fallback ─────────────────────────────────────────────────────────

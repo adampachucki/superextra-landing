@@ -174,7 +174,8 @@ def _embed_chart_images(*, callback_context, llm_response):
     Fall back to appending standalone image parts when no references are found.
 
     If Gemini emitted an error_code instead of a usable response (e.g.
-    MALFORMED_FUNCTION_CALL from code_execution), produce a text-only fallback
+    MALFORMED_FUNCTION_CALL from code_execution), or returned an empty
+    response with no parts / no text at all, produce a text-only fallback
     from the specialist outputs so final_report is always populated.
     """
     error_code = getattr(llm_response, "error_code", None)
@@ -188,8 +189,27 @@ def _embed_chart_images(*, callback_context, llm_response):
             content=types.Content(role="model", parts=[types.Part(text=fallback)])
         )
 
+    # Empty-response guard: an intermittent failure mode where the model
+    # returns a response with no content, no parts, or no usable text —
+    # without any error_code — reached terminal state as
+    # `empty_or_malformed_reply` in live runs (see
+    # docs/pipeline-decoupling-implementation-review-2026-04-21.md P1).
+    # Fallback mirrors the error_code branch so the reply is always usable.
     if not llm_response.content or not llm_response.content.parts:
-        return llm_response
+        logger.warning("Synthesizer returned empty response — falling back to text-only report")
+        fallback = _build_fallback_report(callback_context.state, "empty_response")
+        return LlmResponse(
+            content=types.Content(role="model", parts=[types.Part(text=fallback)])
+        )
+    has_text = any(
+        getattr(p, "text", None) and p.text.strip() for p in llm_response.content.parts
+    )
+    if not has_text:
+        logger.warning("Synthesizer returned no text parts — falling back to text-only report")
+        fallback = _build_fallback_report(callback_context.state, "no_text_parts")
+        return LlmResponse(
+            content=types.Content(role="model", parts=[types.Part(text=fallback)])
+        )
 
     # Collect base64 data URIs for each inline_data image, in order.
     images: list[str] = []
