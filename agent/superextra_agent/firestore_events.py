@@ -145,7 +145,13 @@ def map_event(event: Any) -> dict | None:
     if author in SPECIALIST_AUTHORS:
         return _map_specialist(event, author)
 
-    if author == "synthesizer":
+    # Both synthesizer (turn 1) and follow_up (turn N+1) emit the terminal
+    # `final_report` state_delta; they share `output_key="final_report"` in
+    # `agent.py`. Without this second branch, follow-up turns' terminal
+    # events get dropped by the mapper, the worker's terminal-promotion logic
+    # (which keys on `emitted["type"] == "complete"`) never fires, and the
+    # reply-sanity gate flips the session to status=error.
+    if author in ("synthesizer", "follow_up"):
         return _map_synthesizer(event)
 
     log.debug("unmapped event author=%s", author)

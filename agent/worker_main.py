@@ -722,7 +722,10 @@ async def run(body: RunRequest, request: Request) -> dict:
 
     if not final_reply or not final_reply.strip():
         reason = "empty_or_malformed_reply"
-        log.warning("reply sanity check failed sid=%s", sid)
+        log.warning(
+            "reply sanity check failed",
+            extra={**log_ctx, "event": "reply_sanity_failed"},
+        )
         try:
             await _fenced_update(sid, attempt, worker_id, {
                 "status": "error",

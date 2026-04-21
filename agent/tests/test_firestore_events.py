@@ -332,6 +332,33 @@ def test_synthesizer_no_final_report_is_skipped():
     assert map_event(ev) is None
 
 
+def test_follow_up_final_report_emits_complete():
+    # Follow-up turns go through the `follow_up` LlmAgent (see agent.py:278),
+    # which shares `output_key="final_report"` with synthesizer. The mapper
+    # must dispatch `author="follow_up"` to the same handler — without this,
+    # every follow-up turn's terminal event is dropped and the worker flips
+    # the session to status=error via the empty-reply sanity gate.
+    ev = _event(
+        author="follow_up",
+        is_final=True,
+        state_delta={
+            "final_report": "Your previous question was about service issues. [src](https://ex.com/p)"
+        },
+    )
+    emission = map_event(ev)
+    assert emission is not None, "follow_up terminal must not be dropped"
+    assert emission["type"] == "complete"
+    assert emission["data"]["reply"].startswith("Your previous question")
+    assert emission["data"]["sources"] == [
+        {"title": "src", "url": "https://ex.com/p"}
+    ]
+
+
+def test_follow_up_no_final_report_is_skipped():
+    ev = _event(author="follow_up", is_final=True, state_delta={})
+    assert map_event(ev) is None
+
+
 # ── Source harvesting ──────────────────────────────────────────────────────
 
 
