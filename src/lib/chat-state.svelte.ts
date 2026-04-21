@@ -616,7 +616,9 @@ async function resumeIfInFlight(sessionId: string): Promise<void> {
 // One-shot guard: `onPermissionDenied` can fire from both Firestore observers
 // (session doc + events collection-group) and `onFirstSnapshotTimeout` fires
 // independently. Without this guard two polls would race for the same run.
-// Reset per new subscription in `send()` / `resumeIfInFlight()` / `switchTo()`.
+// Reset per new subscription in `send()` / `resumeIfInFlight()`, and cleared
+// in `recover()`'s `finally` so a retry (e.g. from `handleReturnFromHidden`)
+// can kick off again after the first attempt exhausts or fails.
 let recoveryStartedForRunId: string | null = null;
 
 async function recover(): Promise<boolean> {
@@ -670,6 +672,11 @@ async function recover(): Promise<boolean> {
 	} finally {
 		loading = false;
 		recovering = false;
+		// Clear so a retry (visibility-change, reconnect, etc.) can start again.
+		// Safe: concurrent double-fire from the same subscription is short-
+		// circuited by the sync check at the top of recover(); clearing here
+		// only affects calls that arrive after this recover() has resolved.
+		if (recoveryStartedForRunId === runId) recoveryStartedForRunId = null;
 	}
 }
 
