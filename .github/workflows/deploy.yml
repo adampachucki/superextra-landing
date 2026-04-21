@@ -92,12 +92,7 @@ jobs:
         run: |
           cd agent
           pip install -r requirements-dev.txt
-          # test_follow_up_routing + test_router_evals are pre-existing
-          # baseline failures unrelated to the transport refactor — see
-          # docs/pipeline-decoupling-spike-results.md.
-          PYTHONPATH=. pytest tests/ -v \
-            --ignore=tests/test_router_evals.py \
-            --ignore=tests/test_follow_up_routing.py
+          PYTHONPATH=. pytest tests/ -v
 
   deploy-hosting:
     # Waits for deploy-worker when it runs (agent changed) so agentStream

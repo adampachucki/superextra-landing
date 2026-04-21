@@ -18,7 +18,7 @@
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run",
 		"test:rules": "npx firebase-tools emulators:exec --only firestore --project=superextra-rules-test \"mocha firestore.rules.spec.js\"",
-		"test:evals": "cd agent && PYTHONPATH=. .venv/bin/pytest tests/test_router_evals.py -v"
+		"test:evals": "cd agent && RUN_LIVE_EVALS=1 PYTHONPATH=. .venv/bin/pytest tests/test_router_evals.py tests/test_follow_up_routing.py -v"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.0.3",

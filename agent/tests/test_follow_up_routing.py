@@ -7,10 +7,8 @@ Tests that the router correctly routes:
 
 Uses stub agents and InMemoryRunner. Each test costs 1-2 flash calls.
 
-These tests make live Gemini API calls.
-Run manually (not in CI):
-
-    cd agent && PYTHONPATH=. .venv/bin/pytest tests/test_follow_up_routing.py -v
+These tests make live Gemini API calls. Skipped by default — opt in via
+`RUN_LIVE_EVALS=1` (or just run `npm run test:evals`).
 
 Requires: gcloud auth application-default credentials for Vertex AI.
 """
@@ -21,6 +19,11 @@ os.environ.setdefault("GOOGLE_PLACES_API_KEY", "test-key")
 os.environ.setdefault("GEMINI_VERSION", "3.1")
 
 import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("RUN_LIVE_EVALS"),
+    reason="Live Gemini eval — set RUN_LIVE_EVALS=1 or run `npm run test:evals`",
+)
 from pathlib import Path
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
