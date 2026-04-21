@@ -11,7 +11,6 @@
 	$effect(() => {
 		chatState.messages.length;
 		chatState.loading;
-		chatState.streamingText;
 		chatState.streamingProgress;
 		chatState.streamingActivities;
 		if (scrollEl) {
@@ -26,9 +25,7 @@
 	}
 
 	let hasStreamingContent = $derived(
-		chatState.streamingProgress.length > 0 ||
-			chatState.streamingText.length > 0 ||
-			chatState.streamingActivities.length > 0
+		chatState.streamingProgress.length > 0 || chatState.streamingActivities.length > 0
 	);
 
 	// Elapsed timer — ticks while any step is "running"
@@ -50,42 +47,6 @@
 			if (elapsedInterval) clearInterval(elapsedInterval);
 			elapsedInterval = null;
 		};
-	});
-
-	// Typewriter — drains streamingText at a steady rate
-	let displayText = $state('');
-	let typewriterRaf: number | null = null;
-
-	function drain() {
-		const target = chatState.streamingText;
-		if (displayText.length >= target.length) {
-			typewriterRaf = null;
-			return;
-		}
-		let nextLen = Math.min(displayText.length + 3, target.length);
-		// Skip data URI images in one frame — they can be 200KB+ of base64
-		const upcoming = target.slice(displayText.length);
-		if (upcoming.startsWith('![')) {
-			const end = upcoming.indexOf(')\n');
-			if (end > 0) nextLen = displayText.length + end + 2;
-		}
-		displayText = target.slice(0, nextLen);
-		typewriterRaf = requestAnimationFrame(drain);
-	}
-
-	$effect(() => {
-		const target = chatState.streamingText;
-		if (!target) {
-			displayText = '';
-			if (typewriterRaf) {
-				cancelAnimationFrame(typewriterRaf);
-				typewriterRaf = null;
-			}
-			return;
-		}
-		if (displayText.length < target.length && !typewriterRaf) {
-			drain();
-		}
 	});
 
 	const SOURCES_LIMIT = 19;
@@ -246,13 +207,7 @@
 		{#if chatState.loading && !chatState.recovering}
 			<div class="msg-appear flex justify-start">
 				<div class="max-w-[95%] px-1 py-1">
-					{#if displayText}
-						<div
-							class="prose mt-4 max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
-						>
-							{@html renderMarkdown(displayText)}
-						</div>
-					{:else if hasStreamingContent && chatState.streamingActivities.length === 0}
+					{#if hasStreamingContent && chatState.streamingActivities.length === 0}
 						<div class="flex flex-col gap-1.5">
 							{#each chatState.streamingProgress as step}
 								<div class="flex items-center gap-2 text-[13px]">

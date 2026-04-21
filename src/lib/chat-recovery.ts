@@ -1,14 +1,16 @@
 /**
- * Agent-session recovery polling.
+ * Agent-session recovery polling — last-resort REST fallback when
+ * Firestore's `onSnapshot` can't reach us (ad-blockers on
+ * `firestore.googleapis.com`, corporate proxies blocking WebSocket
+ * channels, rare auth edge cases).
  *
- * When an SSE stream drops (user backgrounded the tab on iOS, network
- * flap, etc.), the agent continues running on the server. This polls
- * the `agentCheck` endpoint until it returns a reply, a terminal
- * failure, or we exceed MAX_ATTEMPTS.
+ * `chat-state` triggers this only on:
+ *   - `onSnapshot` PERMISSION_DENIED error, OR
+ *   - no first snapshot arriving within 10 s of subscribing.
  *
  * Caller owns all state mutations — they pass callbacks (onReply,
- * onError, onComplete) that touch the chat store. The polling loop
- * itself is pure timing + fetch.
+ * onError) that touch the chat store. The polling loop itself is
+ * pure timing + fetch.
  */
 
 export interface ChatSource {
@@ -18,19 +20,26 @@ export interface ChatSource {
 }
 
 export interface RecoveryContext {
-	/** Return the session id the caller expects to recover. */
-	getSessionId(): string | null;
-	/** Return false if the user switched conversations mid-poll — terminates cleanly. */
+	/** Return the (sessionId, runId) pair to recover, or null when there's
+	 *  nothing to recover (e.g. the conversation has no in-flight turn).
+	 *  The `runId` makes agentCheck scoped to the exact turn we're waiting
+	 *  on — stale `runId`s resolve via agentCheck's own ownership logic. */
+	getSession(): { sessionId: string; runId: string } | null;
+	/** Return false if the user switched conversations mid-poll. */
 	isCurrentSession(sessionId: string): boolean;
 	/** Called once per successful recovery with the delivered reply. */
 	onReply(reply: string, sources: ChatSource[] | undefined): void;
 	/** Called once on terminal failure with a user-facing error string. */
 	onError(message: string): void;
-	/** Build the check-endpoint URL for a session. Varies by dev/prod. */
-	checkUrl(sessionId: string): string;
+	/** Build the check-endpoint URL for a (sessionId, runId) pair. */
+	checkUrl(sessionId: string, runId: string): string;
+	/** Bearer ID token for agentCheck; resolves to null if we can't obtain
+	 *  a token (no authenticated user). */
+	getIdToken?(): Promise<string | null>;
 	/**
 	 * Inspect a received reply to decide whether it's already in the
-	 * chat history (SSE delivered it before the poll) — if so, skip onReply.
+	 * chat history — if so, skip onReply. Useful when the Firestore
+	 * stream delivered the reply between subscribe-timeout and poll.
 	 */
 	isDuplicateReply?(reply: string): boolean;
 }
@@ -47,14 +56,16 @@ export interface RecoveryOptions {
 const TERMINAL_REASONS: Record<string, string> = {
 	session_not_found: 'Session not found. Please start a new conversation.',
 	agent_unavailable: 'Agent unavailable. Please try again.',
-	timed_out: 'The request timed out. Please try again.'
+	timed_out: 'The request timed out. Please try again.',
+	ownership_mismatch: 'This conversation belongs to a different session.',
+	pipeline_error: 'The pipeline encountered an error.'
 };
 
 /**
  * Poll the recovery endpoint until we get a reply, a terminal failure,
- * or exceed MAX_ATTEMPTS. Returns true iff a reply was delivered via
- * onReply. Cancellation: if isCurrentSession() ever returns false, the
- * loop exits without calling onReply or onError.
+ * or exceed maxAttempts. Returns true iff a reply was delivered via
+ * onReply. Cancellation: if isCurrentSession() returns false, the loop
+ * exits without calling onReply or onError.
  */
 export async function recoverStream(
 	ctx: RecoveryContext,
@@ -64,15 +75,22 @@ export async function recoverStream(
 	const intervalMs = opts.intervalMs ?? 3000;
 	const fetchTimeoutMs = opts.fetchTimeoutMs ?? 10_000;
 
-	const sessionId = ctx.getSessionId();
-	if (!sessionId) return false;
+	const session = ctx.getSession();
+	if (!session) return false;
+	const { sessionId, runId } = session;
 
-	const url = ctx.checkUrl(sessionId);
+	const url = ctx.checkUrl(sessionId, runId);
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
 		if (!ctx.isCurrentSession(sessionId)) return false;
 		try {
-			const res = await fetch(url, { signal: AbortSignal.timeout(fetchTimeoutMs) });
+			const idToken = ctx.getIdToken ? await ctx.getIdToken() : null;
+			const headers: Record<string, string> = {};
+			if (idToken) headers.Authorization = `Bearer ${idToken}`;
+			const res = await fetch(url, {
+				headers,
+				signal: AbortSignal.timeout(fetchTimeoutMs)
+			});
 			const data = await res.json();
 
 			if (!data.ok && data.reason && TERMINAL_REASONS[data.reason]) {
