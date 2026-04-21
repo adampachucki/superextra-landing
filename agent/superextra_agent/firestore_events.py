@@ -287,16 +287,48 @@ def _map_specialist(event: Any, author: str) -> dict | None:
 
 
 def _map_synthesizer(event: Any) -> dict | None:
-    if _is_final(event) and _has_state_delta(event, "final_report"):
-        text = _state_delta(event).get("final_report") or ""
-        if not isinstance(text, str):
-            return None
-        sources = extract_sources_from_text(text)
-        return {
-            "type": "complete",
-            "data": {"reply": text, "sources": sources},
-        }
-    return None
+    # Only the final event promotes to a terminal reply.
+    if not _is_final(event):
+        return None
+
+    # Preferred source: `state_delta.final_report`. Both synthesizer and
+    # follow_up agents are configured with `output_key="final_report"`, and
+    # the state_delta path preserves today's format-normalization semantics.
+    reply: str | None = None
+    if _has_state_delta(event, "final_report"):
+        candidate = _state_delta(event).get("final_report")
+        if isinstance(candidate, str) and candidate.strip():
+            reply = candidate
+
+    # Fallback: the final event carried text parts but no state_delta. Seen
+    # intermittently in live runs — the LLM emits the final model response as
+    # content.parts[*].text without the state_delta write that output_key
+    # usually performs. Without this branch the mapper returns None, no
+    # complete event is written, and the worker sanity gate flips the
+    # session to `status='error' / empty_or_malformed_reply`.
+    if reply is None:
+        parts_text = _collect_text(event).strip()
+        if parts_text:
+            reply = parts_text
+
+    if not reply:
+        return None
+
+    # Harvest sources from grounding metadata first (in-process Runner
+    # exposes it on the synth event), then fall back to markdown links in
+    # the reply text. Both paths dedupe by URL internally; merging is safe.
+    sources = extract_sources_from_grounding(event)
+    text_sources = extract_sources_from_text(reply)
+    seen = {s["url"] for s in sources}
+    for s in text_sources:
+        if s["url"] not in seen:
+            sources.append(s)
+            seen.add(s["url"])
+
+    return {
+        "type": "complete",
+        "data": {"reply": reply, "sources": sources},
+    }
 
 
 # ── Source harvesting ───────────────────────────────────────────────────────

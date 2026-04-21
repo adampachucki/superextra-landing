@@ -327,9 +327,77 @@ def test_synthesizer_final_report_emits_complete():
     ]
 
 
-def test_synthesizer_no_final_report_is_skipped():
+def test_synthesizer_no_final_report_no_text_is_skipped():
     ev = _event(author="synthesizer", is_final=True, state_delta={})
     assert map_event(ev) is None
+
+
+def test_synthesizer_text_only_final_emits_complete():
+    """Intermittent live-run failure mode (P1 in
+    docs/pipeline-decoupling-implementation-review-2026-04-21.md): the final
+    synthesizer event carries text parts but no state_delta.final_report.
+    Before the P1 fix, the mapper returned None here → no complete event →
+    worker sanity gate flipped to status=error/empty_or_malformed_reply.
+    Post-fix, the text parts are promoted to the complete event's reply."""
+    ev = _event(
+        author="synthesizer",
+        is_final=True,
+        text="# Report\n\nSummary of findings. [Link](https://ex.com/a)",
+        state_delta={},
+    )
+    emission = map_event(ev)
+    assert emission is not None, "text-only final must promote to complete"
+    assert emission["type"] == "complete"
+    assert emission["data"]["reply"].startswith("# Report")
+    assert emission["data"]["sources"] == [
+        {"title": "Link", "url": "https://ex.com/a"}
+    ]
+
+
+def test_synthesizer_prefers_final_report_over_text_parts():
+    """When both are present, state_delta.final_report wins (preserves the
+    current format-normalization semantics for the default path)."""
+    ev = _event(
+        author="synthesizer",
+        is_final=True,
+        text="Raw unpolished draft.",
+        state_delta={"final_report": "# Polished Report\n\nBody."},
+    )
+    emission = map_event(ev)
+    assert emission["data"]["reply"] == "# Polished Report\n\nBody."
+
+
+def test_synthesizer_merges_grounding_and_text_sources():
+    """Grounding metadata and in-text markdown links are both harvested and
+    deduped by URL — matches specialists' source harvesting behavior."""
+    ev = _event(
+        author="synthesizer",
+        is_final=True,
+        text="See [A](https://a.com) and [B](https://b.com).",
+        state_delta={},
+        grounding_chunks=[
+            {"uri": "https://a.com", "title": "A (grounding)"},
+            {"uri": "https://c.com", "title": "C"},
+        ],
+    )
+    emission = map_event(ev)
+    urls = [s["url"] for s in emission["data"]["sources"]]
+    # a.com deduped (prefer grounding), plus c.com and b.com
+    assert set(urls) == {"https://a.com", "https://b.com", "https://c.com"}
+
+
+def test_synthesizer_whitespace_only_final_report_falls_back_to_text():
+    """`_has_state_delta` filters empty-string/None already, but a
+    whitespace-only value still passes — so the widened mapper should treat
+    it as missing and fall through to the text-parts branch."""
+    ev = _event(
+        author="synthesizer",
+        is_final=True,
+        text="Actual reply text.",
+        state_delta={"final_report": "   "},
+    )
+    emission = map_event(ev)
+    assert emission["data"]["reply"] == "Actual reply text."
 
 
 def test_follow_up_final_report_emits_complete():
@@ -354,9 +422,24 @@ def test_follow_up_final_report_emits_complete():
     ]
 
 
-def test_follow_up_no_final_report_is_skipped():
+def test_follow_up_no_final_report_no_text_is_skipped():
     ev = _event(author="follow_up", is_final=True, state_delta={})
     assert map_event(ev) is None
+
+
+def test_follow_up_text_only_final_emits_complete():
+    """Follow-up shares the synthesizer's mapper branch — the text-only
+    fallback applies to follow-up turns too."""
+    ev = _event(
+        author="follow_up",
+        is_final=True,
+        text="Based on the prior report, pricing clusters around PLN 35-45.",
+        state_delta={},
+    )
+    emission = map_event(ev)
+    assert emission is not None
+    assert emission["type"] == "complete"
+    assert emission["data"]["reply"].startswith("Based on the prior report")
 
 
 # ── Source harvesting ──────────────────────────────────────────────────────

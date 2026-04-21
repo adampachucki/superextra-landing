@@ -65,8 +65,13 @@ SID = f"e2e-{uuid.uuid4()}"
 RUN_ID = str(uuid.uuid4())
 USER_ID = f"e2e-user-{uuid.uuid4().hex[:8]}"
 PLACE = {
-    "name": "Umami",
-    "secondary": "Berlin",
+    # Noma, Copenhagen. Verified via Places API (New) v1 at time of authoring:
+    # GET /v1/places/{id}?fields=displayName,formattedAddress →
+    # displayName.text="Noma", formattedAddress="Refshalevej 96, 1432 København".
+    # Keep label/secondary aligned with placeId — the pipeline cross-checks
+    # and a mismatch degrades smoke-test signal quality.
+    "name": "Noma",
+    "secondary": "Copenhagen",
     "placeId": "ChIJpYCQZztTUkYRFOE368Xs6kI",
 }
 

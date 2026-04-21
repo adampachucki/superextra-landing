@@ -474,6 +474,43 @@ def _extract_sources_from_state_delta(sd: dict) -> list[dict]:
     return sources
 
 
+# Last-resort stitching of specialist outputs when the synthesizer
+# silently returns nothing and the agent.py empty-response guard did
+# not fire. Mirrors `_build_fallback_report` in `superextra_agent.agent`
+# but reads from the worker-accumulated state_delta dict, not an ADK
+# callback_context. Returns empty string when no specialist produced
+# usable output — caller falls through to status='error'.
+_DEGRADED_SECTIONS: list[tuple[str, str]] = [
+    ("market_result", "Market Landscape"),
+    ("pricing_result", "Menu & Pricing"),
+    ("revenue_result", "Revenue & Sales"),
+    ("guest_result", "Guest Intelligence"),
+    ("location_result", "Location & Traffic"),
+    ("ops_result", "Operations"),
+    ("marketing_result", "Marketing & Digital"),
+    ("review_result", "Review Analysis"),
+    ("dynamic_result_1", "Additional Research"),
+    ("dynamic_result_2", "Gap Research"),
+]
+
+
+def _build_degraded_reply(accumulated_state: dict) -> str:
+    parts: list[str] = [
+        "# Research findings\n\n",
+        "_Note: final synthesis did not produce a response. "
+        "The detailed specialist findings below are the raw research "
+        "captured before synthesis returned._\n\n",
+    ]
+    had_content = False
+    for key, label in _DEGRADED_SECTIONS:
+        val = accumulated_state.get(key)
+        if not isinstance(val, str) or not val.strip() or val.strip() == "NOT_RELEVANT":
+            continue
+        had_content = True
+        parts.append(f"## {label}\n\n{val}\n\n")
+    return "".join(parts) if had_content else ""
+
+
 # ── SIGTERM handler ─────────────────────────────────────────────────────────
 
 
@@ -713,7 +750,24 @@ async def run(body: RunRequest, request: Request) -> dict:
         # cancel-order; running here afterwards is a safe no-op.
         await _cancel_heartbeat()
 
-    # 4. Sanity check before declaring complete. Single stripped non-empty
+    # 4. Last-resort fallback: if we exited the loop with no final_reply
+    # (synthesizer emitted a final event with no state_delta AND no parts AND
+    # the agent.py empty-response guard didn't fire — vanishingly unlikely
+    # but possible), synthesize a degraded reply from whatever specialist
+    # outputs we accumulated. Prefer delivering usable content over
+    # `status='error'`. See docs/pipeline-decoupling-implementation-review-
+    # 2026-04-21.md P1.
+    if not final_reply or not final_reply.strip():
+        degraded = _build_degraded_reply(accumulated_state)
+        if degraded:
+            log.warning(
+                "synthesizer produced no reply — delivering degraded reply from accumulated state",
+                extra={**log_ctx, "event": "degraded_reply"},
+            )
+            final_reply = degraded
+            final_sources = _extract_sources_from_state_delta(accumulated_state)
+
+    # 5. Sanity check before declaring complete. Single stripped non-empty
     # check — `_map_synthesizer` / `_has_state_delta` only filter `if not
     # value`, so whitespace-only `final_report` would slip through without
     # `.strip()`. We dropped the old len<100 and `startswith("Error:")`
