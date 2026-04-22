@@ -1,7 +1,6 @@
 import logging
 import os
 from pathlib import Path
-from urllib.parse import urlparse
 
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
@@ -20,58 +19,6 @@ INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 _version = os.environ.get("GEMINI_VERSION", "3.1")
 
 RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=60.0)
-
-
-def _append_sources(*, callback_context, llm_response):
-    """Append grounding source URLs to the model response text.
-
-    AgentTool only propagates the text output — grounding metadata is lost.
-    By appending sources to the text, they travel through to session state
-    where the Cloud Function can extract them.
-    """
-    gm = llm_response.grounding_metadata
-    # Inject search queries into state so they appear in the SSE stream
-    if gm and gm.web_search_queries and callback_context:
-        callback_context.state["_web_search_queries"] = list(gm.web_search_queries)
-    if not gm or not gm.grounding_chunks:
-        return llm_response
-    urls = []
-    seen = set()
-    for chunk in gm.grounding_chunks:
-        if chunk.web and chunk.web.uri and chunk.web.uri not in seen:
-            title = chunk.web.title or chunk.web.uri
-            uri = chunk.web.uri
-            # domain is often None; extract from URI if possible, else use title
-            domain = chunk.web.domain
-            if not domain and uri:
-                try:
-                    hostname = urlparse(uri).hostname or ""
-                    if hostname and "vertexaisearch" not in hostname:
-                        domain = hostname
-                except Exception:
-                    pass
-            if not domain:
-                domain = chunk.web.title or ""
-            urls.append((title, uri, domain))
-            seen.add(chunk.web.uri)
-    if not urls:
-        return llm_response
-    # Append a Sources section to the last text part.
-    # Format: - [title](uri){domain} — domain suffix lets the frontend
-    # display the real source host even when uri is a redirect URL.
-    if llm_response.content and llm_response.content.parts:
-        for part in reversed(llm_response.content.parts):
-            if part.text:
-                lines = []
-                for title, uri, domain in urls:
-                    entry = f"- [{title}]({uri})"
-                    if domain:
-                        entry += "{" + domain + "}"
-                    lines.append(entry)
-                sources_md = "\n\n## Sources\n" + "\n".join(lines)
-                part.text += sources_md
-                break
-    return llm_response
 
 
 def _make_gemini(model: str) -> Gemini:
@@ -254,7 +201,6 @@ def _make_specialist(name, description, output_key, tools=None, instruction_name
         generate_content_config=thinking_config if thinking_config is not None else THINKING_CONFIG,
         before_agent_callback=_make_skip_callback(name),
         before_model_callback=_inject_geo_bias,
-        after_model_callback=_append_sources,
         on_model_error_callback=_on_model_error,
         on_tool_error_callback=_on_tool_error,
     )
@@ -328,7 +274,6 @@ def make_gap_researcher():
         generate_content_config=MEDIUM_THINKING_CONFIG,
         before_agent_callback=_skip_if_no_outputs,
         before_model_callback=_inject_geo_bias,
-        after_model_callback=_append_sources,
         on_model_error_callback=_on_model_error,
         on_tool_error_callback=_on_tool_error,
     )

@@ -44,8 +44,6 @@ from pydantic import BaseModel, Field
 from superextra_agent.log_ctx import worker_sid as _worker_sid_ctx
 from superextra_agent.agent import app as adk_app
 from superextra_agent.firestore_events import (
-    AUTHOR_TO_OUTPUT_KEY,
-    extract_sources_from_text,
     map_and_write_event,
 )
 
@@ -454,25 +452,19 @@ async def _generate_title(query_text: str) -> str:
         return _fallback_title(query_text)
 
 
-# ── Source extraction from session state ────────────────────────────────────
+# ── Source accumulator ──────────────────────────────────────────────────────
 
 
-def _extract_sources_from_state_delta(sd: dict) -> list[dict]:
-    """Scan every specialist's output in a state_delta for markdown-link
-    sources. Dedupes across specialists. Used at completion time to populate
-    the top-level `sources` array on the session doc."""
-    sources: list[dict] = []
-    seen: set[str] = set()
-    for output_key in AUTHOR_TO_OUTPUT_KEY.values():
-        value = sd.get(output_key)
-        if not isinstance(value, str):
-            continue
-        for entry in extract_sources_from_text(value):
-            if entry["url"] in seen:
-                continue
-            seen.add(entry["url"])
-            sources.append(entry)
-    return sources
+def _merge_source(sources: list[dict], seen: set[str], entry: dict) -> None:
+    """Append ``entry`` to ``sources`` if its URL hasn't been seen yet.
+    Mutates both in place. Used by the event-loop accumulator."""
+    if not isinstance(entry, dict):
+        return
+    url = entry.get("url")
+    if not url or url in seen:
+        return
+    seen.add(url)
+    sources.append(entry)
 
 
 # Last-resort stitching of specialist outputs when the synthesizer
@@ -662,6 +654,8 @@ async def run(body: RunRequest, request: Request) -> dict:
 
     # 3. Consume events from the in-process Runner.
     accumulated_state: dict[str, Any] = {}
+    specialist_sources: list[dict] = []
+    specialist_sources_seen: set[str] = set()
     final_reply: str | None = None
     final_sources: list[dict] = []
     seq_in_attempt = 0
@@ -689,6 +683,16 @@ async def run(body: RunRequest, request: Request) -> dict:
             for key, value in sd.items():
                 if isinstance(value, str):
                     accumulated_state[key] = value
+            # Accumulate sources from specialist (and gap researcher) completion
+            # activity events. `_map_specialist` already extracts them from
+            # grounding_metadata at emission time; we just carry the union
+            # forward so the terminal reply can include every specialist's
+            # sources, not only whatever the synth event carries.
+            if emitted is not None and emitted.get("type") == "activity":
+                data = emitted.get("data") or {}
+                if data.get("status") == "complete":
+                    for entry in data.get("sources") or []:
+                        _merge_source(specialist_sources, specialist_sources_seen, entry)
             # Promote the first terminal `complete` event the mapper emits
             # (router clarification OR synthesiser final). Reuse the mapper's
             # decision as the source of truth for what counts as terminal —
@@ -703,11 +707,10 @@ async def run(body: RunRequest, request: Request) -> dict:
                 if isinstance(reply, str):
                     final_reply = reply
                     mapper_sources = data.get("sources") or []
-                    state_sources = _extract_sources_from_state_delta(accumulated_state)
-                    # Dedup across mapper-extracted + state-accumulated sources.
+                    # Dedup across mapper-extracted + specialist-accumulated.
                     seen: set[str] = set()
                     merged: list[dict] = []
-                    for s in list(mapper_sources) + list(state_sources):
+                    for s in list(mapper_sources) + list(specialist_sources):
                         url = s.get("url") if isinstance(s, dict) else None
                         if not url or url in seen:
                             continue
@@ -778,7 +781,7 @@ async def run(body: RunRequest, request: Request) -> dict:
                 extra={**log_ctx, "event": "degraded_reply"},
             )
             final_reply = degraded
-            final_sources = _extract_sources_from_state_delta(accumulated_state)
+            final_sources = list(specialist_sources)
 
     # 5. Sanity check before declaring complete. Single stripped non-empty
     # check — `_map_synthesizer` / `_has_state_delta` only filter `if not

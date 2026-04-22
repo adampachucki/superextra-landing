@@ -21,9 +21,9 @@ from worker_main import (  # noqa: E402
     OwnershipLost,
     STALE_HEARTBEAT_S,
     _build_degraded_reply,
-    _extract_sources_from_state_delta,
     _fallback_title,
     _fenced_update_logic,
+    _merge_source,
     _strip_query_prefixes,
     _takeover_logic,
 )
@@ -194,27 +194,32 @@ def test_takeover_userid_mismatch_raises_500():
     assert "userId mismatch" in e.value.detail
 
 
-# ── Source extraction ──────────────────────────────────────────────────────
+# ── Source accumulator ─────────────────────────────────────────────────────
 
 
-def test_extract_sources_dedupes_across_specialists():
-    sd = {
-        "market_result": "[A](https://a.com) [B](https://b.com)",
-        "revenue_result": "[A-dup](https://a.com) [C](https://c.com)",
-        "guest_result": "NOT_RELEVANT",
-        "other_key": "ignored",
-    }
-    sources = _extract_sources_from_state_delta(sd)
-    # Order is specialist-by-specialist; within specialist, first-seen.
-    urls = [s["url"] for s in sources]
-    assert urls == ["https://a.com", "https://b.com", "https://c.com"]
+def test_merge_source_appends_new_url():
+    sources: list[dict] = []
+    seen: set[str] = set()
+    _merge_source(sources, seen, {"title": "A", "url": "https://a.com"})
+    assert sources == [{"title": "A", "url": "https://a.com"}]
+    assert seen == {"https://a.com"}
 
 
-def test_extract_sources_skips_non_string_values():
-    sd = {"market_result": {"not": "a string"}, "pricing_result": "[A](https://x.com)"}
-    assert _extract_sources_from_state_delta(sd) == [
-        {"title": "A", "url": "https://x.com"}
-    ]
+def test_merge_source_dedupes_by_url():
+    sources: list[dict] = [{"title": "A", "url": "https://a.com"}]
+    seen: set[str] = {"https://a.com"}
+    _merge_source(sources, seen, {"title": "A-dup", "url": "https://a.com"})
+    _merge_source(sources, seen, {"title": "B", "url": "https://b.com"})
+    assert [s["url"] for s in sources] == ["https://a.com", "https://b.com"]
+
+
+def test_merge_source_skips_entries_without_url():
+    sources: list[dict] = []
+    seen: set[str] = set()
+    _merge_source(sources, seen, {"title": "A"})  # no url
+    _merge_source(sources, seen, "not a dict")  # wrong type
+    _merge_source(sources, seen, {"url": ""})  # empty url
+    assert sources == []
 
 
 # ── Degraded-reply fallback ────────────────────────────────────────────────
@@ -613,30 +618,51 @@ def _install_run_harness(monkeypatch, *, events, emissions):
 
 @pytest.mark.asyncio
 async def test_sources_accumulate_across_specialist_events(monkeypatch):
-    """1.2 — specialist outputs in earlier events must merge into the
-    terminal `sources` array, not just the synthesiser's final state_delta.
-    """
+    """Specialist activity events' `data.sources` must merge into the
+    terminal `sources[]` array emitted by the synthesiser. Sources come from
+    the mapper's grounding extraction, not from markdown-parsing specialist
+    text."""
     events = [
         _mk_event(
-            {"market_result": "See [Source A](https://a.example) for details."},
+            {"market_result": "Market landscape analysis."},
             author="market_landscape",
         ),
         _mk_event(
-            {"review_result": "Reviews complain; see [Source B](https://b.example)."},
+            {"review_result": "Review sentiment analysis."},
             author="review_analyst",
         ),
         _mk_event(
-            {"final_report": "Overall summary with [Source C](https://c.example)."},
+            {"final_report": "Overall summary."},
             author="synthesizer",
         ),
     ]
     emissions = [
-        None,  # specialist mid-event — mapper may emit activity, not relevant
-        None,
+        {
+            "type": "activity",
+            "data": {
+                "category": "analyze",
+                "id": "analyze-market_landscape",
+                "status": "complete",
+                "label": "Market Landscape",
+                "agent": "market_landscape",
+                "sources": [{"title": "Source A", "url": "https://a.example"}],
+            },
+        },
+        {
+            "type": "activity",
+            "data": {
+                "category": "analyze",
+                "id": "analyze-review_analyst",
+                "status": "complete",
+                "label": "Review Analysis",
+                "agent": "review_analyst",
+                "sources": [{"title": "Source B", "url": "https://b.example"}],
+            },
+        },
         {
             "type": "complete",
             "data": {
-                "reply": "Overall summary with [Source C](https://c.example).",
+                "reply": "Overall summary.",
                 "sources": [{"title": "Source C", "url": "https://c.example"}],
             },
         },
@@ -654,8 +680,41 @@ async def test_sources_accumulate_across_specialist_events(monkeypatch):
     assert len(complete_writes) == 1
     sources = complete_writes[0]["sources"]
     urls = {s["url"] for s in sources}
-    # Synth's own markdown source + both specialists' accumulated sources.
+    # Synth's own sources + both specialists' accumulated sources.
     assert urls == {"https://a.example", "https://b.example", "https://c.example"}
+
+
+@pytest.mark.asyncio
+async def test_sources_dedupe_across_specialist_and_synth(monkeypatch):
+    """Overlapping URLs between specialist activity events and the synthesiser's
+    terminal event dedupe to one entry in the final `sources[]`."""
+    events = [
+        _mk_event({"market_result": "Market."}, author="market_landscape"),
+        _mk_event({"final_report": "Summary."}, author="synthesizer"),
+    ]
+    emissions = [
+        {
+            "type": "activity",
+            "data": {
+                "status": "complete",
+                "agent": "market_landscape",
+                "sources": [{"title": "Shared", "url": "https://shared.example"}],
+            },
+        },
+        {
+            "type": "complete",
+            "data": {
+                "reply": "Summary.",
+                "sources": [{"title": "Shared (dup)", "url": "https://shared.example"}],
+            },
+        },
+    ]
+
+    fenced_writes, _hb = _install_run_harness(monkeypatch, events=events, emissions=emissions)
+    await __import__("worker_main").run(_build_run_request(), _fake_request())
+
+    complete = [u for u in fenced_writes if u.get("status") == "complete"][0]
+    assert [s["url"] for s in complete["sources"]] == ["https://shared.example"]
 
 
 @pytest.mark.asyncio

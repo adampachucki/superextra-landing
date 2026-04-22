@@ -81,7 +81,9 @@ TOOL_LABELS: dict[str, str] = {
     "set_specialist_briefs": "Assigning specialists",
 }
 
-# Markdown link with optional {domain} suffix (as _append_sources writes).
+# Markdown link with optional {domain} suffix. Used by
+# `extract_sources_from_text` as a legacy fallback for specialist outputs that
+# embedded citations inline in prose (rare post-`_append_sources` removal).
 _MD_LINK_RE = re.compile(r"\[([^\]]*)\]\((https?://[^)]+)\)(?:\{([^}]*)\})?")
 
 
@@ -261,12 +263,10 @@ def _map_specialist(event: Any, author: str) -> dict | None:
         output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
         if output_key and _has_state_delta(event, output_key):
             text = _state_delta(event).get(output_key) or ""
-            # Source harvest order:
-            #   1. grounding_metadata.grounding_chunks (in-process Runner
-            #      exposes them directly; replaces the `_append_sources`
-            #      workaround used when we went through AgentTool).
-            #   2. markdown links in the specialist's output text (fallback
-            #      for specialists that still run `_append_sources`).
+            # Grounding metadata is the primary source — the in-process Runner
+            # exposes it directly on the event. Markdown-link extraction
+            # remains as a fallback for rare cases where a specialist embeds
+            # citations inline in its prose instead of via grounded search.
             sources = extract_sources_from_grounding(event)
             if not sources:
                 sources = extract_sources_from_text(text if isinstance(text, str) else "")
