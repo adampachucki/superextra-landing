@@ -19,6 +19,12 @@ from typing import Any
 
 from google.cloud import firestore
 
+from .specialist_catalog import (
+    AUTHOR_TO_OUTPUT_KEY,
+    OUTPUT_KEY_TO_LABEL,
+    SPECIALISTS,
+)
+
 log = logging.getLogger(__name__)
 
 # ── Constants ───────────────────────────────────────────────────────────────
@@ -26,45 +32,9 @@ log = logging.getLogger(__name__)
 EVENT_TTL_DAYS = 30
 
 # Specialist agent authors (incl. gap_researcher which behaves like one).
-SPECIALIST_AUTHORS: set[str] = {
-    "market_landscape",
-    "menu_pricing",
-    "revenue_sales",
-    "guest_intelligence",
-    "location_traffic",
-    "operations",
-    "marketing_digital",
-    "review_analyst",
-    "dynamic_researcher_1",
-    "gap_researcher",
-}
-
-# Author → state_delta key that signals their final output.
-AUTHOR_TO_OUTPUT_KEY: dict[str, str] = {
-    "market_landscape": "market_result",
-    "menu_pricing": "pricing_result",
-    "revenue_sales": "revenue_result",
-    "guest_intelligence": "guest_result",
-    "location_traffic": "location_result",
-    "operations": "ops_result",
-    "marketing_digital": "marketing_result",
-    "review_analyst": "review_result",
-    "dynamic_researcher_1": "dynamic_result_1",
-    "gap_researcher": "dynamic_result_2",
-}
-
-OUTPUT_KEY_TO_LABEL: dict[str, str] = {
-    "market_result": "Market Landscape",
-    "pricing_result": "Menu & Pricing",
-    "revenue_result": "Revenue & Sales",
-    "guest_result": "Guest Intelligence",
-    "location_result": "Location & Traffic",
-    "ops_result": "Operations",
-    "marketing_result": "Marketing & Digital",
-    "review_result": "Review Analysis",
-    "dynamic_result_1": "Dynamic Research",
-    "dynamic_result_2": "Gap Research",
-}
+# Derived from the catalog; `follow_up` is dispatched separately (line 146
+# below) because it shares `output_key="final_report"` with the synth.
+SPECIALIST_AUTHORS: set[str] = {s.name for s in SPECIALISTS}
 
 # Tool name → UI label (mirrors `TOOL_LABELS` / `PLACES_TOOL_LABELS` in
 # `functions/utils.js`).

@@ -6,8 +6,8 @@ from superextra_agent.agent import (
     _follow_up_instruction,
     _router_instruction,
     _SYNTHESIZER_KEYS,
-    _SPECIALIST_RESULT_KEYS,
 )
+from superextra_agent.specialist_catalog import SPECIALIST_RESULT_KEYS
 from superextra_agent.specialists import _make_instruction
 
 

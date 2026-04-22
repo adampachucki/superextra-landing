@@ -3,33 +3,35 @@ import logging
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents import LlmAgent
-from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_response import LlmResponse
 from google.adk.apps import App
 from google.adk.tools import google_search
-from google.genai import Client, types
+from google.genai import types
 
 from .log_ctx import worker_sid
 from .web_tools import fetch_web_content
 logger = logging.getLogger(__name__)
 
+from .specialist_catalog import (
+    FALLBACK_SECTIONS,
+    SPECIALIST_RESULT_KEYS,
+    SPECIALISTS,
+)
 from .specialists import (
     MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG, MEDIUM_THINKING_CONFIG,
     ORCHESTRATOR_THINKING_CONFIG,
     ALL_SPECIALISTS, set_specialist_briefs, RETRY,
-    _inject_geo_bias, make_gap_researcher,
+    _inject_geo_bias, _make_gemini, make_gap_researcher,
 )
 from .places_tools import get_restaurant_details, get_batch_restaurant_details, find_nearby_restaurants, search_restaurants
 from .chat_logger import ChatLoggerPlugin
 from pathlib import Path
 
-# Fast model for simple tasks (routing) — no thinking needed.
-# Route via global endpoint (same as 3.1 models).
-_FAST_MODEL = Gemini(model="gemini-2.5-flash", retry_options=RETRY)
-_FAST_MODEL.api_client = Client(
-    vertexai=True, location="global",
-    http_options=types.HttpOptions(retry_options=RETRY),
-)
+# Fast model for simple tasks (routing, follow-up) — no thinking needed.
+# Routed via the global Vertex AI endpoint because 2.5 Flash isn't served
+# from us-central1 (same constraint as the 3.1 models _make_gemini already
+# handles for specialists).
+_FAST_MODEL = _make_gemini("gemini-2.5-flash", force_global=True)
 
 INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
@@ -37,18 +39,11 @@ INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
 
 _ORCHESTRATOR_TEMPLATE = (INSTRUCTIONS_DIR / "research_orchestrator.md").read_text()
 
-_SPECIALIST_RESULT_KEYS = {
-    "market_result": "Market Landscape", "pricing_result": "Menu & Pricing",
-    "revenue_result": "Revenue & Sales", "guest_result": "Guest Intelligence",
-    "location_result": "Location & Traffic", "ops_result": "Operations",
-    "marketing_result": "Marketing & Digital", "review_result": "Review Analysis",
-    "dynamic_result_1": "Dynamic Research",
-}
 
 def _orchestrator_instruction(ctx):
     """Inject places_context and existing results into the orchestrator's instructions."""
     places_context = ctx.state.get("places_context", "No Google Places data available.")
-    existing = [label for key, label in _SPECIALIST_RESULT_KEYS.items()
+    existing = [label for key, label in SPECIALIST_RESULT_KEYS.items()
                 if ctx.state.get(key) and ctx.state.get(key) != "Agent did not produce output."]
     follow_up_note = ""
     if existing:
@@ -63,11 +58,11 @@ def _orchestrator_instruction(ctx):
     return _ORCHESTRATOR_TEMPLATE.format(places_context=places_context) + follow_up_note
 
 _SYNTHESIZER_TEMPLATE = (INSTRUCTIONS_DIR / "synthesizer.md").read_text()
+# Context pair at the top, then every specialist's output_key (including gap
+# research — the synth reads it alongside Phase 1 findings).
 _SYNTHESIZER_KEYS = [
     "places_context", "research_plan",
-    "market_result", "pricing_result", "revenue_result",
-    "guest_result", "location_result", "ops_result", "marketing_result",
-    "review_result", "dynamic_result_1", "dynamic_result_2",
+    *[s.output_key for s in SPECIALISTS],
 ]
 
 def _synthesizer_instruction(ctx):
@@ -112,20 +107,6 @@ def _make_enricher(name="context_enricher"):
     )
 
 
-_FALLBACK_SECTIONS = [
-    ("market_result", "Market Landscape"),
-    ("pricing_result", "Menu & Pricing"),
-    ("revenue_result", "Revenue & Sales"),
-    ("guest_result", "Guest Intelligence"),
-    ("location_result", "Location & Traffic"),
-    ("ops_result", "Operations"),
-    ("marketing_result", "Marketing & Digital"),
-    ("review_result", "Review Analysis"),
-    ("dynamic_result_1", "Additional Research"),
-    ("dynamic_result_2", "Gap Research"),
-]
-
-
 def _build_fallback_report(state, reason: str) -> str:
     """Concatenate specialist outputs when the synthesizer fails to produce a response.
 
@@ -139,7 +120,7 @@ def _build_fallback_report(state, reason: str) -> str:
         "_Final synthesis didn't produce a response. Full research findings below._\n\n",
     ]
     had_content = False
-    for key, label in _FALLBACK_SECTIONS:
+    for key, label in FALLBACK_SECTIONS:
         val = state.get(key)
         if not val or val == "Agent did not produce output.":
             continue

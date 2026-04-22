@@ -9,6 +9,12 @@ from google.adk.tools import google_search
 from google.genai import Client, types
 
 from .apify_tools import get_google_reviews
+from .specialist_catalog import (
+    BRIEFABLE_SPECIALISTS,
+    ROLE_TITLES,
+    SPECIALIST_OUTPUT_KEYS,
+    VALID_BRIEF_KEYS,
+)
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
 from .web_tools import fetch_web_content
 
@@ -21,16 +27,21 @@ _version = os.environ.get("GEMINI_VERSION", "3.1")
 RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=60.0)
 
 
-def _make_gemini(model: str) -> Gemini:
-    """Create a Gemini instance, routing to the global endpoint for 3.1 models."""
+def _make_gemini(model: str, *, force_global: bool = False) -> Gemini:
+    """Create a Gemini instance.
+
+    Routes via the global Vertex AI endpoint when the model family requires
+    it (3.1 models) or when `force_global=True` (e.g. 2.5 Flash, which ADK
+    would otherwise pin to the container's us-central1 region).
+
+    ADK bakes `GOOGLE_CLOUD_LOCATION=us-central1` into the container
+    (matching the Cloud Run region), but several model families don't serve
+    from that location. Overriding `api_client` to use `location='global'`
+    routes model calls to `https://aiplatform.googleapis.com/` while the
+    rest of ADK (sessions, Agent Engine) stays on us-central1.
+    """
     g = Gemini(model=model, retry_options=RETRY)
-    if _version == "3.1":
-        # Gemini 3.1 is only available via the global Vertex AI endpoint.
-        # ADK bakes GOOGLE_CLOUD_LOCATION=us-central1 into the container
-        # (matching the Cloud Run region), but that location doesn't serve
-        # 3.1 yet. Override the api_client to use location='global' so model
-        # calls route to https://aiplatform.googleapis.com/ while the rest of
-        # ADK (sessions, Agent Engine) keeps using us-central1.
+    if _version == "3.1" or force_global:
         g.api_client = Client(
             vertexai=True,
             location="global",
@@ -73,18 +84,6 @@ authoritative-but-generic. If a claim only appears in non-authoritative sources,
 
 _SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
 
-_ROLE_TITLES = {
-    "market_landscape": "Market Landscape research agent",
-    "menu_pricing": "Menu & Pricing research agent",
-    "revenue_sales": "Revenue & Sales research agent",
-    "guest_intelligence": "Guest Intelligence research agent",
-    "location_traffic": "Location & Traffic research agent",
-    "operations": "Operations research agent",
-    "marketing_digital": "Marketing & Digital research agent",
-    "review_analyst": "Review Analyst",
-    "dynamic_researcher": "flexible research agent",
-}
-
 _NO_BASE = {"gap_researcher"}
 
 
@@ -96,7 +95,7 @@ def _make_instruction(name: str, brief_key: str | None = None):
     else:
         template = (_SPECIALIST_BASE
                     .replace("{specialist_body}", body)
-                    .replace("{role_title}", _ROLE_TITLES.get(name, name)))
+                    .replace("{role_title}", ROLE_TITLES.get(name, name)))
     _brief_key = brief_key or name
 
     def provider(ctx):
@@ -151,13 +150,6 @@ def _on_tool_error(*, tool, args, tool_context, error):
     return {"error": f"Tool {tool.name} failed: {type(error).__name__}"}
 
 
-VALID_BRIEF_KEYS = {
-    "market_landscape", "menu_pricing", "revenue_sales",
-    "guest_intelligence", "location_traffic", "operations",
-    "marketing_digital", "review_analyst", "dynamic_researcher_1",
-}
-
-
 async def set_specialist_briefs(briefs: dict, tool_context) -> str:
     """Assign research briefs to specialist agents.
 
@@ -208,42 +200,38 @@ def _make_specialist(name, description, output_key, tools=None, instruction_name
     )
 
 
-# Phase 0: MEDIUM thinking on specialists whose task is pattern-matching / aggregation
-# rather than deep reasoning. HIGH stays on quantitative-inference + strategic specialists.
-_SPECIALIST_CONFIGS = [
-    ("market_landscape", "Analyzes restaurant market dynamics: openings, closings, competitor activity, cuisine trends, saturation, white space.", "market_result", THINKING_CONFIG),
-    ("menu_pricing", "Analyzes menus, pricing, delivery markups, promotions, trending dishes.", "pricing_result", THINKING_CONFIG),
-    ("revenue_sales", "Estimates revenue, check size, seasonality, channel splits, platform share.", "revenue_result", THINKING_CONFIG),
-    ("guest_intelligence", "Analyzes review sentiment, complaint/praise patterns, rating trends.", "guest_result", MEDIUM_THINKING_CONFIG),
-    ("location_traffic", "Analyzes foot traffic, demographics, purchasing power, rent, trade areas.", "location_result", MEDIUM_THINKING_CONFIG),
-    ("operations", "Analyzes labor market, salary benchmarks, rent, supplier pricing.", "ops_result", THINKING_CONFIG),
-    ("marketing_digital", "Analyzes social media, ads, delivery platform presence, web presence.", "marketing_result", MEDIUM_THINKING_CONFIG),
+# Thinking-level buckets: MEDIUM for pattern-matching / aggregation,
+# HIGH for quantitative-inference / strategic work. Catalog entries carry
+# `thinking="high" | "medium"`; we map to the actual config at build time.
+_THINKING_CONFIGS = {"high": THINKING_CONFIG, "medium": MEDIUM_THINKING_CONFIG}
+
+# Per-specialist tool overrides. Everything not listed here uses the default
+# `[google_search, fetch_web_content]` pair.
+_SPECIALIST_TOOLS: dict[str, list] = {
+    "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
+}
+
+ALL_SPECIALISTS = [
+    _make_specialist(
+        s.name,
+        s.description,
+        s.output_key,
+        tools=_SPECIALIST_TOOLS.get(s.name),
+        instruction_name=s.instruction_name,
+        thinking_config=_THINKING_CONFIGS[s.thinking],
+    )
+    for s in BRIEFABLE_SPECIALISTS
 ]
-
-ALL_SPECIALISTS = [_make_specialist(n, d, k, thinking_config=tc) for n, d, k, tc in _SPECIALIST_CONFIGS]
-
-ALL_SPECIALISTS.append(_make_specialist(
-    "review_analyst",
-    "Quantitative review analysis from structured API sources: tourist/local breakdown, rating trends, owner engagement, rankings.",
-    "review_result",
-    tools=[find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
-))
-
-ALL_SPECIALISTS.append(_make_specialist(
-    "dynamic_researcher_1",
-    "Flexible research agent for investigating specific angles that don't fit the 7 specialist domains.",
-    "dynamic_result_1",
-    instruction_name="dynamic_researcher",
-))
 
 # --- Gap researcher (Phase 2 of two-phase research) ---
 
 _GAP_RESEARCHER_TEMPLATE = (INSTRUCTIONS_DIR / "gap_researcher.md").read_text()
+
+# Context pairs at the top, then every briefable specialist's output_key.
+# Derived so new specialists flow automatically.
 _GAP_RESEARCHER_KEYS = [
     "places_context", "research_plan",
-    "market_result", "pricing_result", "revenue_result",
-    "guest_result", "location_result", "ops_result", "marketing_result",
-    "review_result", "dynamic_result_1",
+    *[s.output_key for s in BRIEFABLE_SPECIALISTS],
 ]
 
 
@@ -256,22 +244,6 @@ def _gap_researcher_instruction(ctx):
         value = ctx.state.get(key, "Agent did not produce output.")
         result = result.replace(f"{{{key}}}", value)
     return result
-
-
-# Specialist name (as assigned in `specialist_briefs`) → state output_key.
-# Kept local to avoid a circular import from `agent.py`. The set mirrors
-# VALID_BRIEF_KEYS (everything the orchestrator can dispatch).
-_SPECIALIST_OUTPUT_KEYS: dict[str, str] = {
-    "market_landscape": "market_result",
-    "menu_pricing": "pricing_result",
-    "revenue_sales": "revenue_result",
-    "guest_intelligence": "guest_result",
-    "location_traffic": "location_result",
-    "operations": "ops_result",
-    "marketing_digital": "marketing_result",
-    "review_analyst": "review_result",
-    "dynamic_researcher_1": "dynamic_result_1",
-}
 
 
 def _should_run_gap_researcher(callback_context):
@@ -289,7 +261,7 @@ def _should_run_gap_researcher(callback_context):
     An orchestrator run with zero assigned specialists skips at the top.
     """
     briefs = callback_context.state.get("specialist_briefs", {}) or {}
-    assigned = [n for n in briefs.keys() if n in _SPECIALIST_OUTPUT_KEYS]
+    assigned = [n for n in briefs.keys() if n in SPECIALIST_OUTPUT_KEYS]
 
     if not assigned:
         # Orchestrator dispatched nothing — preserves the previous
@@ -299,7 +271,7 @@ def _should_run_gap_researcher(callback_context):
 
     failures: list[str] = []
     for spec_name in assigned:
-        value = callback_context.state.get(_SPECIALIST_OUTPUT_KEYS[spec_name])
+        value = callback_context.state.get(SPECIALIST_OUTPUT_KEYS[spec_name])
         if not isinstance(value, str) or value.startswith("Research unavailable: "):
             failures.append(spec_name)
 
@@ -323,7 +295,7 @@ def make_gap_researcher():
         description="Analyzes Phase 1 specialist outputs for gaps, contradictions, and underexplored angles.",
         instruction=_gap_researcher_instruction,
         tools=[google_search, fetch_web_content],
-        output_key="dynamic_result_2",
+        output_key="gap_research_result",
         include_contents="none",
         generate_content_config=MEDIUM_THINKING_CONFIG,
         before_agent_callback=_should_run_gap_researcher,

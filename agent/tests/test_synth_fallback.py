@@ -136,7 +136,7 @@ def test_build_fallback_report_shape():
     state = {
         "market_result": "A",
         "ops_result": "B",
-        "dynamic_result_2": "C",
+        "gap_research_result": "C",
     }
     report = _build_fallback_report(state, "empty_response")
     # Sections appear in the canonical order, not alphabetical / insertion order

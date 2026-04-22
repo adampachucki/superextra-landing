@@ -23,7 +23,7 @@ You have received Google Places data, a research plan with premise assessments, 
 - Marketing & Digital: {marketing_result}
 - Review Analysis: {review_result}
 - Additional Research 1: {dynamic_result_1}
-- Additional Research 2: {dynamic_result_2}
+- Gap Research: {gap_research_result}
 
 ## Your job
 
