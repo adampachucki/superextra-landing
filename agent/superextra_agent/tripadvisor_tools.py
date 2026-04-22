@@ -53,13 +53,18 @@ def _address_match_score(a: str, b: str) -> float:
     return len(overlap) / min(len(words_a), len(words_b))
 
 
-async def find_tripadvisor_restaurant(name: str, area: str, address: str = "") -> dict:
+async def find_tripadvisor_restaurant(name: str, area: str, address: str = "", tool_context=None) -> dict:
     """Find a restaurant on TripAdvisor and return its full profile.
 
     Searches TripAdvisor for the restaurant, then fetches detailed place data
     including ranking, cuisines, dining options, nearby restaurants, and sample
     reviews. Returns up to 3 search candidates so you can verify the match.
     Costs 2 SerpAPI calls.
+
+    Returns `status: "low_confidence"` (not "success") when the address-match
+    score is below 0.4 — the selected candidate may be the wrong place. The
+    caller should inspect `candidates` and decide whether to retry with a more
+    specific query.
 
     Args:
         name: Restaurant name (e.g. 'Umami P-Berg').
@@ -84,7 +89,9 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "") -
         if not places:
             return {"status": "error", "error_message": f"No TripAdvisor results found for '{name} {area}'"}
 
-        # Build candidate list from top 3 results
+        # Build candidate list from top 3 results. `link` is preserved so
+        # the downstream source-accumulator (B2) can cite the TripAdvisor
+        # page URL without a second API call.
         candidates = []
         for p in places[:3]:
             candidates.append({
@@ -93,6 +100,7 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "") -
                 "rating": p.get("rating"),
                 "reviews": p.get("reviews"),
                 "location": p.get("location"),
+                "link": p.get("link"),
             })
 
         # Default to first result
@@ -150,8 +158,22 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "") -
                 review["author_hometown"] = author["hometown"]
             sample_reviews.append(review)
 
+        # Attach a provider source on high-confidence matches so review-heavy
+        # replies surface the TripAdvisor page in the terminal sources[]. Uses
+        # `temp:` scope so follow-up turns that don't call this tool don't
+        # inherit stale entries. Low-confidence matches deliberately skip.
+        selected_link = match.get("link")
+        if tool_context and match_confidence == "high" and selected_link:
+            existing = tool_context.state.get("temp:_tool_sources", []) or []
+            entry = {
+                "title": f"TripAdvisor — {place_data.get('name') or match.get('title') or 'restaurant page'}",
+                "url": selected_link,
+                "domain": "tripadvisor.com",
+            }
+            tool_context.state["temp:_tool_sources"] = existing + [entry]
+
         return {
-            "status": "success",
+            "status": "success" if match_confidence == "high" else "low_confidence",
             "candidates": candidates,
             "selected_index": selected_index,
             "match_confidence": match_confidence,
@@ -175,6 +197,7 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "") -
             "email": place_data.get("email"),
             "website": place_data.get("website"),
             "menu_link": place_data.get("menu", {}).get("link") if place_data.get("menu") else None,
+            "tripadvisor_link": selected_link,
             "nearby_restaurants": nearby,
             "sample_reviews": sample_reviews,
         }
@@ -182,7 +205,7 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "") -
         return {"status": "error", "error_message": str(e)}
 
 
-async def get_tripadvisor_reviews(place_id: str, num_pages: int = 5) -> dict:
+async def get_tripadvisor_reviews(place_id: str, num_pages: int = 5, tool_context=None) -> dict:
     """Fetch TripAdvisor reviews for a restaurant. Returns full review text,
     ratings, trip types, reviewer origins, and owner responses.
 
@@ -244,6 +267,23 @@ async def get_tripadvisor_reviews(place_id: str, num_pages: int = 5) -> dict:
 
         if total_reviews and len(all_reviews) < total_reviews:
             partial = True
+
+        # Annotate the existing TripAdvisor source entry (written by
+        # `find_tripadvisor_restaurant`) with the review count so the
+        # user-visible citation reads "TripAdvisor (N reviews)". Worker-level
+        # dedup by URL collapses this to a single final entry.
+        if tool_context and all_reviews:
+            existing = tool_context.state.get("temp:_tool_sources", []) or []
+            # Find the earlier TripAdvisor entry (if any) to take its URL.
+            ta_entry = next((s for s in existing if s.get("domain") == "tripadvisor.com"), None)
+            if ta_entry:
+                url = ta_entry.get("url")
+                if url:
+                    tool_context.state["temp:_tool_sources"] = existing + [{
+                        "title": f"TripAdvisor ({len(all_reviews)} reviews analysed)",
+                        "url": url,
+                        "domain": "tripadvisor.com",
+                    }]
 
         return {
             "status": "success",

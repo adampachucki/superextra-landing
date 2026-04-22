@@ -13,6 +13,11 @@ from superextra_agent.places_tools import (
 )
 
 
+class MockToolCtx:
+    def __init__(self):
+        self.state = {}
+
+
 class TestGetRestaurantDetails:
     @respx.mock
     @pytest.mark.asyncio
@@ -27,6 +32,46 @@ class TestGetRestaurantDetails:
 
         assert result["status"] == "success"
         assert result["place"]["displayName"]["text"] == "Test Restaurant"
+
+    @respx.mock
+    @pytest.mark.asyncio
+    async def test_captures_google_maps_uri_into_state(self):
+        """B2: `googleMapsUri` is written to tool_context.state so downstream
+        tools (get_google_reviews) can cite the Google Maps page without
+        relying on places_context prose."""
+        place_data = {
+            "displayName": {"text": "Test"},
+            "location": {"latitude": 52.5, "longitude": 13.4},
+            "googleMapsUri": "https://maps.google.com/?cid=12345",
+        }
+        respx.get(f"{BASE_URL}/places/test123").mock(
+            return_value=httpx.Response(200, json=place_data)
+        )
+
+        ctx = MockToolCtx()
+        await get_restaurant_details("test123", tool_context=ctx)
+
+        assert ctx.state["_target_lat"] == 52.5
+        assert ctx.state["_target_lng"] == 13.4
+        assert ctx.state["_target_google_maps_uri"] == "https://maps.google.com/?cid=12345"
+
+    @respx.mock
+    @pytest.mark.asyncio
+    async def test_missing_google_maps_uri_does_not_write_state(self):
+        """If the Places API omits googleMapsUri, don't write a garbage key —
+        leave it absent so get_google_reviews can skip the source entry."""
+        place_data = {
+            "displayName": {"text": "Test"},
+            "location": {"latitude": 52.5, "longitude": 13.4},
+        }
+        respx.get(f"{BASE_URL}/places/test123").mock(
+            return_value=httpx.Response(200, json=place_data)
+        )
+
+        ctx = MockToolCtx()
+        await get_restaurant_details("test123", tool_context=ctx)
+
+        assert "_target_google_maps_uri" not in ctx.state
 
     @respx.mock
     @pytest.mark.asyncio

@@ -133,3 +133,45 @@ class TestGetGoogleReviews:
         call_json = mock_client.post.call_args.kwargs.get("json") or mock_client.post.call_args[1].get("json")
         assert call_json["placeIds"] == ["ChIJMRpv9_HNHkcRdzbAYDXx7fc"]
         assert call_json["reviewsSort"] == "newest"
+
+
+class TestGoogleReviewsSourceWrite:
+    """B2: attaches a Google Reviews provider source entry using the
+    `_target_google_maps_uri` written by places_tools. If the URL isn't
+    in state, skips cleanly rather than inventing one."""
+
+    @pytest.mark.asyncio
+    async def test_writes_source_when_uri_present(self):
+        class MockCtx:
+            def __init__(self):
+                self.state = {"_target_google_maps_uri": "https://maps.google.com/?cid=42"}
+
+        ctx = MockCtx()
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=_mock_response(APIFY_DATASET_RESPONSE))
+
+        with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
+            await get_google_reviews("ChIJtest", tool_context=ctx)
+
+        sources = ctx.state.get("temp:_tool_sources") or []
+        assert len(sources) == 1
+        assert sources[0]["domain"] == "google.com"
+        assert sources[0]["url"] == "https://maps.google.com/?cid=42"
+        assert "2 reviews analysed" in sources[0]["title"]
+
+    @pytest.mark.asyncio
+    async def test_skips_source_when_uri_missing(self):
+        class MockCtx:
+            def __init__(self):
+                self.state = {}
+
+        ctx = MockCtx()
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=_mock_response(APIFY_DATASET_RESPONSE))
+
+        with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
+            await get_google_reviews("ChIJtest", tool_context=ctx)
+
+        assert "temp:_tool_sources" not in ctx.state

@@ -21,6 +21,7 @@ SEARCH_RESPONSE = {
             "rating": 4.1,
             "reviews": 886,
             "location": "Berlin, Germany",
+            "link": "https://www.tripadvisor.com/Restaurant_Review-umami-p-berg",
         },
         {
             "position": 2,
@@ -30,6 +31,7 @@ SEARCH_RESPONSE = {
             "rating": 3.8,
             "reviews": 120,
             "location": "Berlin, Germany",
+            "link": "https://www.tripadvisor.com/Restaurant_Review-umami-restaurant",
         },
         {
             "position": 3,
@@ -39,6 +41,7 @@ SEARCH_RESPONSE = {
             "rating": 4.0,
             "reviews": 55,
             "location": "Berlin, Germany",
+            "link": "https://www.tripadvisor.com/Restaurant_Review-umami-sushi",
         },
     ]
 }
@@ -135,9 +138,13 @@ class TestFindTripadvisorRestaurant:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await find_tripadvisor_restaurant("Umami", "Prenzlauer Berg Berlin")
+            result = await find_tripadvisor_restaurant(
+                "Umami", "Prenzlauer Berg Berlin",
+                address="Knaackstr. 16-18, 10405 Berlin",
+            )
 
         assert result["status"] == "success"
+        assert result["match_confidence"] == "high"
         assert result["place_id"] == "6796040"
         assert result["name"] == "Umami P-Berg"
         assert result["rating"] == 4.1
@@ -145,6 +152,7 @@ class TestFindTripadvisorRestaurant:
         assert result["ranking"] == "#169 of 9,505 Restaurants in Berlin"
         assert result["cuisines"] == ["Asian", "Vietnamese"]
         assert result["menu_link"] == "https://umami-restaurants.de/menu.pdf"
+        assert result["tripadvisor_link"] == "https://www.tripadvisor.com/Restaurant_Review-umami-p-berg"
         assert len(result["nearby_restaurants"]) == 1
         assert result["nearby_restaurants"][0]["name"] == "Pasternak"
         assert len(result["sample_reviews"]) == 1
@@ -185,7 +193,10 @@ class TestFindTripadvisorRestaurant:
         assert result["match_confidence"] == "high"
 
     @pytest.mark.asyncio
-    async def test_address_matching_low_confidence_when_no_match(self):
+    async def test_address_matching_low_confidence_flips_status(self):
+        """When address matching fails, `status` must be `low_confidence`
+        (not `success`) so the LLM doesn't treat the mismatched profile as
+        authoritative. Keeps the `candidates` list so the caller can retry."""
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
             _mock_response(SEARCH_RESPONSE),
@@ -198,10 +209,16 @@ class TestFindTripadvisorRestaurant:
                 "Umami", "Berlin", address="Completely Different Street 99, 99999 Munich"
             )
 
+        assert result["status"] == "low_confidence"
         assert result["match_confidence"] == "low"
+        assert len(result["candidates"]) == 3
 
     @pytest.mark.asyncio
     async def test_backward_compatible_without_address(self):
+        """Without an address to match against, we can't verify the match —
+        multiple candidates therefore return `low_confidence`. Callers should
+        pass the Places address; this behavior prevents silent misattribution
+        when they don't."""
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
             _mock_response(SEARCH_RESPONSE),
@@ -210,10 +227,9 @@ class TestFindTripadvisorRestaurant:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            # Call without address — should still work, select first result
             result = await find_tripadvisor_restaurant("Umami", "Berlin")
 
-        assert result["status"] == "success"
+        assert result["status"] == "low_confidence"
         assert result["selected_index"] == 0
         assert "candidates" in result
 
@@ -240,6 +256,65 @@ class TestFindTripadvisorRestaurant:
 
         assert result["status"] == "error"
         assert "500" in result["error_message"]
+
+
+class TestFindTripadvisorRestaurantSourceWrite:
+    """B2: on high-confidence match, the tool writes a provider entry to
+    `temp:_tool_sources` so the worker accumulator can surface TripAdvisor
+    in the terminal sources[]."""
+
+    @pytest.mark.asyncio
+    async def test_writes_source_on_high_confidence(self):
+        class MockCtx:
+            def __init__(self):
+                self.state = {}
+
+        ctx = MockCtx()
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            await find_tripadvisor_restaurant(
+                "Umami", "Berlin",
+                address="Knaackstr. 16-18, 10405 Berlin",
+                tool_context=ctx,
+            )
+
+        sources = ctx.state.get("temp:_tool_sources") or []
+        assert len(sources) == 1
+        assert sources[0]["domain"] == "tripadvisor.com"
+        assert sources[0]["url"] == "https://www.tripadvisor.com/Restaurant_Review-umami-p-berg"
+        assert "Umami P-Berg" in sources[0]["title"]
+
+    @pytest.mark.asyncio
+    async def test_skips_source_on_low_confidence(self):
+        """Low-confidence matches must NOT attach a source — the whole point
+        of the tightened contract is to keep uncertain matches from leaking
+        into user-visible citations."""
+        class MockCtx:
+            def __init__(self):
+                self.state = {}
+
+        ctx = MockCtx()
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            await find_tripadvisor_restaurant(
+                "Umami", "Berlin",
+                address="Completely Different Street 99, 99999 Munich",
+                tool_context=ctx,
+            )
+
+        assert ctx.state.get("temp:_tool_sources") is None
 
 
 class TestGetTripadvisorReviews:
@@ -335,6 +410,38 @@ class TestGetTripadvisorReviews:
 
         assert result["status"] == "success"
         assert result["fetched_reviews"] == 10
+
+
+class TestGetTripadvisorReviewsSourceWrite:
+    """B2: after `find_tripadvisor_restaurant` has attached the TripAdvisor
+    URL, `get_tripadvisor_reviews` appends an entry annotated with the
+    number of reviews analysed. Worker dedup collapses to one entry."""
+
+    @pytest.mark.asyncio
+    async def test_appends_review_count_entry(self):
+        class MockCtx:
+            def __init__(self):
+                self.state = {
+                    "temp:_tool_sources": [{
+                        "title": "TripAdvisor — Umami P-Berg",
+                        "url": "https://www.tripadvisor.com/r/umami",
+                        "domain": "tripadvisor.com",
+                    }]
+                }
+
+        ctx = MockCtx()
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(REVIEWS_RESPONSE_PAGE_0))
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            await get_tripadvisor_reviews("6796040", num_pages=1, tool_context=ctx)
+
+        sources = ctx.state["temp:_tool_sources"]
+        assert len(sources) == 2  # original + annotated
+        assert "10 reviews analysed" in sources[1]["title"]
+        assert sources[1]["url"] == "https://www.tripadvisor.com/r/umami"
+        assert sources[1]["domain"] == "tripadvisor.com"
 
 
 class TestApiKeyRequired:

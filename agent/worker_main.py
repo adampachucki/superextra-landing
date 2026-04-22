@@ -649,6 +649,15 @@ async def run(body: RunRequest, request: Request) -> dict:
                 if data.get("status") == "complete":
                     for entry in data.get("sources") or []:
                         _merge_source(specialist_sources, specialist_sources_seen, entry)
+            # Also drain structured-tool sources written to `temp:_tool_sources`
+            # by the review_analyst's tools (TripAdvisor / Google Reviews).
+            # Grounding metadata doesn't cover those API-backed providers, so
+            # the tools write an entry on each successful call; the `temp:`
+            # scope auto-clears between invocations, preventing prior-turn
+            # entries from leaking into a follow-up run's sources[].
+            sd = (event.actions.state_delta if event.actions else None) or {}
+            for entry in sd.get("temp:_tool_sources") or []:
+                _merge_source(specialist_sources, specialist_sources_seen, entry)
             # Promote the first terminal `complete` event the mapper emits
             # (router clarification OR synthesiser final). Reuse the mapper's
             # decision as the source of truth for what counts as terminal —

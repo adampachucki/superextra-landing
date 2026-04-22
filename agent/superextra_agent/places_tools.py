@@ -108,12 +108,18 @@ async def get_restaurant_details(place_id: str, tool_context=None) -> dict:
         place = resp.json()
         if not isinstance(place, dict):
             return {"status": "error", "error_message": "Unexpected response format from Places API"}
-        # Store coordinates for geo-biased search
+        # Store target-place metadata for downstream tools:
+        # - lat/lng: geo-biased search (see `_inject_geo_bias`).
+        # - googleMapsUri: used by `get_google_reviews` to attach a
+        #   provider source entry without relying on places_context prose.
         if tool_context:
             loc = place.get("location", {})
             if loc.get("latitude") and loc.get("longitude"):
                 tool_context.state["_target_lat"] = loc["latitude"]
                 tool_context.state["_target_lng"] = loc["longitude"]
+            maps_uri = place.get("googleMapsUri")
+            if maps_uri:
+                tool_context.state["_target_google_maps_uri"] = maps_uri
         return {"status": "success", "place": place}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}
