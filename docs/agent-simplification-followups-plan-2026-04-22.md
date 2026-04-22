@@ -56,7 +56,7 @@ conveyed in a small table, skip the chart.
 | Guest sentiment (review tools, zero grounding)         |                 0 |              2 |              0 |                                    0 |
 | Broad Nordic landscape                                 |                45 |              2 |              0 |                                    0 |
 
-**7 invocations, 0 URL extractions, 0 contributions.** The fallback executes on the happy path (each specialist + the synth call it when grounding is empty) but finds nothing to parse because none of today's agents embed inline `[title](url)` citations in prose. Raw data at `/tmp/a2_deadness_result.json`.
+**7 invocations, 0 URL extractions, 0 contributions.** The fallback executes on the happy path (each specialist + the synth call it when grounding is empty) but finds nothing to parse because none of today's agents embed inline `[title](url)` citations in prose.
 
 **Change.**
 
@@ -106,20 +106,27 @@ Addresses the two P1s from the review. Review-heavy runs today can both (a) act 
 
 **Correction to an earlier draft.** A previous draft of this plan claimed the review tools "already have access to `tool_context`." Not true — verified in `tripadvisor_tools.py:185-257` and `apify_tools.py:43-109`. Adding `tool_context` as a parameter is a one-line signature change per tool; ADK auto-injects it when declared. This is not a new state channel — `tool_context.state` is the documented ADK pattern for exactly this use case, and the repo previously used the same idiom for `_web_search_queries` before Phase 1 deleted it.
 
+**Scope note — `temp:` keys.** Provider sources are per-turn, not per-session: a follow-up turn that doesn't query a provider should show no stale entries for it. ADK's documented per-invocation scope is the `temp:` state prefix, which auto-clears between invocations. This plan uses `temp:_tool_sources` so we don't have to manually reset anything. (The `_target_google_maps_uri` key in the places tool is deliberately session-scoped — the place doesn't change across turns — so it uses a plain key, matching the existing `_target_lat` / `_target_lng` pattern.)
+
 **Change.**
 
-- In `tripadvisor_tools.py`:
-  - `find_tripadvisor_restaurant`: accept `tool_context`. On high-confidence match (`status="success"`), preserve the TripAdvisor place URL. SerpAPI's TripAdvisor Search returns a `link` field per place (currently dropped at lines 89-96 where we build the candidate list) — capture it and write `{title: "TripAdvisor — <restaurant name>", url: <link>, domain: "tripadvisor.com"}` to `tool_context.state["_tool_sources"]`. Skip on `low_confidence` (see B1).
-  - `get_tripadvisor_reviews`: accept `tool_context`. On success, either append to the existing `_tool_sources` entry (e.g. annotate review count) or add a sibling entry with the same URL but a title like "TripAdvisor (N reviews analysed)". Dedup by URL so we don't double-count a single provider.
-- In `apify_tools.py:get_google_reviews`: accept `tool_context`. On success, write `{title: "Google Reviews (N reviews analysed)", url: <restaurant page URL>, domain: "google.com"}`. The URL comes from the Places enricher's `places_context` (Places API returns `googleMapsUri`/`reviewsUri`) — verify the enricher surfaces it; if not, one-line add to the enricher template.
-- In `agent/worker_main.py`, extend the event loop: for every event whose `state_delta` carries a `_tool_sources` list, drain it through the existing `_merge_source` + `specialist_sources_seen` accumulator. Three lines.
+1. **Places tool — capture the deterministic Google URL at source.** In `agent/superextra_agent/places_tools.py` around line 112 (where `_target_lat` / `_target_lng` are already written to state), also write `tool_context.state["_target_google_maps_uri"]` from the raw Places API response's `googleMapsUri` field. Session-scoped, same pattern as the lat/lng keys. No enricher-prompt edits needed; the Places API response already has the field.
+
+2. **TripAdvisor tools — preserve + attribute.**
+   - `find_tripadvisor_restaurant`: accept `tool_context`. Preserve the TripAdvisor place URL — SerpAPI's TripAdvisor Search returns a `link` field per place (currently dropped at lines 89-96 where we build the candidate list). On `status="success"` (high confidence per B1), append `{title: "TripAdvisor — <restaurant name>", url: <link>, domain: "tripadvisor.com"}` to `tool_context.state["temp:_tool_sources"]`. Skip on `low_confidence` (see B1).
+   - `get_tripadvisor_reviews`: accept `tool_context`. On success, add a sibling entry with the same URL and a title like "TripAdvisor (N reviews analysed)". Dedup by URL at drain time (worker handles it via `_merge_source`), so double-writing one TripAdvisor URL collapses to one final entry.
+
+3. **Google Reviews tool — pull the URL from state, not prose.** In `apify_tools.py:get_google_reviews`, accept `tool_context`. On success, read the Google Maps URL from `tool_context.state.get("_target_google_maps_uri")` (set by step 1), and append `{title: "Google Reviews (N reviews analysed)", url: <googleMapsUri>, domain: "google.com"}` to `tool_context.state["temp:_tool_sources"]`. If the URL is missing for any reason, skip the source entry rather than inventing one.
+
+4. **Worker drain.** In `agent/worker_main.py`, extend the event loop: for every event whose `state_delta` carries a `temp:_tool_sources` list, drain it through the existing `_merge_source` + `specialist_sources_seen` accumulator. Three lines. `temp:` auto-clears on each invocation, so nothing leaks into follow-up turns.
 
 **Why not a new payload field.** Users see "resources used," not an internal taxonomy. The UI already renders `sources[]`; repurposing it for provider attribution needs zero frontend changes and zero session-doc shape changes.
 
 **Tests.**
 
-- Unit: for each of the three review tools, assert that after a successful call, `tool_context.state["_tool_sources"]` contains the expected provider entry (title, url, domain).
-- Worker: extend `test_sources_accumulate_across_specialist_events` with a case where a specialist event's `state_delta` carries `_tool_sources`; assert the entries land in the final `sources[]`.
+- Unit (places): after a successful `get_restaurant_details`, assert `tool_context.state["_target_google_maps_uri"]` equals the Places API response's `googleMapsUri`.
+- Unit (review tools): for each of the three review tools, assert that after a successful call, `tool_context.state["temp:_tool_sources"]` contains the expected provider entry (title, url, domain).
+- Worker: extend `test_sources_accumulate_across_specialist_events` with a case where a specialist event's `state_delta` carries `temp:_tool_sources`; assert the entries land in the final `sources[]` and that entries from a prior `temp:` key (simulating a fresh turn) do NOT leak in.
 
 **Verify.** Re-run Q2 from the stress test (review-sentiment, currently `sources=0`). Confirm the new run returns ≥ 1 entry with `domain: "tripadvisor.com"` and ≥ 1 with `domain: "google.com"`.
 
@@ -221,10 +228,10 @@ Gap researcher stays separately constructed — it's not a catalog entry — but
 - `agent/superextra_agent/agent.py` (A3, C1, C2, C3, C4)
 - `agent/superextra_agent/tripadvisor_tools.py` (B1, B2)
 - `agent/superextra_agent/apify_tools.py` (B2)
-- `agent/superextra_agent/instructions/context_enricher.md` — only if `places_context` doesn't already carry `googleMapsUri` (check first; likely untouched)
+- `agent/superextra_agent/places_tools.py` (B2 — capture `googleMapsUri` into state alongside lat/lng)
 - `agent/worker_main.py` (B2)
 - New: `agent/superextra_agent/specialist_catalog.py` (C1)
-- Tests: `test_firestore_events.py`, `test_tripadvisor_tools.py`, `test_apify_tools.py`, `test_worker_main.py`, `test_gap_researcher.py`, `test_instruction_providers.py`
+- Tests: `test_firestore_events.py`, `test_tripadvisor_tools.py`, `test_apify_tools.py`, `test_places_tools.py`, `test_worker_main.py`, `test_gap_researcher.py`, `test_instruction_providers.py`
 
 ## Verification per PR
 
