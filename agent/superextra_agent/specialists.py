@@ -63,19 +63,11 @@ SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 _SOURCE_GUIDANCE = """
 ## Source quality
 
-When making quantitative claims (market size, growth rates, average prices, salary benchmarks,
-demographic statistics), prefer authoritative primary sources — government statistical agencies,
-industry databases and reports, trade publications, public company filings, and academic research.
-
-For qualitative signals (trends, sentiment, local dynamics, recent events), any credible source
-provides legitimate signal — news articles, local media, food blogs, forums, and social media.
-
-When you cite a number, note the source. "Average restaurant revenue: PLN 1.2M (GUS, 2025)"
-is more credible than an unsourced figure. If a claim only appears in non-authoritative sources,
-note this limitation.
-
-Do not limit yourself to authoritative sources — they often lack local specificity. Use them for
-benchmarks and baselines, then add local detail from any credible source.
+For quantitative claims (prices, market size, salary benchmarks, stats), prefer authoritative
+primary sources — government data, industry reports, company filings, academic research. Always
+cite the source and year. For qualitative signals (sentiment, local dynamics, recent events), any
+credible source — news, food blogs, forums, social — is legitimate; local specificity often beats
+authoritative-but-generic. If a claim only appears in non-authoritative sources, flag that.
 """
 
 

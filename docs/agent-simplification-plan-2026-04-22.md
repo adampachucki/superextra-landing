@@ -236,6 +236,10 @@ No `{name}_error` state keys. No source-count heuristic (review correctly noted 
 6. **Eval gate before merge of Phase 4 & 6**: `npm run test:evals` (live Gemini).
 7. **Rollback plan**: each phase is a single PR that reverts cleanly. Phase 4 has per-agent staging inside the phase; revert affected agent only, not the whole phase.
 
+## Open followups to revisit
+
+- **Phase 5 gate may be too aggressive.** The deployed gate runs gap*researcher only when an assigned specialist returns the `"Research unavailable: …"` fallback or is missing from state. On happy-path runs where every specialist returns \_some* output, gap_researcher skips entirely — which throws away its non-error use cases (cross-checking contradictions, flagging `WEAK` coverage, filling in sub-angles the orchestrator didn't plan for). Live run on 2026-04-22 skipped gap_researcher cleanly (`gap gate: skip — 3/3 assigned specialists succeeded`), but the signal loss is real. Candidates for a better gate: orchestrator-emitted `needs_cross_check: bool` based on query complexity or contradictory premises; running on exploratory / broad queries only; or simply reverting to always-on if quality drifts. Decide after a week of real-user traffic.
+
 ## What was rejected from the earlier draft (and why)
 
 - Separate `chart_agent` + `charts[]` payload + new pipeline stage — was a second reporting pipeline, not a simplification. Replaced with Option D (inline chart-spec blocks).
