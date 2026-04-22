@@ -2,79 +2,86 @@
 
 ## What
 
-A GCP VM (g2-standard-4, Belgium) running Claude Code, accessible from any device. Claude runs in persistent zmx sessions on the VM — start a session from your Mac, pick it up from your phone.
+A GCP VM (g2-standard-4, Belgium) running Claude Code, accessible from any device. Claude runs in persistent zmx sessions on the VM — start a session from your Mac, pick it up from your phone. One command (`x`) drives everything, auto-detecting whether to attach via zmx-direct (Mac over ET) or tmux-wrapped (mobile over mosh).
 
 ## Why
 
 - **Always-on sessions** — Claude keeps working after you close the laptop
-- **Multi-device** — same session from Mac (VS Code terminal) and phone (Moshi app)
-- **Native scroll on Mac** — zmx doesn't use alternate screen, so VS Code terminal scrolls natively
+- **Multi-device** — same session from Mac (VS Code / Cursor terminal) and phone (Moshi app)
+- **Smooth Mac scroll** — `CLAUDE_CODE_NO_FLICKER=1` + DECSET 2026 sync output keeps VS Code / Cursor terminal scrollback clean (not strictly "native", but close; see [Scroll](#scroll) below)
 - **Parallel work** — multiple Claude sessions on different tasks simultaneously
 - **Fast reconnect** — ET auto-reconnects after sleep/wake, mosh survives roaming
 
 ## Architecture
 
 ```
-Mac (VS Code terminal)                       Mobile (Moshi app)
+Mac (VS Code / Cursor terminal)              Mobile (Moshi app)
   ↓ ET (TCP, port 2022)                        ↓ mosh (UDP)
 GCP VM (34.38.81.215)                        GCP VM
   ↓                                            ↓
-zmx session ← native scroll                 tmux session (scroll wrapper)
+zmx session ← smooth scroll via xterm.js    tmux session (scroll wrapper)
   ↓                                            ↓ zmx attach
 Claude Code                                  same zmx session → Claude Code
 ```
 
-**zmx** owns the process. **tmux** is a thin scroll wrapper only used on mobile (mosh breaks native scroll). Both devices connect to the same zmx session.
+**zmx** owns the process. **tmux** is a thin scroll wrapper only used on mobile (mosh breaks xterm.js-level scrollback). Both devices connect to the same zmx session.
 
-### Why not just tmux?
+### Scroll
 
-tmux uses the alternate screen buffer, which causes VS Code's xterm.js to convert scroll wheel events to arrow key sequences. This is hardcoded in xterm.js — no setting can fix it. zmx is a raw pty relay that doesn't use alternate screen, so native scroll works.
+- **Mac**: ET forwards raw bytes, zmx is a raw pty relay (doesn't use alternate screen), so VS Code / Cursor's xterm.js scrollback works. Claude Code runs with `CLAUDE_CODE_NO_FLICKER=1`, which wraps each TUI frame in DECSET 2026 sync output so redraws don't pollute scrollback.
+- **Mobile**: tmux mouse mode scrolls tmux's own history (not xterm.js's). `NO_FLICKER` still matters — without it, every SIGWINCH-triggered repaint Claude emits gets captured into tmux scrollback (producing 2× doubling on every reconnect); with it, frames are atomic and scrollback stays clean.
 
-### Why ET over SSH/mosh?
+### Why not just tmux on Mac?
 
-- **vs SSH**: ET auto-reconnects after laptop sleep (1-5s). SSH connections die.
-- **vs mosh**: ET is a raw byte pipe — native scroll works. Mosh runs a terminal emulator that re-renders, breaking native scroll.
-- **Trade-off**: ET has no local echo (unlike mosh), so typing has ~130ms round-trip latency. VS Code GPU rendering and Claude Code no-flicker mode mitigate this.
+tmux uses the alternate screen buffer, which causes VS Code / Cursor's xterm.js to convert scroll wheel events into arrow key sequences. This is hardcoded in xterm.js — no setting can fix it. zmx avoids this by never entering alternate screen.
+
+### Why ET over SSH/mosh on Mac?
+
+- **vs SSH**: ET auto-reconnects after laptop sleep (1-5 s). SSH connections die.
+- **vs mosh**: ET is a raw byte pipe — scrollback works in xterm.js. Mosh runs a terminal emulator that re-renders, breaking xterm.js-level scrollback.
+- **Trade-off**: ET has no local echo (unlike mosh), so typing has ~130 ms round-trip latency. GPU rendering in the terminal + Claude Code's no-flicker mode mitigate the visual impact.
 
 ## Session commands
 
-Two sister command sets. Same interface, different transport layer.
+One command: `x`. Mode auto-detected from context; override with `-z` / `-t` if needed.
 
-### `zx` — Mac/desktop (native scroll via ET)
+### Mode detection
 
-Defined in Mac `~/.zshrc`. Use from VS Code terminal or any Mac terminal.
+| Invoked from                                  | Detected mode | Attach behavior         |
+| --------------------------------------------- | ------------- | ----------------------- |
+| Inside an existing tmux session (`$TMUX` set) | `tmux`        | `tmux switch-client`    |
+| Under `mosh-server` (mobile via Moshi)        | `tmux`        | `tmux attach` (creates) |
+| ET / SSH / local console                      | `zmx`         | `zmx attach` direct     |
 
-| Command            | Action                                                    |
-| ------------------ | --------------------------------------------------------- |
-| `zx` / `zx <name>` | Create session running Claude (+ tmux wrapper for mobile) |
-| `zxl`              | List sessions, pick to join                               |
-| `zxj <name>`       | Join session by name                                      |
-| `zxk <name>`       | Kill session (both zmx + tmux)                            |
-| `zxK`              | Kill all sessions                                         |
+Detection is `ps -o comm= -p $PPID` — checks if the parent process is `mosh-server`; if `$TMUX` is already set, always uses tmux mode.
 
-**Keyboard shortcut:** Cmd+Shift+X in VS Code opens a terminal and runs `zx`.
+### Commands
 
-### `tx` — Mobile (tmux scroll via mosh)
+Defined in Mac `~/.zshrc` and VM `~/.bashrc`. Both sides share the same interface; Mac's `x` runs locally for list/kill housekeeping (via SSH) and tunnels through ET for attach/create.
 
-Defined in VM `~/.bashrc`. Use after mosh-ing in from Moshi.
+| Command       | Action                                                      |
+| ------------- | ----------------------------------------------------------- |
+| `x`           | Create session with a random name, attach in the right mode |
+| `x <name>`    | Create or attach to `<name>`                                |
+| `x j <name>`  | Join `<name>` (auto-creates tmux wrapper if missing)        |
+| `x l` / `xl`  | List sessions, pick one to join                             |
+| `x k <name>`  | Kill session (both zmx + tmux)                              |
+| `xk`          | List + pick to kill                                         |
+| `xK`          | Kill all sessions                                           |
+| `x -z <name>` | Force zmx-direct mode (override auto-detect)                |
+| `x -t <name>` | Force tmux-wrapped mode (override auto-detect)              |
 
-| Command            | Action                                           |
-| ------------------ | ------------------------------------------------ |
-| `tx` / `tx <name>` | Create session (tmux wrapping zmx)               |
-| `txl`              | List sessions, pick to join                      |
-| `txj <name>`       | Join session by name (auto-creates tmux wrapper) |
-| `txk <name>`       | Kill session (both zmx + tmux)                   |
-| `txK`              | Kill all sessions                                |
+**Keyboard shortcut:** Cmd+Shift+X in VS Code / Cursor opens a terminal and runs `x`.
 
-### `zx` on the VM
+### Moshi picker visibility
 
-Also defined in VM `~/.bashrc`. Use when connected via SSH or ET directly (not through mosh). Attaches to zmx without tmux — native scroll.
+When you run `x <name>` on Mac (zmx-direct mode), the command also spawns a detached tmux wrapper on the VM in the background (~0.3–3 s after zmx session creation). This makes the session appear in Moshi's picker without needing to first do a mobile "join" step. On mobile, `x` in tmux mode creates the wrapper synchronously as part of attach.
 
 ### Cross-device workflow
 
-1. Create from Mac: `zx my-task` → creates zmx session + detached tmux wrapper
-2. Join from phone: `txj my-task` → attaches via tmux to same zmx session
-3. Or vice versa — create from phone with `tx`, join from Mac with `zxj`
+1. Create from Mac: `x my-task` → zmx session + detached tmux wrapper on VM
+2. Open Moshi on phone → picker shows `my-task` → tap to attach via tmux
+3. Or from mobile first: `x my-task` → same topology, attach via tmux
 4. Both devices can be connected simultaneously (zmx leader policy: last typist controls resize)
 
 ### Session lifecycle
@@ -104,7 +111,7 @@ When Claude exits (`/exit`, Ctrl+C, or crash), zmx session dies, tmux wrapper di
 
 ### SSH
 
-Used for non-interactive commands (listing/killing sessions).
+Used for non-interactive commands (listing/killing sessions from Mac).
 
 `~/.ssh/config` on Mac:
 
@@ -130,7 +137,7 @@ Host superextra-vm
     RekeyLimit 1G 1h
 ```
 
-Key optimizations: `ObscureKeystrokeTiming no` (disables 20ms delay), `Ciphers aes128-gcm` (hardware AES), `ControlMaster` (connection reuse).
+Key optimizations: `ObscureKeystrokeTiming no` (disables 20 ms delay), `Ciphers aes128-gcm` (hardware AES), `ControlMaster` (connection reuse).
 
 ## Performance tuning
 
@@ -147,26 +154,39 @@ Key optimizations: `ObscureKeystrokeTiming no` (disables 20ms delay), `Ciphers a
 - `sudo sysctl -w net.inet.tcp.delayed_ack=0` — immediate ACKs (persistent via LaunchDaemon)
 - `sudo sysctl -w net.inet.tcp.mssdflt=1448` — proper Ethernet MSS
 
-### VS Code terminal
+### VS Code / Cursor terminal
+
+Both editors should mirror this config. The full set lives in `~/Library/Application Support/{Code,Cursor}/User/settings.json`.
 
 | Setting                                        | Value   | Why                                                           |
 | ---------------------------------------------- | ------- | ------------------------------------------------------------- |
 | `terminal.integrated.gpuAcceleration`          | `on`    | WebGL rendering, fastest on Retina                            |
 | `terminal.integrated.smoothScrolling`          | `false` | No animation delay                                            |
 | `terminal.integrated.localEchoEnabled`         | `off`   | Tested and rejected — causes visual artifacts with Claude TUI |
-| `terminal.integrated.defaultProfile.osx`       | `zsh`   | Required for `zx` commands                                    |
+| `terminal.integrated.defaultProfile.osx`       | `zsh`   | Required for `x` commands                                     |
 | `terminal.integrated.shellIntegration.enabled` | `false` | Prevents relaunch warnings                                    |
 
-### Claude Code
+If terminal scrolling ever feels too fast in x sessions specifically, the tuning knob is `terminal.integrated.mouseWheelScrollSensitivity` (default 1.0; lower = slower). Note that it's global — applies to every terminal, not just x sessions.
 
-Environment variables in VM `~/.bashrc`:
+### Claude Code env
 
-- `CLAUDE_CODE_NO_FLICKER=1` — double-buffered rendering, less data per frame
-- `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` — no telemetry traffic competing with keystrokes
+Single source of truth at `~/.zx-env` on the VM:
+
+```bash
+export CLAUDE_CODE_NO_FLICKER=1
+export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+```
+
+Propagation paths (must all stay in sync — all read the same file):
+
+- **VM `~/.bashrc`** sources `~/.zx-env` at the top → every interactive shell on the VM (SSH, ET, local console, tmux panes opened by hand) has the vars.
+- **Mac `~/.zshrc` `CVM_ET()`** sources `~/.zx-env` over ET before running the command → ET's non-interactive shell gets the vars (bashrc doesn't fire in non-interactive mode).
+- **`x()` tmux mode** passes the vars as `tmux new-session -e KEY=VALUE` → new tmux sessions get them even if the tmux server env is stale.
 
 ## zmx
 
-Session manager that replaced tmux for the Mac path. Raw pty relay — doesn't use alternate screen, so native scroll works in VS Code.
+Session manager that replaced tmux for the Mac path. Raw pty relay — doesn't use alternate screen.
 
 - **Binary**: `/usr/local/bin/zmx` (root-owned, installed via `sudo install`)
 - **Source**: `~/src/zmx` — upstream `github.com/neurosnap/zmx` (no GitHub fork)
@@ -201,7 +221,7 @@ sudo cp /usr/local/bin/zmx.bak-v0.4.2-20260418 /usr/local/bin/zmx
 
 ## tmux config (`~/.tmux.conf` on VM)
 
-Only used as mobile scroll wrapper. Minimal config:
+Only used as the mobile scroll wrapper. Minimal config:
 
 ```tmux
 set -g set-titles on
@@ -220,15 +240,29 @@ set -ga terminal-overrides ",*256col*:RGB,*256col*:Tc"
 set -g history-limit 50000
 ```
 
-## VS Code
+**Note on env propagation:** this config doesn't list Claude Code env vars in `update-environment`; we don't rely on tmux server env being fresh. The `x` function's tmux mode injects `CLAUDE_CODE_*` directly via `tmux new-session -e`. A historical tmux-server-env drift caused Claude spawned via `tx` on mobile to miss `NO_FLICKER` and produce doubling scrollback; the `-e` injection is the fix.
 
-**Keyboard shortcuts:**
+## VS Code and Cursor
 
-| Shortcut    | Action                                   |
-| ----------- | ---------------------------------------- |
-| Cmd+Shift+X | New terminal + `zx` (create zmx session) |
-| Cmd+Shift+B | Claude BR terminal profile               |
-| Cmd+Shift+R | Rename terminal tab                      |
+### Keyboard shortcuts (both editors)
+
+| Shortcut    | Action                                  |
+| ----------- | --------------------------------------- |
+| Cmd+Shift+X | New terminal + `x` (create zmx session) |
+| Cmd+Shift+B | Claude BR terminal profile              |
+| Cmd+Shift+R | Rename terminal tab                     |
+
+Keybindings live in `~/Library/Application Support/{Code,Cursor}/User/keybindings.json`. The two files are structurally identical — same keys and commands — so changes need mirroring between them.
+
+### Terminal profiles
+
+Both editors have these profiles in `settings.json` under `terminal.integrated.profiles.osx`:
+
+- `zsh` (default) — regular shell, sources `~/.zshrc` which defines `x`
+- `Claude` — runs `claude; exec zsh`
+- `Claude BR` — runs `claude-br; exec zsh` (Bedrock-routed Claude)
+
+VS Code has an additional `bash` profile; Cursor doesn't. Add it if you need it.
 
 ## Mutagen file sync
 
@@ -276,7 +310,8 @@ Cmd+Shift+7 on Mac captures screenshot, uploads via SCP to `/home/adam/screensho
 
 ### Config files on VM
 
-- `~/.bashrc` — `zx`, `tx` functions, performance env vars
+- `~/.bashrc` — sources `~/.zx-env`, defines `x` function and helpers (`_x_detect_mode`, `_x_ensure_tmux`, `_x_attach`, `_x_pick`) + `xl/xj/xk/xK` aliases
+- `~/.zx-env` — Claude Code env vars (single source of truth)
 - `~/.tmux.conf` — mouse on, status off (mobile wrapper only)
 - `/etc/et.cfg` — ET server config
 - `~/.claude.json` — MCP server config
@@ -296,16 +331,19 @@ Cmd+Shift+7 on Mac captures screenshot, uploads via SCP to `/home/adam/screensho
 
 | Problem                                                       | Fix                                                                                                                                                                                                                                                                                               |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ET disconnected after sleep**                               | Usually auto-reconnects in 1-5s. If not, run `zxl` to rejoin — zmx session is still alive                                                                                                                                                                                                         |
+| **ET disconnected after sleep**                               | Usually auto-reconnects in 1-5 s. If not, run `xl` to rejoin — zmx session is still alive                                                                                                                                                                                                         |
 | **mosh exits immediately**                                    | Check UDP ports 60000-61000 in GCP firewall. Verify locale: `locale -a \| grep en_US.utf8`                                                                                                                                                                                                        |
-| **Stale SSH sockets**                                         | `rm ~/.ssh/sockets/*` (or just run `zx` — auto-clears)                                                                                                                                                                                                                                            |
-| **Typing feels slow**                                         | ~65ms ping is normal. Check `CLAUDE_CODE_NO_FLICKER=1` is set. ET has no local echo — this is the hard floor                                                                                                                                                                                      |
+| **Stale SSH sockets**                                         | `rm ~/.ssh/sockets/*` (or just run `x` — auto-clears)                                                                                                                                                                                                                                             |
+| **Typing feels slow**                                         | ~65 ms ping is normal. Check `CLAUDE_CODE_NO_FLICKER=1` is set on the live process: `tr '\\0' '\\n' < /proc/<pid>/environ \| grep FLICKER`. ET has no local echo — this is the hard floor                                                                                                         |
 | **zmx needs rebuilding**                                      | See `## zmx → Update procedure`. Requires Zig 0.15.2 at `/opt/zig/`                                                                                                                                                                                                                               |
-| **zmx session lost**                                          | If zmx crashes, the Claude session dies (SIGHUP). Git-committed work is safe. Restart with `zx`                                                                                                                                                                                                   |
-| **Mobile shows Mouse OFF**                                    | Stale tmux config. Kill tmux session (`txk <name>`), rejoin (`txj <name>`)                                                                                                                                                                                                                        |
-| **VS Code SSH can't connect**                                 | Try `ssh superextra-vm` first. If VS Code updated, `rm -rf ~/.vscode-server/` on VM and reconnect                                                                                                                                                                                                 |
+| **zmx session lost**                                          | If zmx crashes, the Claude session dies (SIGHUP). Git-committed work is safe. Restart with `x`                                                                                                                                                                                                    |
+| **Mobile shows Mouse OFF**                                    | Stale tmux config. Kill tmux session (`xk <name>`), rejoin (`xj <name>`)                                                                                                                                                                                                                          |
+| **Mobile scrollback doubles on every reopen**                 | Historical — root cause was `CLAUDE_CODE_NO_FLICKER` missing from Claude's env for tx-created sessions (tmux server env had drifted stale). Fixed by sourcing `~/.zx-env` from `~/.bashrc` + injecting via `tmux new-session -e`. Existing polluted sessions stay polluted until recreated        |
+| **VS Code / Cursor SSH can't connect**                        | Try `ssh superextra-vm` first. If editor updated, `rm -rf ~/.vscode-server/` on VM and reconnect                                                                                                                                                                                                  |
 | **Claude not authenticated**                                  | Run `claude auth login` on VM                                                                                                                                                                                                                                                                     |
 | **Mutagen not syncing**                                       | `mutagen sync list` for status. `mutagen sync flush` to force. `mutagen daemon start` if daemon died                                                                                                                                                                                              |
-| **Mac shows stale content from other device after switching** | Known Ink/SIGWINCH bug; see [zmx-scroll-and-device-switching.md](zmx-scroll-and-device-switching.md) §2. No clean zmx-layer fix — conversation content lives in Ink `<Static>` and cannot be safely wiped.                                                                                        |
-| **Mobile tmux shows duplicate session content**               | Same root cause as Mac artifact but accumulating in tmux scrollback. See doc §3.                                                                                                                                                                                                                  |
+| **Mac shows stale content from other device after switching** | Known Ink/SIGWINCH bug; see [zmx-scroll-and-device-switching.md](zmx-scroll-and-device-switching.md) §2. No clean zmx-layer fix — conversation content lives in Ink `<Static>` and cannot be safely wiped                                                                                         |
+| **Mobile tmux shows duplicate session content mid-session**   | Separate issue from the reopen-doubling bug above. Cross-device size mismatch triggers Claude repaints at Mac size into mobile-sized tmux panes. See [zmx-scroll-and-device-switching.md](zmx-scroll-and-device-switching.md) §3. No clean fix — upstream Claude Code / Ink                       |
+| **New `zx`/`tx` session commands not found**                  | Those were renamed on 2026-04-22 — everything is `x` now. `zx foo` → `x foo`, `zxl` → `xl`, `txj` → `xj`, etc. Mode auto-detects from parent process                                                                                                                                              |
+| **Cursor terminal scrolls too fast in x sessions**            | Add `terminal.integrated.mouseWheelScrollSensitivity: 0.5` (or lower) to Cursor settings. Applies globally to all terminals. Setting `smoothScrolling: false` alone is usually enough                                                                                                             |
 | **skhd not intercepting keys**                                | macOS Accessibility won't list ad-hoc signed binaries. Wrap in .app: `/Applications/skhd.app/Contents/MacOS/skhd` (copy from brew cellar, add Info.plist with bundle ID `com.koekeishiya.skhd`). Update LaunchAgent to point to .app binary. Then add skhd.app in System Settings → Accessibility |
