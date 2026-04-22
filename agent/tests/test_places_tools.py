@@ -5,6 +5,7 @@ import respx
 import httpx
 
 from superextra_agent.places_tools import (
+    get_batch_restaurant_details,
     get_restaurant_details,
     find_nearby_restaurants,
     search_restaurants,
@@ -35,14 +36,13 @@ class TestGetRestaurantDetails:
 
     @respx.mock
     @pytest.mark.asyncio
-    async def test_captures_google_maps_uri_into_state(self):
-        """B2: `googleMapsUri` is written to tool_context.state so downstream
-        tools (get_google_reviews) can cite the Google Maps page without
-        relying on places_context prose."""
+    async def test_stashes_place_name_per_place(self):
+        """Per-place state key (_place_name_<pid>) is written so downstream
+        tools (get_google_reviews) can label citations per restaurant.
+        Lat/lng stay target-scoped as before."""
         place_data = {
-            "displayName": {"text": "Test"},
+            "displayName": {"text": "Test Restaurant"},
             "location": {"latitude": 52.5, "longitude": 13.4},
-            "googleMapsUri": "https://maps.google.com/?cid=12345",
         }
         respx.get(f"{BASE_URL}/places/test123").mock(
             return_value=httpx.Response(200, json=place_data)
@@ -53,15 +53,15 @@ class TestGetRestaurantDetails:
 
         assert ctx.state["_target_lat"] == 52.5
         assert ctx.state["_target_lng"] == 13.4
-        assert ctx.state["_target_google_maps_uri"] == "https://maps.google.com/?cid=12345"
+        assert ctx.state["_place_name_test123"] == "Test Restaurant"
 
     @respx.mock
     @pytest.mark.asyncio
-    async def test_missing_google_maps_uri_does_not_write_state(self):
-        """If the Places API omits googleMapsUri, don't write a garbage key —
-        leave it absent so get_google_reviews can skip the source entry."""
+    async def test_missing_display_name_does_not_write_place_name(self):
+        """If the Places API omits displayName, don't write a garbage key —
+        leave it absent so get_google_reviews falls back to its generic
+        label rather than citing 'None'."""
         place_data = {
-            "displayName": {"text": "Test"},
             "location": {"latitude": 52.5, "longitude": 13.4},
         }
         respx.get(f"{BASE_URL}/places/test123").mock(
@@ -71,7 +71,7 @@ class TestGetRestaurantDetails:
         ctx = MockToolCtx()
         await get_restaurant_details("test123", tool_context=ctx)
 
-        assert "_target_google_maps_uri" not in ctx.state
+        assert "_place_name_test123" not in ctx.state
 
     @respx.mock
     @pytest.mark.asyncio
@@ -98,6 +98,34 @@ class TestGetRestaurantDetails:
 
         assert result["status"] == "error"
         assert "timeout" in result["error_message"].lower()
+
+
+class TestGetBatchRestaurantDetails:
+    @respx.mock
+    @pytest.mark.asyncio
+    async def test_threads_tool_context_so_each_place_gets_name_stashed(self):
+        """get_batch_restaurant_details forwards tool_context to every
+        inner get_restaurant_details call, so competitor fetches populate
+        their own _place_name_<pid> keys concurrently."""
+        respx.get(f"{BASE_URL}/places/target").mock(
+            return_value=httpx.Response(200, json={"displayName": {"text": "Target"}})
+        )
+        respx.get(f"{BASE_URL}/places/comp1").mock(
+            return_value=httpx.Response(200, json={"displayName": {"text": "Competitor 1"}})
+        )
+        respx.get(f"{BASE_URL}/places/comp2").mock(
+            return_value=httpx.Response(200, json={"displayName": {"text": "Competitor 2"}})
+        )
+
+        ctx = MockToolCtx()
+        result = await get_batch_restaurant_details(
+            ["target", "comp1", "comp2"], tool_context=ctx,
+        )
+
+        assert result["status"] == "success"
+        assert ctx.state["_place_name_target"] == "Target"
+        assert ctx.state["_place_name_comp1"] == "Competitor 1"
+        assert ctx.state["_place_name_comp2"] == "Competitor 2"
 
 
 class TestGetApiKey:

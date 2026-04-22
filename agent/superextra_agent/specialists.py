@@ -236,14 +236,11 @@ _GAP_RESEARCHER_KEYS = [
 
 
 def _gap_researcher_instruction(ctx):
-    """Uses `.replace()` rather than `.format()` so specialist outputs that
-    contain literal `{` characters (chart fences, JSON snippets, code samples)
-    don't raise `KeyError`. Same pattern as `_follow_up_instruction`."""
-    result = _GAP_RESEARCHER_TEMPLATE
-    for key in _GAP_RESEARCHER_KEYS:
-        value = ctx.state.get(key, "Agent did not produce output.")
-        result = result.replace(f"{{{key}}}", value)
-    return result
+    """Uses `.format()` — it does NOT re-scan inserted values, so specialist
+    outputs containing literal `{` / `}` characters flow through verbatim.
+    The template itself has no literal braces that would need escaping."""
+    values = {k: ctx.state.get(k, "Agent did not produce output.") for k in _GAP_RESEARCHER_KEYS}
+    return _GAP_RESEARCHER_TEMPLATE.format(**values)
 
 
 def _should_run_gap_researcher(callback_context):

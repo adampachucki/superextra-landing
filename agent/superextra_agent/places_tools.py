@@ -108,18 +108,19 @@ async def get_restaurant_details(place_id: str, tool_context=None) -> dict:
         place = resp.json()
         if not isinstance(place, dict):
             return {"status": "error", "error_message": "Unexpected response format from Places API"}
-        # Store target-place metadata for downstream tools:
-        # - lat/lng: geo-biased search (see `_inject_geo_bias`).
-        # - googleMapsUri: used by `get_google_reviews` to attach a
-        #   provider source entry without relying on places_context prose.
+        # Stash per-place metadata so downstream tools (esp. apify_tools.
+        # get_google_reviews) can cite the right restaurant without extra API
+        # calls. lat/lng are target-only (used for geo-biased search); the
+        # place-name dict key is per-place so batch fetches for competitors
+        # populate it concurrently without fighting over a shared dict.
         if tool_context:
             loc = place.get("location", {})
             if loc.get("latitude") and loc.get("longitude"):
                 tool_context.state["_target_lat"] = loc["latitude"]
                 tool_context.state["_target_lng"] = loc["longitude"]
-            maps_uri = place.get("googleMapsUri")
-            if maps_uri:
-                tool_context.state["_target_google_maps_uri"] = maps_uri
+            name = (place.get("displayName") or {}).get("text")
+            if name:
+                tool_context.state[f"_place_name_{place_id}"] = name
         return {"status": "success", "place": place}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}
@@ -162,9 +163,13 @@ async def find_nearby_restaurants(latitude: float, longitude: float, radius: flo
         return {"status": "error", "error_message": str(e)}
 
 
-async def get_batch_restaurant_details(place_ids: list[str]) -> dict:
+async def get_batch_restaurant_details(place_ids: list[str], tool_context=None) -> dict:
     """Get full Google Places profiles for multiple restaurants at once.
     Much faster than calling get_restaurant_details one at a time.
+
+    Forwards `tool_context` to each inner call so `_place_name_<pid>` keys
+    get populated for every restaurant (target + competitors), enabling
+    per-place source citations downstream.
 
     Args:
         place_ids: List of Google Places IDs to fetch (max 10).
@@ -173,7 +178,7 @@ async def get_batch_restaurant_details(place_ids: list[str]) -> dict:
         return {"status": "error", "error_message": "No place_ids provided"}
     place_ids = place_ids[:10]
     results = await asyncio.gather(
-        *(get_restaurant_details(pid) for pid in place_ids),
+        *(get_restaurant_details(pid, tool_context=tool_context) for pid in place_ids),
         return_exceptions=True,
     )
     places = []

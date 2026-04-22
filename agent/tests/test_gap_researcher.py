@@ -31,17 +31,19 @@ class TestGapResearcherInstruction:
 
         assert "Agent did not produce output." in result
 
-    def test_literal_braces_in_values_do_not_raise(self):
-        """A specialist output containing literal `{` (chart fence, JSON
-        snippet, code sample) must not raise KeyError during substitution.
-        `.replace()` handles this where `.format()` would not."""
-        brace_value = 'Example: {"type":"bar","data":[{"label":"A","value":1}]}'
-        state = {k: brace_value for k in _GAP_RESEARCHER_KEYS}
+    def test_inserted_placeholder_like_text_stays_verbatim(self):
+        """Guards against the chained-`.replace()` regression. `.format()`
+        does NOT re-scan values for placeholders, so a specialist output
+        containing `{review_result}` renders as literal text, not a second
+        substitution round."""
+        state = {k: "ignored" for k in _GAP_RESEARCHER_KEYS}
+        state["market_result"] = "literal token {review_result}"
+        state["review_result"] = "REVIEW"
         ctx = MockCtx(state=state)
 
-        result = _gap_researcher_instruction(ctx)  # must not raise
+        result = _gap_researcher_instruction(ctx)
 
-        assert brace_value in result
+        assert "literal token {review_result}" in result
 
 
 class TestShouldRunGapResearcher:

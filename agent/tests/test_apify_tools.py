@@ -136,15 +136,20 @@ class TestGetGoogleReviews:
 
 
 class TestGoogleReviewsSourceWrite:
-    """B2: attaches a Google Reviews provider source entry using the
-    `_target_google_maps_uri` written by places_tools. If the URL isn't
-    in state, skips cleanly rather than inventing one."""
+    """Per-place citations: URL is derived deterministically from the
+    `place_id` argument (Google Maps shortlink format); pill label reads
+    the name from `_place_name_<pid>` with a generic fallback if missing."""
 
     @pytest.mark.asyncio
-    async def test_writes_source_when_uri_present(self):
+    async def test_writes_distinct_source_per_place(self):
+        """Two consecutive calls for different place_ids must each write their
+        own source entry — different URLs, different names."""
         class MockCtx:
             def __init__(self):
-                self.state = {"_target_google_maps_uri": "https://maps.google.com/?cid=42"}
+                self.state = {
+                    "_place_name_ChIJtarget": "Noma",
+                    "_place_name_ChIJcomp": "Alchemist",
+                }
 
         ctx = MockCtx()
         mock_client = AsyncMock()
@@ -152,16 +157,25 @@ class TestGoogleReviewsSourceWrite:
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            await get_google_reviews("ChIJtest", tool_context=ctx)
+            await get_google_reviews("ChIJtarget", tool_context=ctx)
+            first_write = list(ctx.state["_tool_sources"])
+            await get_google_reviews("ChIJcomp", tool_context=ctx)
+            second_write = list(ctx.state["_tool_sources"])
 
-        sources = ctx.state.get("_tool_sources") or []
-        assert len(sources) == 1
-        assert sources[0]["domain"] == "google.com"
-        assert sources[0]["url"] == "https://maps.google.com/?cid=42"
-        assert "2 reviews analysed" in sources[0]["title"]
+        # First call wrote a Noma citation
+        assert len(first_write) == 1
+        assert first_write[0]["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJtarget"
+        assert first_write[0]["title"] == "Google Reviews — Noma"
+
+        # Second call overwrote state with its own batch (overwrite-only pattern)
+        assert len(second_write) == 1
+        assert second_write[0]["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJcomp"
+        assert second_write[0]["title"] == "Google Reviews — Alchemist"
 
     @pytest.mark.asyncio
-    async def test_skips_source_when_uri_missing(self):
+    async def test_falls_back_to_generic_name_when_place_key_missing(self):
+        """If the enricher didn't run (or this is an ad-hoc call), cite the
+        provider with a generic label rather than dropping the citation."""
         class MockCtx:
             def __init__(self):
                 self.state = {}
@@ -172,6 +186,10 @@ class TestGoogleReviewsSourceWrite:
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            await get_google_reviews("ChIJtest", tool_context=ctx)
+            await get_google_reviews("ChIJunknown", tool_context=ctx)
 
-        assert "_tool_sources" not in ctx.state
+        sources = ctx.state["_tool_sources"]
+        assert len(sources) == 1
+        assert sources[0]["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJunknown"
+        assert sources[0]["title"] == "Google Reviews — restaurant"
+        assert sources[0]["domain"] == "google.com"

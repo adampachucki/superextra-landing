@@ -656,6 +656,12 @@ async def run(body: RunRequest, request: Request) -> dict:
             # state_delta contains only that call's batch and follow-up turns
             # that don't re-invoke the tools produce no state_delta entries
             # here — nothing to leak.
+            #
+            # ASSUMPTION: ADK emits one event per tool call. If that ever
+            # changes (e.g. future ADK batches multiple tool responses into
+            # one event), this drain would only see the last write per event
+            # — the overwrite-only pattern would need to be replaced with a
+            # batch-merge here. Current ADK (verified) emits per-call events.
             sd = (event.actions.state_delta if event.actions else None) or {}
             for entry in sd.get("_tool_sources") or []:
                 _merge_source(specialist_sources, specialist_sources_seen, entry)

@@ -88,18 +88,20 @@ class TestSynthesizerInstruction:
 
         assert "Agent did not produce output." in result
 
-    def test_literal_braces_in_values_do_not_raise(self):
-        """A specialist output containing literal `{` or `}` (JSON, URL
-        template, code sample, chart fence) must NOT blow up substitution.
-        Pre-A3 this called `.format()` and raised `KeyError` on inputs
-        like `{"x": 1}`."""
-        brace_value = 'Example JSON: {"type":"bar","data":[{"label":"A","value":1}]}'
-        state = {k: brace_value for k in _SYNTHESIZER_KEYS}
+    def test_inserted_placeholder_like_text_stays_verbatim(self):
+        """`.format()` does NOT re-scan inserted values for placeholders —
+        a specialist output containing `{pricing_result}` must render as
+        that exact text, not get overwritten by the next iteration. Guards
+        against the chained-`.replace()` regression that shipped in A3."""
+        state = {k: "ignored" for k in _SYNTHESIZER_KEYS}
+        state["market_result"] = "literal token {pricing_result}"
+        state["pricing_result"] = "PRICE"
         ctx = MockCtx(state=state)
 
-        result = _synthesizer_instruction(ctx)  # must not raise
+        result = _synthesizer_instruction(ctx)
 
-        assert brace_value in result
+        # market_result section must still contain the literal placeholder text
+        assert "Market Landscape: literal token {pricing_result}" in result
 
 
 class TestMakeInstruction:

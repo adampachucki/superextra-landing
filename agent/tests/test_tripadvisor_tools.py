@@ -193,6 +193,46 @@ class TestFindTripadvisorRestaurant:
         assert result["match_confidence"] == "high"
 
     @pytest.mark.asyncio
+    async def test_search_query_includes_address_when_provided(self):
+        """Root-cause fix: when the caller provides an address, SerpAPI
+        should see `name + address` in the search query so it can rank the
+        geographically-correct candidate first. Previously the query was
+        always `name + area`, throwing away disambiguating signal."""
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            await find_tripadvisor_restaurant(
+                "Umami", "Berlin", address="Knaackstr. 16-18, 10405 Berlin"
+            )
+
+        # First call is the tripadvisor search; inspect its params.
+        first_call_params = mock_client.get.call_args_list[0].kwargs["params"]
+        assert first_call_params["engine"] == "tripadvisor"
+        assert "Knaackstr" in first_call_params["q"]
+        assert "10405" in first_call_params["q"]
+
+    @pytest.mark.asyncio
+    async def test_search_query_falls_back_to_area_without_address(self):
+        """When no address is provided, the old `name + area` query is used."""
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            await find_tripadvisor_restaurant("Umami", "Prenzlauer Berg Berlin")
+
+        first_call_params = mock_client.get.call_args_list[0].kwargs["params"]
+        assert first_call_params["q"] == "Umami Prenzlauer Berg Berlin"
+
+    @pytest.mark.asyncio
     async def test_address_matching_low_confidence_flips_status(self):
         """When address matching fails, `status` must be `low_confidence`
         (not `success`) so the LLM doesn't treat the mismatched profile as
@@ -410,30 +450,6 @@ class TestGetTripadvisorReviews:
 
         assert result["status"] == "success"
         assert result["fetched_reviews"] == 10
-
-
-class TestGetTripadvisorReviewsDoesNotWriteSources:
-    """B2: source attribution happens at `find_tripadvisor_restaurant`,
-    which has the URL. `get_tripadvisor_reviews` intentionally doesn't
-    re-emit — the find's entry is already in the sources pipeline, and
-    a second write would clobber it under the overwrite-only pattern."""
-
-    @pytest.mark.asyncio
-    async def test_does_not_touch_tool_sources(self):
-        class MockCtx:
-            def __init__(self):
-                self.state = {"_tool_sources": [{"url": "https://prior"}]}
-
-        ctx = MockCtx()
-        mock_client = AsyncMock()
-        mock_client.get = AsyncMock(return_value=_mock_response(REVIEWS_RESPONSE_PAGE_0))
-
-        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
-             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            await get_tripadvisor_reviews("6796040", num_pages=1, tool_context=ctx)
-
-        # Unchanged — this tool doesn't contribute provider entries.
-        assert ctx.state["_tool_sources"] == [{"url": "https://prior"}]
 
 
 class TestApiKeyRequired:

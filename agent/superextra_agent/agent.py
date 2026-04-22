@@ -68,16 +68,14 @@ _SYNTHESIZER_KEYS = [
 def _synthesizer_instruction(ctx):
     """Resolve synthesizer template with defaults for missing specialist outputs.
 
-    Uses `.replace()` rather than `.format()` so specialist outputs that
-    contain literal `{` characters (chart fences, JSON snippets, URL template
-    syntax, code samples) don't raise `KeyError`. Same pattern as
-    `_follow_up_instruction`.
+    Uses `.format()` — it does NOT re-scan inserted values for placeholders, so
+    a specialist output containing a literal `{pricing_result}` token stays
+    verbatim in the rendered prompt. The synth template uses `{{`/`}}` to
+    escape literal braces in the chart-JSON example; `.format()` unescapes
+    those correctly.
     """
-    result = _SYNTHESIZER_TEMPLATE
-    for key in _SYNTHESIZER_KEYS:
-        value = ctx.state.get(key, "Agent did not produce output.")
-        result = result.replace(f"{{{key}}}", value)
-    return result
+    values = {k: ctx.state.get(k, "Agent did not produce output.") for k in _SYNTHESIZER_KEYS}
+    return _SYNTHESIZER_TEMPLATE.format(**values)
 
 # --- Shared agent config ---
 
@@ -200,17 +198,20 @@ def _make_synthesizer(name="synthesizer"):
 _FOLLOW_UP_TEMPLATE = (INSTRUCTIONS_DIR / "follow_up.md").read_text()
 
 def _follow_up_instruction(ctx):
-    """Inject prior report and context into the follow-up agent's instructions."""
-    replacements = {
+    """Inject prior report and context into the follow-up agent's instructions.
+
+    Uses `.format()` — the template has three plain placeholders and no
+    literal `{` / `}` characters, so no escape handling is needed. An earlier
+    version used a `.replace()` loop citing "LLM output may contain curly
+    braces"; that comment was wrong — `.format()` doesn't re-scan inserted
+    values, so chart-fence JSON in `final_report` flows through verbatim.
+    """
+    values = {
         "final_report": ctx.state.get("final_report", "No prior report available."),
         "places_context": ctx.state.get("places_context", "No restaurant data available."),
         "research_plan": ctx.state.get("research_plan", "No research plan available."),
     }
-    # Use replace() instead of .format() — LLM output may contain curly braces.
-    result = _FOLLOW_UP_TEMPLATE
-    for key, value in replacements.items():
-        result = result.replace(f"{{{key}}}", value)
-    return result
+    return _FOLLOW_UP_TEMPLATE.format(**values)
 
 follow_up = LlmAgent(
     name="follow_up",

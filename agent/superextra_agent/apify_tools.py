@@ -101,21 +101,23 @@ async def get_google_reviews(place_id: str, max_reviews: int = 50, tool_context=
                 review["owner_response"] = owner_resp
             reviews.append(review)
 
-        # Attach a provider source entry pointing at the Google Maps page.
-        # URL is the deterministic `googleMapsUri` captured by
-        # `get_restaurant_details` for the target place; skip silently if
-        # the state key is absent (e.g. tool called for a non-target
-        # competitor), since we have no reliable URL to cite.
-        # Overwrite-only write — per-event state_delta propagates to the
-        # worker accumulator; no read-append to prevent cross-turn leakage.
+        # Attach a per-place provider source entry. The URL is deterministic
+        # from place_id (Google Maps' documented shortlink format), so every
+        # call — target or competitor — cites the correct restaurant. The
+        # pill label uses the restaurant name stashed by `get_restaurant_details`
+        # in `_place_name_<pid>`; missing name falls back to a generic label.
+        # Overwrite-only write to `_tool_sources` — per-event state_delta
+        # carries this batch to the worker accumulator; no read-append so
+        # follow-up turns that don't call this tool produce no state_delta
+        # entries and can't leak a stale citation.
         if tool_context and reviews:
-            maps_uri = tool_context.state.get("_target_google_maps_uri")
-            if maps_uri:
-                tool_context.state["_tool_sources"] = [{
-                    "title": f"Google Reviews ({len(reviews)} reviews analysed)",
-                    "url": maps_uri,
-                    "domain": "google.com",
-                }]
+            maps_uri = f"https://www.google.com/maps/place/?q=place_id:{place_id}"
+            name = tool_context.state.get(f"_place_name_{place_id}", "restaurant")
+            tool_context.state["_tool_sources"] = [{
+                "title": f"Google Reviews — {name}",
+                "url": maps_uri,
+                "domain": "google.com",
+            }]
 
         return {
             "status": "success",

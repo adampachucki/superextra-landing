@@ -75,10 +75,15 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "", t
         client = _get_client()
         api_key = _get_api_key()
 
-        # Step 1: Search for the restaurant
+        # Step 1: Search for the restaurant. When the caller provides an
+        # address, include it in the query — SerpAPI's relevance ranking then
+        # has the disambiguating signal it needs to put the right place first,
+        # rather than us picking candidate 0 blindly and relying purely on the
+        # post-selection confidence check to catch wrong matches.
+        search_q = f"{name} {address}" if address else f"{name} {area}"
         search_resp = await client.get(BASE_URL, params={
             "engine": "tripadvisor",
-            "q": f"{name} {area}",
+            "q": search_q,
             "api_key": api_key,
         })
         if search_resp.status_code != 200:
@@ -205,7 +210,7 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "", t
         return {"status": "error", "error_message": str(e)}
 
 
-async def get_tripadvisor_reviews(place_id: str, num_pages: int = 5, tool_context=None) -> dict:
+async def get_tripadvisor_reviews(place_id: str, num_pages: int = 5) -> dict:
     """Fetch TripAdvisor reviews for a restaurant. Returns full review text,
     ratings, trip types, reviewer origins, and owner responses.
 
