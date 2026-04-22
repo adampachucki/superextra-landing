@@ -1,6 +1,4 @@
-import base64
 import logging
-import re
 
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.agents.parallel_agent import ParallelAgent
@@ -14,8 +12,6 @@ from google.genai import Client, types
 from .log_ctx import worker_sid
 from .web_tools import fetch_web_content
 logger = logging.getLogger(__name__)
-
-MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2 MB
 
 from .specialists import (
     MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG, MEDIUM_THINKING_CONFIG,
@@ -107,22 +103,6 @@ def _make_enricher(name="context_enricher"):
     )
 
 
-def _inject_code_execution(*, callback_context, llm_request):
-    """Add code execution tool to the synthesizer's request.
-
-    We inject the tool manually instead of using BuiltInCodeExecutor so that
-    ADK's code execution post-processor doesn't strip inline_data images and
-    save them to an artifact service.  This lets _embed_chart_images convert
-    them to base64 data URIs that flow through as regular text.
-    """
-    llm_request.config = llm_request.config or types.GenerateContentConfig()
-    llm_request.config.tools = llm_request.config.tools or []
-    llm_request.config.tools.append(
-        types.Tool(code_execution=types.ToolCodeExecution())
-    )
-    return None
-
-
 _FALLBACK_SECTIONS = [
     ("market_result", "Market Landscape"),
     ("pricing_result", "Menu & Pricing"),
@@ -137,19 +117,17 @@ _FALLBACK_SECTIONS = [
 ]
 
 
-def _build_fallback_report(state, error_code: str) -> str:
+def _build_fallback_report(state, reason: str) -> str:
     """Concatenate specialist outputs when the synthesizer fails to produce a response.
 
-    The synthesizer occasionally emits MALFORMED_FUNCTION_CALL on its code_execution
-    tool (chart generation) — special characters in data, truncated JSON, etc.
-    When that happens the response has no text, so output_key='final_report' is
-    never populated and the user sees nothing. This fallback guarantees a
-    readable report from the specialist outputs already in session state.
+    Triggers: empty content, no text parts, or an error_code from the model.
+    Guarantees `final_report` is populated so the user sees a usable reply
+    instead of an `empty_or_malformed_reply` terminal state.
     """
-    # `error_code` is for the structured synth_outcome log, not the user banner.
+    # `reason` is for the structured synth_outcome log, not the user banner.
     parts = [
         "# Research findings\n\n",
-        "_Charts couldn't be generated for this report. Full research findings below._\n\n",
+        "_Final synthesis didn't produce a response. Full research findings below._\n\n",
     ]
     had_content = False
     for key, label in _FALLBACK_SECTIONS:
@@ -165,116 +143,46 @@ def _build_fallback_report(state, error_code: str) -> str:
     return "".join(parts)
 
 
-def _embed_chart_images(*, callback_context, llm_response):
-    """Convert inline_data image parts to base64 data URI markdown images.
+def _synth_fallback_callback(*, callback_context, llm_response):
+    """Guarantee `final_report` is always populated.
 
-    When the model places inline markdown references like
-    ![alt](code_execution_image_N_...) in its text, replace those references
-    with the actual base64 data URIs so charts render where the model intended.
-    Fall back to appending standalone image parts when no references are found.
-
-    If Gemini emitted an error_code instead of a usable response (e.g.
-    MALFORMED_FUNCTION_CALL from code_execution), or returned an empty
-    response with no parts / no text at all, produce a text-only fallback
-    from the specialist outputs so final_report is always populated.
+    The synthesizer is a plain text-generating agent (no tools). If the model
+    returns an error_code, an empty response, or parts with no usable text,
+    substitute a text-only report stitched from the specialist outputs in
+    state. Emit a structured `synth_outcome` log for rate tracking.
     """
-    # synth_outcome / reason / sid are surfaced by _STRUCTURED_LOG_KEYS in worker_main.py.
     def _outcome_extra(reason: str) -> dict:
         return {"event": "synth_outcome", "reason": reason, "sid": worker_sid.get()}
 
     error_code = getattr(llm_response, "error_code", None)
     if error_code:
-        logger.warning(
-            "synth outcome %s", error_code, extra=_outcome_extra(error_code)
-        )
-        fallback = _build_fallback_report(callback_context.state, error_code)
-        return LlmResponse(
-            content=types.Content(role="model", parts=[types.Part(text=fallback)])
-        )
+        logger.warning("synth outcome %s", error_code, extra=_outcome_extra(error_code))
+        return LlmResponse(content=types.Content(
+            role="model",
+            parts=[types.Part(text=_build_fallback_report(callback_context.state, error_code))],
+        ))
 
-    # Empty-response guard: an intermittent failure mode where the model
-    # returns a response with no content, no parts, or no usable text —
-    # without any error_code — reached terminal state as
-    # `empty_or_malformed_reply` in live runs (see
-    # docs/pipeline-decoupling-implementation-review-2026-04-21.md P1).
-    # Fallback mirrors the error_code branch so the reply is always usable.
     if not llm_response.content or not llm_response.content.parts:
-        logger.warning(
-            "synth outcome empty_response", extra=_outcome_extra("empty_response")
-        )
-        fallback = _build_fallback_report(callback_context.state, "empty_response")
-        return LlmResponse(
-            content=types.Content(role="model", parts=[types.Part(text=fallback)])
-        )
-    has_text = any(
-        getattr(p, "text", None) and p.text.strip() for p in llm_response.content.parts
-    )
-    if not has_text:
-        logger.warning(
-            "synth outcome no_text_parts", extra=_outcome_extra("no_text_parts")
-        )
-        fallback = _build_fallback_report(callback_context.state, "no_text_parts")
-        return LlmResponse(
-            content=types.Content(role="model", parts=[types.Part(text=fallback)])
-        )
+        logger.warning("synth outcome empty_response", extra=_outcome_extra("empty_response"))
+        return LlmResponse(content=types.Content(
+            role="model",
+            parts=[types.Part(text=_build_fallback_report(callback_context.state, "empty_response"))],
+        ))
+
+    if not any(getattr(p, "text", None) and p.text.strip() for p in llm_response.content.parts):
+        logger.warning("synth outcome no_text_parts", extra=_outcome_extra("no_text_parts"))
+        return LlmResponse(content=types.Content(
+            role="model",
+            parts=[types.Part(text=_build_fallback_report(callback_context.state, "no_text_parts"))],
+        ))
 
     logger.info("synth outcome ok", extra=_outcome_extra("ok"))
-
-    # Collect base64 data URIs for each inline_data image, in order.
-    images: list[str] = []
-    for part in llm_response.content.parts:
-        if (
-            part.inline_data
-            and part.inline_data.mime_type
-            and part.inline_data.mime_type.startswith("image/")
-        ):
-            if len(part.inline_data.data) > MAX_IMAGE_BYTES:
-                logger.warning(
-                    "Skipping oversized chart image: %d bytes (limit %d)",
-                    len(part.inline_data.data),
-                    MAX_IMAGE_BYTES,
-                )
-                continue
-            b64 = base64.b64encode(part.inline_data.data).decode("utf-8")
-            mime = part.inline_data.mime_type
-            images.append(f"data:{mime};base64,{b64}")
-
-    if not images:
-        return llm_response
-
-    # Try to replace code_execution_image references in text parts.
-    # Pattern: ![alt text](code_execution_image_N_timestamp.ext)
-    _IMG_REF = re.compile(r"!\[([^\]]*)\]\(code_execution_image_(\d+)_[^)]+\)")
-    replaced = set()
-
-    def _replace_ref(m):
-        alt = m.group(1)
-        idx = int(m.group(2)) - 1  # code_execution_image is 1-indexed
-        if 0 <= idx < len(images):
-            replaced.add(idx)
-            return f"![{alt}]({images[idx]})"
-        return m.group(0)
-
-    new_parts = []
-    for part in llm_response.content.parts:
-        if part.text and _IMG_REF.search(part.text):
-            new_parts.append(types.Part(text=_IMG_REF.sub(_replace_ref, part.text)))
-        elif part.inline_data and part.inline_data.mime_type and part.inline_data.mime_type.startswith("image/"):
-            continue  # drop standalone inline_data — handled via text refs
-        else:
-            new_parts.append(part)
-
-    # If some images weren't referenced in text, append them as fallback.
-    for idx, uri in enumerate(images):
-        if idx not in replaced:
-            new_parts.append(types.Part(text=f"\n\n![Chart]({uri})\n\n"))
-
-    llm_response.content.parts = new_parts
     return llm_response
 
 
 def _make_synthesizer(name="synthesizer"):
-    """Create a synthesizer instance."""
+    """Create a synthesizer instance. Text-only — charts are emitted as
+    ```chart <JSON>``` fenced blocks and rendered by the frontend."""
     return LlmAgent(
         name=name,
         model=MODEL_GEMINI,
@@ -282,8 +190,7 @@ def _make_synthesizer(name="synthesizer"):
         description="Synthesizes findings from all specialist agents into a cohesive report.",
         output_key="final_report",
         generate_content_config=THINKING_CONFIG,
-        before_model_callback=_inject_code_execution,
-        after_model_callback=_embed_chart_images,
+        after_model_callback=_synth_fallback_callback,
     )
 
 

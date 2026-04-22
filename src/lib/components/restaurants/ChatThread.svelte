@@ -2,6 +2,8 @@
 	import { marked } from 'marked';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { tts } from '$lib/tts.svelte';
+	import { splitChartSegments } from '$lib/chart-blocks';
+	import ChartBlock from './ChartBlock.svelte';
 	import StreamingProgress from './StreamingProgress.svelte';
 
 	marked.setOptions({ breaks: true, gfm: true });
@@ -82,7 +84,13 @@
 						<div
 							class="prose max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
 						>
-							{@html renderMarkdown(msg.text)}
+							{#each splitChartSegments(msg.text) as seg, segIdx (segIdx)}
+								{#if seg.kind === 'chart'}
+									<ChartBlock spec={seg.spec} />
+								{:else}
+									{@html renderMarkdown(seg.text)}
+								{/if}
+							{/each}
 						</div>
 						<div class="mt-2 flex justify-end">
 							<button
