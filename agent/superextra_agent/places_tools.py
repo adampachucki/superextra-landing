@@ -110,12 +110,18 @@ async def get_restaurant_details(place_id: str, tool_context=None) -> dict:
             return {"status": "error", "error_message": "Unexpected response format from Places API"}
         # Stash per-place metadata so downstream tools (esp. apify_tools.
         # get_google_reviews) can cite the right restaurant without extra API
-        # calls. lat/lng are target-only (used for geo-biased search); the
-        # place-name dict key is per-place so batch fetches for competitors
-        # populate it concurrently without fighting over a shared dict.
+        # calls. `_place_name_<pid>` is per-place and written every call —
+        # batch competitor fetches need to populate it too. `_target_lat` /
+        # `_target_lng` are target-only (consumed by `_inject_geo_bias` to
+        # bias google_search toward the target) and must NOT be overwritten
+        # by later competitor fetches; first write wins. The enricher calls
+        # target first by convention, so this protects the intended coords.
         if tool_context:
             loc = place.get("location", {})
-            if loc.get("latitude") and loc.get("longitude"):
+            if (
+                loc.get("latitude") and loc.get("longitude")
+                and "_target_lat" not in tool_context.state
+            ):
                 tool_context.state["_target_lat"] = loc["latitude"]
                 tool_context.state["_target_lng"] = loc["longitude"]
             name = (place.get("displayName") or {}).get("text")

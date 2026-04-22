@@ -127,6 +127,54 @@ class TestGetBatchRestaurantDetails:
         assert ctx.state["_place_name_comp1"] == "Competitor 1"
         assert ctx.state["_place_name_comp2"] == "Competitor 2"
 
+    @respx.mock
+    @pytest.mark.asyncio
+    async def test_competitor_batch_does_not_overwrite_target_coords(self):
+        """Regression: previously `get_restaurant_details` unconditionally
+        wrote `_target_lat`/`_target_lng`, so a competitor batch fetch
+        (which runs AFTER the enricher's target fetch per context_enricher.md
+        Steps 1 and 3) silently overwrote the target's coords, biasing
+        downstream google_search toward whichever competitor finished last.
+
+        Guard: target coords are written once (first-write-wins). This
+        mirrors the actual enricher flow — target fetched solo, then
+        competitors fetched via batch."""
+        target_coords = {"latitude": 55.6876, "longitude": 12.6100}   # Noma
+        comp1_coords = {"latitude": 55.6989, "longitude": 12.5896}    # Alchemist
+        comp2_coords = {"latitude": 55.6803, "longitude": 12.5730}    # Geranium
+        respx.get(f"{BASE_URL}/places/target").mock(
+            return_value=httpx.Response(200, json={
+                "displayName": {"text": "Target"},
+                "location": target_coords,
+            })
+        )
+        respx.get(f"{BASE_URL}/places/comp1").mock(
+            return_value=httpx.Response(200, json={
+                "displayName": {"text": "Competitor 1"},
+                "location": comp1_coords,
+            })
+        )
+        respx.get(f"{BASE_URL}/places/comp2").mock(
+            return_value=httpx.Response(200, json={
+                "displayName": {"text": "Competitor 2"},
+                "location": comp2_coords,
+            })
+        )
+
+        ctx = MockToolCtx()
+        # Step 1 of enricher flow: solo target fetch.
+        await get_restaurant_details("target", tool_context=ctx)
+        # Step 3: competitor batch (target is NOT included per the instruction).
+        await get_batch_restaurant_details(["comp1", "comp2"], tool_context=ctx)
+
+        # Target coords survive the competitor batch.
+        assert ctx.state["_target_lat"] == target_coords["latitude"]
+        assert ctx.state["_target_lng"] == target_coords["longitude"]
+        # Per-place names still get written for every place.
+        assert ctx.state["_place_name_target"] == "Target"
+        assert ctx.state["_place_name_comp1"] == "Competitor 1"
+        assert ctx.state["_place_name_comp2"] == "Competitor 2"
+
 
 class TestGetApiKey:
     def test_missing_env_var(self, monkeypatch):
