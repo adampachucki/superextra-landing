@@ -299,9 +299,9 @@ class TestFindTripadvisorRestaurant:
 
 
 class TestFindTripadvisorRestaurantSourceWrite:
-    """B2: on high-confidence match, the tool writes a provider entry to
-    `_tool_sources` so the worker accumulator can surface TripAdvisor
-    in the terminal sources[]."""
+    """On high-confidence match, the tool writes a provider entry under a
+    unique `_tool_src_<uuid>` state key so parallel tool calls batched
+    into one ADK event's state_delta all survive."""
 
     @pytest.mark.asyncio
     async def test_writes_source_on_high_confidence(self):
@@ -324,11 +324,12 @@ class TestFindTripadvisorRestaurantSourceWrite:
                 tool_context=ctx,
             )
 
-        sources = ctx.state.get("_tool_sources") or []
-        assert len(sources) == 1
-        assert sources[0]["domain"] == "tripadvisor.com"
-        assert sources[0]["url"] == "https://www.tripadvisor.com/Restaurant_Review-umami-p-berg"
-        assert "Umami P-Berg" in sources[0]["title"]
+        source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
+        assert len(source_keys) == 1
+        entry = ctx.state[source_keys[0]]
+        assert entry["domain"] == "tripadvisor.com"
+        assert entry["url"] == "https://www.tripadvisor.com/Restaurant_Review-umami-p-berg"
+        assert "Umami P-Berg" in entry["title"]
 
     @pytest.mark.asyncio
     async def test_skips_source_on_low_confidence(self):
@@ -354,7 +355,7 @@ class TestFindTripadvisorRestaurantSourceWrite:
                 tool_context=ctx,
             )
 
-        assert ctx.state.get("_tool_sources") is None
+        assert not any(k.startswith("_tool_src_") for k in ctx.state)
 
 
 class TestGetTripadvisorReviews:

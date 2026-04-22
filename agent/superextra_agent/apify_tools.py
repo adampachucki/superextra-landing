@@ -1,6 +1,8 @@
 import atexit
 import logging
 import os
+import uuid
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -101,23 +103,23 @@ async def get_google_reviews(place_id: str, max_reviews: int = 50, tool_context=
                 review["owner_response"] = owner_resp
             reviews.append(review)
 
-        # Attach a per-place provider source entry. The URL is deterministic
-        # from place_id (Google Maps' documented shortlink format), so every
-        # call — target or competitor — cites the correct restaurant. The
-        # pill label uses the restaurant name stashed by `get_restaurant_details`
-        # in `_place_name_<pid>`; missing name falls back to a generic label.
-        # Overwrite-only write to `_tool_sources` — per-event state_delta
-        # carries this batch to the worker accumulator; no read-append so
-        # follow-up turns that don't call this tool produce no state_delta
-        # entries and can't leak a stale citation.
+        # Attach a per-place provider source entry under a UNIQUE state key
+        # per tool call. ADK batches parallel tool calls into one event with
+        # one state_delta — if multiple calls wrote to the same key, only
+        # the last survives. A unique `_tool_src_<uuid>` key per call means
+        # all parallel writes appear as distinct keys in state_delta, so the
+        # worker accumulator drains every one. Also immune to cross-turn
+        # leakage: old turn's keys persist in session state but never appear
+        # in a future event's state_delta (nothing writes to them), so the
+        # drain doesn't see them.
         if tool_context and reviews:
             maps_uri = f"https://www.google.com/maps/place/?q=place_id:{place_id}"
             name = tool_context.state.get(f"_place_name_{place_id}", "restaurant")
-            tool_context.state["_tool_sources"] = [{
+            tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
                 "title": f"Google Reviews — {name}",
                 "url": maps_uri,
                 "domain": "google.com",
-            }]
+            }
 
         return {
             "status": "success",

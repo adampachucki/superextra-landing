@@ -682,14 +682,16 @@ async def test_sources_dedupe_across_specialist_and_synth(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_tool_sources_drain_into_terminal_sources(monkeypatch):
-    """B2: when a tool writes provider entries to `_tool_sources` in
-    state_delta, the worker accumulator drains them into the terminal
-    sources[] alongside specialist activity-event sources."""
+    """When tools write unique `_tool_src_<uuid>` state keys, the worker
+    drain iterates every `_tool_src_*` key in each event's state_delta and
+    accumulates the entries. Parallel tool calls batched into one event
+    all survive (each has its own uuid key)."""
     events = [
         _mk_event(
-            {"_tool_sources": [
-                {"title": "TripAdvisor — Umami", "url": "https://ta.com/r/1", "domain": "tripadvisor.com"},
-            ]},
+            {
+                "_tool_src_aaa": {"title": "TripAdvisor — Umami", "url": "https://ta.com/r/1", "domain": "tripadvisor.com"},
+                "_tool_src_bbb": {"title": "Google Reviews — Umami", "url": "https://maps.example/1", "domain": "google.com"},
+            },
             author="review_analyst",
         ),
         _mk_event({"final_report": "Review summary."}, author="synthesizer"),
@@ -704,15 +706,15 @@ async def test_tool_sources_drain_into_terminal_sources(monkeypatch):
 
     complete = [u for u in fenced_writes if u.get("status") == "complete"][0]
     urls = {s["url"] for s in complete["sources"]}
-    assert urls == {"https://ta.com/r/1"}
+    assert urls == {"https://ta.com/r/1", "https://maps.example/1"}
 
 
 @pytest.mark.asyncio
 async def test_tool_sources_do_not_leak_across_events(monkeypatch):
-    """B2: the worker drain operates on each event's state_delta, so
-    entries don't flow in unless a tool wrote them in THAT event. Simulates
-    a follow-up turn: no tool writes _tool_sources in any event, so
-    no provider entries appear in the terminal sources[]."""
+    """The worker drain operates on each event's state_delta, so entries
+    only flow in when a tool wrote them in THAT event. Simulates a
+    follow-up turn: no tool writes any `_tool_src_*` key in any event,
+    so no provider entries appear in the terminal sources[]."""
     events = [
         _mk_event({"market_result": "follow-up analysis"}, author="market_landscape"),
         _mk_event({"final_report": "Follow-up reply."}, author="follow_up"),

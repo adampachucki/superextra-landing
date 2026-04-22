@@ -138,12 +138,14 @@ class TestGetGoogleReviews:
 class TestGoogleReviewsSourceWrite:
     """Per-place citations: URL is derived deterministically from the
     `place_id` argument (Google Maps shortlink format); pill label reads
-    the name from `_place_name_<pid>` with a generic fallback if missing."""
+    the name from `_place_name_<pid>` with a generic fallback if missing.
+    Each call writes a UNIQUE `_tool_src_<uuid>` state key so parallel
+    calls batched into one ADK event's state_delta all survive."""
 
     @pytest.mark.asyncio
-    async def test_writes_distinct_source_per_place(self):
-        """Two consecutive calls for different place_ids must each write their
-        own source entry — different URLs, different names."""
+    async def test_writes_distinct_source_per_call(self):
+        """Two consecutive calls for different place_ids write to distinct
+        state keys — both survive in state (not overwritten)."""
         class MockCtx:
             def __init__(self):
                 self.state = {
@@ -158,19 +160,19 @@ class TestGoogleReviewsSourceWrite:
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
             await get_google_reviews("ChIJtarget", tool_context=ctx)
-            first_write = list(ctx.state["_tool_sources"])
             await get_google_reviews("ChIJcomp", tool_context=ctx)
-            second_write = list(ctx.state["_tool_sources"])
 
-        # First call wrote a Noma citation
-        assert len(first_write) == 1
-        assert first_write[0]["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJtarget"
-        assert first_write[0]["title"] == "Google Reviews — Noma"
-
-        # Second call overwrote state with its own batch (overwrite-only pattern)
-        assert len(second_write) == 1
-        assert second_write[0]["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJcomp"
-        assert second_write[0]["title"] == "Google Reviews — Alchemist"
+        # Two distinct `_tool_src_<uuid>` keys — one per call.
+        source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
+        assert len(source_keys) == 2
+        entries = [ctx.state[k] for k in source_keys]
+        urls = {e["url"] for e in entries}
+        titles = {e["title"] for e in entries}
+        assert urls == {
+            "https://www.google.com/maps/place/?q=place_id:ChIJtarget",
+            "https://www.google.com/maps/place/?q=place_id:ChIJcomp",
+        }
+        assert titles == {"Google Reviews — Noma", "Google Reviews — Alchemist"}
 
     @pytest.mark.asyncio
     async def test_falls_back_to_generic_name_when_place_key_missing(self):
@@ -188,8 +190,9 @@ class TestGoogleReviewsSourceWrite:
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
             await get_google_reviews("ChIJunknown", tool_context=ctx)
 
-        sources = ctx.state["_tool_sources"]
-        assert len(sources) == 1
-        assert sources[0]["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJunknown"
-        assert sources[0]["title"] == "Google Reviews — restaurant"
-        assert sources[0]["domain"] == "google.com"
+        source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
+        assert len(source_keys) == 1
+        entry = ctx.state[source_keys[0]]
+        assert entry["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJunknown"
+        assert entry["title"] == "Google Reviews — restaurant"
+        assert entry["domain"] == "google.com"

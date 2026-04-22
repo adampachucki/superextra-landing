@@ -651,20 +651,16 @@ async def run(body: RunRequest, request: Request) -> dict:
                         _merge_source(specialist_sources, specialist_sources_seen, entry)
             # Also drain structured-tool sources written by review_analyst's
             # tools (TripAdvisor / Google Reviews) — grounding metadata
-            # doesn't cover API-backed providers. Tools use an overwrite-only
-            # write pattern (no read-append), so each tool-call event's
-            # state_delta contains only that call's batch and follow-up turns
-            # that don't re-invoke the tools produce no state_delta entries
-            # here — nothing to leak.
-            #
-            # ASSUMPTION: ADK emits one event per tool call. If that ever
-            # changes (e.g. future ADK batches multiple tool responses into
-            # one event), this drain would only see the last write per event
-            # — the overwrite-only pattern would need to be replaced with a
-            # batch-merge here. Current ADK (verified) emits per-call events.
+            # doesn't cover API-backed providers. Each tool call writes a
+            # UNIQUE state key (`_tool_src_<uuid>`) so parallel tool calls
+            # that ADK batches into one event's state_delta all survive
+            # as distinct entries. Cross-turn leakage is impossible because
+            # follow-up events don't write to stale keys, so they never
+            # appear in the next event's state_delta.
             sd = (event.actions.state_delta if event.actions else None) or {}
-            for entry in sd.get("_tool_sources") or []:
-                _merge_source(specialist_sources, specialist_sources_seen, entry)
+            for key, value in sd.items():
+                if key.startswith("_tool_src_"):
+                    _merge_source(specialist_sources, specialist_sources_seen, value)
             # Promote the first terminal `complete` event the mapper emits
             # (router clarification OR synthesiser final). Reuse the mapper's
             # decision as the source of truth for what counts as terminal —

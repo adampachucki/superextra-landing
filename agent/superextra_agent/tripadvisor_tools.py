@@ -1,6 +1,8 @@
 import atexit
 import os
 import re
+import uuid
+
 import httpx
 
 BASE_URL = "https://serpapi.com/search.json"
@@ -163,19 +165,19 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "", t
                 review["author_hometown"] = author["hometown"]
             sample_reviews.append(review)
 
-        # Attach a provider source on high-confidence matches so review-heavy
-        # replies surface the TripAdvisor page in the terminal sources[].
-        # Overwrite-only (no read-append): each tool call writes only its own
-        # batch. Worker drains per-event state_delta, so multiple tool calls
-        # in one run each contribute; follow-up turns that don't call this
-        # tool produce no state_delta entries and leak nothing.
+        # Attach a provider source on high-confidence matches. Writes a
+        # UNIQUE state key per tool call (`_tool_src_<uuid>`) so that when
+        # ADK batches multiple parallel tool calls into one event's
+        # state_delta, all of the writes survive as distinct keys rather
+        # than overwriting each other. See apify_tools.get_google_reviews
+        # for the same pattern and its reasoning.
         selected_link = match.get("link")
         if tool_context and match_confidence == "high" and selected_link:
-            tool_context.state["_tool_sources"] = [{
+            tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
                 "title": f"TripAdvisor — {place_data.get('name') or match.get('title') or 'restaurant page'}",
                 "url": selected_link,
                 "domain": "tripadvisor.com",
-            }]
+            }
 
         return {
             "status": "success" if match_confidence == "high" else "low_confidence",
