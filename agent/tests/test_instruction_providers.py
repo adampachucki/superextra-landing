@@ -88,6 +88,19 @@ class TestSynthesizerInstruction:
 
         assert "Agent did not produce output." in result
 
+    def test_literal_braces_in_values_do_not_raise(self):
+        """A specialist output containing literal `{` or `}` (JSON, URL
+        template, code sample, chart fence) must NOT blow up substitution.
+        Pre-A3 this called `.format()` and raised `KeyError` on inputs
+        like `{"x": 1}`."""
+        brace_value = 'Example JSON: {"type":"bar","data":[{"label":"A","value":1}]}'
+        state = {k: brace_value for k in _SYNTHESIZER_KEYS}
+        ctx = MockCtx(state=state)
+
+        result = _synthesizer_instruction(ctx)  # must not raise
+
+        assert brace_value in result
+
 
 class TestMakeInstruction:
     def test_returns_provider_that_injects_places_context(self):

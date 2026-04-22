@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -80,12 +79,6 @@ TOOL_LABELS: dict[str, str] = {
     "get_google_reviews": "Fetching Google reviews",
     "set_specialist_briefs": "Assigning specialists",
 }
-
-# Markdown link with optional {domain} suffix. Used by
-# `extract_sources_from_text` as a rare fallback for specialists that
-# embed citations inline in prose; grounding metadata is the primary path.
-_MD_LINK_RE = re.compile(r"\[([^\]]*)\]\((https?://[^)]+)\)(?:\{([^}]*)\})?")
-
 
 # ── Public: write a single ADK event to Firestore ──────────────────────────
 
@@ -262,14 +255,7 @@ def _map_specialist(event: Any, author: str) -> dict | None:
     if _is_final(event):
         output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
         if output_key and _has_state_delta(event, output_key):
-            text = _state_delta(event).get(output_key) or ""
-            # Grounding metadata is the primary source — the in-process Runner
-            # exposes it directly on the event. Markdown-link extraction
-            # remains as a fallback for rare cases where a specialist embeds
-            # citations inline in its prose instead of via grounded search.
             sources = extract_sources_from_grounding(event)
-            if not sources:
-                sources = extract_sources_from_text(text if isinstance(text, str) else "")
             return {
                 "type": "activity",
                 "data": {
@@ -314,16 +300,10 @@ def _map_synthesizer(event: Any) -> dict | None:
     if not reply:
         return None
 
-    # Harvest sources from grounding metadata first (in-process Runner
-    # exposes it on the synth event), then fall back to markdown links in
-    # the reply text. Both paths dedupe by URL internally; merging is safe.
+    # The in-process Runner exposes grounding metadata on the synth event.
+    # Worker-level accumulation (see `_merge_source` in worker_main) unions
+    # these with specialist activity-event sources at terminal time.
     sources = extract_sources_from_grounding(event)
-    text_sources = extract_sources_from_text(reply)
-    seen = {s["url"] for s in sources}
-    for s in text_sources:
-        if s["url"] not in seen:
-            sources.append(s)
-            seen.add(s["url"])
 
     return {
         "type": "complete",
@@ -356,25 +336,6 @@ def extract_sources_from_grounding(event: Any) -> list[dict]:
             "url": uri,
         }
         domain = _get(web, "domain")
-        if domain:
-            entry["domain"] = domain
-        out.append(entry)
-    return out
-
-
-def extract_sources_from_text(text: str) -> list[dict]:
-    """Parse markdown links from specialist output. Mirrors
-    `extractSourcesFromText` in `functions/utils.js`. Dedupes by URL."""
-    out: list[dict] = []
-    seen: set[str] = set()
-    if not text:
-        return out
-    for m in _MD_LINK_RE.finditer(text):
-        title, url, domain = m.group(1), m.group(2), m.group(3)
-        if url in seen:
-            continue
-        seen.add(url)
-        entry: dict[str, Any] = {"title": title or url, "url": url}
         if domain:
             entry["domain"] = domain
         out.append(entry)

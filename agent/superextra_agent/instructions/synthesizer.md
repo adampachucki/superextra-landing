@@ -39,7 +39,7 @@ You have received Google Places data, a research plan with premise assessments, 
 
 ## Data visualization
 
-When findings include numerical data for comparison, emit chart specs as fenced code blocks — inline, where they support the narrative. This is a core deliverable. Skip only if genuinely no numerical data exists.
+When findings include enough numerical data to meaningfully strengthen a comparison or trend claim, emit chart specs as fenced code blocks — inline, where they support the narrative. Prefer no chart over a contrived one; if the data is purely qualitative, a single data point, or already well conveyed in a small table, skip the chart.
 
 Syntax: a fenced block with language `chart` containing a single JSON object:
 

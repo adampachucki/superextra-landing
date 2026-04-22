@@ -31,6 +31,18 @@ class TestGapResearcherInstruction:
 
         assert "Agent did not produce output." in result
 
+    def test_literal_braces_in_values_do_not_raise(self):
+        """A specialist output containing literal `{` (chart fence, JSON
+        snippet, code sample) must not raise KeyError during substitution.
+        `.replace()` handles this where `.format()` would not."""
+        brace_value = 'Example: {"type":"bar","data":[{"label":"A","value":1}]}'
+        state = {k: brace_value for k in _GAP_RESEARCHER_KEYS}
+        ctx = MockCtx(state=state)
+
+        result = _gap_researcher_instruction(ctx)  # must not raise
+
+        assert brace_value in result
+
 
 class TestShouldRunGapResearcher:
     def test_skips_when_no_specialists_assigned(self):

@@ -71,9 +71,18 @@ _SYNTHESIZER_KEYS = [
 ]
 
 def _synthesizer_instruction(ctx):
-    """Resolve synthesizer template with defaults for missing specialist outputs."""
-    values = {k: ctx.state.get(k, "Agent did not produce output.") for k in _SYNTHESIZER_KEYS}
-    return _SYNTHESIZER_TEMPLATE.format(**values)
+    """Resolve synthesizer template with defaults for missing specialist outputs.
+
+    Uses `.replace()` rather than `.format()` so specialist outputs that
+    contain literal `{` characters (chart fences, JSON snippets, URL template
+    syntax, code samples) don't raise `KeyError`. Same pattern as
+    `_follow_up_instruction`.
+    """
+    result = _SYNTHESIZER_TEMPLATE
+    for key in _SYNTHESIZER_KEYS:
+        value = ctx.state.get(key, "Agent did not produce output.")
+        result = result.replace(f"{{{key}}}", value)
+    return result
 
 # --- Shared agent config ---
 

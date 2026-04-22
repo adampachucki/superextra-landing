@@ -248,8 +248,14 @@ _GAP_RESEARCHER_KEYS = [
 
 
 def _gap_researcher_instruction(ctx):
-    values = {k: ctx.state.get(k, "Agent did not produce output.") for k in _GAP_RESEARCHER_KEYS}
-    return _GAP_RESEARCHER_TEMPLATE.format(**values)
+    """Uses `.replace()` rather than `.format()` so specialist outputs that
+    contain literal `{` characters (chart fences, JSON snippets, code samples)
+    don't raise `KeyError`. Same pattern as `_follow_up_instruction`."""
+    result = _GAP_RESEARCHER_TEMPLATE
+    for key in _GAP_RESEARCHER_KEYS:
+        value = ctx.state.get(key, "Agent did not produce output.")
+        result = result.replace(f"{{{key}}}", value)
+    return result
 
 
 # Specialist name (as assigned in `specialist_briefs`) → state output_key.

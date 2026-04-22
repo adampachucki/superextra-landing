@@ -18,7 +18,6 @@ from superextra_agent.firestore_events import (
     AUTHOR_TO_OUTPUT_KEY,
     TOOL_LABELS,
     extract_sources_from_grounding,
-    extract_sources_from_text,
     map_event,
 )
 
@@ -248,6 +247,9 @@ def test_specialist_tripadvisor_tool_is_data_category():
 
 
 def test_specialist_final_with_output_key_emits_analyze_complete():
+    """Without grounding metadata, sources[] is empty — the markdown-link
+    fallback was removed after the deadness test showed it contributed
+    zero URLs across three live runs."""
     ev = _event(
         author="guest_intelligence",
         is_final=True,
@@ -259,20 +261,16 @@ def test_specialist_final_with_output_key_emits_analyze_complete():
     assert emission["data"]["id"] == f"analyze-guest_intelligence"
     assert emission["data"]["status"] == "complete"
     assert emission["data"]["label"] == "Guest Intelligence"
-    # Fallback source harvested from markdown link
-    assert emission["data"]["sources"] == [
-        {"title": "Link", "url": "https://example.com"}
-    ]
+    assert emission["data"]["sources"] == []
 
 
-def test_specialist_final_prefers_grounding_chunks_over_text():
-    """When grounding_metadata is present, use it and ignore markdown links."""
+def test_specialist_final_uses_grounding_chunks():
+    """Sources come from grounding_metadata, which the in-process Runner
+    exposes directly on the event."""
     ev = _event(
         author="review_analyst",
         is_final=True,
-        state_delta={
-            "review_result": "ignored markdown [Old](https://old.example.com)"
-        },
+        state_delta={"review_result": "Some analysis text."},
         grounding_chunks=[
             {"uri": "https://ta.com/r/1", "title": "Review 1", "domain": "tripadvisor.com"},
         ],
@@ -312,6 +310,9 @@ def test_every_specialist_author_has_output_key_mapping():
 
 
 def test_synthesizer_final_report_emits_complete():
+    """Synth sources come from grounding metadata only. Markdown links in
+    the reply text are no longer extracted — the deadness test showed the
+    fallback contributed zero URLs across three live runs."""
     ev = _event(
         author="synthesizer",
         is_final=True,
@@ -322,9 +323,7 @@ def test_synthesizer_final_report_emits_complete():
     emission = map_event(ev)
     assert emission["type"] == "complete"
     assert emission["data"]["reply"].startswith("# Report")
-    assert emission["data"]["sources"] == [
-        {"title": "Docs", "url": "https://example.com/doc"}
-    ]
+    assert emission["data"]["sources"] == []
 
 
 def test_synthesizer_no_final_report_no_text_is_skipped():
@@ -342,16 +341,13 @@ def test_synthesizer_text_only_final_emits_complete():
     ev = _event(
         author="synthesizer",
         is_final=True,
-        text="# Report\n\nSummary of findings. [Link](https://ex.com/a)",
+        text="# Report\n\nSummary of findings.",
         state_delta={},
     )
     emission = map_event(ev)
     assert emission is not None, "text-only final must promote to complete"
     assert emission["type"] == "complete"
     assert emission["data"]["reply"].startswith("# Report")
-    assert emission["data"]["sources"] == [
-        {"title": "Link", "url": "https://ex.com/a"}
-    ]
 
 
 def test_synthesizer_prefers_final_report_over_text_parts():
@@ -367,23 +363,21 @@ def test_synthesizer_prefers_final_report_over_text_parts():
     assert emission["data"]["reply"] == "# Polished Report\n\nBody."
 
 
-def test_synthesizer_merges_grounding_and_text_sources():
-    """Grounding metadata and in-text markdown links are both harvested and
-    deduped by URL — matches specialists' source harvesting behavior."""
+def test_synthesizer_sources_come_from_grounding():
+    """Synth sources are harvested from grounding metadata exclusively."""
     ev = _event(
         author="synthesizer",
         is_final=True,
         text="See [A](https://a.com) and [B](https://b.com).",
         state_delta={},
         grounding_chunks=[
-            {"uri": "https://a.com", "title": "A (grounding)"},
+            {"uri": "https://a.com", "title": "A"},
             {"uri": "https://c.com", "title": "C"},
         ],
     )
     emission = map_event(ev)
-    urls = [s["url"] for s in emission["data"]["sources"]]
-    # a.com deduped (prefer grounding), plus c.com and b.com
-    assert set(urls) == {"https://a.com", "https://b.com", "https://c.com"}
+    urls = {s["url"] for s in emission["data"]["sources"]}
+    assert urls == {"https://a.com", "https://c.com"}
 
 
 def test_synthesizer_whitespace_only_final_report_falls_back_to_text():
@@ -410,16 +404,14 @@ def test_follow_up_final_report_emits_complete():
         author="follow_up",
         is_final=True,
         state_delta={
-            "final_report": "Your previous question was about service issues. [src](https://ex.com/p)"
+            "final_report": "Your previous question was about service issues."
         },
     )
     emission = map_event(ev)
     assert emission is not None, "follow_up terminal must not be dropped"
     assert emission["type"] == "complete"
     assert emission["data"]["reply"].startswith("Your previous question")
-    assert emission["data"]["sources"] == [
-        {"title": "src", "url": "https://ex.com/p"}
-    ]
+    assert emission["data"]["sources"] == []
 
 
 def test_follow_up_no_final_report_no_text_is_skipped():
@@ -443,22 +435,6 @@ def test_follow_up_text_only_final_emits_complete():
 
 
 # ── Source harvesting ──────────────────────────────────────────────────────
-
-
-def test_extract_sources_from_text_dedupes_by_url():
-    text = "[A](https://x.com) and [B](https://x.com) and [C](https://y.com)"
-    srcs = extract_sources_from_text(text)
-    assert srcs == [
-        {"title": "A", "url": "https://x.com"},
-        {"title": "C", "url": "https://y.com"},
-    ]
-
-
-def test_extract_sources_from_text_picks_up_domain_suffix():
-    text = "[Title](https://redirect.example/x){real.domain.com}"
-    assert extract_sources_from_text(text) == [
-        {"title": "Title", "url": "https://redirect.example/x", "domain": "real.domain.com"}
-    ]
 
 
 def test_extract_sources_from_grounding_handles_missing_fields():
