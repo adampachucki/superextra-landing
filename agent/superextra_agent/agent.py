@@ -182,13 +182,21 @@ def _synth_fallback_callback(*, callback_context, llm_response):
 
 def _make_synthesizer(name="synthesizer"):
     """Create a synthesizer instance. Text-only — charts are emitted as
-    ```chart <JSON>``` fenced blocks and rendered by the frontend."""
+    ```chart <JSON>``` fenced blocks and rendered by the frontend.
+
+    `include_contents='none'`: `_synthesizer_instruction` already injects
+    every specialist output + research_plan + places_context from state at
+    runtime, so the model doesn't need prior ADK conversation history.
+    This is the highest-value flip in the pipeline — synth requests in the
+    observed runs carried content_count ~25, most of which was stale history.
+    """
     return LlmAgent(
         name=name,
         model=MODEL_GEMINI,
         instruction=_synthesizer_instruction,
         description="Synthesizes findings from all specialist agents into a cohesive report.",
         output_key="final_report",
+        include_contents="none",
         generate_content_config=THINKING_CONFIG,
         after_model_callback=_synth_fallback_callback,
     )

@@ -190,7 +190,16 @@ async def set_specialist_briefs(briefs: dict, tool_context) -> str:
 
 
 def _make_specialist(name, description, output_key, tools=None, instruction_name=None, thinking_config=None):
-    """Create a specialist agent with standard callbacks and config."""
+    """Create a specialist agent with standard callbacks and config.
+
+    `include_contents='none'` isolates the model call to its own instruction +
+    brief. The instruction provider (`_make_instruction`) already resolves
+    every piece of required context from `ctx.state` at runtime (places_context,
+    briefs), so the model doesn't need prior ADK conversation history — and
+    the history it would otherwise inherit (enricher output, orchestrator
+    reasoning, sibling specialist outputs with their own source blocks) was
+    pure prompt bloat.
+    """
     return LlmAgent(
         name=name,
         model=SPECIALIST_GEMINI,
@@ -198,6 +207,7 @@ def _make_specialist(name, description, output_key, tools=None, instruction_name
         instruction=_make_instruction(instruction_name or name, brief_key=name),
         tools=tools or [google_search, fetch_web_content],
         output_key=output_key,
+        include_contents="none",
         generate_content_config=thinking_config if thinking_config is not None else THINKING_CONFIG,
         before_agent_callback=_make_skip_callback(name),
         before_model_callback=_inject_geo_bias,
@@ -264,6 +274,9 @@ def _skip_if_no_outputs(callback_context):
 
 
 def make_gap_researcher():
+    # `include_contents='none'`: `_gap_researcher_instruction` injects every
+    # specialist output + places_context + research_plan from state at runtime,
+    # so the model doesn't need prior conversation history.
     return LlmAgent(
         name="gap_researcher",
         model=SPECIALIST_GEMINI,
@@ -271,6 +284,7 @@ def make_gap_researcher():
         instruction=_gap_researcher_instruction,
         tools=[google_search, fetch_web_content],
         output_key="dynamic_result_2",
+        include_contents="none",
         generate_content_config=MEDIUM_THINKING_CONFIG,
         before_agent_callback=_skip_if_no_outputs,
         before_model_callback=_inject_geo_bias,
