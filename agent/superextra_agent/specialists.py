@@ -260,16 +260,55 @@ def _gap_researcher_instruction(ctx):
     return _GAP_RESEARCHER_TEMPLATE.format(**values)
 
 
-def _skip_if_no_outputs(callback_context):
-    """Skip gap researcher if no specialists produced output."""
-    output_keys = [
-        "market_result", "pricing_result", "revenue_result",
-        "guest_result", "location_result", "ops_result", "marketing_result",
-        "review_result", "dynamic_result_1",
-    ]
-    default = "Agent did not produce output."
-    if all(callback_context.state.get(k, default) == default for k in output_keys):
+# Specialist name (as assigned in `specialist_briefs`) → state output_key.
+# Kept local to avoid a circular import from `agent.py`. The set mirrors
+# VALID_BRIEF_KEYS (everything the orchestrator can dispatch).
+_SPECIALIST_OUTPUT_KEYS: dict[str, str] = {
+    "market_landscape": "market_result",
+    "menu_pricing": "pricing_result",
+    "revenue_sales": "revenue_result",
+    "guest_intelligence": "guest_result",
+    "location_traffic": "location_result",
+    "operations": "ops_result",
+    "marketing_digital": "marketing_result",
+    "review_analyst": "review_result",
+    "dynamic_researcher_1": "dynamic_result_1",
+}
+
+
+def _should_run_gap_researcher(callback_context):
+    """Decide whether to invoke the gap researcher.
+
+    Gap research is a Gemini Pro + MEDIUM-thinking + 3-search call (~30–50K
+    tokens). The prior gate only skipped when no specialist produced any
+    output at all, so the step ran on almost every turn. This tightens the
+    decision to: run only when a specialist the orchestrator actually
+    assigned returned the model-error fallback `"Research unavailable: …"`
+    (see `_on_model_error`). Successful outputs and unassigned specialists
+    (`NOT_RELEVANT` / missing state) both skip.
+    """
+    briefs = callback_context.state.get("specialist_briefs", {}) or {}
+    assigned = [n for n in briefs.keys() if n in _SPECIALIST_OUTPUT_KEYS]
+
+    if not assigned:
+        # Orchestrator dispatched nothing — preserves the previous
+        # "no specialist outputs to analyze" skip behavior.
+        logger.info("gap gate: skip — no assigned specialists")
         return types.Content(role="model", parts=[types.Part(text="No specialist outputs to analyze.")])
+
+    failures: list[str] = []
+    for spec_name in assigned:
+        value = callback_context.state.get(_SPECIALIST_OUTPUT_KEYS[spec_name])
+        if not isinstance(value, str) or value.startswith("Research unavailable: "):
+            failures.append(spec_name)
+
+    if not failures:
+        logger.info("gap gate: skip — %d/%d assigned specialists succeeded",
+                    len(assigned), len(assigned))
+        return types.Content(role="model", parts=[types.Part(text="All assigned specialists succeeded; no gaps to research.")])
+
+    logger.info("gap gate: run — %d/%d assigned specialists failed: %s",
+                len(failures), len(assigned), failures)
     return None
 
 
@@ -286,7 +325,7 @@ def make_gap_researcher():
         output_key="dynamic_result_2",
         include_contents="none",
         generate_content_config=MEDIUM_THINKING_CONFIG,
-        before_agent_callback=_skip_if_no_outputs,
+        before_agent_callback=_should_run_gap_researcher,
         before_model_callback=_inject_geo_bias,
         on_model_error_callback=_on_model_error,
         on_tool_error_callback=_on_tool_error,
