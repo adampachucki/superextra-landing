@@ -82,8 +82,8 @@ TOOL_LABELS: dict[str, str] = {
 }
 
 # Markdown link with optional {domain} suffix. Used by
-# `extract_sources_from_text` as a legacy fallback for specialist outputs that
-# embedded citations inline in prose (rare post-`_append_sources` removal).
+# `extract_sources_from_text` as a rare fallback for specialists that
+# embed citations inline in prose; grounding metadata is the primary path.
 _MD_LINK_RE = re.compile(r"\[([^\]]*)\]\((https?://[^)]+)\)(?:\{([^}]*)\})?")
 
 

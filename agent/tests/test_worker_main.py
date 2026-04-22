@@ -280,9 +280,9 @@ def test_json_formatter_emits_correlation_keys():
     record.cloudTaskName = "projects/p/locations/l/queues/q/tasks/run-123"
     record.trace = "projects/p/traces/t-1"
     # `event` + `reason` are the synth telemetry fields emitted from
-    # _embed_chart_images. `reason` is in _STRUCTURED_LOG_KEYS so the
+    # `_synth_fallback_callback`. `reason` is in _STRUCTURED_LOG_KEYS so the
     # formatter must surface it as a top-level jsonPayload field — that's
-    # what the Phase 2 Cloud Logging rate query depends on.
+    # what the Cloud Logging synth-outcome rate query depends on.
     record.event = "synth_outcome"
     record.reason = "MALFORMED_FUNCTION_CALL"
 

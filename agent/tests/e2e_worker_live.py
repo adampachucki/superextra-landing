@@ -158,11 +158,16 @@ async def main() -> int:
     seed_session()
 
     today = datetime.now(timezone.utc).date().isoformat()
+    # Override via E2E_QUERY env var. Default exercises numeric chart emission.
+    query_text = os.environ.get(
+        "E2E_QUERY",
+        "How do entree prices compare to other top fine-dining restaurants in Copenhagen?",
+    )
     query = (
         f"[Date: {today}] "
         f"[Context: asking about {PLACE['name']}, {PLACE['secondary']} "
         f"(Place ID: {PLACE['placeId']})] "
-        f"How do entree prices compare to other top fine-dining restaurants in Copenhagen?"
+        f"{query_text}"
     )
     body = RunRequest(
         sessionId=SID,

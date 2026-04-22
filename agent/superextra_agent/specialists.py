@@ -274,10 +274,13 @@ def _should_run_gap_researcher(callback_context):
     Gap research is a Gemini Pro + MEDIUM-thinking + 3-search call (~30–50K
     tokens). The prior gate only skipped when no specialist produced any
     output at all, so the step ran on almost every turn. This tightens the
-    decision to: run only when a specialist the orchestrator actually
-    assigned returned the model-error fallback `"Research unavailable: …"`
-    (see `_on_model_error`). Successful outputs and unassigned specialists
-    (`NOT_RELEVANT` / missing state) both skip.
+    decision to: inspect only orchestrator-assigned specialists, and run
+    when any of them either has no state entry or returned the model-error
+    fallback `"Research unavailable: …"` (see `_on_model_error`).
+
+    Unassigned specialists aren't iterated at all (they never appear in
+    `specialist_briefs`), so their `NOT_RELEVANT` outputs are irrelevant.
+    An orchestrator run with zero assigned specialists skips at the top.
     """
     briefs = callback_context.state.get("specialist_briefs", {}) or {}
     assigned = [n for n in briefs.keys() if n in _SPECIALIST_OUTPUT_KEYS]

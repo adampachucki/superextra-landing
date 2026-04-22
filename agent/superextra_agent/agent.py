@@ -151,33 +151,36 @@ def _synth_fallback_callback(*, callback_context, llm_response):
     substitute a text-only report stitched from the specialist outputs in
     state. Emit a structured `synth_outcome` log for rate tracking.
     """
-    def _outcome_extra(reason: str) -> dict:
-        return {"event": "synth_outcome", "reason": reason, "sid": worker_sid.get()}
+    reason = _classify_synth_response(llm_response)
+    if reason == "ok":
+        logger.info("synth outcome ok",
+                    extra={"event": "synth_outcome", "reason": "ok", "sid": worker_sid.get()})
+        return llm_response
 
+    logger.warning("synth outcome %s", reason,
+                   extra={"event": "synth_outcome", "reason": reason, "sid": worker_sid.get()})
+    return LlmResponse(content=types.Content(
+        role="model",
+        parts=[types.Part(text=_build_fallback_report(callback_context.state, reason))],
+    ))
+
+
+def _classify_synth_response(llm_response) -> str:
+    """Return the synth_outcome reason for a model response.
+
+    Ordered by specificity: an explicit `error_code` trumps shape checks
+    because a failed model call can still leave stale `content` on the
+    response object. `ok` means the model emitted at least one non-empty
+    text part.
+    """
     error_code = getattr(llm_response, "error_code", None)
     if error_code:
-        logger.warning("synth outcome %s", error_code, extra=_outcome_extra(error_code))
-        return LlmResponse(content=types.Content(
-            role="model",
-            parts=[types.Part(text=_build_fallback_report(callback_context.state, error_code))],
-        ))
-
+        return error_code
     if not llm_response.content or not llm_response.content.parts:
-        logger.warning("synth outcome empty_response", extra=_outcome_extra("empty_response"))
-        return LlmResponse(content=types.Content(
-            role="model",
-            parts=[types.Part(text=_build_fallback_report(callback_context.state, "empty_response"))],
-        ))
-
+        return "empty_response"
     if not any(getattr(p, "text", None) and p.text.strip() for p in llm_response.content.parts):
-        logger.warning("synth outcome no_text_parts", extra=_outcome_extra("no_text_parts"))
-        return LlmResponse(content=types.Content(
-            role="model",
-            parts=[types.Part(text=_build_fallback_report(callback_context.state, "no_text_parts"))],
-        ))
-
-    logger.info("synth outcome ok", extra=_outcome_extra("ok"))
-    return llm_response
+        return "no_text_parts"
+    return "ok"
 
 
 def _make_synthesizer(name="synthesizer"):

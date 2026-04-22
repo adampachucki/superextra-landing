@@ -516,8 +516,9 @@ async def run(body: RunRequest, request: Request) -> dict:
 
     sid = body.sessionId
     run_id = body.runId
-    # Thread sid through to logs emitted inside ADK callbacks (_embed_chart_images
-    # synth_outcome events) so Phase 2 rate queries can filter load-test sids.
+    # Thread sid through to logs emitted inside ADK callbacks
+    # (`_synth_fallback_callback` synth_outcome events) so rate queries can
+    # filter load-test sids.
     _worker_sid_ctx.set(sid)
     assert _fs is not None
     session_ref = _fs.collection("sessions").document(sid)
