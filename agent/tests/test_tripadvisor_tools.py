@@ -260,7 +260,7 @@ class TestFindTripadvisorRestaurant:
 
 class TestFindTripadvisorRestaurantSourceWrite:
     """B2: on high-confidence match, the tool writes a provider entry to
-    `temp:_tool_sources` so the worker accumulator can surface TripAdvisor
+    `_tool_sources` so the worker accumulator can surface TripAdvisor
     in the terminal sources[]."""
 
     @pytest.mark.asyncio
@@ -284,7 +284,7 @@ class TestFindTripadvisorRestaurantSourceWrite:
                 tool_context=ctx,
             )
 
-        sources = ctx.state.get("temp:_tool_sources") or []
+        sources = ctx.state.get("_tool_sources") or []
         assert len(sources) == 1
         assert sources[0]["domain"] == "tripadvisor.com"
         assert sources[0]["url"] == "https://www.tripadvisor.com/Restaurant_Review-umami-p-berg"
@@ -314,7 +314,7 @@ class TestFindTripadvisorRestaurantSourceWrite:
                 tool_context=ctx,
             )
 
-        assert ctx.state.get("temp:_tool_sources") is None
+        assert ctx.state.get("_tool_sources") is None
 
 
 class TestGetTripadvisorReviews:
@@ -412,22 +412,17 @@ class TestGetTripadvisorReviews:
         assert result["fetched_reviews"] == 10
 
 
-class TestGetTripadvisorReviewsSourceWrite:
-    """B2: after `find_tripadvisor_restaurant` has attached the TripAdvisor
-    URL, `get_tripadvisor_reviews` appends an entry annotated with the
-    number of reviews analysed. Worker dedup collapses to one entry."""
+class TestGetTripadvisorReviewsDoesNotWriteSources:
+    """B2: source attribution happens at `find_tripadvisor_restaurant`,
+    which has the URL. `get_tripadvisor_reviews` intentionally doesn't
+    re-emit — the find's entry is already in the sources pipeline, and
+    a second write would clobber it under the overwrite-only pattern."""
 
     @pytest.mark.asyncio
-    async def test_appends_review_count_entry(self):
+    async def test_does_not_touch_tool_sources(self):
         class MockCtx:
             def __init__(self):
-                self.state = {
-                    "temp:_tool_sources": [{
-                        "title": "TripAdvisor — Umami P-Berg",
-                        "url": "https://www.tripadvisor.com/r/umami",
-                        "domain": "tripadvisor.com",
-                    }]
-                }
+                self.state = {"_tool_sources": [{"url": "https://prior"}]}
 
         ctx = MockCtx()
         mock_client = AsyncMock()
@@ -437,11 +432,8 @@ class TestGetTripadvisorReviewsSourceWrite:
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
             await get_tripadvisor_reviews("6796040", num_pages=1, tool_context=ctx)
 
-        sources = ctx.state["temp:_tool_sources"]
-        assert len(sources) == 2  # original + annotated
-        assert "10 reviews analysed" in sources[1]["title"]
-        assert sources[1]["url"] == "https://www.tripadvisor.com/r/umami"
-        assert sources[1]["domain"] == "tripadvisor.com"
+        # Unchanged — this tool doesn't contribute provider entries.
+        assert ctx.state["_tool_sources"] == [{"url": "https://prior"}]
 
 
 class TestApiKeyRequired:

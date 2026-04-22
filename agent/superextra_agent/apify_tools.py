@@ -106,11 +106,12 @@ async def get_google_reviews(place_id: str, max_reviews: int = 50, tool_context=
         # `get_restaurant_details` for the target place; skip silently if
         # the state key is absent (e.g. tool called for a non-target
         # competitor), since we have no reliable URL to cite.
+        # Overwrite-only write — per-event state_delta propagates to the
+        # worker accumulator; no read-append to prevent cross-turn leakage.
         if tool_context and reviews:
             maps_uri = tool_context.state.get("_target_google_maps_uri")
             if maps_uri:
-                existing = tool_context.state.get("temp:_tool_sources", []) or []
-                tool_context.state["temp:_tool_sources"] = existing + [{
+                tool_context.state["_tool_sources"] = [{
                     "title": f"Google Reviews ({len(reviews)} reviews analysed)",
                     "url": maps_uri,
                     "domain": "google.com",

@@ -154,7 +154,7 @@ class TestGoogleReviewsSourceWrite:
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
             await get_google_reviews("ChIJtest", tool_context=ctx)
 
-        sources = ctx.state.get("temp:_tool_sources") or []
+        sources = ctx.state.get("_tool_sources") or []
         assert len(sources) == 1
         assert sources[0]["domain"] == "google.com"
         assert sources[0]["url"] == "https://maps.google.com/?cid=42"
@@ -174,4 +174,4 @@ class TestGoogleReviewsSourceWrite:
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
             await get_google_reviews("ChIJtest", tool_context=ctx)
 
-        assert "temp:_tool_sources" not in ctx.state
+        assert "_tool_sources" not in ctx.state

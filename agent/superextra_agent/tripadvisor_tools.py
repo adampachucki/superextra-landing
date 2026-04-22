@@ -159,18 +159,18 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "", t
             sample_reviews.append(review)
 
         # Attach a provider source on high-confidence matches so review-heavy
-        # replies surface the TripAdvisor page in the terminal sources[]. Uses
-        # `temp:` scope so follow-up turns that don't call this tool don't
-        # inherit stale entries. Low-confidence matches deliberately skip.
+        # replies surface the TripAdvisor page in the terminal sources[].
+        # Overwrite-only (no read-append): each tool call writes only its own
+        # batch. Worker drains per-event state_delta, so multiple tool calls
+        # in one run each contribute; follow-up turns that don't call this
+        # tool produce no state_delta entries and leak nothing.
         selected_link = match.get("link")
         if tool_context and match_confidence == "high" and selected_link:
-            existing = tool_context.state.get("temp:_tool_sources", []) or []
-            entry = {
+            tool_context.state["_tool_sources"] = [{
                 "title": f"TripAdvisor — {place_data.get('name') or match.get('title') or 'restaurant page'}",
                 "url": selected_link,
                 "domain": "tripadvisor.com",
-            }
-            tool_context.state["temp:_tool_sources"] = existing + [entry]
+            }]
 
         return {
             "status": "success" if match_confidence == "high" else "low_confidence",
@@ -268,22 +268,10 @@ async def get_tripadvisor_reviews(place_id: str, num_pages: int = 5, tool_contex
         if total_reviews and len(all_reviews) < total_reviews:
             partial = True
 
-        # Annotate the existing TripAdvisor source entry (written by
-        # `find_tripadvisor_restaurant`) with the review count so the
-        # user-visible citation reads "TripAdvisor (N reviews)". Worker-level
-        # dedup by URL collapses this to a single final entry.
-        if tool_context and all_reviews:
-            existing = tool_context.state.get("temp:_tool_sources", []) or []
-            # Find the earlier TripAdvisor entry (if any) to take its URL.
-            ta_entry = next((s for s in existing if s.get("domain") == "tripadvisor.com"), None)
-            if ta_entry:
-                url = ta_entry.get("url")
-                if url:
-                    tool_context.state["temp:_tool_sources"] = existing + [{
-                        "title": f"TripAdvisor ({len(all_reviews)} reviews analysed)",
-                        "url": url,
-                        "domain": "tripadvisor.com",
-                    }]
+        # Source attribution for TripAdvisor is handled at the
+        # `find_tripadvisor_restaurant` boundary (which has the URL). This
+        # tool only fetches additional pages; the final `sources[]` already
+        # carries the TripAdvisor entry.
 
         return {
             "status": "success",

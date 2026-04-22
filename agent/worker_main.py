@@ -649,14 +649,15 @@ async def run(body: RunRequest, request: Request) -> dict:
                 if data.get("status") == "complete":
                     for entry in data.get("sources") or []:
                         _merge_source(specialist_sources, specialist_sources_seen, entry)
-            # Also drain structured-tool sources written to `temp:_tool_sources`
-            # by the review_analyst's tools (TripAdvisor / Google Reviews).
-            # Grounding metadata doesn't cover those API-backed providers, so
-            # the tools write an entry on each successful call; the `temp:`
-            # scope auto-clears between invocations, preventing prior-turn
-            # entries from leaking into a follow-up run's sources[].
+            # Also drain structured-tool sources written by review_analyst's
+            # tools (TripAdvisor / Google Reviews) — grounding metadata
+            # doesn't cover API-backed providers. Tools use an overwrite-only
+            # write pattern (no read-append), so each tool-call event's
+            # state_delta contains only that call's batch and follow-up turns
+            # that don't re-invoke the tools produce no state_delta entries
+            # here — nothing to leak.
             sd = (event.actions.state_delta if event.actions else None) or {}
-            for entry in sd.get("temp:_tool_sources") or []:
+            for entry in sd.get("_tool_sources") or []:
                 _merge_source(specialist_sources, specialist_sources_seen, entry)
             # Promote the first terminal `complete` event the mapper emits
             # (router clarification OR synthesiser final). Reuse the mapper's

@@ -682,12 +682,12 @@ async def test_sources_dedupe_across_specialist_and_synth(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_tool_sources_drain_into_terminal_sources(monkeypatch):
-    """B2: when a tool writes provider entries to `temp:_tool_sources` in
+    """B2: when a tool writes provider entries to `_tool_sources` in
     state_delta, the worker accumulator drains them into the terminal
     sources[] alongside specialist activity-event sources."""
     events = [
         _mk_event(
-            {"temp:_tool_sources": [
+            {"_tool_sources": [
                 {"title": "TripAdvisor — Umami", "url": "https://ta.com/r/1", "domain": "tripadvisor.com"},
             ]},
             author="review_analyst",
@@ -711,7 +711,7 @@ async def test_tool_sources_drain_into_terminal_sources(monkeypatch):
 async def test_tool_sources_do_not_leak_across_events(monkeypatch):
     """B2: the worker drain operates on each event's state_delta, so
     entries don't flow in unless a tool wrote them in THAT event. Simulates
-    a follow-up turn: no tool writes temp:_tool_sources in any event, so
+    a follow-up turn: no tool writes _tool_sources in any event, so
     no provider entries appear in the terminal sources[]."""
     events = [
         _mk_event({"market_result": "follow-up analysis"}, author="market_landscape"),
