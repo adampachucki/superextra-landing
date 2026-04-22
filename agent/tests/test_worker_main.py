@@ -20,7 +20,6 @@ from worker_main import (  # noqa: E402
     AGENT_ENGINE_ID,
     OwnershipLost,
     STALE_HEARTBEAT_S,
-    _build_degraded_reply,
     _fallback_title,
     _fenced_update_logic,
     _merge_source,
@@ -220,42 +219,6 @@ def test_merge_source_skips_entries_without_url():
     _merge_source(sources, seen, "not a dict")  # wrong type
     _merge_source(sources, seen, {"url": ""})  # empty url
     assert sources == []
-
-
-# ── Degraded-reply fallback ────────────────────────────────────────────────
-
-
-def test_degraded_reply_builds_from_specialist_state():
-    """Last-resort fallback when synthesizer emits no usable final event.
-    Specialist outputs accumulated across the event loop are stitched into
-    a readable report so the session doesn't flip to
-    `empty_or_malformed_reply`. See
-    docs/pipeline-decoupling-implementation-review-2026-04-21.md P1."""
-    state = {
-        "market_result": "Market landscape body.",
-        "pricing_result": "Pricing body.",
-        "guest_result": "NOT_RELEVANT",  # filtered out
-        "review_result": "   ",  # whitespace-only filtered out
-        "dynamic_result_2": "Gap body.",
-    }
-    reply = _build_degraded_reply(state)
-    assert reply != ""
-    # Sections appear in canonical order, not dict/insertion order.
-    assert reply.index("Market Landscape") < reply.index("Menu & Pricing") < reply.index("Gap Research")
-    assert "Market landscape body." in reply
-    assert "Pricing body." in reply
-    assert "Gap body." in reply
-    assert "Guest Intelligence" not in reply
-    assert "Review Analysis" not in reply
-
-
-def test_degraded_reply_returns_empty_when_no_specialist_output():
-    """When no specialist produced usable output, fallback returns "" and
-    the caller falls through to status='error' — nothing to show is worse
-    than a bare section-less placeholder."""
-    assert _build_degraded_reply({}) == ""
-    assert _build_degraded_reply({"unrelated_key": "ignored"}) == ""
-    assert _build_degraded_reply({"market_result": "NOT_RELEVANT"}) == ""
 
 
 # ── Title fallback ─────────────────────────────────────────────────────────
@@ -715,6 +678,39 @@ async def test_sources_dedupe_across_specialist_and_synth(monkeypatch):
 
     complete = [u for u in fenced_writes if u.get("status") == "complete"][0]
     assert [s["url"] for s in complete["sources"]] == ["https://shared.example"]
+
+
+@pytest.mark.asyncio
+async def test_synth_callback_fallback_reply_lands_as_complete(monkeypatch):
+    """Phase 3 collapse: the worker no longer stitches specialist outputs
+    into a degraded reply on its own. The synth callback in agent.py
+    (`_synth_fallback_callback`) is now the only fallback — when it fires
+    for an error_code / empty / no-text response, it populates `final_report`
+    with a report stitched from specialist state, the mapper emits a normal
+    `complete` event, and the worker writes `status='complete'` with no
+    special handling. This test exercises that path via a synth emission
+    that looks like a normal complete (since the callback would have
+    already produced the text)."""
+    fallback_reply = (
+        "# Research findings\n\n"
+        "_Final synthesis didn't produce a response. Full research findings below._\n\n"
+        "## Market Landscape\n\nMarket text.\n\n"
+    )
+    events = [_mk_event({"final_report": fallback_reply}, author="synthesizer")]
+    emissions = [
+        {"type": "complete", "data": {"reply": fallback_reply, "sources": []}},
+    ]
+
+    fenced_writes, _hb = _install_run_harness(monkeypatch, events=events, emissions=emissions)
+    result = await __import__("worker_main").run(_build_run_request(), _fake_request())
+
+    assert result["ok"] is True
+    assert result["action"] == "complete"
+    complete = [u for u in fenced_writes if u.get("status") == "complete"]
+    assert len(complete) == 1
+    assert complete[0]["reply"] == fallback_reply
+    # No degraded_reply log event — worker-level stitching is gone.
+    assert not any(u.get("status") == "error" for u in fenced_writes)
 
 
 @pytest.mark.asyncio

@@ -162,7 +162,7 @@ async def main() -> int:
         f"[Date: {today}] "
         f"[Context: asking about {PLACE['name']}, {PLACE['secondary']} "
         f"(Place ID: {PLACE['placeId']})] "
-        f"What service issues come up in reviews?"
+        f"How do entree prices compare to other top fine-dining restaurants in Copenhagen?"
     )
     body = RunRequest(
         sessionId=SID,
