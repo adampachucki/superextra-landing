@@ -1,59 +1,101 @@
-"""Map ADK Runner events to Firestore event docs.
-
-The worker calls `map_and_write_event(...)` on every event yielded from
-`runner.run_async()`. The mapper is stateless — it decides _what_ (if
-anything) to emit for a single event and returns a doc shape the UI already
-understands (progress / activity / complete / error).
-
-See `docs/pipeline-decoupling-spike-results.md` §B for the source-of-truth
-taxonomy (27 captured events covering every author + state-delta key we
-actually see in the pipeline).
-"""
+"""Map ADK Runner events into the simplified activity-timeline contract."""
 
 from __future__ import annotations
 
 import asyncio
-import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 from google.cloud import firestore
 
-from .specialist_catalog import (
-    AUTHOR_TO_OUTPUT_KEY,
-    OUTPUT_KEY_TO_LABEL,
-    SPECIALISTS,
-)
-
-log = logging.getLogger(__name__)
-
-# ── Constants ───────────────────────────────────────────────────────────────
+from .specialist_catalog import AUTHOR_TO_OUTPUT_KEY, SPECIALISTS
 
 EVENT_TTL_DAYS = 30
 
-# Specialist agent authors (incl. gap_researcher which behaves like one).
-# Derived from the catalog; `follow_up` is dispatched separately (line 146
-# below) because it shares `output_key="final_report"` with the synth.
 SPECIALIST_AUTHORS: set[str] = {s.name for s in SPECIALISTS}
 
-# Tool name → UI label (mirrors `TOOL_LABELS` / `PLACES_TOOL_LABELS` in
-# `functions/utils.js`).
-TOOL_LABELS: dict[str, str] = {
-    "google_search": "Searching the web",
-    "fetch_web_content": "Reading source",
-    "get_restaurant_details": "Loading place details",
-    "find_nearby_restaurants": "Checking nearby places",
-    "search_restaurants": "Searching nearby places",
-    "find_tripadvisor_restaurant": "Looking up TripAdvisor profile",
-    "get_tripadvisor_reviews": "Fetching TripAdvisor reviews",
-    "get_google_reviews": "Fetching Google reviews",
-    "set_specialist_briefs": "Assigning specialists",
-}
-
-# ── Public: write a single ADK event to Firestore ──────────────────────────
+TIMELINE_FAMILIES = (
+    "Searching the web",
+    "Google Maps",
+    "TripAdvisor",
+    "Google reviews",
+    "Public sources",
+    "Warnings",
+)
 
 
-async def map_and_write_event(
+def _place_name(state: dict[str, Any] | None, place_id: str | None) -> str | None:
+    if not state or not place_id:
+        return None
+    place_names = state.get("place_names")
+    if not isinstance(place_names, dict):
+        return None
+    name = place_names.get(place_id)
+    return name if isinstance(name, str) and name.strip() else None
+
+
+def _detail(kind_id: str, group: str, family: str, text: str) -> dict[str, Any]:
+    return {
+        "kind": "detail",
+        "id": kind_id,
+        "group": group,
+        "family": family,
+        "text": text,
+    }
+
+
+def _normalize_space(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _short_url(url: str) -> str:
+    try:
+        parsed = urlparse(url)
+        host = parsed.netloc.replace("www.", "")
+        path = parsed.path.rstrip("/")
+        label = host + (path or "")
+        return label[:117] + "..." if len(label) > 120 else label
+    except Exception:
+        text = url.strip()
+        return text[:117] + "..." if len(text) > 120 else text
+
+
+def _iter_parts(event: Any) -> list[Any]:
+    content = _get(event, "content")
+    parts = _get(content, "parts") if content else None
+    return list(parts or [])
+
+
+def _iter_function_calls(event: Any) -> list[tuple[int, str, dict[str, Any]]]:
+    out: list[tuple[int, str, dict[str, Any]]] = []
+    for idx, part in enumerate(_iter_parts(event)):
+        fc = _get(part, "function_call")
+        if not fc:
+            continue
+        name = _get(fc, "name")
+        if not isinstance(name, str) or not name:
+            continue
+        args = _get(fc, "args") or {}
+        out.append((idx, name, args if isinstance(args, dict) else {}))
+    return out
+
+
+def _iter_function_responses(event: Any) -> list[tuple[int, str, dict[str, Any]]]:
+    out: list[tuple[int, str, dict[str, Any]]] = []
+    for idx, part in enumerate(_iter_parts(event)):
+        fr = _get(part, "function_response")
+        if not fr:
+            continue
+        name = _get(fr, "name")
+        if not isinstance(name, str) or not name:
+            continue
+        response = _get(fr, "response") or {}
+        out.append((idx, name, response if isinstance(response, dict) else {}))
+    return out
+
+
+async def write_event_doc(
     *,
     fs: firestore.Client,
     sid: str,
@@ -61,25 +103,16 @@ async def map_and_write_event(
     run_id: str,
     attempt: int,
     seq_in_attempt: int,
-    event: Any,
-) -> dict | None:
-    """Dispatch an ADK Event to zero-or-one Firestore event writes.
-
-    Returns the doc that was written (for logging) or None if the event was
-    not mapped. Firestore writes are offloaded to a thread so we don't block
-    the runner's async loop.
-    """
-    emission = map_event(event)
-    if emission is None:
-        return None
-
+    event_type: str,
+    data: dict[str, Any],
+) -> dict[str, Any]:
     doc = {
         "userId": user_id,
         "runId": run_id,
         "attempt": attempt,
         "seqInAttempt": seq_in_attempt,
-        "type": emission["type"],
-        "data": emission["data"],
+        "type": event_type,
+        "data": data,
         "ts": firestore.SERVER_TIMESTAMP,
         "expiresAt": datetime.now(timezone.utc) + timedelta(days=EVENT_TTL_DAYS),
     }
@@ -88,223 +121,91 @@ async def map_and_write_event(
     return doc
 
 
-# ── Pure mapping (testable) ─────────────────────────────────────────────────
-
-
-def map_event(event: Any) -> dict | None:
-    """Return `{"type": ..., "data": ...}` for an ADK Event, or None to skip.
-
-    See the rules table in `docs/pipeline-decoupling-spike-results.md` §B.
-    """
+def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]:
     author = _get(event, "author")
-
-    if author == "router":
-        return _map_router(event)
-
-    if author == "context_enricher":
-        return _map_enricher(event)
-
-    if author == "research_orchestrator":
-        return _map_orchestrator(event)
-
-    if author in SPECIALIST_AUTHORS:
-        return _map_specialist(event, author)
-
-    # Both synthesizer (turn 1) and follow_up (turn N+1) emit the terminal
-    # `final_report` state_delta; they share `output_key="final_report"` in
-    # `agent.py`. Without this second branch, follow-up turns' terminal
-    # events get dropped by the mapper, the worker's terminal-promotion logic
-    # (which keys on `emitted["type"] == "complete"`) never fires, and the
-    # reply-sanity gate flips the session to status=error.
-    if author in ("synthesizer", "follow_up"):
-        return _map_synthesizer(event)
-
-    log.debug("unmapped event author=%s", author)
-    return None
-
-
-# ── Per-author handlers ─────────────────────────────────────────────────────
-
-
-def _map_router(event: Any) -> dict | None:
-    fc = _first_function_call(event)
-    if fc and getattr(fc, "name", None) == "transfer_to_agent":
-        # Internal routing — UI doesn't need it.
-        return None
-    if _is_final(event):
-        text = _collect_text(event)
-        if text:
-            # Router produced a terminal reply (usually a clarification).
-            return {"type": "complete", "data": {"reply": text, "sources": []}}
-    return None
-
-
-def _map_enricher(event: Any) -> dict | None:
-    fc = _first_function_call(event)
-    if fc:
-        name = getattr(fc, "name", "") or ""
-        return {
-            "type": "activity",
-            "data": {
-                "category": "data",
-                "id": _activity_id_for_tool(name),
-                "status": "running",
-                "label": TOOL_LABELS.get(name, name),
-                "agent": "context_enricher",
-            },
-        }
-    if _has_state_delta(event, "places_context"):
-        return {
-            "type": "progress",
-            "data": {
-                "stage": "context",
-                "status": "complete",
-                "label": "Place data gathered",
-            },
-        }
-    return None
-
-
-def _map_orchestrator(event: Any) -> dict | None:
-    fc = _first_function_call(event)
-    if fc and getattr(fc, "name", None) == "set_specialist_briefs":
-        # Unpack the brief keys so the UI can render pending activity entries
-        # for exactly the specialists that are about to run.
-        args = getattr(fc, "args", None) or {}
-        briefs = args.get("briefs") if isinstance(args, dict) else None
-        specialists = sorted(briefs.keys()) if isinstance(briefs, dict) else []
-        return {
-            "type": "activity",
-            "data": {
-                "category": "analyze",
-                "id": "orchestrator-briefs",
-                "status": "running",
-                "label": "Assigning specialists",
-                "agent": "research_orchestrator",
-                "specialists": specialists,
-            },
-        }
-    if _has_state_delta(event, "research_plan"):
-        return {
-            "type": "progress",
-            "data": {
-                "stage": "planning",
-                "status": "complete",
-                "label": "Research planned",
-            },
-        }
-    return None
-
-
-def _map_specialist(event: Any, author: str) -> dict | None:
-    fc = _first_function_call(event)
-    if fc:
-        name = getattr(fc, "name", "") or ""
-        category = "search" if name in ("google_search", "fetch_web_content") else "data"
-        label = TOOL_LABELS.get(name, name)
-        # Specialist-level tool calls often include a query/URL in args —
-        # surface a short version of it as detail so the UI can display
-        # "Searching: <query>" instead of the generic label.
-        args = getattr(fc, "args", None) or {}
-        detail: str | None = None
-        if isinstance(args, dict):
-            raw = args.get("query") or args.get("url")
-            if isinstance(raw, str):
-                detail = raw if len(raw) <= 100 else raw[:97] + "…"
-        data = {
-            "category": category,
-            "id": f"{author}-{name}-{_event_id(event)}",
-            "status": "running",
-            "label": label,
-            "agent": author,
-        }
-        if detail:
-            data["detail"] = detail
-        return {"type": "activity", "data": data}
-
-    if _is_final(event):
-        output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
-        if output_key and _has_state_delta(event, output_key):
-            sources = extract_sources_from_grounding(event)
-            return {
-                "type": "activity",
-                "data": {
-                    "category": "analyze",
-                    "id": f"analyze-{author}",
-                    "status": "complete",
-                    "label": OUTPUT_KEY_TO_LABEL.get(output_key, author),
-                    "agent": author,
-                    "sources": sources,
-                },
-            }
-        # NOT_RELEVANT or otherwise no output — skip silently.
-        return None
-    return None
-
-
-def _map_synthesizer(event: Any) -> dict | None:
-    # Only the final event promotes to a terminal reply.
-    if not _is_final(event):
-        return None
-
-    # Preferred source: `state_delta.final_report`. Both synthesizer and
-    # follow_up agents are configured with `output_key="final_report"`, and
-    # the state_delta path preserves today's format-normalization semantics.
-    reply: str | None = None
-    if _has_state_delta(event, "final_report"):
-        candidate = _state_delta(event).get("final_report")
-        if isinstance(candidate, str) and candidate.strip():
-            reply = candidate
-
-    # Fallback: the final event carried text parts but no state_delta. Seen
-    # intermittently in live runs — the LLM emits the final model response as
-    # content.parts[*].text without the state_delta write that output_key
-    # usually performs. Without this branch the mapper returns None, no
-    # complete event is written, and the worker sanity gate flips the
-    # session to `status='error' / empty_or_malformed_reply`.
-    if reply is None:
-        parts_text = _collect_text(event).strip()
-        if parts_text:
-            reply = parts_text
-
-    if not reply:
-        return None
-
-    # The in-process Runner exposes grounding metadata on the synth event.
-    # Worker-level accumulation (see `_merge_source` in worker_main) unions
-    # these with specialist activity-event sources at terminal time.
-    sources = extract_sources_from_grounding(event)
-
-    return {
-        "type": "complete",
-        "data": {"reply": reply, "sources": sources},
+    mapping: dict[str, Any] = {
+        "timeline_events": [],
+        "complete": None,
+        "grounding_sources": [],
+        "milestones": {
+            "context_started": False,
+            "plan_ready_text": None,
+            "research_started": False,
+            "research_result_text": None,
+            "drafting_started": False,
+        },
     }
 
+    _ingest_place_names(event, state)
 
-# ── Source harvesting ───────────────────────────────────────────────────────
+    if author == "router":
+        complete = _map_router_complete(event)
+        if complete is not None:
+            mapping["complete"] = complete
+        return mapping
+
+    detail_events: list[dict[str, Any]] = []
+    for idx, name, args in _iter_function_calls(event):
+        detail = _map_function_call(author, name, args, state, _event_id(event), idx)
+        if detail is not None:
+            detail_events.append(detail)
+
+    for idx, name, response in _iter_function_responses(event):
+        detail_events.extend(
+            _map_function_response(author, name, response, state, _event_id(event), idx)
+        )
+
+    mapping["timeline_events"] = detail_events
+
+    if author == "context_enricher" and detail_events:
+        mapping["milestones"]["context_started"] = True
+
+    if author == "research_orchestrator" and _has_state_delta(event, "research_plan"):
+        mapping["milestones"]["plan_ready_text"] = str(_state_delta(event)["research_plan"])
+
+    if author in SPECIALIST_AUTHORS and detail_events:
+        mapping["milestones"]["research_started"] = True
+
+    if author in SPECIALIST_AUTHORS:
+        output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
+        if output_key and _has_state_delta(event, output_key):
+            mapping["milestones"]["research_result_text"] = str(_state_delta(event)[output_key])
+            mapping["grounding_sources"] = extract_sources_from_grounding(event)
+
+    if _has_state_delta(event, "_drafting_started"):
+        mapping["milestones"]["drafting_started"] = True
+        mapping["timeline_events"].append(
+            {
+                "kind": "drafting",
+                "id": f"{_event_id(event)}:drafting",
+                "text": "Drafting the answer…",
+            }
+        )
+
+    if author in ("synthesizer", "follow_up"):
+        complete = _map_synth_complete(event)
+        if complete is not None:
+            mapping["complete"] = complete
+
+    return mapping
 
 
-def extract_sources_from_grounding(event: Any) -> list[dict]:
-    """Pull sources from `event.grounding_metadata.grounding_chunks` (Gemini
-    grounded-search metadata). Dedupes by URL."""
+def extract_sources_from_grounding(event: Any) -> list[dict[str, Any]]:
     gm = _get(event, "grounding_metadata")
     if not gm:
         return []
     chunks = _get(gm, "grounding_chunks") or []
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for chunk in chunks:
         web = _get(chunk, "web")
         if not web:
             continue
         uri = _get(web, "uri")
-        if not uri or uri in seen:
+        if not isinstance(uri, str) or not uri or uri in seen:
             continue
         seen.add(uri)
-        entry: dict[str, Any] = {
-            "title": _get(web, "title") or uri,
-            "url": uri,
-        }
+        entry: dict[str, Any] = {"title": _get(web, "title") or uri, "url": uri}
         domain = _get(web, "domain")
         if domain:
             entry["domain"] = domain
@@ -312,45 +213,202 @@ def extract_sources_from_grounding(event: Any) -> list[dict]:
     return out
 
 
-# ── Internal helpers ────────────────────────────────────────────────────────
+def _map_router_complete(event: Any) -> dict[str, Any] | None:
+    for _, name, _args in _iter_function_calls(event):
+        if name == "transfer_to_agent":
+            return None
+    if not _is_final(event):
+        return None
+    text = _collect_text(event).strip()
+    if not text:
+        return None
+    return {"reply": text, "sources": []}
+
+
+def _map_synth_complete(event: Any) -> dict[str, Any] | None:
+    if not _is_final(event):
+        return None
+
+    reply: str | None = None
+    if _has_state_delta(event, "final_report"):
+        candidate = _state_delta(event).get("final_report")
+        if isinstance(candidate, str) and candidate.strip():
+            reply = candidate
+
+    if reply is None:
+        text = _collect_text(event).strip()
+        if text:
+            reply = text
+
+    if not reply:
+        return None
+
+    return {"reply": reply, "sources": extract_sources_from_grounding(event)}
+
+
+def _map_function_call(
+    author: str | None,
+    name: str,
+    args: dict[str, Any],
+    state: dict[str, Any] | None,
+    event_id: str,
+    idx: int,
+) -> dict[str, Any] | None:
+    row_id = f"{event_id}:call:{idx}:{name}"
+    if name == "google_search":
+        query = _normalize_space(str(args.get("query") or "")).strip()
+        if query:
+            return _detail(row_id, "search", "Searching the web", query)
+        return None
+    if name == "fetch_web_content":
+        url = str(args.get("url") or "").strip()
+        if url:
+            return _detail(row_id, "source", "Public sources", _short_url(url))
+        return None
+    if name == "search_restaurants":
+        query = _normalize_space(str(args.get("query") or "")).strip()
+        if query:
+            return _detail(row_id, "platform", "Google Maps", query)
+        return _detail(row_id, "platform", "Google Maps", "Searching places")
+    if name == "find_tripadvisor_restaurant":
+        place = _normalize_space(str(args.get("name") or "")).strip()
+        return _detail(
+            row_id,
+            "platform",
+            "TripAdvisor",
+            f"Matching {place}" if place else "Matching venue",
+        )
+    if name == "get_google_reviews":
+        place_id = str(args.get("place_id") or "").strip()
+        place = _place_name(state, place_id)
+        return _detail(
+            row_id,
+            "platform",
+            "Google reviews",
+            f"Checking {place}" if place else "Checking reviews",
+        )
+    if name == "get_tripadvisor_reviews":
+        return _detail(row_id, "platform", "TripAdvisor", "Reading reviews")
+    return None
+
+
+def _map_function_response(
+    author: str | None,
+    name: str,
+    response: dict[str, Any],
+    state: dict[str, Any] | None,
+    event_id: str,
+    idx: int,
+) -> list[dict[str, Any]]:
+    row_id = f"{event_id}:response:{idx}:{name}"
+    rows: list[dict[str, Any]] = []
+    status = str(response.get("status") or "").strip().lower()
+
+    if name == "get_restaurant_details" and status == "success":
+        place = response.get("place") if isinstance(response.get("place"), dict) else {}
+        display_name = _get(place.get("displayName") if isinstance(place, dict) else None, "text")
+        if isinstance(display_name, str) and display_name.strip():
+            rows.append(_detail(row_id, "platform", "Google Maps", f"Profile for {display_name.strip()}"))
+        return rows
+
+    if name == "get_batch_restaurant_details" and status == "success":
+        places = response.get("places")
+        if isinstance(places, list):
+            rows.append(
+                _detail(row_id, "platform", "Google Maps", f"{len(places)} place profiles")
+            )
+        return rows
+
+    if name in ("find_nearby_restaurants", "search_restaurants") and status == "success":
+        results = response.get("results")
+        if isinstance(results, list):
+            label = "nearby places" if name == "find_nearby_restaurants" else "place matches"
+            rows.append(_detail(row_id, "platform", "Google Maps", f"{len(results)} {label}"))
+        return rows
+
+    if name == "find_tripadvisor_restaurant":
+        display_name = str(response.get("name") or "").strip() or str(response.get("title") or "").strip()
+        if status == "low_confidence":
+            rows.append(
+                _detail(
+                    row_id,
+                    "warning",
+                    "Warnings",
+                    f"TripAdvisor match uncertain for {display_name or 'the venue'}",
+                )
+            )
+            return rows
+        if status == "success":
+            rows.append(
+                _detail(
+                    row_id,
+                    "platform",
+                    "TripAdvisor",
+                    f"Matched {display_name}" if display_name else "Matched venue",
+                )
+            )
+        elif status == "error":
+            rows.append(
+                _detail(row_id, "warning", "Warnings", "TripAdvisor lookup failed")
+            )
+        return rows
+
+    if name == "get_tripadvisor_reviews":
+        if status == "success":
+            count = int(response.get("fetched_reviews") or 0)
+            rows.append(
+                _detail(row_id, "platform", "TripAdvisor", f"{count} reviews loaded")
+            )
+        elif status == "error":
+            rows.append(
+                _detail(row_id, "warning", "Warnings", "TripAdvisor reviews unavailable")
+            )
+        return rows
+
+    if name == "get_google_reviews":
+        place_id = str(response.get("place_id") or "").strip()
+        place = _place_name(state, place_id)
+        if status == "success":
+            count = int(response.get("total_fetched") or 0)
+            label = f"{count} reviews for {place}" if place else f"{count} Google reviews"
+            rows.append(_detail(row_id, "platform", "Google reviews", label))
+        elif status == "error":
+            rows.append(
+                _detail(
+                    row_id,
+                    "warning",
+                    "Warnings",
+                    f"Google reviews unavailable for {place}" if place else "Google reviews unavailable",
+                )
+            )
+        return rows
+
+    if name == "fetch_web_content" and status == "error":
+        rows.append(_detail(row_id, "warning", "Warnings", "Source fetch failed"))
+
+    return rows
+
+
+def _ingest_place_names(event: Any, state: dict[str, Any] | None) -> None:
+    if state is None:
+        return
+    place_names = state.setdefault("place_names", {})
+    if not isinstance(place_names, dict):
+        return
+    for key, value in _state_delta(event).items():
+        if not key.startswith("_place_name_"):
+            continue
+        if isinstance(value, str) and value.strip():
+            place_names[key.removeprefix("_place_name_")] = value.strip()
 
 
 def _get(obj: Any, attr: str, default: Any = None) -> Any:
-    """Attribute access that also handles dict-shaped inputs (useful in tests
-    where events are synthesised as SimpleNamespace / dict)."""
     if isinstance(obj, dict):
         return obj.get(attr, default)
     return getattr(obj, attr, default)
 
 
-def _is_final(event: Any) -> bool:
-    fn = getattr(event, "is_final_response", None)
-    if callable(fn):
-        try:
-            return bool(fn())
-        except Exception:
-            return False
-    # Fallback for dict-shaped fixtures.
-    return bool(_get(event, "is_final"))
-
-
-def _event_id(event: Any) -> str:
-    return str(_get(event, "id") or "")
-
-
-def _first_function_call(event: Any) -> Any | None:
-    content = _get(event, "content")
-    parts = _get(content, "parts") if content else None
-    if not parts:
-        return None
-    for part in parts:
-        fc = _get(part, "function_call")
-        if fc:
-            return fc
-    return None
-
-
-def _state_delta(event: Any) -> dict:
+def _state_delta(event: Any) -> dict[str, Any]:
     actions = _get(event, "actions")
     sd = _get(actions, "state_delta") if actions else None
     return sd if isinstance(sd, dict) else {}
@@ -363,29 +421,29 @@ def _has_state_delta(event: Any, key: str) -> bool:
     value = sd[key]
     if not value:
         return False
-    # Specialists that skip return the literal "NOT_RELEVANT" — don't treat
-    # that as a real completion event.
     if isinstance(value, str) and value.strip() == "NOT_RELEVANT":
         return False
     return True
 
 
 def _collect_text(event: Any) -> str:
-    content = _get(event, "content")
-    parts = _get(content, "parts") if content else None
-    if not parts:
-        return ""
     chunks: list[str] = []
-    for p in parts:
-        t = _get(p, "text")
-        if t:
-            chunks.append(t)
+    for part in _iter_parts(event):
+        text = _get(part, "text")
+        if text:
+            chunks.append(text)
     return "".join(chunks)
 
 
-def _activity_id_for_tool(name: str) -> str:
-    return {
-        "get_restaurant_details": "data-primary",
-        "find_nearby_restaurants": "data-check",
-        "search_restaurants": "data-check",
-    }.get(name, f"data-{name}")
+def _is_final(event: Any) -> bool:
+    fn = getattr(event, "is_final_response", None)
+    if callable(fn):
+        try:
+            return bool(fn())
+        except Exception:
+            return False
+    return bool(_get(event, "is_final"))
+
+
+def _event_id(event: Any) -> str:
+    return str(_get(event, "id") or "evt")

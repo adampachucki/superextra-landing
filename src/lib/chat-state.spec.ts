@@ -13,11 +13,18 @@ vi.mock('$lib/firebase', () => ({
 	getIdToken: vi.fn(async () => 'mock-id-token')
 }));
 
+vi.mock('firebase/firestore', () => ({
+	doc: vi.fn((_db, _collection, id) => ({ _id: id })),
+	getDoc: vi.fn()
+}));
+
 import { chatState } from './chat-state.svelte';
 import { postAgentStream, subscribeToSession } from '$lib/firestore-stream';
+import { getDoc } from 'firebase/firestore';
 
 const mockPost = postAgentStream as Mock;
 const mockSubscribe = subscribeToSession as Mock;
+const mockGetDoc = getDoc as unknown as Mock;
 
 type StreamCallbacks = Parameters<typeof subscribeToSession>[2];
 
@@ -67,10 +74,18 @@ async function waitUntil(fn: () => boolean, timeout = 2000) {
 	}
 }
 
+function docSnap(data: Record<string, unknown> | null) {
+	return {
+		exists: () => data !== null,
+		data: () => data ?? {}
+	};
+}
+
 describe('chatState (Firestore transport)', () => {
 	beforeEach(() => {
 		mockPost.mockReset();
 		mockSubscribe.mockReset();
+		mockGetDoc.mockReset();
 		resetAll();
 	});
 
@@ -114,6 +129,24 @@ describe('chatState (Firestore transport)', () => {
 			expect(agentMsg?.sources).toEqual(sources);
 			expect(chatState.loading).toBe(false);
 			expect(stream.unsubscribed).toBe(true);
+		});
+
+		it('onComplete marks the live reply for typing after drafting starts', async () => {
+			const stream = hangingStream();
+			chatState.start('typed reply', null);
+			await waitUntil(() => !!stream.cbs);
+
+			stream.cbs.onTimelineEvent!({
+				kind: 'drafting',
+				id: 'd1',
+				text: 'Drafting the answer…'
+			});
+			stream.cbs.onComplete('agent reply', []);
+
+			await waitUntil(() => !chatState.loading);
+			const agentMsg = chatState.messages.find((m) => m.role === 'agent');
+			expect(agentMsg).toBeTruthy();
+			expect(chatState.typingMessageTimestamp).toBe(agentMsg?.timestamp);
 		});
 
 		it('dedupes when onComplete fires twice for the same runId', async () => {
@@ -227,21 +260,21 @@ describe('chatState (Firestore transport)', () => {
 			chatState.start('will retry', null);
 			await waitUntil(() => !!stream.cbs);
 
-			stream.cbs.onActivity!({
+			stream.cbs.onTimelineEvent!({
+				kind: 'detail',
 				id: 'a1',
-				category: 'data',
-				status: 'running',
-				label: 'Loading'
+				group: 'platform',
+				family: 'Google Maps',
+				text: 'Loading'
 			});
-			expect(chatState.streamingActivities.length).toBe(1);
+			expect(chatState.liveTimeline.length).toBe(1);
 
 			stream.cbs.onAttemptChange!(2);
-			expect(chatState.streamingActivities.length).toBe(0);
-			// Retrying cue surfaces through streamingProgress so the existing
-			// StreamingProgress component renders it without new UI wiring.
-			expect(chatState.streamingProgress).toEqual([
-				{ stage: 'retrying', status: 'running', label: 'Retrying…' }
-			]);
+			expect(chatState.liveTimeline).toHaveLength(1);
+			expect(chatState.liveTimeline[0]).toMatchObject({
+				kind: 'note',
+				text: 'Retrying…'
+			});
 		});
 
 		it('maps 409 response to previous_turn_in_flight error', async () => {
@@ -301,60 +334,133 @@ describe('chatState (Firestore transport)', () => {
 		});
 	});
 
-	describe('streamingActivities', () => {
-		it('upserts activity items by id', async () => {
+	describe('liveTimeline', () => {
+		it('appends timeline rows and dedupes identical detail rows', async () => {
 			const stream = hangingStream();
 			chatState.start('test', null);
 			await waitUntil(() => !!stream.cbs);
 
-			stream.cbs.onActivity!({
+			stream.cbs.onTimelineEvent!({
+				kind: 'detail',
 				id: 'data-0',
-				category: 'data',
-				status: 'running',
-				label: 'Loading restaurant details'
+				group: 'platform',
+				family: 'Google Maps',
+				text: 'Profile for Umami'
 			});
-			expect(chatState.streamingActivities).toHaveLength(1);
-			expect(chatState.streamingActivities[0].status).toBe('running');
-
-			stream.cbs.onActivity!({
-				id: 'data-0',
-				category: 'data',
-				status: 'complete',
-				label: 'Loading restaurant details'
+			stream.cbs.onTimelineEvent!({
+				kind: 'detail',
+				id: 'data-1',
+				group: 'platform',
+				family: 'Google Maps',
+				text: 'Profile for Umami'
 			});
-			expect(chatState.streamingActivities).toHaveLength(1);
-			expect(chatState.streamingActivities[0].status).toBe('complete');
+			expect(chatState.liveTimeline).toHaveLength(1);
 		});
 
-		it('all-complete marks every item in category as complete', async () => {
+		it('keeps distinct note and drafting rows in order', async () => {
 			const stream = hangingStream();
 			chatState.start('test', null);
 			await waitUntil(() => !!stream.cbs);
 
-			stream.cbs.onActivity!({ id: 'd1', category: 'data', status: 'running', label: 'A' });
-			stream.cbs.onActivity!({ id: 'd2', category: 'data', status: 'running', label: 'B' });
-			stream.cbs.onActivity!({ id: '', category: 'data', status: 'all-complete', label: '' });
-			expect(chatState.streamingActivities.every((a) => a.status === 'complete')).toBe(true);
+			stream.cbs.onTimelineEvent!({
+				kind: 'note',
+				id: 'n1',
+				text: 'Checking the venue',
+				noteSource: 'deterministic',
+				counts: { webQueries: 0, sources: 0, venues: 1, platforms: 1 }
+			});
+			stream.cbs.onTimelineEvent!({
+				kind: 'drafting',
+				id: 'd1',
+				text: 'Drafting the answer…'
+			});
+			expect(chatState.liveTimeline.map((event) => event.kind)).toEqual(['note', 'drafting']);
 		});
 
-		it('next send clears streamingActivities from previous turn', async () => {
+		it('next send clears liveTimeline from previous turn', async () => {
 			const stream1 = hangingStream();
 			chatState.start('first', null);
 			await waitUntil(() => !!stream1.cbs);
-			stream1.cbs.onActivity!({
+			stream1.cbs.onTimelineEvent!({
+				kind: 'detail',
 				id: 'data-0',
-				category: 'data',
-				status: 'running',
-				label: 'Loading'
+				group: 'platform',
+				family: 'Google Maps',
+				text: 'Loading'
 			});
 			stream1.cbs.onComplete('reply', [], undefined);
 			await waitUntil(() => !chatState.loading);
-			expect(chatState.streamingActivities).toHaveLength(1);
+			expect(chatState.liveTimeline).toHaveLength(0);
 
 			const stream2 = hangingStream();
 			chatState.send('follow-up');
 			await waitUntil(() => !!stream2.cbs);
-			expect(chatState.streamingActivities).toHaveLength(0);
+			expect(chatState.liveTimeline).toHaveLength(0);
+		});
+	});
+
+	describe('resumeCurrentIfNeeded()', () => {
+		it('returns false when there is no active conversation', async () => {
+			await expect(chatState.resumeCurrentIfNeeded()).resolves.toBe(false);
+			expect(mockGetDoc).not.toHaveBeenCalled();
+		});
+
+		it('returns false when the last message is not from the user', async () => {
+			const stream = hangingStream();
+			chatState.start('finished turn', null);
+			await waitUntil(() => !!stream.cbs);
+			stream.cbs.onComplete('agent reply', [], undefined);
+			await waitUntil(() => !chatState.loading);
+
+			await expect(chatState.resumeCurrentIfNeeded()).resolves.toBe(false);
+			expect(mockGetDoc).not.toHaveBeenCalled();
+		});
+
+		it('reattaches through Firestore when the last message is from the user', async () => {
+			mockPost.mockRejectedValueOnce(new Error('offline'));
+			chatState.start('resume me', null);
+			await waitUntil(() => !chatState.loading);
+
+			mockGetDoc.mockResolvedValue(
+				docSnap({
+					status: 'running',
+					currentRunId: 'resume-run',
+					queuedAt: { toMillis: () => 123 }
+				})
+			);
+
+			await expect(chatState.resumeCurrentIfNeeded()).resolves.toBe(true);
+			expect(mockGetDoc).toHaveBeenCalledTimes(1);
+			expect(mockSubscribe).toHaveBeenCalledTimes(1);
+			expect(mockSubscribe.mock.calls[0][1]).toBe('resume-run');
+		});
+
+		it('tries Firestore resume before recover on visibility return when runId is missing', async () => {
+			mockPost.mockRejectedValueOnce(new Error('offline'));
+			chatState.start('resume on return', null);
+			await waitUntil(() => !chatState.loading);
+
+			mockGetDoc.mockResolvedValue(
+				docSnap({
+					status: 'running',
+					currentRunId: 'resume-run',
+					queuedAt: { toMillis: () => 456 }
+				})
+			);
+
+			const fetchMock = vi.fn();
+			vi.stubGlobal('fetch', fetchMock);
+			vi.useFakeTimers();
+			try {
+				chatState.handleReturn(60_000);
+				await vi.advanceTimersByTimeAsync(350);
+				expect(mockGetDoc).toHaveBeenCalledTimes(1);
+				expect(mockSubscribe).toHaveBeenCalledTimes(1);
+				expect(fetchMock).not.toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+				vi.unstubAllGlobals();
+			}
 		});
 	});
 

@@ -1,4 +1,11 @@
-import { postAgentStream, subscribeToSession, type ActivityEvent } from '$lib/firestore-stream';
+import {
+	postAgentStream,
+	subscribeToSession,
+	type ChatSource,
+	type TimelineEvent,
+	type TurnCounts,
+	type TurnSummary
+} from '$lib/firestore-stream';
 import { ensureAnonAuth, getIdToken } from '$lib/firebase';
 import { recoverStream } from '$lib/chat-recovery';
 import { handleReturnFromHidden, type IosVisibilityHandle } from '$lib/ios-sse-workaround';
@@ -14,37 +21,12 @@ function uuid(): string {
 	);
 }
 
-interface ChatSource {
-	title: string;
-	url: string;
-	domain?: string;
-}
-
-interface StreamingStep {
-	stage: string;
-	status: string;
-	label: string;
-	previews?: Array<{ name: string; preview: string }>;
-}
-
-export type ActivityCategory = 'data' | 'search' | 'read' | 'analyze';
-
-export interface ActivityItem {
-	id: string;
-	category: ActivityCategory;
-	status: 'pending' | 'running' | 'complete';
-	label: string;
-	detail?: string;
-	url?: string;
-	agent?: string;
-	timestamp: number;
-}
-
 interface ChatMessage {
 	role: 'user' | 'agent';
 	text: string;
 	timestamp: number;
 	sources?: ChatSource[];
+	turnSummary?: TurnSummary;
 }
 
 interface PlaceContext {
@@ -76,9 +58,10 @@ let placeContext = $state<PlaceContext | null>(null);
 let currentId = $state<string | null>(null);
 
 // Streaming state (ephemeral — never persisted to localStorage)
-let streamingProgress = $state<StreamingStep[]>([]);
-let streamingActivities = $state<ActivityItem[]>([]);
+let liveTimeline = $state<TimelineEvent[]>([]);
+let currentTurnStartedAtMs = $state<number | null>(null);
 let currentRunId = $state<string | null>(null);
+let typingMessageTimestamp = $state<number | null>(null);
 // Terminal-reply dedup key. Set to the runId the first time a reply lands
 // (via Firestore observer OR chat-recovery REST poll) so a second delivery
 // of the same turn's terminal is a no-op. Reset to null at the start of a
@@ -101,14 +84,16 @@ if (typeof localStorage !== 'undefined') {
 		const stored = localStorage.getItem(STORAGE_KEY);
 		if (stored) {
 			const data = JSON.parse(stored);
-			conversations = data.conversations || [];
+			const restoredConversations: Conversation[] = Array.isArray(data.conversations)
+				? data.conversations
+				: [];
 
 			// One-time migration: merge old separate sessionId into id
 			// sessionId is the Firestore-known value, so it becomes the canonical id
 			let migrated = false;
 			const oldIdToNewId: Record<string, string> = {};
 			const claimedIds: Record<string, true> = {};
-			for (const c of conversations) {
+			for (const c of restoredConversations) {
 				const oldId = c.id;
 				const oldSid = (c as unknown as Record<string, unknown>).sessionId as string | undefined;
 				if (oldSid) {
@@ -129,16 +114,17 @@ if (typeof localStorage !== 'undefined') {
 				data.activeId = data.activeId ? (oldIdToNewId[data.activeId] ?? null) : null;
 				localStorage.setItem(
 					STORAGE_KEY,
-					JSON.stringify({ activeId: data.activeId, conversations })
+					JSON.stringify({ activeId: data.activeId, conversations: restoredConversations })
 				);
 			}
+			conversations = restoredConversations;
 
 			// URL ?sid= takes precedence over stored activeId on refresh
 			let restored = false;
 			if (typeof window !== 'undefined') {
 				const urlSid = new URL(window.location.href).searchParams.get('sid');
 				if (urlSid) {
-					const conv = conversations.find((c: Conversation) => c.id === urlSid);
+					const conv = restoredConversations.find((c: Conversation) => c.id === urlSid);
 					if (conv) {
 						loadConversation(conv);
 						restored = true;
@@ -146,7 +132,7 @@ if (typeof localStorage !== 'undefined') {
 				}
 			}
 			if (!restored && data.activeId) {
-				const conv = conversations.find((c: Conversation) => c.id === data.activeId);
+				const conv = restoredConversations.find((c: Conversation) => c.id === data.activeId);
 				if (conv) loadConversation(conv);
 			}
 		} else {
@@ -258,59 +244,63 @@ function cleanupSubscription() {
 	}
 }
 
+function zeroCounts(): TurnCounts {
+	return { webQueries: 0, sources: 0, venues: 0, platforms: 0 };
+}
+
+function toMillis(value: unknown): number | null {
+	if (typeof value === 'number' && Number.isFinite(value)) return value;
+	if (
+		typeof value === 'object' &&
+		value !== null &&
+		'toMillis' in value &&
+		typeof (value as { toMillis?: unknown }).toMillis === 'function'
+	) {
+		return ((value as { toMillis: () => number }).toMillis() ?? null) as number | null;
+	}
+	return null;
+}
+
 function buildStreamCallbacks(sendingConvId: string | null, sendingRunId: string) {
 	return {
-		onProgress(
-			stage: string,
-			status: string,
-			label: string,
-			previews?: Array<{ name: string; preview: string }>
-		) {
+		onTimelineEvent(event: TimelineEvent) {
 			if (currentId !== sendingConvId) return;
-			const step: StreamingStep = { stage, status, label, previews };
-			const idx = streamingProgress.findIndex((p) => p.stage === stage);
-			if (idx >= 0) {
-				streamingProgress[idx] = step;
-			} else {
-				streamingProgress = [...streamingProgress, step];
-			}
-		},
-		onActivity(activity: ActivityEvent) {
-			if (currentId !== sendingConvId) return;
-			if (activity.status === 'all-complete') {
-				streamingActivities = streamingActivities.map((a) =>
-					a.category === activity.category && a.status !== 'complete'
-						? { ...a, status: 'complete' as const }
-						: a
-				);
+			if (currentTurnStartedAtMs === null) currentTurnStartedAtMs = Date.now();
+			const ts = Date.now();
+			const next = { ...event, ts } as TimelineEvent;
+			if (
+				next.kind === 'detail' &&
+				liveTimeline.some(
+					(item) =>
+						item.kind === 'detail' &&
+						item.group === next.group &&
+						item.family === next.family &&
+						item.text === next.text
+				)
+			) {
 				return;
 			}
-			const { status, id, category, label, detail, url, agent } = activity;
-			const idx = streamingActivities.findIndex((a) => a.id === id);
-			if (idx >= 0) {
-				const update: Partial<ActivityItem> = { status };
-				if (label !== undefined) update.label = label;
-				if (detail !== undefined) update.detail = detail;
-				if (url !== undefined) update.url = url;
-				if (agent !== undefined) update.agent = agent;
-				streamingActivities[idx] = { ...streamingActivities[idx], ...update };
-			} else {
-				streamingActivities = [
-					...streamingActivities,
-					{ id, category, status, label, detail, url, agent, timestamp: Date.now() }
-				];
-			}
+			liveTimeline = [...liveTimeline, next];
 		},
 		onAttemptChange() {
 			if (currentId !== sendingConvId) return;
-			// Cloud Tasks retry — drop UI state from the failed attempt so it
-			// doesn't mingle with the retry's events. Seed a visible cue so
-			// the UI doesn't show a blank panel during the gap before the new
-			// attempt's first real event arrives (plan Phase 5 / Tier 2.1).
-			streamingActivities = [];
-			streamingProgress = [{ stage: 'retrying', status: 'running', label: 'Retrying…' }];
+			liveTimeline = [
+				{
+					kind: 'note',
+					id: `retry-${Date.now()}`,
+					text: 'Retrying…',
+					noteSource: 'deterministic',
+					counts: zeroCounts(),
+					ts: Date.now()
+				}
+			];
 		},
-		onComplete(reply: string, sources: ChatSource[] | undefined, title?: string) {
+		onComplete(
+			reply: string,
+			sources: ChatSource[] | undefined,
+			title?: string,
+			turnSummary?: TurnSummary
+		) {
 			if (pageHidden) return;
 			// Dedup by runId — chat-recovery may surface the same turn's reply
 			// first if Firestore was briefly blocked. Old text-equality dedup
@@ -321,14 +311,19 @@ function buildStreamCallbacks(sendingConvId: string | null, sendingRunId: string
 				// Already appended for this turn (recover() raced us).
 			} else {
 				appendedReplyForRunId = sendingRunId;
+				const timestamp = Date.now();
 				const msg: ChatMessage = {
 					role: 'agent',
 					text: reply,
-					timestamp: Date.now(),
-					sources: sources?.length ? sources : undefined
+					timestamp,
+					sources: sources?.length ? sources : undefined,
+					turnSummary
 				};
 				if (currentId === sendingConvId) {
 					messages.push(msg);
+					if (liveTimeline.some((event) => event.kind === 'drafting')) {
+						typingMessageTimestamp = timestamp;
+					}
 				} else if (sendingConvId) {
 					const idx = conversations.findIndex((c) => c.id === sendingConvId);
 					if (idx >= 0) {
@@ -344,7 +339,8 @@ function buildStreamCallbacks(sendingConvId: string | null, sendingRunId: string
 			}
 			if (currentId === sendingConvId) {
 				loading = false;
-				streamingProgress = [];
+				liveTimeline = [];
+				currentTurnStartedAtMs = null;
 			}
 			cleanupSubscription();
 			currentRunId = null;
@@ -354,7 +350,8 @@ function buildStreamCallbacks(sendingConvId: string | null, sendingRunId: string
 			if (currentId !== sendingConvId || pageHidden) return;
 			error = err || 'unknown_error';
 			loading = false;
-			streamingProgress = [];
+			liveTimeline = [];
+			currentTurnStartedAtMs = null;
 			cleanupSubscription();
 			currentRunId = null;
 			persist();
@@ -390,8 +387,9 @@ async function send(text: string) {
 	messages.push({ role: 'user', text: trimmed, timestamp: Date.now() });
 	loading = true;
 	error = '';
-	streamingProgress = [];
-	streamingActivities = [];
+	liveTimeline = [];
+	currentTurnStartedAtMs = Date.now();
+	typingMessageTimestamp = null;
 	cleanupSubscription();
 	persist();
 
@@ -478,6 +476,9 @@ function start(query: string, place: PlaceContext | null) {
 	placeContext = place;
 	active = true;
 	error = '';
+	liveTimeline = [];
+	currentTurnStartedAtMs = null;
+	typingMessageTimestamp = null;
 
 	send(query);
 }
@@ -485,13 +486,22 @@ function start(query: string, place: PlaceContext | null) {
 function reset() {
 	syncCurrentToList();
 	cleanupSubscription();
+	iosReturnHandle?.cancel();
+	iosReturnHandle = null;
 	messages = [];
 	loading = false;
+	recovering = false;
 	error = '';
 	active = false;
+	pageHidden = false;
 	placeContext = null;
 	currentId = null;
 	currentRunId = null;
+	appendedReplyForRunId = null;
+	recoveryStartedForRunId = null;
+	liveTimeline = [];
+	currentTurnStartedAtMs = null;
+	typingMessageTimestamp = null;
 	persist();
 }
 
@@ -500,26 +510,19 @@ function switchTo(id: string) {
 	if (loading) {
 		cleanupSubscription();
 		loading = false;
-		streamingProgress = [];
-		streamingActivities = [];
+		liveTimeline = [];
+		currentTurnStartedAtMs = null;
 	}
 	cleanupSubscription();
 	currentRunId = null;
+	typingMessageTimestamp = null;
 	syncCurrentToList();
 	const conv = conversations.find((c) => c.id === id);
 	if (!conv) return;
 	loadConversation(conv);
 	persist();
 
-	// If the last message was from the user, there's an in-flight turn to
-	// resume. Firestore is the source of truth for the current runId; read
-	// it, then either subscribe (queued/running) or render a terminal state.
-	const msgs = conv.messages;
-	if (msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
-		resumeIfInFlight(id).catch((err) => {
-			console.warn('resumeIfInFlight failed:', err);
-		});
-	}
+	void resumeCurrentIfNeeded();
 }
 
 async function resumeIfInFlight(sessionId: string): Promise<void> {
@@ -556,7 +559,8 @@ async function resumeIfInFlight(sessionId: string): Promise<void> {
 					timestamp: Date.now(),
 					sources: (data.sources as ChatSource[] | undefined)?.length
 						? (data.sources as ChatSource[])
-						: undefined
+						: undefined,
+					turnSummary: (data.turnSummary as TurnSummary | undefined) ?? undefined
 				});
 				// Mirror the server-generated title. Firestore observer's
 				// `onComplete` already does this for fresh runs, but the
@@ -573,23 +577,30 @@ async function resumeIfInFlight(sessionId: string): Promise<void> {
 			}
 			loading = false;
 			recovering = false;
+			liveTimeline = [];
+			currentTurnStartedAtMs = null;
 			return;
 		}
 		if (status === 'error') {
 			error = (data.error as string) || 'pipeline_error';
 			loading = false;
 			recovering = false;
+			liveTimeline = [];
+			currentTurnStartedAtMs = null;
 			return;
 		}
 		if (!runId) {
 			loading = false;
 			recovering = false;
+			liveTimeline = [];
+			currentTurnStartedAtMs = null;
 			return;
 		}
 		// status is queued or running — subscribe with the server-authoritative runId.
 		currentRunId = runId;
 		appendedReplyForRunId = null;
 		recoveryStartedForRunId = null;
+		currentTurnStartedAtMs = toMillis(data.queuedAt) ?? Date.now();
 		const unsub = await subscribeToSession(
 			sessionId,
 			runId,
@@ -613,6 +624,15 @@ async function resumeIfInFlight(sessionId: string): Promise<void> {
 	}
 }
 
+async function resumeCurrentIfNeeded(): Promise<boolean> {
+	if (!currentId) return false;
+	if (loading || recovering || subscriptionUnsubscribe) return false;
+	const lastMessage = messages[messages.length - 1];
+	if (!lastMessage || lastMessage.role !== 'user') return false;
+	await resumeIfInFlight(currentId);
+	return true;
+}
+
 // One-shot guard: `onPermissionDenied` can fire from both Firestore observers
 // (session doc + events collection-group) and `onFirstSnapshotTimeout` fires
 // independently. Without this guard two polls would race for the same run.
@@ -631,16 +651,27 @@ async function recover(): Promise<boolean> {
 	if (!loading) loading = true;
 	recovering = true;
 	error = '';
+	if (currentTurnStartedAtMs === null) currentTurnStartedAtMs = Date.now();
 	try {
 		return await recoverStream({
 			getSession: () => ({ sessionId: recoveringConvId, runId }),
 			isCurrentSession: (sid) => currentId === sid,
-			onReply: (reply, sources, title) => {
+			onReply: (reply, sources, title, turnSummary) => {
 				// Dedup by runId — buildStreamCallbacks' onComplete may have
 				// already appended this same reply via Firestore.
 				if (appendedReplyForRunId === runId) return;
 				appendedReplyForRunId = runId;
-				messages.push({ role: 'agent', text: reply, timestamp: Date.now(), sources });
+				const timestamp = Date.now();
+				messages.push({
+					role: 'agent',
+					text: reply,
+					timestamp,
+					sources,
+					turnSummary
+				});
+				typingMessageTimestamp = liveTimeline.some((event) => event.kind === 'drafting')
+					? timestamp
+					: null;
 				// Sync server-generated title — mirrors the Firestore observer's
 				// onComplete path (chat-state `buildStreamCallbacks`). Without
 				// this, the REST-recovered conversation keeps its client
@@ -655,6 +686,8 @@ async function recover(): Promise<boolean> {
 			},
 			onError: (msg) => {
 				error = msg;
+				liveTimeline = [];
+				currentTurnStartedAtMs = null;
 			},
 			checkUrl: (sid, rid) => agentCheckUrl(sid, rid),
 			getIdToken: async () => {
@@ -672,11 +705,20 @@ async function recover(): Promise<boolean> {
 	} finally {
 		loading = false;
 		recovering = false;
+		liveTimeline = [];
+		currentTurnStartedAtMs = null;
 		// Clear so a retry (visibility-change, reconnect, etc.) can start again.
 		// Safe: concurrent double-fire from the same subscription is short-
 		// circuited by the sync check at the top of recover(); clearing here
 		// only affects calls that arrive after this recover() has resolved.
 		if (recoveryStartedForRunId === runId) recoveryStartedForRunId = null;
+	}
+}
+
+async function resumeCurrentIfNeededOrRecover(): Promise<void> {
+	const resumed = await resumeCurrentIfNeeded();
+	if (!resumed && currentRunId) {
+		await recover();
 	}
 }
 
@@ -691,7 +733,7 @@ function handleReturn(hiddenMs = Infinity) {
 			},
 			abortStream: () => cleanupSubscription(),
 			recover: () => {
-				recover();
+				void resumeCurrentIfNeededOrRecover();
 			},
 			hasPendingUserMessage: () =>
 				messages.length > 0 && messages[messages.length - 1].role === 'user',
@@ -712,6 +754,9 @@ function deleteConversation(id: string) {
 		placeContext = null;
 		currentId = null;
 		currentRunId = null;
+		liveTimeline = [];
+		currentTurnStartedAtMs = null;
+		typingMessageTimestamp = null;
 	}
 	persist();
 }
@@ -747,14 +792,20 @@ export const chatState = {
 	get activeId() {
 		return currentId;
 	},
-	get streamingProgress() {
-		return streamingProgress;
+	get liveTimeline() {
+		return liveTimeline;
 	},
-	get streamingActivities() {
-		return streamingActivities;
+	get currentTurnStartedAtMs() {
+		return currentTurnStartedAtMs;
+	},
+	get typingMessageTimestamp() {
+		return typingMessageTimestamp;
+	},
+	set typingMessageTimestamp(v: number | null) {
+		typingMessageTimestamp = v;
 	},
 	get isStreaming() {
-		return streamingProgress.length > 0 || streamingActivities.length > 0;
+		return liveTimeline.length > 0;
 	},
 	abort() {
 		cleanupSubscription();
@@ -763,6 +814,7 @@ export const chatState = {
 	start,
 	reset,
 	recover,
+	resumeCurrentIfNeeded,
 	handleReturn,
 	switchTo,
 	deleteConversation

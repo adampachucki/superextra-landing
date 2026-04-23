@@ -524,12 +524,65 @@ def _mk_event(state_delta: dict, *, author: str | None = None):
     return SimpleNamespace(actions=actions, author=author)
 
 
+def _empty_mapping() -> dict:
+    return {
+        "timeline_events": [],
+        "complete": None,
+        "grounding_sources": [],
+        "milestones": {
+            "context_started": False,
+            "plan_ready_text": None,
+            "research_started": False,
+            "research_result_text": None,
+            "drafting_started": False,
+        },
+    }
+
+
+def _translate_emission(emission):
+    """Bridge older worker tests onto the new `map_event` contract.
+
+    Tests below mostly care about terminal writes and accumulated sources.
+    They can keep describing those fixtures tersely while the harness feeds
+    `run()` the mapper shape it now consumes.
+    """
+    if emission is None:
+        return _empty_mapping()
+
+    if isinstance(emission, dict) and (
+        "timeline_events" in emission
+        or "complete" in emission
+        or "grounding_sources" in emission
+        or "milestones" in emission
+    ):
+        base = _empty_mapping()
+        base.update(emission)
+        return base
+
+    if not isinstance(emission, dict):
+        raise TypeError(f"unsupported emission fixture: {emission!r}")
+
+    base = _empty_mapping()
+    event_type = emission.get("type")
+    data = emission.get("data") or {}
+    if event_type == "activity":
+        base["grounding_sources"] = list(data.get("sources") or [])
+        return base
+    if event_type == "complete":
+        base["complete"] = {
+            "reply": data.get("reply"),
+            "sources": list(data.get("sources") or []),
+        }
+        return base
+    raise ValueError(f"unsupported legacy emission type: {event_type!r}")
+
+
 def _install_run_harness(monkeypatch, *, events, emissions):
     """Wire up the module singletons + mocks for a `run` invocation.
 
     ``events`` is the sequence of ADK events yielded by `_runner.run_async`.
-    ``emissions`` is a matching list of ``{'type': ..., 'data': ...}`` dicts
-    returned by `map_and_write_event` for each event (or `None` to skip).
+    ``emissions`` is a matching list of mapper outputs (or older shorthand
+    fixtures translated by `_translate_emission`).
     Returns `(fenced_writes, hb_cancel_calls)` for post-run assertions.
     """
     import worker_main
@@ -548,15 +601,23 @@ def _install_run_harness(monkeypatch, *, events, emissions):
     monkeypatch.setattr(worker_main, "_session_svc", MagicMock())
     monkeypatch.setattr(worker_main, "_takeover_txn", lambda *a, **k: {"action": "run", "attempt": 1})
 
-    emission_iter = iter(emissions)
+    emission_iter = iter(_translate_emission(emission) for emission in emissions)
 
-    async def fake_map_and_write_event(**kwargs):
+    def fake_map_event(event, state=None):
         try:
             return next(emission_iter)
         except StopIteration:
-            return None
+            return _empty_mapping()
 
-    monkeypatch.setattr(worker_main, "map_and_write_event", fake_map_and_write_event)
+    monkeypatch.setattr(worker_main, "map_event", fake_map_event)
+
+    async def fake_write_event_doc(**kwargs):
+        return {
+            "type": kwargs["event_type"],
+            "data": kwargs["data"],
+        }
+
+    monkeypatch.setattr(worker_main, "write_event_doc", fake_write_event_doc)
 
     fenced_writes: list[dict] = []
 
@@ -885,6 +946,58 @@ async def test_title_absent_when_not_first_message(monkeypatch):
     complete_writes = [u for u in fenced_writes if u.get("status") == "complete"]
     assert len(complete_writes) == 1
     assert "title" not in complete_writes[0]
+
+
+@pytest.mark.asyncio
+async def test_note_tasks_are_cancelled_before_turn_summary_is_serialized(monkeypatch):
+    import worker_main as wm
+
+    events = [
+        _mk_event({}, author="research_orchestrator"),
+        _mk_event({"final_report": "Done."}, author="synthesizer"),
+    ]
+    emissions = [
+        {
+            "milestones": {
+                "context_started": False,
+                "plan_ready_text": "Validate pricing and venue signals.",
+                "research_started": False,
+                "research_result_text": None,
+                "drafting_started": False,
+            }
+        },
+        {
+            "complete": {"reply": "Done.", "sources": []},
+        },
+    ]
+
+    fenced_writes, _hb = _install_run_harness(monkeypatch, events=events, emissions=emissions)
+
+    async def _slow_note(**_kwargs) -> str:
+        await asyncio.sleep(10)
+        return "This should never land."
+
+    order: list[str] = []
+
+    async def _record_cancel(tasks):
+        order.append("cancel")
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _record_fenced_update(_sid, _attempt, _worker_id, updates):
+        order.append(f"write:{updates.get('status', 'progress')}")
+        fenced_writes.append(updates)
+
+    monkeypatch.setattr(wm, "_generate_timeline_note", _slow_note)
+    monkeypatch.setattr(wm, "_cancel_background_tasks", _record_cancel)
+    monkeypatch.setattr(wm, "_fenced_update", _record_fenced_update)
+
+    result = await wm.run(_build_run_request(), _fake_request())
+
+    assert result["ok"] is True
+    assert order.index("cancel") < order.index("write:complete")
 
 
 @pytest.mark.asyncio
