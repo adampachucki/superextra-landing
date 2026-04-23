@@ -125,7 +125,7 @@ POLL_WAIT_MAX_S = 420  # 7 min — matches plan's active-owner poll ceiling
 POLL_INTERVAL_S = 5
 STALE_HEARTBEAT_S = 120  # 2 min — takeover threshold
 TITLE_TIMEOUT_S = 5.0
-NOTE_TIMEOUT_S = 3.0
+NOTE_TIMEOUT_S = 8.0
 
 
 # ── Module singletons, initialised in lifespan ─────────────────────────────
@@ -1086,7 +1086,7 @@ async def run(body: RunRequest, request: Request) -> dict:
                             builder=timeline_builder,
                             milestone="plan_ready",
                             query_text=body.queryText,
-                            input_text=str(milestones["plan_ready_text"]),
+                            input_text=str(milestones["plan_ready_text"])[:1500],
                             counts_snapshot=counts_snapshot,
                         )
                     )
@@ -1115,7 +1115,7 @@ async def run(body: RunRequest, request: Request) -> dict:
                             builder=timeline_builder,
                             milestone="research_result",
                             query_text=body.queryText,
-                            input_text=str(milestones["research_result_text"]),
+                            input_text=str(milestones["research_result_text"])[:1500],
                             counts_snapshot=counts_snapshot,
                         )
                     )
