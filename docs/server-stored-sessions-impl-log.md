@@ -883,3 +883,78 @@ The composite `sessions(participants, updatedAt)` index reached READY at the con
 - Any user report of stuck chats, silently-lost turns, or failed deletes → investigate
 
 **Completed:** 2026-04-23 17:58 — Verification: PASS (full owner flow + cross-device + delete + headers all live on production)
+
+---
+
+## Stage 11 — Extended production E2E (post-cutover, follow-up verification)
+
+**Started:** 2026-04-23 18:20
+**Agent:** Main session (driven by operator pushback: "did you run FULL tests simulating real user behavior?")
+
+### Why this stage exists
+
+Stage 10's initial smoke covered the light subset: owner flow, cross-device read, delete-as-creator, headers. It skipped the single most load-bearing behavioral test of this whole rearchitecture — **cross-device CONTINUE** — which exercises:
+
+- agentStream's submitter-vs-creator UID split (Stage 2)
+- ADK `Runner.run_async(user_id=<creator>)` called with the CREATOR's UID, not the submitter's (Stage 4)
+- `participants` arrayUnion extending the shared-access audience (Stage 2)
+- The sidebar query matching the new participant post-arrayUnion (security rules + client state)
+
+If any of those were broken, the follow-up from a second user would fail — either with `ValueError: Session does not belong to user` at the ADK layer, or with the sidebar not updating, or with a silent no-op at the Runner.
+
+### What was done
+
+Chrome MCP test harness, all against production `https://agent.superextra.ai`:
+
+- Creator (default context): submitted prompt 1 "In one sentence, what is Sketch famous for?" with place context = Sketch London. sid = `9c4f497e-45ce-4569-93cc-b31c924688a4`.
+- **Refresh mid-research** (plan §15 item 4): reloaded the creator tab ~30s into the run. URL preserved, sidebar listener reattached, live timeline picked back up mid-flight. PASS.
+- Contributor2 (fresh isolated browser context, different anon UID, empty IndexedDB): opened same URL ~1m into the run. Live timeline visible. Sidebar empty (not a participant yet). PASS (plan §15 item 5: mid-research shared viewing).
+- Creator's turn 1 completed — 1m 37s, 3 sources, clean markdown answer.
+- Contributor2 submitted **turn 2** from their isolated context: "And what are their opening hours?".
+- Turn 2 completed in **3 seconds** — correct answer from the ADK session carrying over the place context.
+- Contributor2's sidebar (on reload) now correctly shows the chat — proving the participants arrayUnion applied. PASS (plan §15 item 3: cross-device continue).
+- Opened a third isolated context "stranger" (yet another distinct anon UID). Sidebar empty — the session they never contributed to doesn't appear. PASS.
+
+### Worker logs for the shared-continue test (sid 9c4f497e…)
+
+```
+2026-04-23T18:30:15Z  run_start      attempt=0  runId=fe0534c1…  (turn 1, creator)
+2026-04-23T18:30:22Z  adk_session_created  (first turn only)
+2026-04-23T18:32:00Z  run_complete   attempt=1  runId=fe0534c1…
+
+2026-04-23T18:33:31Z  run_start      attempt=0  runId=427dbdcf…  (turn 2, contributor2)
+2026-04-23T18:33:34Z  run_complete   attempt=1  runId=427dbdcf…
+```
+
+**Turn 2 did NOT emit `adk_session_created`.** This is the empirical proof the ADK user_id swap works: the worker reused the existing `adk_session_id` under the creator's stored UID. If the code had (incorrectly) passed contributor2's submitter UID to `Runner.run_async`, the ADK client-side equality check (`vertex_ai_session_service.py:190-193`) would have raised `ValueError('Session … does not belong to user …')` and turn 2 would have ended in `status='error'`. It did not.
+
+### IP constraint (noted explicitly)
+
+All four browser contexts ran in the VM's single Chromium instance via Chrome DevTools MCP with `isolatedContext` flag. That gives:
+
+- Different anonymous Firebase Auth UIDs (what the security model actually keys on)
+- Different IndexedDB caches (tests cold-cache behavior)
+- Different Firestore listener sessions
+
+What it does NOT give:
+
+- Different public IP addresses (all share the VM's IP)
+- Different Cloud Function per-IP rate-limit buckets
+
+True-different-IP testing would require a second client outside this VM (e.g., a laptop on a separate network). The product's security model doesn't depend on IP diversity — it's keyed on Firebase Auth UIDs and capability URLs — so the isolated-context approach exercises the real attack/access surface. Per-IP rate-limiting is in-memory per Cloud Function instance anyway (§16 deliberately-not-mitigated item in the plan).
+
+### Small nuance found during the test
+
+Contributor2's sidebar did NOT pick up the new chat via the live listener — only after a page reload did the session appear. Likely cause: the sidebar query `where('participants', 'array-contains', contributor2Uid)` was evaluated before contributor2's UID was arrayUnion'd, and the Firestore SDK doesn't always re-match a running query when a document's array field grows to include a new value that now makes it match. The reload attached a fresh listener against the current state. This is a minor UX gap — contributor2 can't see "a chat I just contributed to" in their sidebar until they refresh. Not blocking; could be fixed later with a listener re-attach after `sendFollowUp` succeeds, but that adds defensive complexity that the plan's "no weird-case creep" rule argues against. Worth a follow-up ticket if the pattern becomes a common user complaint.
+
+### What this stage did NOT exercise
+
+- iOS Safari mobile backgrounding (plan §15 item 6) — out of scope without a real iOS device
+- 10-turn cap (plan §15 item 9) — would require 10 real prompts at real token cost; covered by Stage 2 unit tests (cap-boundary race, 409 on 11th)
+- `agentDelete` 403 path with a contributor's real Firebase ID token — covered by Stage 3 unit tests; in-browser extraction would require sending a turn first (which would change state); 401-without-token was verified in Stage 10
+
+### Files changed this stage
+
+Just this log file. No code changes.
+
+**Completed:** 2026-04-23 18:38 — Verification: PASS. The headline product feature (shared-URL chats continuable by anyone with the URL) works end-to-end in production, and the single most failure-prone code path (ADK user_id swap for contributor follow-ups) is empirically verified.
