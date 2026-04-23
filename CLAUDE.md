@@ -128,13 +128,21 @@ Push to `main` → `.github/workflows/deploy.yml`:
 3. **deploy-worker** — `gcloud run deploy superextra-worker --source=agent` (skipped if agent code unchanged)
 4. **deploy-hosting** — Firebase Hosting + Cloud Functions + Firestore rules/indexes. Waits for `deploy-worker` when the worker deploys; proceeds otherwise.
 
-For deployment gotchas (Cloud Run worker, Cloud Tasks IAM, Firestore indexes, watchdog, rerun policy): @docs/deployment-gotchas.md
+For deployment gotchas and the live E2E playbook (Cloud Run worker, Cloud Tasks IAM, Firestore indexes, watchdog, rerun policy, Chrome MCP E2E flow): read `docs/deployment-gotchas.md` when working on those areas.
 
 ## Assume nothing — verify
 
 - Never rely on training knowledge for factual claims — check the real source: docs, code, APIs, actual data.
 - When something can be looked up, look it up. Otherwise, say "I don't know."
 - **External APIs and services:** Read the official documentation first — before writing any code.
+
+## Simplicity and root causes
+
+- Build the simplest thing that solves the problem. Every line is a regression surface — fewer lines, fewer ways to break.
+- Solutions must be **complete** for the real cases, but skip rare edge cases when handling them adds meaningful complexity. The extra code costs more than the edge case saves.
+- When something breaks — bug, regression, poor experience — find the **root cause**, even several layers down. Don't patch symptoms; symptom-fixes accrete and create more bugs than they solve.
+- Deleting code, functions, or whole features is a legitimate fix. If the root cause is that the feature shouldn't exist in its current form, remove it rather than propping it up.
+- When a fix requires surrounding complexity to "make it work safely," that's a signal the approach is wrong — step back and reconsider the root.
 
 ## Honesty and pushback
 

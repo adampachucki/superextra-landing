@@ -140,3 +140,41 @@ gcloud run services delete superextra-agent \
   `superextra-worker@superextra-site.iam.gserviceaccount.com` needs
   `roles/run.invoker` on the worker service itself plus
   `roles/datastore.user` and `roles/aiplatform.user` on the project.
+
+## Live E2E via Chrome DevTools MCP
+
+Ad-hoc real-prompt monitoring — drive the real UI against the real backend
+and stitch the signals together. No harness, no automation, no new code;
+all of this relies on observability that already exists (structured JSON
+logs keyed by `sid`, Cloud Trace IDs embedded in every log line, sid in the
+URL, Chrome DevTools MCP). Runs cost real Gemini/Places/SerpAPI/Apify
+tokens and leave a 30-day-TTL session doc; use sparingly, not as a CI gate.
+
+1. **Navigate.** Chrome MCP `new_page` → `http://localhost:5199/agent/chat`.
+   Anonymous Firebase auth bootstraps silently; no login or modal blocks
+   the first prompt.
+2. **Submit.** `fill` the textarea, `press_key` Enter (Shift+Enter is
+   multiline — use Enter). Poll the page URL; once `?sid=<sid>` appears,
+   the session id is yours. That's the only correlation key needed — the
+   session doc carries `currentRunId` for anything deeper.
+3. **Watch the user's view.** Periodic `take_screenshot` + `take_snapshot`
+   while `chatState.loading` would be true (phase labels, elapsed timer,
+   source counts, recovery/error banners, final typewriter text all render
+   in the DOM). `list_console_messages` and `list_network_requests` give
+   client-side signal for free.
+4. **Backend logs, one command.** Worker JSON logs carry top-level `sid`:
+   ```bash
+   gcloud logging read 'jsonPayload.sid="<sid>"' \
+     --project=superextra-site --limit=500 --format=json
+   ```
+   Every line also has `logging.googleapis.com/trace`. Open that URL in
+   Cloud Trace — full waterfall across router → enricher → orchestrator →
+   specialists → synthesizer. Usually the fastest way in.
+5. **Firestore state.** Session doc `sessions/<sid>` (terminal status,
+   fencing info, heartbeats) and events subcollection `sessions/<sid>/events`.
+   Firebase console works; so does
+   `gcloud firestore documents describe sessions/<sid>`.
+
+For backend-only reproduction (UI is innocent, want to isolate the worker),
+`agent/tests/e2e_worker_live.py` drives the pipeline in-process against the
+real stack without involving Chrome or the dev server.
