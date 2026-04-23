@@ -830,3 +830,56 @@ Index CANNOT be rolled back cleanly (Firestore allows deletion but not time-trav
 The CLAUDE.md operating rules require explicit authorization for commits, pushes to main, production deploys, and destructive ops (wipes). The main session has stopped here to hand off. A future session (or human operator) executes Steps A–E.
 
 **Status:** PREPARED, AWAITING AUTHORIZATION
+
+---
+
+## Stage 10 — Production cutover (executed)
+
+**Executed:** 2026-04-23 17:32–17:56
+**Agent:** Main session, with operator authorization ("do it all")
+
+### Sequence actually followed
+
+1. **Feature branch + commit:** `feat/server-stored-sessions` → `5f810d5 feat(chat): server-stored sessions with capability-URL access`. Files staged by name per Adam's CLAUDE.md convention (never `-A`). `hello.md` (pre-existing scratch file, unrelated) left untouched.
+
+2. **Firestore index deploy attempt via `firebase deploy`:** FAILED — Firebase CLI on this VM has no credentials (`serviceusage.googleapis.com 403 insufficient authentication scopes`). Pivoted to pushing to `main` and letting GitHub Actions (which has its own authed SA) handle the combined rules+indexes+hosting+functions deploy.
+
+3. **Merge + push to main:** `git merge --no-ff feat/server-stored-sessions` → `8b0f1fc`. GitHub Actions run `24849414233`: detect-changes ✓, test (1m59s) ✓, deploy-worker (3m32s) ✓, deploy-hosting (2m28s) ✓. Total 8m8s. The composite index reached CREATING then READY during this window.
+
+4. **Existing session wipe** via `gcloud firestore bulk-delete`:
+   - `--collection-ids=sessions` reaped **58 docs** (~1.2M bytes)
+   - `--collection-ids=turns,events` reaped **585 docs** (~2.2M bytes — the old event docs from prior sessions)
+   - Both completed in <30s. Non-interactive mode required `--quiet` flag.
+
+5. **Production smoke via Chrome DevTools MCP** against `https://agent.superextra.ai/chat`:
+
+| Scenario                                                                                   | Result                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Owner flow — real prompt ("top 3 complaints for Sketch restaurant London"), real agent run | ✅ Completed in 3m 31s; 11 sources; multi-section markdown answer with ChartBlock; turn summary visible; sidebar populated with auto-titled entry "Sketch restaurant complaints"                                                                                           |
+| Worker logs match expected shape                                                           | ✅ `run_start` → `adk_session_created` → `run_complete` on trace for sid `501d3f36-be2e-4f7a-927e-29e0ce894f56`                                                                                                                                                            |
+| Cross-device read (fresh isolated browser context)                                         | ✅ Full transcript renders (6099 chars); sidebar empty (no CONVERSATIONS heading); no delete affordance for contributor UID                                                                                                                                                |
+| `agentDelete` without token                                                                | ✅ Returns 401 `{ok:false,error:"Authorization header required"}`                                                                                                                                                                                                          |
+| `agentDelete` 403 / 404 branches                                                           | Covered by Stage 3 unit tests (57 passing). In-browser 403 path not exercised because contributor-token extraction from the SDK is non-trivial without modifying chat state; accepted based on unit-test coverage + confirmed FE gating (no delete button for contributor) |
+| Delete-as-creator                                                                          | ✅ Click-through "Delete" confirm in sidebar → session removed; URL reset to `/chat`; sidebar CONVERSATIONS section disappeared; contributor tab reload → "Couldn't load this chat" (correct §7 missing-state copy)                                                        |
+| Security headers                                                                           | Initial deploy missing two plan §6 mitigations (`Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex, nofollow`) — fixed in follow-up commit `1ea5a6b` and redeployed (GitHub Actions run `24850478384`, 2m32s). Verified on production: both headers now live.          |
+| `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff`                                | ✅ Already in place from prior config                                                                                                                                                                                                                                      |
+| Cold-cache load state post-deletion                                                        | ✅ Verified: reload of deleted-session URL waits through the server-confirmed-missing path then renders "Couldn't load this chat"                                                                                                                                          |
+
+### Key unexpected finding during cutover
+
+The composite `sessions(participants, updatedAt)` index reached READY at the control plane (`gcloud firestore indexes composite list`) roughly 60s before the Firestore query SDK picked it up — client saw "currently building" for another ~60s after the control-plane READY state. No action needed; client retries absorbed the gap. Sidebar `permission-denied` error the client logged during this window is swallowed by the try/catch in `attachSidebarListener` exactly as designed.
+
+### Unshipped / deferred (pre-existing-decision)
+
+- `agentRead` endpoint: not needed per Stage 9a decision gate. Can be added later if restrictive-network UX shows worse than "10s → couldn't load."
+- `sessions_private/{sid}` split: deferred pending post-deploy listener-churn observation.
+- Worker-side dual-write bridge: not shipped; mixed-version window during the cutover itself was ~5 minutes (worker deployed first, then hosting) with zero real users in-flight, so the "refresh once worst case" UX never actually needed to be tested against real users.
+
+### Observability for first 24h (ongoing)
+
+- Watch `gcloud logging read 'jsonPayload.event="ownership_lost"'` — no spike expected
+- Watch `functions/watchdog.js` per-reason skip counters — baseline near-zero
+- Watch 5xx rates on `agentStream` + `agentDelete` — baseline near-zero
+- Any user report of stuck chats, silently-lost turns, or failed deletes → investigate
+
+**Completed:** 2026-04-23 17:58 — Verification: PASS (full owner flow + cross-device + delete + headers all live on production)
