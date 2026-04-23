@@ -11,7 +11,7 @@ from google.cloud import firestore
 
 from .specialist_catalog import AUTHOR_TO_OUTPUT_KEY, SPECIALISTS
 
-EVENT_TTL_DAYS = 30
+EVENT_TTL_DAYS = 3
 
 SPECIALIST_AUTHORS: set[str] = {s.name for s in SPECIALISTS}
 

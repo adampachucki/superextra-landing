@@ -118,7 +118,8 @@ const uidRateLimitMap = new Map();
 const UID_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const UID_RATE_LIMIT_MAX = 20; // per-UID pipeline runs per hour (plan default)
 
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+// Plan §5 / §6 — shared 10-turn cap per chat, counted across all contributors.
+const MAX_TURNS_PER_SESSION = 10;
 
 // Cloud Tasks config. WORKER_URL is canonically set at deploy time: the
 // workflow describes the deployed `superextra-worker` Cloud Run service and
@@ -187,10 +188,10 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 		res.status(401).json({ ok: false, error: 'Authorization header required' });
 		return;
 	}
-	let userId;
+	let submitterUid;
 	try {
 		const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
-		userId = decoded.uid;
+		submitterUid = decoded.uid;
 	} catch (e) {
 		console.warn('verifyIdToken rejected:', e.code || e.message);
 		res.status(401).json({ ok: false, error: 'Invalid auth token' });
@@ -198,13 +199,23 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 	}
 
 	// 2. Rate limits — IP first (pre-UID) then UID (authenticated scope).
+	// Rate limiting keys off the *submitter* UID from the request token,
+	// regardless of whether this is a new chat or a shared-URL follow-up.
 	const now = Date.now();
 	const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
 	if (!checkRateLimit(rateLimitMap, ip, now, 10 * 60 * 1000, 20)) {
 		res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
 		return;
 	}
-	if (!checkRateLimit(uidRateLimitMap, userId, now, UID_RATE_LIMIT_WINDOW_MS, UID_RATE_LIMIT_MAX)) {
+	if (
+		!checkRateLimit(
+			uidRateLimitMap,
+			submitterUid,
+			now,
+			UID_RATE_LIMIT_WINDOW_MS,
+			UID_RATE_LIMIT_MAX
+		)
+	) {
 		res.status(429).json({ ok: false, error: 'Hourly pipeline limit reached.' });
 		return;
 	}
@@ -224,37 +235,44 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 
 	// 4. Server-generated runId — never trust a client-supplied one.
 	const runId = crypto.randomUUID();
-	const ref = db.collection('sessions').doc(sessionId);
+	const sessionRef = db.collection('sessions').doc(sessionId);
 
-	// 5. Atomic session upsert with ownership + in-flight + expiresAt logic.
+	// 5. Atomic session upsert + turn-doc creation under capability-URL rules
+	// (plan §5 / §6 / §8). Two UID roles are explicit here:
+	//   - `submitterUid` — caller of this request; goes into `participants` and
+	//     rate limiting.
+	//   - `creatorUid` — the session's stored `userId`, allocated on the first
+	//     turn. Preserved across follow-ups (even from a different submitter)
+	//     because the worker continues the shared Vertex Agent Engine session
+	//     under the original creator UID.
 	// Transactions can re-run on contention, so we capture decision signals
 	// into outer-scope vars on every attempt; the last successful attempt
 	// wins and those are the values we use for the Cloud Task body.
 	let existingAdkSessionId = null;
 	let isFirstMessage = false;
+	let creatorUid = submitterUid;
+	let newTurnIdx = 1;
 	try {
 		await db.runTransaction(async (t) => {
-			const snap = await t.get(ref);
+			const snap = await t.get(sessionRef);
 			const existing = snap.exists ? snap.data() : null;
 
-			// Ownership check — Admin SDK bypasses Firestore rules, so this is
-			// the only guard keeping a caller with a known `sid` out of another
-			// user's conversation. Reject when `userId` is missing too: a
-			// legacy/malformed doc without `userId` must not silently pass the
-			// check (audit Finding 3).
-			if (existing && (!existing.userId || existing.userId !== userId)) {
-				throw new AgentStreamError(403, 'ownership_mismatch');
-			}
+			// One-in-flight guard per chat (plan §6). The ownership gate is
+			// intentionally gone — any signed-in visitor with the URL may
+			// submit a turn.
 			if (existing && (existing.status === 'queued' || existing.status === 'running')) {
 				throw new AgentStreamError(409, 'previous_turn_in_flight');
 			}
 
-			existingAdkSessionId = existing?.adkSessionId || null;
-			isFirstMessage = !existing;
+			const lastTurnIndex = existing?.lastTurnIndex ?? 0;
+			if (lastTurnIndex >= MAX_TURNS_PER_SESSION) {
+				throw new AgentStreamError(409, 'turn_cap_reached');
+			}
 
-			// expiresAt: never shrinks. Extend to max(existing, now + 30d).
-			const prevExpires = existing?.expiresAt?.toMillis?.() ?? existing?.expiresAt ?? 0;
-			const newExpiresAt = new Date(Math.max(prevExpires, now + SESSION_TTL_MS));
+			isFirstMessage = !existing;
+			existingAdkSessionId = existing?.adkSessionId || null;
+			creatorUid = existing?.userId || submitterUid;
+			newTurnIdx = lastTurnIndex + 1;
 
 			const perTurn = {
 				currentRunId: runId,
@@ -264,15 +282,15 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 				queuedAt: FieldValue.serverTimestamp(),
 				lastHeartbeat: null,
 				lastEventAt: null,
-				reply: null,
-				sources: null,
 				error: null,
-				expiresAt: newExpiresAt
+				lastTurnIndex: newTurnIdx,
+				updatedAt: FieldValue.serverTimestamp()
 			};
 
 			if (isFirstMessage) {
-				t.set(ref, {
-					userId,
+				t.set(sessionRef, {
+					userId: submitterUid,
+					participants: [submitterUid],
 					createdAt: FieldValue.serverTimestamp(),
 					adkSessionId: null, // worker creates on first turn
 					placeContext: placeContext || null,
@@ -281,8 +299,30 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 				});
 			} else {
 				// Preserve userId / createdAt / adkSessionId / placeContext / title.
-				t.update(ref, perTurn);
+				// `participants` arrays-union'd so shared-URL contributors pin
+				// the chat to their sidebar without overwriting prior UIDs.
+				t.update(sessionRef, {
+					...perTurn,
+					participants: FieldValue.arrayUnion(submitterUid)
+				});
 			}
+
+			// Create the turn doc in the same transaction so sidebar readers
+			// and the worker see a consistent lastTurnIndex → turn-doc pairing.
+			const turnKey = String(newTurnIdx).padStart(4, '0');
+			const turnRef = sessionRef.collection('turns').doc(turnKey);
+			t.set(turnRef, {
+				turnIndex: newTurnIdx,
+				runId,
+				userMessage: message,
+				status: 'pending',
+				reply: null,
+				sources: null,
+				turnSummary: null,
+				createdAt: FieldValue.serverTimestamp(),
+				completedAt: null,
+				error: null
+			});
 		});
 	} catch (err) {
 		if (err instanceof AgentStreamError) {
@@ -311,14 +351,20 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 	// 7. Enqueue Cloud Task. On enqueue failure, flip the freshly-queued
 	// session to status=error so the watchdog doesn't sweep it, and surface
 	// a 502 so the client can retry deterministically.
+	//
+	// Cloud Task body carries the creator UID (not the submitter UID) because
+	// the worker uses it for Vertex Agent Engine session ownership. `turnIdx`
+	// is sent as an integer; the worker formats to a zero-padded doc key on
+	// its side.
 	try {
 		await enqueueRunTask({
 			runId,
 			body: {
 				sessionId,
 				runId,
+				turnIdx: newTurnIdx,
 				adkSessionId: existingAdkSessionId,
-				userId,
+				userId: creatorUid,
 				queryText,
 				isFirstMessage,
 				placeContext: placeContext || null,
@@ -328,7 +374,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 	} catch (err) {
 		console.error('Cloud Tasks enqueue failed:', err.message || err);
 		try {
-			await ref.update({
+			await sessionRef.update({
 				status: 'error',
 				error: 'enqueue_failed'
 			});
@@ -543,3 +589,87 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 		res.json({ ok: false, reason: 'agent_unavailable' });
 	}
 });
+
+// --- Agent delete endpoint (hard-deletes a chat, creator-only) ---
+//
+// Plan §6 / §8: possession of the chat URL grants read + continue, but hard
+// deletion stays creator-only. Verifies a Firebase ID token, checks that the
+// caller's UID matches the session's stored `userId`, then uses
+// `db.recursiveDelete(...)` to reap the session doc plus both subcollections
+// (`turns/*`, `events/*`) in one server call.
+//
+// No soft-delete, no undo, no mid-run drain protocol. If the worker is still
+// writing when the delete lands, its next fenced write will hit OwnershipLost
+// and bail; any event docs it writes before that are bounded by the 3-day
+// events TTL.
+export const agentDelete = onRequest(
+	{ cors: true, timeoutSeconds: 120, memory: '256MiB' },
+	async (req, res) => {
+		if (req.method !== 'POST') {
+			res.status(405).json({ ok: false, error: 'Method not allowed' });
+			return;
+		}
+
+		// 1. Firebase ID token verification.
+		const authHeader = req.headers.authorization || '';
+		const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
+		if (!tokenMatch) {
+			res.status(401).json({ ok: false, error: 'Authorization header required' });
+			return;
+		}
+		let uid;
+		try {
+			const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
+			uid = decoded.uid;
+		} catch (e) {
+			console.warn('agentDelete verifyIdToken rejected:', e.code || e.message);
+			res.status(401).json({ ok: false, error: 'Invalid auth token' });
+			return;
+		}
+
+		// 2. Input validation.
+		const { sid } = req.body || {};
+		if (!sid || typeof sid !== 'string') {
+			res.status(400).json({ ok: false, error: 'sid is required' });
+			return;
+		}
+
+		// 3. Ownership check. Read the session first; a missing doc is a 404,
+		// a non-creator caller is a 403. Admin SDK bypasses Firestore rules,
+		// so this explicit check is load-bearing.
+		const sessionRef = db.collection('sessions').doc(sid);
+		let snap;
+		try {
+			snap = await sessionRef.get();
+		} catch (err) {
+			console.error('agentDelete session read failed:', sid, err.message || err);
+			res.status(500).json({ ok: false, error: 'delete_failed' });
+			return;
+		}
+
+		if (!snap.exists) {
+			res.status(404).json({ ok: false, error: 'session_not_found' });
+			return;
+		}
+
+		const data = snap.data() || {};
+		if (data.userId !== uid) {
+			res.status(403).json({ ok: false, error: 'not_creator' });
+			return;
+		}
+
+		// 4. Recursive delete. Firebase Admin SDK 13 reaps the session doc and
+		// both subcollections in one call. No batching, no BulkWriter, no
+		// retry loop — on failure we log, return 500, and let the operator
+		// (or the user) retry.
+		try {
+			await db.recursiveDelete(sessionRef);
+		} catch (err) {
+			console.error('agentDelete recursiveDelete failed:', sid, err.message || err);
+			res.status(500).json({ ok: false, error: 'delete_failed' });
+			return;
+		}
+
+		res.status(200).json({ ok: true });
+	}
+);

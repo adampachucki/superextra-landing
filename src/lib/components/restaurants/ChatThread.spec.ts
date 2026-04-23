@@ -1,9 +1,18 @@
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { render } from 'svelte/server';
 
-vi.mock('$lib/firestore-stream', () => ({
-	postAgentStream: vi.fn(),
-	subscribeToSession: vi.fn()
+// Mock firebase/firestore before importing chat-state so its dynamic
+// `import('firebase/firestore')` resolves to our stubs.
+vi.mock('firebase/firestore', () => ({
+	doc: vi.fn((_db, ...parts: string[]) => ({ _kind: 'doc', _path: parts.join('/') })),
+	collection: vi.fn((_db, ...parts: string[]) => ({
+		_kind: 'collection',
+		_path: parts.join('/')
+	})),
+	query: vi.fn((ref, ...constraints) => ({ _kind: 'query', _ref: ref, _constraints: constraints })),
+	where: vi.fn((f, op, v) => ({ _kind: 'where', f, op, v })),
+	orderBy: vi.fn((f) => ({ _kind: 'orderBy', f })),
+	onSnapshot: vi.fn()
 }));
 
 vi.mock('$lib/firebase', () => ({
@@ -12,76 +21,122 @@ vi.mock('$lib/firebase', () => ({
 	getIdToken: vi.fn(async () => 'mock-id-token')
 }));
 
-import { chatState } from '$lib/chat-state.svelte';
-import { postAgentStream, subscribeToSession } from '$lib/firestore-stream';
+import { chatState, _testing } from '$lib/chat-state.svelte';
+import { onSnapshot } from 'firebase/firestore';
 import ChatThread from './ChatThread.svelte';
 
-const mockPost = postAgentStream as Mock;
-const mockSubscribe = subscribeToSession as Mock;
+const mockOnSnapshot = onSnapshot as unknown as Mock;
 
-type StreamCallbacks = Parameters<typeof subscribeToSession>[2];
+type SnapHandler = (snap: unknown) => void;
+type ErrHandler = (err: unknown) => void;
 
-function hangingStream() {
-	let capturedCbs!: StreamCallbacks;
+interface Captured {
+	ref: { _path?: string; _ref?: { _path?: string }; _kind?: string };
+	onNext: SnapHandler;
+	onError: ErrHandler;
+	unsubscribe: Mock;
+}
 
-	mockPost.mockResolvedValue({ sessionId: 'server-sid', runId: 'run-1' });
-	mockSubscribe.mockImplementation(
-		async (_sid: string, _runId: string, callbacks: StreamCallbacks) => {
-			capturedCbs = callbacks;
-			return () => {};
-		}
-	);
-
+function captureObservers() {
+	const captured: Captured[] = [];
+	mockOnSnapshot.mockImplementation((ref, onNext, onError) => {
+		const unsubscribe = vi.fn();
+		captured.push({ ref, onNext, onError, unsubscribe });
+		return unsubscribe;
+	});
 	return {
-		get cbs() {
-			return capturedCbs;
+		session(sid: string) {
+			return captured.find((c) => c.ref._kind === 'doc' && c.ref._path === `sessions/${sid}`);
+		},
+		turns(sid: string) {
+			return captured.find((c) => c.ref._ref?._path === `sessions/${sid}/turns`);
 		}
 	};
 }
 
-function resetAll() {
-	chatState.reset();
-	for (const conv of [...chatState.conversations]) {
-		chatState.deleteConversation(conv.id);
-	}
-	chatState.pageHidden = false;
+function sessionSnap(data: Record<string, unknown>, { fromCache = false } = {}) {
+	return {
+		exists: () => true,
+		data: () => data,
+		metadata: { fromCache }
+	};
+}
+
+function turnsSnap(entries: Array<{ data: Record<string, unknown> }>, { fromCache = false } = {}) {
+	return {
+		metadata: { fromCache },
+		forEach(cb: (docSnap: { id: string; data: () => Record<string, unknown> }) => void) {
+			for (const e of entries) {
+				const idx = (e.data.turnIndex as number | undefined) ?? 0;
+				cb({ id: String(idx).padStart(4, '0'), data: () => e.data });
+			}
+		}
+	};
 }
 
 async function waitUntil(fn: () => boolean, timeout = 2000) {
 	const start = Date.now();
 	while (!fn()) {
 		if (Date.now() - start > timeout) throw new Error('waitUntil timed out');
-		await new Promise((r) => setTimeout(r, 10));
+		await new Promise((r) => setTimeout(r, 5));
 	}
 }
 
 describe('ChatThread', () => {
 	beforeEach(() => {
-		mockPost.mockReset();
-		mockSubscribe.mockReset();
-		resetAll();
+		mockOnSnapshot.mockReset();
+		_testing.reset();
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
 	});
 
 	it('does not render a duplicate final counts row in the completed summary', async () => {
-		const stream = hangingStream();
-		chatState.start('review summary', null);
-		await waitUntil(() => !!stream.cbs);
+		const obs = captureObservers();
+		chatState.selectSession('sid-1');
+		await waitUntil(() => !!obs.turns('sid-1'));
 
-		stream.cbs.onComplete('Agent reply', [], undefined, {
-			startedAtMs: 0,
-			finishedAtMs: 10_000,
-			elapsedMs: 10_000,
-			notes: [
+		obs.session('sid-1')!.onNext(
+			sessionSnap({
+				userId: 'uid-test',
+				participants: ['uid-test'],
+				status: 'complete',
+				currentRunId: 'run-1',
+				lastTurnIndex: 1
+			})
+		);
+		obs.turns('sid-1')!.onNext(
+			turnsSnap([
 				{
-					text: 'I checked the strongest signals.',
-					noteSource: 'deterministic',
-					counts: { webQueries: 0, sources: 1, venues: 0, platforms: 0 }
+					data: {
+						turnIndex: 1,
+						runId: 'run-1',
+						userMessage: 'review summary',
+						status: 'complete',
+						reply: 'Agent reply',
+						sources: [],
+						turnSummary: {
+							startedAtMs: 0,
+							finishedAtMs: 10_000,
+							elapsedMs: 10_000,
+							notes: [
+								{
+									text: 'I checked the strongest signals.',
+									noteSource: 'deterministic',
+									counts: { webQueries: 0, sources: 1, venues: 0, platforms: 0 }
+								}
+							],
+							finalCounts: { webQueries: 0, sources: 1, venues: 0, platforms: 0 }
+						},
+						createdAt: { toMillis: () => 1000 },
+						completedAt: { toMillis: () => 11_000 }
+					}
 				}
-			],
-			finalCounts: { webQueries: 0, sources: 1, venues: 0, platforms: 0 }
-		});
-		await waitUntil(() => !chatState.loading);
+			])
+		);
 
+		expect(chatState.messages).toHaveLength(2);
 		const { body } = render(ChatThread, { props: {} });
 		expect(body.match(/Opened 1 source/g)).toHaveLength(1);
 	});

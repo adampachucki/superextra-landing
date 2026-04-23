@@ -1,14 +1,29 @@
-import {
-	postAgentStream,
-	subscribeToSession,
-	type ChatSource,
-	type TimelineEvent,
-	type TurnCounts,
-	type TurnSummary
-} from '$lib/firestore-stream';
-import { ensureAnonAuth, getIdToken } from '$lib/firebase';
-import { recoverStream } from '$lib/chat-recovery';
-import { handleReturnFromHidden, type IosVisibilityHandle } from '$lib/ios-sse-workaround';
+/**
+ * Firestore-driven chat state (plan §9).
+ *
+ * Four live Firestore reads drive the UI:
+ *   1. **Sidebar listener** — `sessions where participants array-contains
+ *      currentUid order by updatedAt desc`. Attaches once anon auth resolves;
+ *      re-renders the sidebar as sessions are created, updated, or deleted.
+ *   2. **Active session listener** — `sessions/{sid}`. Drives the activeSession
+ *      reactive value, `canDelete`, `loadState`.
+ *   3. **Active turns listener** — `sessions/{sid}/turns order by turnIndex`.
+ *      Source of truth for the flattened `messages` array and the current
+ *      turn's status.
+ *   4. **Active events listener** — `sessions/{sid}/events where runId ==
+ *      currentRunId order by (attempt, seqInAttempt)`. Attaches only while
+ *      the latest turn is `queued`/`running`; detaches on the turn doc's
+ *      terminal status (plan §10 / pin #6).
+ *
+ * There is no browser-local conversation store. Stage 6 deleted
+ * `chat-recovery.ts` and `ios-sse-workaround.ts` — the Firestore SDK's
+ * persistent cache + automatic listener resumption cover the reconnect cases
+ * those modules used to mitigate.
+ */
+
+import type { Unsubscribe } from 'firebase/firestore';
+import type { ChatSource, TimelineEvent, TurnCounts, TurnSummary } from '$lib/firestore-stream';
+import { ensureAnonAuth, getFirebase, getIdToken } from '$lib/firebase';
 
 /** crypto.randomUUID() is only available in secure contexts (HTTPS / localhost).
  *  Fall back to crypto.getRandomValues() which works everywhere. */
@@ -21,7 +36,7 @@ function uuid(): string {
 	);
 }
 
-interface ChatMessage {
+export interface ChatMessage {
 	role: 'user' | 'agent';
 	text: string;
 	timestamp: number;
@@ -29,223 +44,61 @@ interface ChatMessage {
 	turnSummary?: TurnSummary;
 }
 
-interface PlaceContext {
+export interface PlaceContext {
 	name: string;
 	secondary: string;
 	placeId: string;
 }
 
-interface Conversation {
-	id: string;
-	title: string;
-	messages: ChatMessage[];
+/** Shape of the `sessions/{sid}` document as consumed by the client. */
+export interface Session {
+	sid: string;
+	userId: string;
+	participants: string[];
+	title: string | null;
 	placeContext: PlaceContext | null;
-	createdAt: number;
-	updatedAt: number;
+	status: 'queued' | 'running' | 'complete' | 'error' | null;
+	currentRunId: string | null;
+	lastTurnIndex: number;
+	createdAtMs: number | null;
+	updatedAtMs: number | null;
 }
 
-const STORAGE_KEY = 'se_chats';
-const OLD_STORAGE_KEY = 'se_chat';
-const MAX_CONVERSATIONS = 50;
-
-// Working state — the currently loaded conversation
-let messages = $state<ChatMessage[]>([]);
-let loading = $state(false);
-let recovering = $state(false);
-let error = $state('');
-let active = $state(false);
-let placeContext = $state<PlaceContext | null>(null);
-let currentId = $state<string | null>(null);
-
-// Streaming state (ephemeral — never persisted to localStorage)
-let liveTimeline = $state<TimelineEvent[]>([]);
-let currentTurnStartedAtMs = $state<number | null>(null);
-let currentRunId = $state<string | null>(null);
-let typingMessageTimestamp = $state<number | null>(null);
-// Terminal-reply dedup key. Set to the runId the first time a reply lands
-// (via Firestore observer OR chat-recovery REST poll) so a second delivery
-// of the same turn's terminal is a no-op. Reset to null at the start of a
-// new subscription. Replaces the old text-equality dedup, which false-
-// rejected legitimately-new short replies across turns.
-let appendedReplyForRunId: string | null = null;
-let subscriptionUnsubscribe: (() => void) | null = null;
-let iosReturnHandle: IosVisibilityHandle | null = null;
-let pageHidden = $state(false);
-
-// All conversations
-let conversations = $state<Conversation[]>([]);
-
-// Restore from localStorage (or migrate from old single-conversation key).
-// One-shot migration from se_chat (single-conv) to se_chats (multi-conv) +
-// merge of legacy `sessionId` field into `id`. Safe to delete this whole
-// block once no v1 clients remain (~6 months after rollout of multi-conv).
-if (typeof localStorage !== 'undefined') {
-	try {
-		const stored = localStorage.getItem(STORAGE_KEY);
-		if (stored) {
-			const data = JSON.parse(stored);
-			const restoredConversations: Conversation[] = Array.isArray(data.conversations)
-				? data.conversations
-				: [];
-
-			// One-time migration: merge old separate sessionId into id
-			// sessionId is the Firestore-known value, so it becomes the canonical id
-			let migrated = false;
-			const oldIdToNewId: Record<string, string> = {};
-			const claimedIds: Record<string, true> = {};
-			for (const c of restoredConversations) {
-				const oldId = c.id;
-				const oldSid = (c as unknown as Record<string, unknown>).sessionId as string | undefined;
-				if (oldSid) {
-					if (!claimedIds[oldSid]) {
-						c.id = oldSid;
-						claimedIds[oldSid] = true;
-					}
-					// else: duplicate sessionId from old reuse bug — keep existing c.id
-				}
-				claimedIds[c.id] = true;
-				oldIdToNewId[oldId] = c.id;
-				if ('sessionId' in c) {
-					delete (c as unknown as Record<string, unknown>).sessionId;
-					migrated = true;
-				}
-			}
-			if (migrated) {
-				data.activeId = data.activeId ? (oldIdToNewId[data.activeId] ?? null) : null;
-				localStorage.setItem(
-					STORAGE_KEY,
-					JSON.stringify({ activeId: data.activeId, conversations: restoredConversations })
-				);
-			}
-			conversations = restoredConversations;
-
-			// URL ?sid= takes precedence over stored activeId on refresh
-			let restored = false;
-			if (typeof window !== 'undefined') {
-				const urlSid = new URL(window.location.href).searchParams.get('sid');
-				if (urlSid) {
-					const conv = restoredConversations.find((c: Conversation) => c.id === urlSid);
-					if (conv) {
-						loadConversation(conv);
-						restored = true;
-					}
-				}
-			}
-			if (!restored && data.activeId) {
-				const conv = restoredConversations.find((c: Conversation) => c.id === data.activeId);
-				if (conv) loadConversation(conv);
-			}
-		} else {
-			const old = localStorage.getItem(OLD_STORAGE_KEY);
-			if (old) {
-				const s = JSON.parse(old);
-				if (s.messages?.length) {
-					const conv: Conversation = {
-						id: s.sessionId || uuid(),
-						title: generateTitle(s.messages[0]?.text || 'Untitled'),
-						messages: s.messages,
-						placeContext: s.placeContext || null,
-						createdAt: s.messages[0]?.timestamp || Date.now(),
-						updatedAt: s.messages[s.messages.length - 1]?.timestamp || Date.now()
-					};
-					conversations = [conv];
-					loadConversation(conv);
-				}
-				localStorage.removeItem(OLD_STORAGE_KEY);
-				persist();
-			}
-		}
-	} catch {
-		// localStorage parse failures are non-critical
-	}
+/** Sidebar entry — subset of Session shape exposed by the sidebar listener. */
+export interface SessionSummary {
+	sid: string;
+	title: string | null;
+	placeContext: PlaceContext | null;
+	updatedAtMs: number | null;
+	userId: string;
+	lastTurnIndex: number;
+	status: 'queued' | 'running' | 'complete' | 'error' | null;
 }
 
-function generateTitle(text: string): string {
-	const clean = text.trim();
-	if (clean.length <= 50) return clean;
-	const truncated = clean.slice(0, 50);
-	const lastSpace = truncated.lastIndexOf(' ');
-	return (lastSpace > 20 ? truncated.slice(0, lastSpace) : truncated) + '...';
+/** Shape of a `sessions/{sid}/turns/{turnKey}` document. */
+export interface Turn {
+	turnIndex: number;
+	runId: string;
+	userMessage: string;
+	status: 'pending' | 'running' | 'complete' | 'error';
+	reply: string | null;
+	sources: ChatSource[] | null;
+	turnSummary: TurnSummary | null;
+	createdAtMs: number | null;
+	completedAtMs: number | null;
+	error: string | null;
 }
 
-function loadConversation(conv: Conversation) {
-	messages = [...conv.messages];
-	placeContext = conv.placeContext;
-	currentId = conv.id;
-	active = conv.messages.length > 0;
-	error = '';
-	loading = false;
-}
+export type LoadState = 'idle' | 'loading' | 'loaded' | 'missing' | 'loadTimedOut';
 
-function syncCurrentToList() {
-	if (!currentId || !messages.length) return;
-	const idx = conversations.findIndex((c) => c.id === currentId);
-	if (idx >= 0) {
-		conversations[idx] = {
-			...conversations[idx],
-			messages: [...messages],
-			placeContext,
-			updatedAt: messages[messages.length - 1]?.timestamp || conversations[idx].updatedAt
-		};
-	}
-}
+const LOAD_TIMEOUT_MS = 10_000;
 
-function persist() {
-	if (typeof localStorage === 'undefined') return;
-	syncCurrentToList();
-	try {
-		localStorage.setItem(
-			STORAGE_KEY,
-			JSON.stringify({
-				activeId: currentId,
-				conversations
-			})
-		);
-	} catch {
-		// Storage full or unavailable — non-critical
-	}
-}
+/** Events listener attaches only while latest turn is in these statuses. */
+const IN_FLIGHT_STATUSES = new Set(['queued', 'running', 'pending']);
 
-function buildHistory(): Array<{ role: string; parts: Array<{ text: string }> }> {
-	return messages.map((m) => ({
-		role: m.role === 'agent' ? 'model' : 'user',
-		parts: [{ text: m.text }]
-	}));
-}
-
-function appendToConversation(convId: string, msg: ChatMessage) {
-	const idx = conversations.findIndex((c) => c.id === convId);
-	if (idx < 0) return;
-	conversations[idx] = {
-		...conversations[idx],
-		messages: [...conversations[idx].messages, msg],
-		updatedAt: msg.timestamp
-	};
-}
-
-// Same-origin rewrites for both dev and prod. `firebase.json` defines
-// `/api/agent/stream` → `agentStream` and `/api/agent/check` → `agentCheck`
-// under the `agent` hosting target, and the Vite dev proxy mirrors them.
-// Post-decoupling `agentStream` is a plain POST-returns-JSON enqueue (no
-// SSE), so the earlier `cloudfunctions.net` GFE-proxy SSE workaround is no
-// longer load-bearing — see docs/deployment-gotchas.md "Cloud Functions".
-function agentStreamUrl() {
-	return '/api/agent/stream';
-}
-
-function agentCheckUrl(sid: string, runId: string) {
-	return `/api/agent/check?sid=${encodeURIComponent(sid)}&runId=${encodeURIComponent(runId)}`;
-}
-
-function cleanupSubscription() {
-	if (subscriptionUnsubscribe) {
-		subscriptionUnsubscribe();
-		subscriptionUnsubscribe = null;
-	}
-}
-
-function zeroCounts(): TurnCounts {
-	return { webQueries: 0, sources: 0, venues: 0, platforms: 0 };
+/** Turn doc IDs are zero-padded 4-digit strings (plan §5 / Stage 4). */
+function turnDocKey(turnIdx: number): string {
+	return String(turnIdx).padStart(4, '0');
 }
 
 function toMillis(value: unknown): number | null {
@@ -256,585 +109,601 @@ function toMillis(value: unknown): number | null {
 		'toMillis' in value &&
 		typeof (value as { toMillis?: unknown }).toMillis === 'function'
 	) {
-		return ((value as { toMillis: () => number }).toMillis() ?? null) as number | null;
+		try {
+			return (value as { toMillis: () => number }).toMillis();
+		} catch {
+			return null;
+		}
 	}
 	return null;
 }
 
-function buildStreamCallbacks(sendingConvId: string | null, sendingRunId: string) {
-	return {
-		onTimelineEvent(event: TimelineEvent) {
-			if (currentId !== sendingConvId) return;
-			if (currentTurnStartedAtMs === null) currentTurnStartedAtMs = Date.now();
-			const ts = Date.now();
-			const next = { ...event, ts } as TimelineEvent;
-			if (
-				next.kind === 'detail' &&
-				liveTimeline.some(
-					(item) =>
-						item.kind === 'detail' &&
-						item.group === next.group &&
-						item.family === next.family &&
-						item.text === next.text
-				)
-			) {
-				return;
-			}
-			liveTimeline = [...liveTimeline, next];
-		},
-		onAttemptChange() {
-			if (currentId !== sendingConvId) return;
-			liveTimeline = [
-				{
-					kind: 'note',
-					id: `retry-${Date.now()}`,
-					text: 'Retrying…',
-					noteSource: 'deterministic',
-					counts: zeroCounts(),
-					ts: Date.now()
-				}
-			];
-		},
-		onComplete(
-			reply: string,
-			sources: ChatSource[] | undefined,
-			title?: string,
-			turnSummary?: TurnSummary
-		) {
-			if (pageHidden) return;
-			// Dedup by runId — chat-recovery may surface the same turn's reply
-			// first if Firestore was briefly blocked. Old text-equality dedup
-			// false-rejected legitimately-new short replies across turns
-			// ("OK", "Yes"). Since the terminal is written once per turn and
-			// keyed on runId, the runId is the right dedup key.
-			if (appendedReplyForRunId === sendingRunId) {
-				// Already appended for this turn (recover() raced us).
-			} else {
-				appendedReplyForRunId = sendingRunId;
-				const timestamp = Date.now();
-				const msg: ChatMessage = {
-					role: 'agent',
-					text: reply,
-					timestamp,
-					sources: sources?.length ? sources : undefined,
-					turnSummary
-				};
-				if (currentId === sendingConvId) {
-					messages.push(msg);
-					if (liveTimeline.some((event) => event.kind === 'drafting')) {
-						typingMessageTimestamp = timestamp;
-					}
-				} else if (sendingConvId) {
-					const idx = conversations.findIndex((c) => c.id === sendingConvId);
-					if (idx >= 0) {
-						appendToConversation(sendingConvId, msg);
-					}
-				}
-			}
-			if (title && sendingConvId) {
-				const idx = conversations.findIndex((c) => c.id === sendingConvId);
-				if (idx >= 0) {
-					conversations[idx] = { ...conversations[idx], title };
-				}
-			}
-			if (currentId === sendingConvId) {
-				loading = false;
-				liveTimeline = [];
-				currentTurnStartedAtMs = null;
-			}
-			cleanupSubscription();
-			currentRunId = null;
-			persist();
-		},
-		onError(err: string) {
-			if (currentId !== sendingConvId || pageHidden) return;
-			error = err || 'unknown_error';
-			loading = false;
-			liveTimeline = [];
-			currentTurnStartedAtMs = null;
-			cleanupSubscription();
-			currentRunId = null;
-			persist();
-		},
-		onPermissionDenied() {
-			if (currentId !== sendingConvId) return;
-			// Fall back to the REST poll. Usually caused by ad-blockers on
-			// *.googleapis.com or corporate proxies killing the WebSocket
-			// channel used by Firestore.
-			console.warn('Firestore PERMISSION_DENIED — falling back to agentCheck poll');
-			recover().catch(() => {});
-		},
-		onFirstSnapshotTimeout() {
-			if (currentId !== sendingConvId) return;
-			// Same fallback shape as PERMISSION_DENIED. We keep the live
-			// subscription running in case it recovers; the poll just
-			// races it.
-			console.warn('Firestore first-snapshot timeout — falling back to agentCheck poll');
-			recover().catch(() => {});
-		}
-	};
+function zeroCounts(): TurnCounts {
+	return { webQueries: 0, sources: 0, venues: 0, platforms: 0 };
 }
 
-async function send(text: string) {
-	const trimmed = text.trim();
-	if (!trimmed || loading) return;
-
-	const sendingConvId = currentId;
-	const sessionId = sendingConvId;
-	if (!sessionId) return;
-	const history = buildHistory();
-	const isFirstMessageForApi = messages.filter((m) => m.role === 'agent').length === 0;
-	messages.push({ role: 'user', text: trimmed, timestamp: Date.now() });
-	loading = true;
-	error = '';
-	liveTimeline = [];
-	currentTurnStartedAtMs = Date.now();
-	typingMessageTimestamp = null;
-	cleanupSubscription();
-	persist();
-
-	let runId: string;
+// Optional pin #5 localStorage cleanup: clear the legacy browser-local
+// conversation store on module init. Deletable ~1 month after cutover.
+if (typeof localStorage !== 'undefined') {
 	try {
-		await ensureAnonAuth();
-		const idToken = await getIdToken();
-		const resp = await postAgentStream(
-			agentStreamUrl(),
-			{
-				message: trimmed,
-				sessionId,
-				placeContext,
-				history,
-				isFirstMessage: isFirstMessageForApi
-			},
-			idToken
-		);
-		runId = resp.runId;
-	} catch (e: unknown) {
-		const err = e as { status?: number; message?: string };
-		if (currentId === sendingConvId && !pageHidden) {
-			if (err.status === 401) error = 'auth_required';
-			else if (err.status === 403) error = 'ownership_mismatch';
-			else if (err.status === 409) error = 'previous_turn_in_flight';
-			else if (err.status === 429) error = err.message || 'rate_limited';
-			else error = 'Could not reach the server. Please check your connection.';
-			loading = false;
-		}
-		persist();
-		return;
+		localStorage.removeItem('se_chats');
+		localStorage.removeItem('se_chat');
+	} catch {
+		// Ignore — private mode / storage quota / etc.
 	}
+}
 
-	currentRunId = runId;
-	appendedReplyForRunId = null;
-	recoveryStartedForRunId = null;
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
 
-	try {
-		const unsubscribe = await subscribeToSession(
-			sessionId,
-			runId,
-			buildStreamCallbacks(sendingConvId, runId)
-		);
-		// If the user already moved on, drop the subscription immediately.
-		if (currentId !== sendingConvId) {
-			unsubscribe();
-			return;
-		}
-		subscriptionUnsubscribe = unsubscribe;
-	} catch (e: unknown) {
-		if (currentId === sendingConvId && !pageHidden) {
-			const msg = e instanceof Error ? e.message : 'subscribe_failed';
-			console.warn('subscribeToSession failed, falling back to poll:', msg);
-			// Try REST polling as a last resort.
-			await recover().catch(() => {
-				error = 'Could not subscribe to progress. Please try again.';
-				loading = false;
+let currentUid = $state<string | null>(null);
+let sessionsList = $state<SessionSummary[]>([]);
+let activeSid = $state<string | null>(null);
+let activeSession = $state<Session | null>(null);
+let turns = $state<Turn[]>([]);
+let liveTimeline = $state<TimelineEvent[]>([]);
+let loadState = $state<LoadState>('idle');
+let placeContextState = $state<PlaceContext | null>(null);
+let typingMessageTimestamp = $state<number | null>(null);
+
+// Listener unsubscribes — kept outside $state because they're opaque cleanup
+// handles, not reactive values.
+let sessionsListUnsubscribe: Unsubscribe | null = null;
+let activeSessionUnsubscribe: Unsubscribe | null = null;
+let activeTurnsUnsubscribe: Unsubscribe | null = null;
+let activeEventsUnsubscribe: Unsubscribe | null = null;
+let loadTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+let currentEventsRunId: string | null = null;
+
+// Typewriter tracking: turnIndexes that we've seen transition running→complete
+// in this browser session. Turns already complete on initial load are NOT in
+// this set, so they render as historical text without animation. Plain Set/Map
+// are fine here — these are internal dedup structures and don't need to trigger
+// UI reactivity.
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const typewriterEligibleTurns = new Set<number>();
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const previousTurnStatus = new Map<number, Turn['status']>();
+
+// Events dedup — reconnects replay the same doc; key on (runId, attempt,
+// seqInAttempt) to avoid duplicating timeline rows across resubscribes.
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const renderedEventKeys = new Set<string>();
+
+// Sidebar listener state — attached lazily on first consumer access.
+let sidebarAttachStarted = false;
+
+// ---------------------------------------------------------------------------
+// Derived state (plain getters over $state — read inside components)
+// ---------------------------------------------------------------------------
+
+function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
+	const msgs: ChatMessage[] = [];
+	for (const turn of turnList) {
+		msgs.push({
+			role: 'user',
+			text: turn.userMessage,
+			timestamp: turn.createdAtMs ?? Date.now()
+		});
+		if (turn.status === 'complete' && turn.reply) {
+			msgs.push({
+				role: 'agent',
+				text: turn.reply,
+				timestamp: turn.completedAtMs ?? Date.now(),
+				sources: turn.sources?.length ? turn.sources : undefined,
+				turnSummary: turn.turnSummary ?? undefined
 			});
 		}
 	}
+	return msgs;
 }
 
-function start(query: string, place: PlaceContext | null) {
-	syncCurrentToList();
+// ---------------------------------------------------------------------------
+// Sidebar listener
+// ---------------------------------------------------------------------------
 
-	const id = uuid();
-	const conv: Conversation = {
-		id,
-		title: generateTitle(query),
-		messages: [],
-		placeContext: place,
-		createdAt: Date.now(),
-		updatedAt: Date.now()
-	};
-
-	conversations.unshift(conv);
-	if (conversations.length > MAX_CONVERSATIONS) {
-		conversations = conversations.slice(0, MAX_CONVERSATIONS);
-	}
-
-	currentId = id;
-	messages = [];
-	loading = false;
-	placeContext = place;
-	active = true;
-	error = '';
-	liveTimeline = [];
-	currentTurnStartedAtMs = null;
-	typingMessageTimestamp = null;
-
-	send(query);
-}
-
-function reset() {
-	syncCurrentToList();
-	cleanupSubscription();
-	iosReturnHandle?.cancel();
-	iosReturnHandle = null;
-	messages = [];
-	loading = false;
-	recovering = false;
-	error = '';
-	active = false;
-	pageHidden = false;
-	placeContext = null;
-	currentId = null;
-	currentRunId = null;
-	appendedReplyForRunId = null;
-	recoveryStartedForRunId = null;
-	liveTimeline = [];
-	currentTurnStartedAtMs = null;
-	typingMessageTimestamp = null;
-	persist();
-}
-
-function switchTo(id: string) {
-	if (id === currentId) return;
-	if (loading) {
-		cleanupSubscription();
-		loading = false;
-		liveTimeline = [];
-		currentTurnStartedAtMs = null;
-	}
-	cleanupSubscription();
-	currentRunId = null;
-	typingMessageTimestamp = null;
-	syncCurrentToList();
-	const conv = conversations.find((c) => c.id === id);
-	if (!conv) return;
-	loadConversation(conv);
-	persist();
-
-	void resumeCurrentIfNeeded();
-}
-
-async function resumeIfInFlight(sessionId: string): Promise<void> {
-	if (currentId !== sessionId) return;
-	loading = true;
-	recovering = true;
-	error = '';
+async function attachSidebarListener() {
+	if (sidebarAttachStarted) return;
+	sidebarAttachStarted = true;
 	try {
-		await ensureAnonAuth();
-		const { db } = await import('$lib/firebase').then((m) => m.getFirebase());
-		const { doc, getDoc } = await import('firebase/firestore');
-		const snap = await getDoc(doc(db, 'sessions', sessionId));
-		if (currentId !== sessionId) return;
-		if (!snap.exists()) {
-			error = 'Session not found. Please start a new conversation.';
-			loading = false;
-			recovering = false;
-			return;
-		}
-		const data = snap.data() as Record<string, unknown>;
-		const status = data.status as string | undefined;
-		const runId = data.currentRunId as string | undefined;
-		if (status === 'complete') {
-			const reply = data.reply as string | undefined;
-			// RunId dedup — same contract as `buildStreamCallbacks.onComplete`
-			// and `recover().isDuplicateReply`. Text-equality dedup here was
-			// the last surviving spot that false-rejected legitimately-new
-			// short replies across turns on refresh-after-complete.
-			if (reply && runId && appendedReplyForRunId !== runId) {
-				appendedReplyForRunId = runId;
-				messages.push({
-					role: 'agent',
-					text: reply,
-					timestamp: Date.now(),
-					sources: (data.sources as ChatSource[] | undefined)?.length
-						? (data.sources as ChatSource[])
-						: undefined,
-					turnSummary: (data.turnSummary as TurnSummary | undefined) ?? undefined
-				});
-				// Mirror the server-generated title. Firestore observer's
-				// `onComplete` already does this for fresh runs, but the
-				// resume-after-reload path missed it — so titles persisted
-				// for users who stayed on the tab and dropped for cold reloads.
-				const serverTitle = data.title as string | undefined;
-				if (serverTitle) {
-					const idx = conversations.findIndex((c) => c.id === sessionId);
-					if (idx >= 0) {
-						conversations[idx] = { ...conversations[idx], title: serverTitle };
-					}
-				}
-				persist();
-			}
-			loading = false;
-			recovering = false;
-			liveTimeline = [];
-			currentTurnStartedAtMs = null;
-			return;
-		}
-		if (status === 'error') {
-			error = (data.error as string) || 'pipeline_error';
-			loading = false;
-			recovering = false;
-			liveTimeline = [];
-			currentTurnStartedAtMs = null;
-			return;
-		}
-		if (!runId) {
-			loading = false;
-			recovering = false;
-			liveTimeline = [];
-			currentTurnStartedAtMs = null;
-			return;
-		}
-		// status is queued or running — subscribe with the server-authoritative runId.
-		currentRunId = runId;
-		appendedReplyForRunId = null;
-		recoveryStartedForRunId = null;
-		currentTurnStartedAtMs = toMillis(data.queuedAt) ?? Date.now();
-		const unsub = await subscribeToSession(
-			sessionId,
-			runId,
-			buildStreamCallbacks(sessionId, runId)
+		const uid = await ensureAnonAuth();
+		currentUid = uid;
+		const { db } = await getFirebase();
+		const firestoreMod = await import('firebase/firestore');
+		const { collection, query, where, orderBy, onSnapshot } = firestoreMod;
+		const q = query(
+			collection(db, 'sessions'),
+			where('participants', 'array-contains', uid),
+			orderBy('updatedAt', 'desc')
 		);
-		if (currentId !== sessionId) {
-			unsub();
-			return;
-		}
-		subscriptionUnsubscribe = unsub;
-		recovering = false;
+		sessionsListUnsubscribe = onSnapshot(
+			q,
+			(snap) => {
+				const next: SessionSummary[] = [];
+				snap.forEach((docSnap) => {
+					const data = docSnap.data() as Record<string, unknown>;
+					next.push({
+						sid: docSnap.id,
+						title: (data.title as string | undefined) ?? null,
+						placeContext: (data.placeContext as PlaceContext | undefined) ?? null,
+						updatedAtMs: toMillis(data.updatedAt),
+						userId: (data.userId as string | undefined) ?? '',
+						lastTurnIndex: (data.lastTurnIndex as number | undefined) ?? 0,
+						status: (data.status as SessionSummary['status']) ?? null
+					});
+				});
+				sessionsList = next;
+			},
+			(err) => {
+				console.warn('[chat-state] sidebar listener error:', err);
+			}
+		);
 	} catch (err) {
-		console.warn('resumeIfInFlight error:', err);
-		if (currentId !== sessionId) return;
-		// `getDoc` failed — Firestore rules reject reads of a missing doc
-		// (rule references `resource.data.userId`), or Firebase init couldn't
-		// bootstrap at all. Try REST recovery; if it has nothing to poll
-		// (no runId — the runId lives only in memory and is lost on reload)
-		// `recover()` returns false without throwing, so we explicitly clear
-		// the optimistic loading/recovering flags set above. Without this
-		// reset the UI would stay stuck on "Reconnecting to the session…"
-		// indefinitely.
-		let recovered = false;
-		let recoverThrew = false;
-		try {
-			recovered = await recover();
-		} catch {
-			recoverThrew = true;
-		}
-		if (recovered) return;
-		if (currentId === sessionId && (loading || recovering)) {
-			error = recoverThrew
-				? 'Could not subscribe to progress. Please try again.'
-				: 'Session not found. Please start a new conversation.';
-			loading = false;
-			recovering = false;
-			liveTimeline = [];
-			currentTurnStartedAtMs = null;
-		}
+		console.warn('[chat-state] sidebar listener bootstrap failed:', err);
+		sidebarAttachStarted = false;
 	}
 }
 
-async function resumeCurrentIfNeeded(): Promise<boolean> {
-	if (!currentId) return false;
-	if (loading || recovering || subscriptionUnsubscribe) return false;
-	const lastMessage = messages[messages.length - 1];
-	if (!lastMessage || lastMessage.role !== 'user') return false;
-	await resumeIfInFlight(currentId);
-	return true;
+// ---------------------------------------------------------------------------
+// Active session + turns + events listeners
+// ---------------------------------------------------------------------------
+
+function detachActiveListeners() {
+	activeSessionUnsubscribe?.();
+	activeSessionUnsubscribe = null;
+	activeTurnsUnsubscribe?.();
+	activeTurnsUnsubscribe = null;
+	detachActiveEventsListener();
+	if (loadTimeoutHandle) {
+		clearTimeout(loadTimeoutHandle);
+		loadTimeoutHandle = null;
+	}
 }
 
-// One-shot guard: `onPermissionDenied` can fire from both Firestore observers
-// (session doc + events collection-group) and `onFirstSnapshotTimeout` fires
-// independently. Without this guard two polls would race for the same run.
-// Reset per new subscription in `send()` / `resumeIfInFlight()`, and cleared
-// in `recover()`'s `finally` so a retry (e.g. from `handleReturnFromHidden`)
-// can kick off again after the first attempt exhausts or fails.
-let recoveryStartedForRunId: string | null = null;
+function detachActiveEventsListener() {
+	activeEventsUnsubscribe?.();
+	activeEventsUnsubscribe = null;
+	currentEventsRunId = null;
+}
 
-async function recover(): Promise<boolean> {
-	if (!currentId) return false;
-	const recoveringConvId = currentId;
-	const runId = currentRunId;
-	if (!runId) return false;
-	if (recoveryStartedForRunId === runId) return false;
-	recoveryStartedForRunId = runId;
-	if (!loading) loading = true;
-	recovering = true;
-	error = '';
-	if (currentTurnStartedAtMs === null) currentTurnStartedAtMs = Date.now();
-	try {
-		return await recoverStream({
-			getSession: () => ({ sessionId: recoveringConvId, runId }),
-			isCurrentSession: (sid) => currentId === sid,
-			onReply: (reply, sources, title, turnSummary) => {
-				// Dedup by runId — buildStreamCallbacks' onComplete may have
-				// already appended this same reply via Firestore.
-				if (appendedReplyForRunId === runId) return;
-				appendedReplyForRunId = runId;
-				const timestamp = Date.now();
-				messages.push({
-					role: 'agent',
-					text: reply,
-					timestamp,
-					sources,
-					turnSummary
-				});
-				typingMessageTimestamp = liveTimeline.some((event) => event.kind === 'drafting')
-					? timestamp
-					: null;
-				// Sync server-generated title — mirrors the Firestore observer's
-				// onComplete path (chat-state `buildStreamCallbacks`). Without
-				// this, the REST-recovered conversation keeps its client
-				// placeholder instead of the worker-generated title.
-				if (title && recoveringConvId) {
-					const idx = conversations.findIndex((c) => c.id === recoveringConvId);
-					if (idx >= 0) {
-						conversations[idx] = { ...conversations[idx], title };
+function clearActiveState() {
+	activeSid = null;
+	activeSession = null;
+	turns = [];
+	liveTimeline = [];
+	loadState = 'idle';
+	placeContextState = null;
+	typingMessageTimestamp = null;
+	typewriterEligibleTurns.clear();
+	previousTurnStatus.clear();
+	renderedEventKeys.clear();
+}
+
+async function attachActiveListeners(sid: string) {
+	// Ensure anon auth has resolved before subscribing — the SDK needs a token
+	// even though rules are now path-scoped.
+	await ensureAnonAuth();
+	const { db } = await getFirebase();
+	const firestoreMod = await import('firebase/firestore');
+	const { collection, doc, onSnapshot, orderBy, query } = firestoreMod;
+
+	// Bail if the active sid has changed by the time we resolved.
+	if (activeSid !== sid) return;
+
+	const sessionRef = doc(db, 'sessions', sid);
+	const turnsQuery = query(collection(db, 'sessions', sid, 'turns'), orderBy('turnIndex'));
+
+	// Load state: arm the 10 s cache-only timeout. Server-confirmed snapshots
+	// clear it; cache-only snapshots do not.
+	loadState = 'loading';
+	if (loadTimeoutHandle) clearTimeout(loadTimeoutHandle);
+	loadTimeoutHandle = setTimeout(() => {
+		if (activeSid === sid && loadState === 'loading') {
+			loadState = 'loadTimedOut';
+		}
+	}, LOAD_TIMEOUT_MS);
+
+	activeSessionUnsubscribe = onSnapshot(
+		sessionRef,
+		(snap) => {
+			if (activeSid !== sid) return;
+			const fromCache = snap.metadata.fromCache;
+			const exists = snap.exists();
+
+			// fromCache-aware initial load state (plan §7). A cache-only
+			// first snapshot with exists=false is NOT authoritative.
+			if (!fromCache) {
+				if (loadTimeoutHandle) {
+					clearTimeout(loadTimeoutHandle);
+					loadTimeoutHandle = null;
+				}
+				loadState = exists ? 'loaded' : 'missing';
+			} else if (exists) {
+				// Cache-only but the doc exists — safe to flip to loaded
+				// for render purposes; the server version will confirm soon.
+				loadState = 'loaded';
+			}
+
+			if (!exists) {
+				activeSession = null;
+				return;
+			}
+			const data = snap.data() as Record<string, unknown>;
+			const next: Session = {
+				sid,
+				userId: (data.userId as string | undefined) ?? '',
+				participants: (data.participants as string[] | undefined) ?? [],
+				title: (data.title as string | undefined) ?? null,
+				placeContext: (data.placeContext as PlaceContext | undefined) ?? null,
+				status: (data.status as Session['status']) ?? null,
+				currentRunId: (data.currentRunId as string | undefined) ?? null,
+				lastTurnIndex: (data.lastTurnIndex as number | undefined) ?? 0,
+				createdAtMs: toMillis(data.createdAt),
+				updatedAtMs: toMillis(data.updatedAt)
+			};
+			activeSession = next;
+			// Keep placeContextState in sync so consumers that read it for
+			// follow-up submissions have the server-stored context.
+			if (next.placeContext) {
+				placeContextState = next.placeContext;
+			}
+			maybeAttachEventsListener();
+		},
+		(err) => {
+			console.warn('[chat-state] active session listener error:', err);
+		}
+	);
+
+	activeTurnsUnsubscribe = onSnapshot(
+		turnsQuery,
+		(snap) => {
+			if (activeSid !== sid) return;
+			const next: Turn[] = [];
+			snap.forEach((docSnap) => {
+				const data = docSnap.data() as Record<string, unknown>;
+				const turnIndex = (data.turnIndex as number | undefined) ?? Number(docSnap.id);
+				const status = ((data.status as string | undefined) ?? 'pending') as Turn['status'];
+				const sourcesRaw = data.sources as ChatSource[] | null | undefined;
+				const turn: Turn = {
+					turnIndex,
+					runId: (data.runId as string | undefined) ?? '',
+					userMessage: (data.userMessage as string | undefined) ?? '',
+					status,
+					reply: (data.reply as string | null | undefined) ?? null,
+					sources: Array.isArray(sourcesRaw) ? sourcesRaw : null,
+					turnSummary: (data.turnSummary as TurnSummary | null | undefined) ?? null,
+					createdAtMs: toMillis(data.createdAt),
+					completedAtMs: toMillis(data.completedAt),
+					error: (data.error as string | null | undefined) ?? null
+				};
+				next.push(turn);
+
+				// Typewriter rule (plan §10): a running→complete transition
+				// observed in the current browser session marks the turn as
+				// typewriter-eligible. Turns that are already complete when
+				// we first see them are NOT eligible.
+				const prev = previousTurnStatus.get(turnIndex);
+				if (prev && prev !== 'complete' && status === 'complete') {
+					typewriterEligibleTurns.add(turnIndex);
+					// Only animate the latest turn's reply, and only if a
+					// drafting event is in flight (matching the prior UX).
+					const reply = turn.reply;
+					if (reply && turn.completedAtMs !== null) {
+						if (liveTimeline.some((e) => e.kind === 'drafting')) {
+							typingMessageTimestamp = turn.completedAtMs ?? Date.now();
+						}
 					}
 				}
-				persist();
-			},
-			onError: (msg) => {
-				error = msg;
-				liveTimeline = [];
-				currentTurnStartedAtMs = null;
-			},
-			checkUrl: (sid, rid) => agentCheckUrl(sid, rid),
-			getIdToken: async () => {
-				try {
-					return await getIdToken();
-				} catch {
-					return null;
-				}
-			},
-			// `reply` is ignored — runId is the canonical dedup key. The
-			// signature still passes reply for compatibility but we only use
-			// the runId-scoped closure flag here.
-			isDuplicateReply: () => appendedReplyForRunId === runId
-		});
-	} finally {
-		loading = false;
-		recovering = false;
-		liveTimeline = [];
-		currentTurnStartedAtMs = null;
-		// Clear so a retry (visibility-change, reconnect, etc.) can start again.
-		// Safe: concurrent double-fire from the same subscription is short-
-		// circuited by the sync check at the top of recover(); clearing here
-		// only affects calls that arrive after this recover() has resolved.
-		if (recoveryStartedForRunId === runId) recoveryStartedForRunId = null;
-	}
-}
-
-async function resumeCurrentIfNeededOrRecover(): Promise<void> {
-	const resumed = await resumeCurrentIfNeeded();
-	if (!resumed && currentRunId) {
-		await recover();
-	}
-}
-
-function handleReturn(hiddenMs = Infinity) {
-	// Clear any pending poll/timeout from a prior visibilitychange.
-	iosReturnHandle?.cancel();
-	iosReturnHandle = handleReturnFromHidden(
-		{
-			isLoading: () => loading,
-			setLoading: (v) => {
-				loading = v;
-			},
-			abortStream: () => cleanupSubscription(),
-			recover: () => {
-				void resumeCurrentIfNeededOrRecover();
-			},
-			hasPendingUserMessage: () =>
-				messages.length > 0 && messages[messages.length - 1].role === 'user',
-			getSessionId: () => currentId
+				previousTurnStatus.set(turnIndex, status);
+			});
+			turns = next;
+			maybeAttachEventsListener();
 		},
-		hiddenMs
+		(err) => {
+			console.warn('[chat-state] active turns listener error:', err);
+		}
 	);
 }
 
-function deleteConversation(id: string) {
-	conversations = conversations.filter((c) => c.id !== id);
-	if (id === currentId) {
-		cleanupSubscription();
-		messages = [];
-		loading = false;
-		error = '';
-		active = false;
-		placeContext = null;
-		currentId = null;
-		currentRunId = null;
-		liveTimeline = [];
-		currentTurnStartedAtMs = null;
-		typingMessageTimestamp = null;
+/** Attach (or detach) the events listener based on the latest turn's status.
+ *  Per plan §10 / pin #6 the detach trigger is the TURN doc's terminal
+ *  status, not the session's — during the worker's fenced two-doc write the
+ *  two can briefly disagree. */
+function maybeAttachEventsListener() {
+	const sid = activeSid;
+	if (!sid) {
+		detachActiveEventsListener();
+		return;
 	}
-	persist();
+	const latest = turns[turns.length - 1];
+	const session = activeSession;
+	if (!latest || !session) {
+		// No turn yet — session doc's currentRunId may still be useful if
+		// the user just sent a message and we're waiting for agentStream's
+		// transaction to land the turn doc.
+		const runId = session?.currentRunId ?? null;
+		const inFlight = session?.status && IN_FLIGHT_STATUSES.has(session.status);
+		if (runId && inFlight) {
+			void ensureEventsListener(sid, runId);
+		} else {
+			detachActiveEventsListener();
+		}
+		return;
+	}
+	const inFlight = IN_FLIGHT_STATUSES.has(latest.status);
+	if (!inFlight) {
+		detachActiveEventsListener();
+		liveTimeline = [];
+		return;
+	}
+	const runId = latest.runId || session?.currentRunId || null;
+	if (!runId) return;
+	void ensureEventsListener(sid, runId);
 }
 
+async function ensureEventsListener(sid: string, runId: string) {
+	if (activeEventsUnsubscribe && currentEventsRunId === runId) return;
+	// Different runId — detach the old listener first.
+	detachActiveEventsListener();
+	currentEventsRunId = runId;
+	// Reset the per-run dedup set; different runs legitimately share keys.
+	renderedEventKeys.clear();
+	liveTimeline = [];
+
+	try {
+		const { db } = await getFirebase();
+		const firestoreMod = await import('firebase/firestore');
+		const { collection, onSnapshot, orderBy, query, where } = firestoreMod;
+		// Bail if the active sid/runId moved while we awaited imports.
+		if (activeSid !== sid || currentEventsRunId !== runId) return;
+		const q = query(
+			collection(db, 'sessions', sid, 'events'),
+			where('runId', '==', runId),
+			orderBy('attempt'),
+			orderBy('seqInAttempt')
+		);
+		activeEventsUnsubscribe = onSnapshot(
+			q,
+			(snap) => {
+				if (activeSid !== sid || currentEventsRunId !== runId) return;
+				for (const change of snap.docChanges()) {
+					if (change.type !== 'added') continue;
+					const data = change.doc.data() as {
+						attempt?: number;
+						seqInAttempt?: number;
+						type?: string;
+						data?: Record<string, unknown>;
+					};
+					const attempt = data.attempt ?? 0;
+					const seq = data.seqInAttempt ?? 0;
+					const key = `${runId}:${attempt}:${seq}`;
+					if (renderedEventKeys.has(key)) continue;
+					renderedEventKeys.add(key);
+					// `type='complete'` / `type='error'` events are ignored by
+					// design — the turn doc is the sole terminal source.
+					if (data.type !== 'timeline') continue;
+					const payload = (data.data ?? {}) as TimelineEvent;
+					liveTimeline = [...liveTimeline, { ...payload, ts: Date.now() } as TimelineEvent];
+				}
+			},
+			(err) => {
+				console.warn('[chat-state] events listener error:', err);
+			}
+		);
+	} catch (err) {
+		console.warn('[chat-state] events listener bootstrap failed:', err);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Submission
+// ---------------------------------------------------------------------------
+
+function agentStreamUrl() {
+	return '/api/agent/stream';
+}
+
+function agentDeleteUrl() {
+	return '/api/agent/delete';
+}
+
+async function postAgentStream(body: Record<string, unknown>): Promise<void> {
+	const idToken = await getIdToken();
+	const res = await fetch(agentStreamUrl(), {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${idToken}`
+		},
+		body: JSON.stringify(body)
+	});
+	if (!res.ok) {
+		const payload = await res.json().catch(() => null);
+		const reason = (payload as { error?: string } | null)?.error ?? `http_${res.status}`;
+		const err = new Error(reason) as Error & { status?: number };
+		err.status = res.status;
+		throw err;
+	}
+}
+
+async function startNewChat(query: string, place: PlaceContext | null): Promise<string> {
+	const trimmed = query.trim();
+	if (!trimmed) throw new Error('empty_message');
+	const sid = uuid();
+	// Attach listeners first so the session/turn docs we're about to write
+	// stream in through the listener rather than through a separate fetch.
+	selectSession(sid);
+	placeContextState = place;
+	await postAgentStream({
+		sessionId: sid,
+		message: trimmed,
+		placeContext: place,
+		history: [],
+		isFirstMessage: true
+	});
+	return sid;
+}
+
+async function sendFollowUp(message: string): Promise<void> {
+	const trimmed = message.trim();
+	if (!trimmed) return;
+	const sid = activeSid;
+	if (!sid) throw new Error('no_active_session');
+	await postAgentStream({
+		sessionId: sid,
+		message: trimmed,
+		placeContext: placeContextState,
+		history: [],
+		isFirstMessage: false
+	});
+}
+
+function selectSession(sid: string) {
+	if (activeSid === sid) return;
+	detachActiveListeners();
+	clearActiveState();
+	activeSid = sid;
+	loadState = 'loading';
+	void attachActiveListeners(sid);
+	// Kick the sidebar listener too if it hasn't started — entering a chat
+	// implies the user is interacting with the agent UI.
+	void attachSidebarListener();
+}
+
+async function deleteSession(sid: string): Promise<void> {
+	const idToken = await getIdToken();
+	const res = await fetch(agentDeleteUrl(), {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${idToken}`
+		},
+		body: JSON.stringify({ sid })
+	});
+	if (!res.ok) {
+		const payload = await res.json().catch(() => null);
+		const reason = (payload as { error?: string } | null)?.error ?? `http_${res.status}`;
+		const err = new Error(reason) as Error & { status?: number };
+		err.status = res.status;
+		throw err;
+	}
+	if (activeSid === sid) {
+		detachActiveListeners();
+		clearActiveState();
+	}
+	// Sidebar listener picks up the removal via its own snapshot; no manual
+	// splice needed.
+}
+
+function reset() {
+	detachActiveListeners();
+	clearActiveState();
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 export const chatState = {
-	get messages() {
-		return messages;
+	get messages(): ChatMessage[] {
+		return flattenTurnsToMessages(turns);
 	},
-	get loading() {
-		return loading;
+	get turns(): Turn[] {
+		return turns;
 	},
-	get recovering() {
-		return recovering;
+	get loading(): boolean {
+		const latest = turns[turns.length - 1];
+		if (!latest) {
+			// No turn doc yet, but agentStream was invoked — session status
+			// signals the in-flight window before the turn doc lands.
+			const status = activeSession?.status;
+			return !!status && IN_FLIGHT_STATUSES.has(status);
+		}
+		return IN_FLIGHT_STATUSES.has(latest.status);
 	},
-	get error() {
-		return error;
+	get error(): string {
+		const latest = turns[turns.length - 1];
+		if (latest?.status === 'error') return latest.error ?? 'pipeline_error';
+		return '';
 	},
-	set pageHidden(v: boolean) {
-		pageHidden = v;
+	get active(): boolean {
+		return activeSid !== null;
 	},
-	get active() {
-		return active;
-	},
-	get placeContext() {
-		return placeContext;
+	get placeContext(): PlaceContext | null {
+		return activeSession?.placeContext ?? placeContextState;
 	},
 	set placeContext(p: PlaceContext | null) {
-		placeContext = p;
+		placeContextState = p;
 	},
-	get conversations() {
-		return conversations;
+	get activeSid(): string | null {
+		return activeSid;
 	},
-	get activeId() {
-		return currentId;
+	get activeSession(): Session | null {
+		return activeSession;
 	},
-	get liveTimeline() {
+	get sessionsList(): SessionSummary[] {
+		// Lazy-attach on first read from the UI.
+		if (!sidebarAttachStarted) void attachSidebarListener();
+		return sessionsList;
+	},
+	get currentTurnStartedAtMs(): number | null {
+		const latest = turns[turns.length - 1];
+		if (!latest) return null;
+		if (!IN_FLIGHT_STATUSES.has(latest.status)) return null;
+		return latest.createdAtMs ?? null;
+	},
+	get liveTimeline(): TimelineEvent[] {
 		return liveTimeline;
 	},
-	get currentTurnStartedAtMs() {
-		return currentTurnStartedAtMs;
-	},
-	get typingMessageTimestamp() {
+	get typingMessageTimestamp(): number | null {
 		return typingMessageTimestamp;
 	},
 	set typingMessageTimestamp(v: number | null) {
 		typingMessageTimestamp = v;
 	},
-	get isStreaming() {
+	get isStreaming(): boolean {
 		return liveTimeline.length > 0;
 	},
-	abort() {
-		cleanupSubscription();
+	get canDelete(): boolean {
+		if (!currentUid || !activeSession) return false;
+		return activeSession.userId === currentUid;
 	},
-	send,
-	start,
-	reset,
-	recover,
-	resumeCurrentIfNeeded,
-	handleReturn,
-	switchTo,
-	deleteConversation
+	get loadState(): LoadState {
+		return loadState;
+	},
+	get currentUid(): string | null {
+		return currentUid;
+	},
+
+	startNewChat,
+	sendFollowUp,
+	selectSession,
+	deleteSession,
+	reset
+};
+
+// ---------------------------------------------------------------------------
+// Test-only helpers — enable deterministic resets between tests.
+// ---------------------------------------------------------------------------
+
+export const _testing = {
+	reset() {
+		detachActiveListeners();
+		sessionsListUnsubscribe?.();
+		sessionsListUnsubscribe = null;
+		sidebarAttachStarted = false;
+		clearActiveState();
+		currentUid = null;
+		sessionsList = [];
+	},
+	setCurrentUid(uid: string | null) {
+		currentUid = uid;
+	},
+	// For tests that want to avoid the real attach path.
+	markSidebarAttached() {
+		sidebarAttachStarted = true;
+	},
+	/** Coverage for zeroCounts / toMillis helpers — not used in production. */
+	_helpers: { zeroCounts, toMillis, turnDocKey }
 };

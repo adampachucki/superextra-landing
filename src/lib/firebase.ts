@@ -35,11 +35,33 @@ export function getFirebase(): Promise<FirebaseHandle> {
 		]);
 		const config = await loadConfig();
 		// Guard against double-init when the module is re-imported in dev HMR.
-		const app = getApps().length > 0 ? getApps()[0] : initializeApp(config);
+		const appAlreadyExists = getApps().length > 0;
+		const app = appAlreadyExists ? getApps()[0] : initializeApp(config);
+		// `initializeFirestore(...)` MUST stay inside this lazy async path.
+		// `persistentMultipleTabManager()` touches `window` and IndexedDB,
+		// which would throw during prerender if hoisted to module scope.
+		// Plan §7 SDK config block: persistent local cache + multi-tab
+		// coordination for automatic listener resumption after offline →
+		// online transitions. Cache size uses the SDK default (100 MB).
+		//
+		// On HMR the FirebaseApp persists across module reloads but our
+		// `handlePromise` memo does not. Calling `initializeFirestore` twice
+		// on the same app throws; fall back to `getFirestore` in that case so
+		// a stale editor save doesn't hard-crash the dev page.
+		let db: Firestore;
+		if (appAlreadyExists) {
+			db = firestoreMod.getFirestore(app);
+		} else {
+			db = firestoreMod.initializeFirestore(app, {
+				localCache: firestoreMod.persistentLocalCache({
+					tabManager: firestoreMod.persistentMultipleTabManager()
+				})
+			});
+		}
 		return {
 			app,
 			auth: authMod.getAuth(app),
-			db: firestoreMod.getFirestore(app)
+			db
 		};
 	})();
 	return handlePromise;

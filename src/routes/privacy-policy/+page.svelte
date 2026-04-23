@@ -15,7 +15,7 @@
 
 <article class="mx-auto max-w-[720px] px-6 pt-32 pb-20">
 	<h1 class="text-3xl font-medium tracking-tight text-black dark:text-white">Privacy Policy</h1>
-	<p class="mt-2 text-sm text-black/40 dark:text-white/40">Last updated: March 10, 2026</p>
+	<p class="mt-2 text-sm text-black/40 dark:text-white/40">Last updated: April 23, 2026</p>
 
 	<div
 		class="prose prose-sm mt-10 max-w-none text-black/60 prose-neutral dark:text-white/60 dark:prose-invert prose-headings:font-medium prose-headings:text-black dark:prose-headings:text-white prose-h2:mt-10 prose-h2:mb-4 prose-h2:text-lg prose-p:leading-relaxed prose-a:text-black prose-a:underline dark:prose-a:text-white prose-li:leading-relaxed"
@@ -78,7 +78,40 @@
 			<li>Comply with legal obligations.</li>
 		</ul>
 
-		<h2>4. How We Share Your Information</h2>
+		<h2>4. Chat Conversations</h2>
+		<p>
+			When you use the Superextra chat (research conversations with our AI agent), each chat is
+			given a unique URL. A few things about how chats are stored and shared are worth calling out:
+		</p>
+		<ul>
+			<li>
+				<strong
+					>Every question you ask and every answer you receive is durably stored in the cloud until
+					you delete the chat.</strong
+				> This includes the sources the agent returned and the activity summary for each turn.
+			</li>
+			<li>
+				<strong>Anyone with the chat URL can read it and continue the conversation.</strong>
+				Treat chat URLs like sensitive document links — if the URL is shared, so is the chat.
+			</li>
+			<li>
+				<strong>Only the person who originally created a chat can delete it.</strong> Other people with
+				the URL cannot delete your chats.
+			</li>
+			<li>
+				<strong>Anonymous browser identifiers are stored alongside chats.</strong> We record the anonymous
+				identifier of the original creator and the anonymous identifiers of every browser that has contributed
+				a message to the chat. These are not personally identifying on their own, but they are readable
+				by anyone with the chat URL.
+			</li>
+			<li>
+				<strong>Operational activity events</strong> (e.g., per-turn search/tool activity) are retained
+				for up to 3 days for debugging and reliability and are then automatically deleted. The question,
+				answer, and source list for each turn are retained for as long as the chat exists.
+			</li>
+		</ul>
+
+		<h2>5. How We Share Your Information</h2>
 		<p>We do not sell your personal information. We may share data with:</p>
 		<ul>
 			<li>
@@ -95,7 +128,7 @@
 			</li>
 		</ul>
 
-		<h2>5. Data Retention</h2>
+		<h2>6. Data Retention</h2>
 		<p>
 			We retain personal information for as long as your account is active or as needed to provide
 			the Service. We may also retain data as necessary to comply with legal obligations, resolve
@@ -103,7 +136,7 @@
 			anonymize it.
 		</p>
 
-		<h2>6. Data Security</h2>
+		<h2>7. Data Security</h2>
 		<p>
 			We implement industry-standard technical and organizational measures to protect your
 			information, including encryption in transit (TLS) and at rest, access controls, and regular
@@ -111,7 +144,7 @@
 			cannot guarantee absolute security.
 		</p>
 
-		<h2>7. Cookies</h2>
+		<h2>8. Cookies</h2>
 		<p>We use the following types of cookies:</p>
 		<ul>
 			<li>
@@ -128,7 +161,7 @@
 			may affect Service functionality.
 		</p>
 
-		<h2>8. Your Rights</h2>
+		<h2>9. Your Rights</h2>
 		<p>Depending on your jurisdiction, you may have the right to:</p>
 		<ul>
 			<li>Access the personal data we hold about you.</li>
@@ -144,28 +177,28 @@
 			>. We will respond within 30 days.
 		</p>
 
-		<h2>9. International Transfers</h2>
+		<h2>10. International Transfers</h2>
 		<p>
 			Your information may be transferred to and processed in countries other than your country of
 			residence. We ensure appropriate safeguards are in place, such as standard contractual
 			clauses, to protect your data in accordance with applicable law.
 		</p>
 
-		<h2>10. Children's Privacy</h2>
+		<h2>11. Children's Privacy</h2>
 		<p>
 			The Service is not directed to individuals under 16. We do not knowingly collect personal
 			information from children. If we learn we have collected data from a child, we will delete it
 			promptly.
 		</p>
 
-		<h2>11. Changes to This Policy</h2>
+		<h2>12. Changes to This Policy</h2>
 		<p>
 			We may update this Privacy Policy from time to time. We will notify you of material changes by
 			posting the updated policy on this page and updating the "Last updated" date. Continued use of
 			the Service after changes constitutes acceptance of the revised policy.
 		</p>
 
-		<h2>12. Contact Us</h2>
+		<h2>13. Contact Us</h2>
 		<p>If you have questions about this Privacy Policy, please contact us at:</p>
 		<p>
 			Superextra<br />

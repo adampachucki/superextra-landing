@@ -4,9 +4,15 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 // `import('firebase/firestore')` resolves to our stubbed module.
 vi.mock('firebase/firestore', () => {
 	return {
-		doc: vi.fn((_db, _col, id) => ({ _id: id })),
+		// `doc(db, col, id)` → `/sessions/{id}`; `doc(db, col, sid, sub, key)`
+		// → `/sessions/{sid}/turns/{key}`. The test partitions observers by
+		// the ref's `_path`.
+		doc: vi.fn((_db, ...parts: string[]) => ({ _path: parts.join('/') })),
 		onSnapshot: vi.fn(),
-		collectionGroup: vi.fn((_db, name) => ({ _kind: 'collectionGroup', _name: name })),
+		collection: vi.fn((_db, ...parts: string[]) => ({
+			_kind: 'collection',
+			_path: parts.join('/')
+		})),
 		query: vi.fn((ref, ...constraints) => ({ _ref: ref, _constraints: constraints })),
 		where: vi.fn((f, op, v) => ({ _kind: 'where', f, op, v })),
 		orderBy: vi.fn((f) => ({ _kind: 'orderBy', f }))
@@ -30,12 +36,13 @@ type SnapHandler = (snap: unknown) => void;
 type ErrHandler = (err: unknown) => void;
 
 /**
- * Capture the session + events observers so tests can synthesise snapshots
- * from the outside. Returns handles for firing snapshots and errors.
+ * Capture the session / turn / events observers so tests can synthesise
+ * snapshots from the outside. Observers are partitioned by the `_path` tag
+ * attached to each ref/query by the mock factory above.
  */
 function captureObservers() {
 	const captured: Array<{
-		ref: unknown;
+		ref: { _path?: string; _ref?: { _path?: string } };
 		onNext: SnapHandler;
 		onError: ErrHandler;
 		unsubscribe: Mock;
@@ -46,11 +53,20 @@ function captureObservers() {
 		return unsubscribe;
 	});
 	return {
+		/** `sessions/{sid}` observer — path has 2 segments. */
 		get session() {
-			return captured[0];
+			return captured.find((c) => c.ref._path?.split('/').length === 2)!;
 		},
+		/** `sessions/{sid}/turns/{turnKey}` observer — 4-segment path. */
+		get turn() {
+			return captured.find(
+				(c) => c.ref._path?.split('/').length === 4 && c.ref._path?.includes('/turns/')
+			)!;
+		},
+		/** Events query — ref is a `query(...)` wrapper whose `_ref._path`
+		 *  matches `sessions/{sid}/events`. */
 		get events() {
-			return captured[1];
+			return captured.find((c) => c.ref._ref?._path?.endsWith('/events'))!;
 		},
 		get count() {
 			return captured.length;
@@ -59,6 +75,21 @@ function captureObservers() {
 }
 
 function sessionSnap(
+	data: Record<string, unknown> | null,
+	{ fromCache = false }: { fromCache?: boolean } = {}
+) {
+	return {
+		exists() {
+			return data !== null;
+		},
+		data() {
+			return data ?? {};
+		},
+		metadata: { fromCache }
+	};
+}
+
+function turnSnap(
 	data: Record<string, unknown> | null,
 	{ fromCache = false }: { fromCache?: boolean } = {}
 ) {
@@ -123,168 +154,123 @@ describe('subscribeToSession', () => {
 		vi.useRealTimers();
 	});
 
-	it('wires two observers: session doc + events collection-group', async () => {
+	it('wires three observers: session doc + turn doc + events per-session collection', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
-		expect(obs.count).toBe(2);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
+		expect(obs.count).toBe(3);
+		expect(obs.session.ref._path).toBe('sessions/sid-1');
+		expect(obs.turn.ref._path).toBe('sessions/sid-1/turns/0000');
+		// Events query is scoped to the per-session path, not a
+		// collection-group.
+		expect(obs.events.ref._ref?._path).toBe('sessions/sid-1/events');
 	});
 
-	it('session doc status=complete + reply fires onComplete once', async () => {
+	it('turn doc with 4-digit zero-padded key for large turn indices', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 9, cbs);
+		expect(obs.turn.ref._path).toBe('sessions/sid-1/turns/0009');
+	});
 
+	it('turn doc status=complete + reply fires onComplete with title from session doc', async () => {
+		const obs = captureObservers();
+		const cbs = buildCallbacks();
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
+
+		// Session delivers title first.
 		obs.session.onNext(
 			sessionSnap({
-				status: 'complete',
-				reply: 'final answer',
-				sources: [{ url: 'https://s.example', title: 's' }],
+				status: 'running',
 				title: 'My Chat',
 				currentAttempt: 1,
 				currentRunId: 'run-1'
 			})
 		);
+
+		// Turn doc settles with the terminal content.
+		obs.turn.onNext(
+			turnSnap({
+				status: 'complete',
+				runId: 'run-1',
+				reply: 'final answer',
+				sources: [{ url: 'https://s.example', title: 's' }],
+				turnSummary: undefined
+			})
+		);
+
 		expect(cbs.completes).toEqual([
 			['final answer', [{ url: 'https://s.example', title: 's' }], 'My Chat', undefined]
 		]);
 	});
 
-	it('ignores cached status=complete snapshot (waits for server-confirmed)', async () => {
+	it("turn doc terminal fires even when session hasn't delivered title yet (undefined title)", async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
 
-		obs.session.onNext(
-			sessionSnap(
-				{ status: 'complete', reply: 'stale', currentAttempt: 1, currentRunId: 'run-1' },
-				{ fromCache: true }
-			)
-		);
-		expect(cbs.completes).toEqual([]);
-
-		// Server-confirmed follow-up fires onComplete.
-		obs.session.onNext(
-			sessionSnap(
-				{ status: 'complete', reply: 'real', currentAttempt: 1, currentRunId: 'run-1' },
-				{ fromCache: false }
-			)
-		);
-		expect(cbs.completes).toHaveLength(1);
-		expect(cbs.completes[0][0]).toBe('real');
-	});
-
-	it('ignores cached status=error snapshot (waits for server-confirmed)', async () => {
-		// Cached error from a prior turn (same sid reused) must not leak into
-		// the current subscription. Server-confirmed error of the current run
-		// still fires onError.
-		const obs = captureObservers();
-		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-2', cbs);
-
-		obs.session.onNext(
-			sessionSnap(
-				{ status: 'error', error: 'prior_turn_error', currentRunId: 'run-2' },
-				{ fromCache: true }
-			)
-		);
-		expect(cbs.errors).toEqual([]);
-
-		obs.session.onNext(
-			sessionSnap(
-				{ status: 'error', error: 'pipeline_error', currentRunId: 'run-2' },
-				{ fromCache: false }
-			)
-		);
-		expect(cbs.errors).toEqual(['pipeline_error']);
-	});
-
-	it('ignores terminal snapshots with stale currentRunId', async () => {
-		// Reused `sid`: turn N-1 errored and is still reflected in the doc
-		// when turn N subscribes. The observer must not fire onError for the
-		// prior run's terminal state.
-		const obs = captureObservers();
-		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-new', cbs);
-
-		obs.session.onNext(
-			sessionSnap({ status: 'error', error: 'prior_turn_error', currentRunId: 'run-old' })
-		);
-		expect(cbs.errors).toEqual([]);
-
-		obs.session.onNext(
-			sessionSnap({ status: 'complete', reply: 'prior reply', currentRunId: 'run-old' })
-		);
-		expect(cbs.completes).toEqual([]);
-
-		// Once the server flushes the new turn's state it comes through.
-		obs.session.onNext(
-			sessionSnap({
-				status: 'running',
-				currentAttempt: 1,
-				currentRunId: 'run-new'
-			})
-		);
-		obs.session.onNext(
-			sessionSnap({
+		obs.turn.onNext(
+			turnSnap({
 				status: 'complete',
-				reply: 'real',
-				currentAttempt: 1,
-				currentRunId: 'run-new'
+				runId: 'run-1',
+				reply: 'final answer',
+				sources: []
 			})
+		);
+
+		expect(cbs.completes).toEqual([['final answer', [], undefined, undefined]]);
+	});
+
+	it('ignores cached turn status=complete snapshot (waits for server-confirmed)', async () => {
+		const obs = captureObservers();
+		const cbs = buildCallbacks();
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
+
+		obs.turn.onNext(
+			turnSnap({ status: 'complete', runId: 'run-1', reply: 'stale' }, { fromCache: true })
+		);
+		expect(cbs.completes).toEqual([]);
+
+		obs.turn.onNext(
+			turnSnap({ status: 'complete', runId: 'run-1', reply: 'real' }, { fromCache: false })
 		);
 		expect(cbs.completes).toHaveLength(1);
 		expect(cbs.completes[0][0]).toBe('real');
 	});
 
-	it('session doc status=error fires onError with the error string', async () => {
+	it('ignores cached turn status=error snapshot (waits for server-confirmed)', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-2', 1, cbs);
 
-		obs.session.onNext(
-			sessionSnap({
-				status: 'error',
-				error: 'pipeline_error',
-				currentAttempt: 1,
-				currentRunId: 'run-1'
-			})
+		obs.turn.onNext(
+			turnSnap({ status: 'error', runId: 'run-2', error: 'prior_turn_error' }, { fromCache: true })
+		);
+		expect(cbs.errors).toEqual([]);
+
+		obs.turn.onNext(
+			turnSnap({ status: 'error', runId: 'run-2', error: 'pipeline_error' }, { fromCache: false })
 		);
 		expect(cbs.errors).toEqual(['pipeline_error']);
 	});
 
-	it('increments in currentAttempt fire onAttemptChange', async () => {
+	it('turn doc with mismatched runId is ignored (defensive)', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-new', 0, cbs);
 
-		obs.session.onNext(
-			sessionSnap({ status: 'running', currentAttempt: 1, currentRunId: 'run-1' })
-		);
-		obs.session.onNext(
-			sessionSnap({ status: 'running', currentAttempt: 2, currentRunId: 'run-1' })
-		);
-		expect(cbs.attempts).toEqual([2]);
+		obs.turn.onNext(turnSnap({ status: 'complete', runId: 'run-old', reply: 'prior reply' }));
+		expect(cbs.completes).toEqual([]);
+
+		obs.turn.onNext(turnSnap({ status: 'complete', runId: 'run-new', reply: 'real' }));
+		expect(cbs.completes).toHaveLength(1);
+		expect(cbs.completes[0][0]).toBe('real');
 	});
 
-	it('first observed attempt sets the baseline, no onAttemptChange fired', async () => {
+	it('session doc with stale currentRunId does not pollute attempt baseline', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
-
-		obs.session.onNext(
-			sessionSnap({ status: 'running', currentAttempt: 3, currentRunId: 'run-1' })
-		);
-		expect(cbs.attempts).toEqual([]);
-	});
-
-	it('snapshots with stale currentRunId do not pollute attempt baseline', async () => {
-		// A stale-run snapshot arriving before the server version must not
-		// seed `observedAttempt`, otherwise a legitimate attempt change in the
-		// new run could be silently dropped.
-		const obs = captureObservers();
-		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-new', cbs);
+		await subscribeToSession('sid-1', 'run-new', 0, cbs);
 
 		// Stale: currentAttempt=5 from prior run. Must be ignored entirely.
 		obs.session.onNext(
@@ -301,10 +287,44 @@ describe('subscribeToSession', () => {
 		expect(cbs.attempts).toEqual([2]);
 	});
 
+	it('turn doc status=error fires onError with the error string', async () => {
+		const obs = captureObservers();
+		const cbs = buildCallbacks();
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
+
+		obs.turn.onNext(turnSnap({ status: 'error', runId: 'run-1', error: 'pipeline_error' }));
+		expect(cbs.errors).toEqual(['pipeline_error']);
+	});
+
+	it('increments in currentAttempt fire onAttemptChange', async () => {
+		const obs = captureObservers();
+		const cbs = buildCallbacks();
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
+
+		obs.session.onNext(
+			sessionSnap({ status: 'running', currentAttempt: 1, currentRunId: 'run-1' })
+		);
+		obs.session.onNext(
+			sessionSnap({ status: 'running', currentAttempt: 2, currentRunId: 'run-1' })
+		);
+		expect(cbs.attempts).toEqual([2]);
+	});
+
+	it('first observed attempt sets the baseline, no onAttemptChange fired', async () => {
+		const obs = captureObservers();
+		const cbs = buildCallbacks();
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
+
+		obs.session.onNext(
+			sessionSnap({ status: 'running', currentAttempt: 3, currentRunId: 'run-1' })
+		);
+		expect(cbs.attempts).toEqual([]);
+	});
+
 	it('events snapshot dispatches timeline rows by type', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
 
 		obs.events.onNext(
 			eventsSnap([
@@ -340,13 +360,13 @@ describe('subscribeToSession', () => {
 		expect(cbs.timeline[1]).toMatchObject({ kind: 'detail', id: 'd1', family: 'Google Maps' });
 	});
 
-	it('events-stream type=complete does NOT fire onComplete (session doc is sole terminal)', async () => {
+	it('events-stream type=complete does NOT fire onComplete (turn doc is sole terminal)', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
 
 		// Simulate a stale worker leaking a terminal event doc while the
-		// session doc is still `running`. Must not trigger onComplete.
+		// turn doc is still `running`. Must not trigger onComplete.
 		obs.events.onNext(
 			eventsSnap([
 				eventChange('added', {
@@ -359,23 +379,23 @@ describe('subscribeToSession', () => {
 		);
 		expect(cbs.completes).toEqual([]);
 
-		// Session doc still drives the real completion.
-		obs.session.onNext(
-			sessionSnap({
+		// Turn doc drives the real completion.
+		obs.turn.onNext(
+			turnSnap({
 				status: 'complete',
+				runId: 'run-1',
 				reply: 'real reply',
-				currentAttempt: 1,
-				currentRunId: 'run-1'
+				sources: []
 			})
 		);
 		expect(cbs.completes).toHaveLength(1);
 		expect(cbs.completes[0][0]).toBe('real reply');
 	});
 
-	it('events-stream type=error does NOT fire onError (session doc is sole terminal)', async () => {
+	it('events-stream type=error does NOT fire onError (turn doc is sole terminal)', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
 
 		obs.events.onNext(
 			eventsSnap([
@@ -393,7 +413,7 @@ describe('subscribeToSession', () => {
 	it('skips events already rendered (reconnect replay)', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
 
 		obs.events.onNext(
 			eventsSnap([
@@ -421,16 +441,19 @@ describe('subscribeToSession', () => {
 		expect(cbs.timeline).toHaveLength(1);
 	});
 
-	it('PERMISSION_DENIED on either observer fires onPermissionDenied exactly once', async () => {
-		// Both session and events observers share a single handleErr; without
-		// the one-shot guard, both errors would double-fire the callback and
-		// the caller would race two concurrent `agentCheck` recovery polls.
-		// Per the `StreamCallbacks.onPermissionDenied` JSDoc contract.
+	it('PERMISSION_DENIED on any observer fires onPermissionDenied exactly once', async () => {
+		// All three observers share a single handleErr; without the
+		// one-shot guard, errors from multiple observers would double-fire
+		// the callback. Per the `StreamCallbacks.onPermissionDenied` JSDoc
+		// contract.
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
 
 		obs.session.onError({ code: 'permission-denied', message: 'denied' });
+		expect(cbs.permDenied).toBe(1);
+
+		obs.turn.onError({ code: 'permission-denied', message: 'denied' });
 		expect(cbs.permDenied).toBe(1);
 
 		obs.events.onError({ code: 'permission-denied', message: 'denied' });
@@ -440,7 +463,7 @@ describe('subscribeToSession', () => {
 	it('other snapshot errors do NOT call onPermissionDenied', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
 
 		obs.session.onError({ code: 'unavailable' });
 		expect(cbs.permDenied).toBe(0);
@@ -450,7 +473,7 @@ describe('subscribeToSession', () => {
 		vi.useFakeTimers();
 		captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
 
 		vi.advanceTimersByTime(10_001);
 		expect(cbs.firstSnapshotTimeout).toBe(1);
@@ -461,34 +484,46 @@ describe('subscribeToSession', () => {
 		vi.useFakeTimers();
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
 
-		obs.session.onNext(sessionSnap({ status: 'running', currentAttempt: 1 }));
+		obs.turn.onNext(turnSnap({ status: 'running', runId: 'run-1' }));
 		vi.advanceTimersByTime(15_000);
 		expect(cbs.firstSnapshotTimeout).toBe(0);
 		vi.useRealTimers();
 	});
 
-	it('returns an unsubscribe function that tears down both observers', async () => {
+	it('returns an unsubscribe function that tears down all three observers', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		const unsub = await subscribeToSession('sid-1', 'run-1', cbs);
+		const unsub = await subscribeToSession('sid-1', 'run-1', 0, cbs);
 		unsub();
 		expect(obs.session.unsubscribe).toHaveBeenCalledTimes(1);
+		expect(obs.turn.unsubscribe).toHaveBeenCalledTimes(1);
 		expect(obs.events.unsubscribe).toHaveBeenCalledTimes(1);
 	});
 
 	it('suppresses duplicate terminal emissions', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
-		await subscribeToSession('sid-1', 'run-1', cbs);
+		await subscribeToSession('sid-1', 'run-1', 0, cbs);
 
-		obs.session.onNext(
-			sessionSnap({ status: 'complete', reply: 'a', currentAttempt: 1, currentRunId: 'run-1' })
-		);
-		obs.session.onNext(
-			sessionSnap({ status: 'complete', reply: 'a', currentAttempt: 1, currentRunId: 'run-1' })
-		);
+		obs.turn.onNext(turnSnap({ status: 'complete', runId: 'run-1', reply: 'a', sources: [] }));
+		obs.turn.onNext(turnSnap({ status: 'complete', runId: 'run-1', reply: 'a', sources: [] }));
 		expect(cbs.completes).toHaveLength(1);
+	});
+
+	it('events query is filtered by runId (not by userId)', async () => {
+		const obs = captureObservers();
+		const cbs = buildCallbacks();
+		await subscribeToSession('sid-1', 'run-42', 0, cbs);
+
+		const constraints = (
+			obs.events.ref as { _constraints?: Array<{ _kind?: string; f?: string; v?: unknown }> }
+		)._constraints;
+		const whereClauses = (constraints ?? []).filter((c) => c._kind === 'where');
+		// Exactly one `where` — on runId. The old code had a second where on
+		// userId which must be gone.
+		expect(whereClauses).toHaveLength(1);
+		expect(whereClauses[0]).toMatchObject({ f: 'runId', v: 'run-42' });
 	});
 });

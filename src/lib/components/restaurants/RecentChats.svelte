@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { chatState } from '$lib/chat-state.svelte';
 
-	let recent = $derived(chatState.conversations.slice(0, 4));
+	let recent = $derived(chatState.sessionsList.slice(0, 4));
 
 	function formatRelativeTime(ts: number): string {
 		const diff = Date.now() - ts;
@@ -27,22 +27,22 @@
 			</p>
 		</div>
 		<div class="scrollbar-hide flex gap-3 overflow-x-auto scroll-smooth">
-			{#each recent as conv, i (conv.id)}
+			{#each recent as sess, i (sess.sid)}
 				<a
-					href="/agent/chat?sid={conv.id}"
+					href="/agent/chat?sid={sess.sid}"
 					class="min-w-[200px] shrink-0 rounded-lg border border-black/[0.08] px-4 py-3 transition-colors hover:border-black/[0.16] hover:bg-black/[0.02] dark:border-white/[0.08] dark:hover:border-white/[0.16] dark:hover:bg-white/[0.03]"
 					style="{i === 0 ? 'margin-left: var(--content-inset)' : ''}{i === recent.length - 1
 						? 'margin-right: var(--content-inset)'
 						: ''}"
 				>
 					<p class="truncate text-[13px] text-black/80 dark:text-white/80">
-						{conv.title}
+						{sess.title ?? 'Untitled chat'}
 					</p>
 					<p class="mt-0.5 truncate text-[11px] text-black/40 dark:text-white/40">
-						{#if conv.placeContext}
-							{conv.placeContext.name} &middot;
+						{#if sess.placeContext}
+							{sess.placeContext.name} &middot;
 						{/if}
-						{formatRelativeTime(conv.updatedAt)}
+						{sess.updatedAtMs ? formatRelativeTime(sess.updatedAtMs) : ''}
 					</p>
 				</a>
 			{/each}

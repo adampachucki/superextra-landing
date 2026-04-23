@@ -146,10 +146,17 @@ _current_worker_id: str | None = None
 class RunRequest(BaseModel):
     sessionId: str
     runId: str
+    # Integer turn index allocated by agentStream (1-based). Worker formats
+    # to the zero-padded `turns/{turnIdx:04d}` doc key only when addressing
+    # the turn doc.
+    turnIdx: int
     # Optional: None on first turn — the worker creates the Agent Engine
     # session on first dispatch and writes the id back via fenced update so
     # follow-up turns reuse it.
     adkSessionId: str | None = None
+    # Creator UID — the session's stored `userId`. agentStream puts the
+    # creator UID (not the submitter UID) in the task body so the worker
+    # can address the Vertex Agent Engine session under stable ownership.
     userId: str
     queryText: str
     isFirstMessage: bool = Field(default=False)
@@ -225,12 +232,69 @@ async def _fenced_update(
     )
 
 
+def _fenced_update_session_and_turn_logic(
+    txn: firestore.Transaction,
+    session_ref: firestore.DocumentReference,
+    turn_ref: firestore.DocumentReference,
+    expected_attempt: int,
+    expected_worker_id: str,
+    session_updates: dict,
+    turn_updates: dict,
+) -> None:
+    """Two-doc fenced write. Used for terminal session + turn transitions
+    (complete / error) so session metadata and turn content update
+    atomically. Single transactional-read on the session doc validates
+    ownership before either write lands."""
+    snap = session_ref.get(transaction=txn)
+    data = snap.to_dict() or {}
+    if (
+        data.get("currentAttempt") != expected_attempt
+        or data.get("currentWorkerId") != expected_worker_id
+    ):
+        raise OwnershipLost()
+    txn.update(session_ref, session_updates)
+    txn.update(turn_ref, turn_updates)
+
+
+_fenced_update_session_and_turn_txn = firestore.transactional(
+    _fenced_update_session_and_turn_logic
+)
+
+
+def _turn_doc_key(turn_idx: int) -> str:
+    return f"{turn_idx:04d}"
+
+
+async def _fenced_update_session_and_turn(
+    sid: str,
+    turn_idx: int,
+    attempt: int,
+    worker_id: str,
+    session_updates: dict,
+    turn_updates: dict,
+) -> None:
+    assert _fs is not None
+    session_ref = _fs.collection("sessions").document(sid)
+    turn_ref = session_ref.collection("turns").document(_turn_doc_key(turn_idx))
+    await asyncio.to_thread(
+        _fenced_update_session_and_turn_txn,
+        _fs.transaction(),
+        session_ref,
+        turn_ref,
+        attempt,
+        worker_id,
+        session_updates,
+        turn_updates,
+    )
+
+
 # ── Takeover + active-owner poll ────────────────────────────────────────────
 
 
 def _takeover_logic(
     txn: firestore.Transaction,
     session_ref: firestore.DocumentReference,
+    turn_ref: firestore.DocumentReference,
     payload_user_id: str,
     run_id: str,
     worker_id: str,
@@ -243,6 +307,11 @@ def _takeover_logic(
         {"action": "noop_complete"}      — terminal for THIS runId already
         {"action": "noop_stale"}         — session moved to a newer runId;
                                            we're a stale redelivery
+
+    On "run" the transaction ALSO marks `turn_ref.status='running'` so
+    session and turn doc transition atomically. agentStream wrote the turn
+    doc at `pending` when enqueuing; takeover is the single place that
+    advances it to running.
     """
     snap = session_ref.get(transaction=txn)
     if not snap.exists:
@@ -252,7 +321,10 @@ def _takeover_logic(
     data = snap.to_dict() or {}
 
     # Defense-in-depth: agentStream already checked userId, but the worker
-    # checks again in case of a payload mismatch.
+    # checks again in case of a payload mismatch. Under server-stored
+    # sessions, agentStream puts `session.userId` (the stored creator UID)
+    # into the task body — so submitter-vs-creator is invisible here; the
+    # two sides must agree on the creator UID.
     if data.get("userId") != payload_user_id:
         raise HTTPException(status_code=500, detail="userId mismatch — agentStream bug")
 
@@ -289,13 +361,16 @@ def _takeover_logic(
         "lastHeartbeat": firestore.SERVER_TIMESTAMP,
         "lastEventAt": firestore.SERVER_TIMESTAMP,
     })
+    txn.update(turn_ref, {"status": "running"})
     return {"action": "run", "attempt": new_attempt}
 
 
 _takeover_txn = firestore.transactional(_takeover_logic)
 
 
-async def _poll_until_resolved(sid: str, run_id: str, worker_id: str) -> dict:
+async def _poll_until_resolved(
+    sid: str, turn_idx: int, run_id: str, worker_id: str
+) -> dict:
     """Wait while another worker owns this run. Bail when:
 
     - status goes terminal (other worker finished or watchdog errored) → noop
@@ -305,6 +380,7 @@ async def _poll_until_resolved(sid: str, run_id: str, worker_id: str) -> dict:
     """
     assert _fs is not None
     ref = _fs.collection("sessions").document(sid)
+    turn_ref = ref.collection("turns").document(_turn_doc_key(turn_idx))
     start = asyncio.get_event_loop().time()
     while True:
         await asyncio.sleep(POLL_INTERVAL_S)
@@ -331,6 +407,7 @@ async def _poll_until_resolved(sid: str, run_id: str, worker_id: str) -> dict:
                     _takeover_txn,
                     _fs.transaction(),
                     ref,
+                    turn_ref,
                     data["userId"],
                     run_id,
                     worker_id,
@@ -916,6 +993,8 @@ async def run(body: RunRequest, request: Request) -> dict:
     _worker_sid_ctx.set(sid)
     assert _fs is not None
     session_ref = _fs.collection("sessions").document(sid)
+    turn_idx = body.turnIdx
+    turn_ref = session_ref.collection("turns").document(_turn_doc_key(turn_idx))
 
     # Every downstream log benefits from the run-correlation keys; build a
     # dict once and spread it into `extra` at each call site.
@@ -941,6 +1020,7 @@ async def run(body: RunRequest, request: Request) -> dict:
             _takeover_txn,
             _fs.transaction(),
             session_ref,
+            turn_ref,
             body.userId,
             run_id,
             worker_id,
@@ -958,7 +1038,7 @@ async def run(body: RunRequest, request: Request) -> dict:
         return {"ok": True, "action": "noop_stale"}
 
     if outcome["action"] == "poll":
-        outcome = await _poll_until_resolved(sid, run_id, worker_id)
+        outcome = await _poll_until_resolved(sid, turn_idx, run_id, worker_id)
         if outcome["action"] == "noop_complete":
             return {"ok": True, "action": "noop_complete_after_poll"}
         if outcome["action"] == "noop_stale":
@@ -1175,10 +1255,18 @@ async def run(body: RunRequest, request: Request) -> dict:
         err_msg = f"{type(e).__name__}: {str(e)[:500]}"
         log.exception("pipeline error", extra={**log_ctx, "event": "pipeline_error"})
         try:
-            await _fenced_update(sid, attempt, worker_id, {
-                "status": "error",
-                "error": err_msg,
-            })
+            await _fenced_update_session_and_turn(
+                sid,
+                turn_idx,
+                attempt,
+                worker_id,
+                {
+                    "status": "error",
+                    "error": err_msg,
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                },
+                {"status": "error", "error": err_msg},
+            )
         except OwnershipLost:
             log.warning("could not write error state; another worker owns sid=%s", sid)
         except Exception:  # noqa: BLE001
@@ -1206,10 +1294,18 @@ async def run(body: RunRequest, request: Request) -> dict:
             extra={**log_ctx, "event": "reply_sanity_failed"},
         )
         try:
-            await _fenced_update(sid, attempt, worker_id, {
-                "status": "error",
-                "error": reason,
-            })
+            await _fenced_update_session_and_turn(
+                sid,
+                turn_idx,
+                attempt,
+                worker_id,
+                {
+                    "status": "error",
+                    "error": reason,
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                },
+                {"status": "error", "error": reason},
+            )
         except OwnershipLost:
             pass
         return {"ok": False, "action": reason}
@@ -1221,27 +1317,42 @@ async def run(body: RunRequest, request: Request) -> dict:
     # reply stitching layer. The sanity gate above catches the one residual
     # case: no `complete` event ever emitted at all.
     #
-    # Title must land in the same fenced txn
-    # as status/reply/sources — a split write races the client onSnapshot
-    # observer, which unsubscribes on the first terminal snapshot (see
-    # firestore-stream.ts:165-174). Fall back to the deterministic title
-    # on task failure so a degraded title never costs the user their reply.
+    # Under server-stored sessions (plan §5) the session doc holds only
+    # metadata + operational state; reply/sources/turnSummary live on the
+    # per-turn doc. The session+turn pair is updated in a single fenced
+    # transaction so the two can't disagree for more than a Firestore commit
+    # window. Title still lands on the session doc (first turn only) because
+    # the sidebar listener reads it from there.
     await timeline_writer.close()
     await _cancel_background_tasks(note_tasks)
-    terminal_update: dict = {
+
+    session_terminal_update: dict = {
+        "status": "complete",
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
+    if title_task is not None:
+        try:
+            session_terminal_update["title"] = await title_task
+        except Exception:  # noqa: BLE001
+            session_terminal_update["title"] = _fallback_title(body.queryText)
+
+    turn_terminal_update: dict = {
         "status": "complete",
         "reply": final_reply,
         "sources": final_sources,
         "turnSummary": timeline_builder.build_summary(),
+        "completedAt": firestore.SERVER_TIMESTAMP,
     }
-    if title_task is not None:
-        try:
-            terminal_update["title"] = await title_task
-        except Exception:  # noqa: BLE001
-            terminal_update["title"] = _fallback_title(body.queryText)
 
     try:
-        await _fenced_update(sid, attempt, worker_id, terminal_update)
+        await _fenced_update_session_and_turn(
+            sid,
+            turn_idx,
+            attempt,
+            worker_id,
+            session_terminal_update,
+            turn_terminal_update,
+        )
     except OwnershipLost:
         log.warning("ownership lost before final write sid=%s", sid)
         return {"ok": True, "action": "abandoned_before_complete"}
