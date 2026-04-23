@@ -145,7 +145,7 @@
 							secondary: params.get('placeSecondary') ?? ''
 						}
 					: null;
-			chatState.start(q, placeContext);
+			void chatState.startNewChat(q, placeContext);
 			// Strip query params so reload doesn't re-send
 			const clean = new URL(window.location.href);
 			clean.searchParams.delete('q');
@@ -154,44 +154,21 @@
 			clean.searchParams.delete('placeId');
 			history.replaceState(history.state, '', clean);
 		} else if (sid) {
-			chatState.switchTo(sid);
+			chatState.selectSession(sid);
 		}
 		sidebarOpen = window.matchMedia('(min-width: 1024px)').matches;
 		prevSidebarOpen = sidebarOpen;
 		tick().then(() => {
 			mounted = true;
 		});
-
-		// Reattach mid-flight runs after URL/localStorage restoration.
-		const msgs = chatState.messages;
-		if (chatState.activeId && msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
-			void chatState.resumeCurrentIfNeeded();
-		}
-
-		// Recover from Safari (and other browsers) killing SSE connections when backgrounded
-		let hiddenAt = 0;
-		function onVisibilityChange() {
-			if (document.visibilityState === 'hidden') {
-				hiddenAt = Date.now();
-				chatState.pageHidden = true;
-			} else if (document.visibilityState === 'visible') {
-				chatState.pageHidden = false;
-				if (hiddenAt > 0) {
-					chatState.handleReturn(Date.now() - hiddenAt);
-					hiddenAt = 0;
-				}
-			}
-		}
-		document.addEventListener('visibilitychange', onVisibilityChange);
-		return () => document.removeEventListener('visibilitychange', onVisibilityChange);
 	});
 
 	// Keep URL in sync with active session
 	$effect(() => {
 		if (!mounted) return;
 		const url = new URL(window.location.href);
-		if (chatState.activeId) {
-			url.searchParams.set('sid', chatState.activeId);
+		if (chatState.activeSid) {
+			url.searchParams.set('sid', chatState.activeSid);
 		} else {
 			url.searchParams.delete('sid');
 		}
@@ -204,7 +181,7 @@
 		const trimmed = query.trim();
 		if (!trimmed || chatState.loading) return;
 		if (chatState.active) {
-			chatState.send(trimmed);
+			void chatState.sendFollowUp(trimmed);
 			query = '';
 			resizeTextarea();
 		} else {
@@ -215,7 +192,7 @@
 				return;
 			}
 			placeNudge = false;
-			chatState.start(trimmed, selectedPlace);
+			void chatState.startNewChat(trimmed, selectedPlace);
 			query = '';
 			resizeTextarea();
 		}
@@ -434,7 +411,7 @@
 			New chat
 		</button>
 
-		{#if chatState.conversations.length > 0}
+		{#if chatState.sessionsList.length > 0}
 			<p
 				class="sb-item mb-2 text-[11px] font-medium tracking-wide text-black/40 dark:text-white/40"
 				style="--sb-delay: 0.32s"
@@ -443,7 +420,8 @@
 				CONVERSATIONS
 			</p>
 			<div class="flex flex-col gap-0.5">
-				{#each chatState.conversations as conv, i (conv.id)}
+				{#each chatState.sessionsList as sess, i (sess.sid)}
+					{@const canDeleteRow = sess.userId === chatState.currentUid}
 					<div
 						class="sb-item group relative"
 						style="--sb-delay: {Math.min(0.38 + i * 0.05, 0.7)}s"
@@ -451,45 +429,45 @@
 					>
 						<button
 							onclick={() => {
-								if (confirmDeleteId && confirmDeleteId !== conv.id) confirmDeleteId = null;
-								if (confirmDeleteId === conv.id) return;
-								chatState.switchTo(conv.id);
+								if (confirmDeleteId && confirmDeleteId !== sess.sid) confirmDeleteId = null;
+								if (confirmDeleteId === sess.sid) return;
+								chatState.selectSession(sess.sid);
 								if (!isDesktop) sidebarOpen = false;
 							}}
-							class="w-full cursor-pointer rounded-lg px-2 py-2 pr-8 text-left transition-colors {conv.id ===
-							chatState.activeId
+							class="w-full cursor-pointer rounded-lg px-2 py-2 pr-8 text-left transition-colors {sess.sid ===
+							chatState.activeSid
 								? 'bg-cream-100 dark:bg-cream-100'
-								: confirmDeleteId === conv.id
+								: confirmDeleteId === sess.sid
 									? 'bg-cream-100/50 dark:bg-cream-50/50'
 									: 'hover:bg-cream-100/50 dark:hover:bg-cream-50/50'}"
 						>
 							<p
-								class="truncate text-[13px] {conv.id === chatState.activeId
+								class="truncate text-[13px] {sess.sid === chatState.activeSid
 									? 'text-black dark:text-white'
 									: 'text-black/70 dark:text-white/70'}"
 							>
-								{conv.title}
+								{sess.title ?? 'Untitled chat'}
 							</p>
 							<div class="relative mt-0.5 text-[11px]">
 								<div
 									class="flex items-center gap-1.5 transition-opacity duration-150 {confirmDeleteId ===
-									conv.id
+									sess.sid
 										? 'pointer-events-none opacity-0'
 										: 'opacity-100'}"
 								>
-									{#if conv.placeContext}
+									{#if sess.placeContext}
 										<span class="truncate text-black/40 dark:text-white/40"
-											>{conv.placeContext.name}</span
+											>{sess.placeContext.name}</span
 										>
 										<span class="text-black/20 dark:text-white/20">&middot;</span>
 									{/if}
 									<span class="shrink-0 text-black/30 dark:text-white/30"
-										>{formatRelativeTime(conv.updatedAt)}</span
+										>{sess.updatedAtMs ? formatRelativeTime(sess.updatedAtMs) : ''}</span
 									>
 								</div>
 								<div
 									class="absolute inset-0 flex items-center gap-1.5 transition-all duration-150 {confirmDeleteId ===
-									conv.id
+									sess.sid
 										? 'translate-x-0 opacity-100'
 										: 'pointer-events-none -translate-x-1.5 opacity-0'}"
 								>
@@ -498,14 +476,14 @@
 										tabindex="0"
 										onclick={(e) => {
 											e.stopPropagation();
-											chatState.deleteConversation(conv.id);
+											void chatState.deleteSession(sess.sid);
 											confirmDeleteId = null;
 										}}
 										onkeydown={(e) => {
 											if (e.key === 'Enter' || e.key === ' ') {
 												e.preventDefault();
 												e.stopPropagation();
-												chatState.deleteConversation(conv.id);
+												void chatState.deleteSession(sess.sid);
 												confirmDeleteId = null;
 											}
 										}}
@@ -533,27 +511,29 @@
 								</div>
 							</div>
 						</button>
-						<button
-							onclick={() => (confirmDeleteId = conv.id)}
-							aria-label="Delete conversation"
-							class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] dark:hover:bg-white/[0.06] {confirmDeleteId ===
-							conv.id
-								? 'hidden'
-								: conv.id === chatState.activeId
-									? 'lg:opacity-0 lg:group-hover:opacity-100'
-									: 'max-lg:hidden lg:opacity-0 lg:group-hover:opacity-100'}"
-						>
-							<svg
-								class="h-3 w-3 text-black/30 dark:text-white/30"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								stroke-width="2"
+						{#if canDeleteRow}
+							<button
+								onclick={() => (confirmDeleteId = sess.sid)}
+								aria-label="Delete conversation"
+								class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] dark:hover:bg-white/[0.06] {confirmDeleteId ===
+								sess.sid
+									? 'hidden'
+									: sess.sid === chatState.activeSid
+										? 'lg:opacity-0 lg:group-hover:opacity-100'
+										: 'max-lg:hidden lg:opacity-0 lg:group-hover:opacity-100'}"
 							>
-								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-							</svg>
-						</button>
+								<svg
+									class="h-3 w-3 text-black/30 dark:text-white/30"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							</button>
+						{/if}
 					</div>
 				{/each}
 			</div>
@@ -638,9 +618,19 @@
 			: ''}"
 	>
 		{#if chatState.active}
-			<div class="chat-thread-enter {mounted ? 'is-mounted' : ''}">
-				<ChatThread />
-			</div>
+			{#if chatState.loadState === 'missing' || chatState.loadState === 'loadTimedOut'}
+				<div
+					class="chat-thread-enter flex min-h-dvh items-center justify-center {mounted
+						? 'is-mounted'
+						: ''}"
+				>
+					<p class="text-[14px] text-black/40 dark:text-white/40">Couldn't load this chat</p>
+				</div>
+			{:else}
+				<div class="chat-thread-enter {mounted ? 'is-mounted' : ''}">
+					<ChatThread />
+				</div>
+			{/if}
 		{:else}
 			<div
 				class="chat-thread-enter flex min-h-dvh items-center justify-center {mounted

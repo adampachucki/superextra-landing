@@ -1,10 +1,17 @@
 import { describe, it, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-// Mock firebase-admin/firestore before importing watchdog.
+// Mock firebase-admin/firestore before importing watchdog. FieldValue.serverTimestamp
+// is used by the transactional flip to bump session.updatedAt alongside the
+// status=error write, so the mock needs to surface a sentinel rather than
+// the real static class. Tests assert on presence of the sentinel via equality.
+const SERVER_TIMESTAMP_SENTINEL = '__server_timestamp__';
 mock.module('firebase-admin/firestore', {
 	namedExports: {
-		getFirestore: () => ({})
+		getFirestore: () => ({}),
+		FieldValue: {
+			serverTimestamp: () => SERVER_TIMESTAMP_SENTINEL
+		}
 	}
 });
 
@@ -71,6 +78,19 @@ function makeDb(plans, { txReads = {} } = {}) {
 				...base,
 				doc: (id) => ({
 					id,
+					// Minimal subcollection support so `ref.collection('turns').doc(key)`
+					// inside the fenced txn produces a ref the txn.update mock can
+					// identify. The returned ref carries an `_isTurnDoc` flag plus
+					// the composite id `sid/turns/turnKey` so partition logic in
+					// tests doesn't depend on a path-cracking regex.
+					collection: (subName) => ({
+						doc: (subId) => ({
+							id: `${id}/${subName}/${subId}`,
+							_isTurnDoc: subName === 'turns',
+							_sessionId: id,
+							_turnKey: subId
+						})
+					}),
 					update: mock.fn(async (data) => {
 						docUpdates.push({ id, data });
 					})
@@ -210,17 +230,21 @@ describe('runWatchdog', () => {
 			])
 		};
 		// Inside the txn, the doc state is unchanged — still stuck. Flip lands.
+		// Carry `lastTurnIndex` so the watchdog can address the in-flight
+		// turn doc in the same transaction (plan §8 / pin #4).
 		const txReads = {
 			q1: {
 				status: 'queued',
 				queuedAt: millisTs(NOW - 45 * 60 * 1000),
-				currentRunId: 'run-q1'
+				currentRunId: 'run-q1',
+				lastTurnIndex: 1
 			},
 			hb1: {
 				status: 'running',
 				lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
 				currentAttempt: 3,
-				currentRunId: 'run-hb1'
+				currentRunId: 'run-hb1',
+				lastTurnIndex: 2
 			}
 		};
 		const db = makeDb(plans, { txReads });
@@ -229,14 +253,91 @@ describe('runWatchdog', () => {
 		assert.equal(result.stuck, 2);
 		assert.equal(result.flipped, 2);
 		assert.equal(result.skipped, 0);
-		assert.equal(db._txUpdates.length, 2);
-		const q1 = db._txUpdates.find((u) => u.id === 'q1');
-		const hb1 = db._txUpdates.find((u) => u.id === 'hb1');
+		// Two session updates + two turn updates in the same transaction pairs.
+		assert.equal(db._txUpdates.length, 4);
+		const sessionUpdates = db._txUpdates.filter((u) => !u.id.includes('/turns/'));
+		const turnUpdates = db._txUpdates.filter((u) => u.id.includes('/turns/'));
+		assert.equal(sessionUpdates.length, 2);
+		assert.equal(turnUpdates.length, 2);
+
+		const q1 = sessionUpdates.find((u) => u.id === 'q1');
+		const hb1 = sessionUpdates.find((u) => u.id === 'hb1');
 		assert.equal(q1.data.status, 'error');
 		assert.equal(q1.data.error, 'queue_dispatch_timeout');
+		// Session bump carries updatedAt sentinel so the sidebar reorders.
+		assert.equal(q1.data.updatedAt, '__server_timestamp__');
 		assert.equal(hb1.data.status, 'error');
 		assert.equal(hb1.data.error, 'worker_lost');
 		assert.equal(hb1.data.errorDetails.currentAttempt, 3);
+		assert.equal(hb1.data.updatedAt, '__server_timestamp__');
+
+		// Turn doc propagation — status + error reason match the session.
+		const q1Turn = turnUpdates.find((u) => u.id === 'q1/turns/0001');
+		const hb1Turn = turnUpdates.find((u) => u.id === 'hb1/turns/0002');
+		assert.ok(q1Turn, 'expected q1 turn doc update at turnIdx=1');
+		assert.ok(hb1Turn, 'expected hb1 turn doc update at turnIdx=2');
+		assert.equal(q1Turn.data.status, 'error');
+		assert.equal(q1Turn.data.error, 'queue_dispatch_timeout');
+		assert.equal(hb1Turn.data.status, 'error');
+		assert.equal(hb1Turn.data.error, 'worker_lost');
+	});
+
+	it('skips turn-doc update when lastTurnIndex is missing (legacy partial-enqueue doc)', async () => {
+		const plans = {
+			'sessions|status|queuedAt|limit': mockSnap([
+				mockDoc('legacy', {
+					status: 'queued',
+					queuedAt: millisTs(NOW - 45 * 60 * 1000),
+					currentRunId: 'run-legacy'
+				})
+			])
+		};
+		const txReads = {
+			legacy: {
+				status: 'queued',
+				queuedAt: millisTs(NOW - 45 * 60 * 1000),
+				currentRunId: 'run-legacy'
+				// no lastTurnIndex
+			}
+		};
+		const db = makeDb(plans, { txReads });
+		const result = await runWatchdog(db, NOW);
+
+		assert.equal(result.flipped, 1);
+		// Only the session update — no turn doc to address.
+		assert.equal(db._txUpdates.length, 1);
+		assert.equal(db._txUpdates[0].id, 'legacy');
+	});
+
+	it('skips both writes if currentRunId advanced between scan and txn', async () => {
+		// Race-safety is preserved: the transaction re-checks currentRunId
+		// BEFORE either the session flip OR the turn-doc propagation. A
+		// new turn enqueued between scan and txn → neither write fires.
+		const plans = {
+			'sessions|status|queuedAt|limit': mockSnap([
+				mockDoc('q1', {
+					status: 'queued',
+					queuedAt: millisTs(NOW - 45 * 60 * 1000),
+					currentRunId: 'run-old'
+				})
+			])
+		};
+		const txReads = {
+			q1: {
+				status: 'queued',
+				queuedAt: millisTs(NOW - 10 * 1000),
+				currentRunId: 'run-new',
+				lastTurnIndex: 2
+			}
+		};
+		const db = makeDb(plans, { txReads });
+		const result = await runWatchdog(db, NOW);
+
+		assert.equal(result.stuck, 1);
+		assert.equal(result.flipped, 0);
+		assert.equal(result.skipped, 1);
+		// NEITHER the session nor the turn doc was updated.
+		assert.equal(db._txUpdates.length, 0);
 	});
 
 	it('returns per-reason skip breakdown for ops visibility', async () => {

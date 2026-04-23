@@ -22,9 +22,11 @@ from worker_main import (  # noqa: E402
     STALE_HEARTBEAT_S,
     _fallback_title,
     _fenced_update_logic,
+    _fenced_update_session_and_turn_logic,
     _merge_source,
     _strip_query_prefixes,
     _takeover_logic,
+    _turn_doc_key,
 )
 
 
@@ -40,6 +42,11 @@ def _mock_session_ref(doc_data: dict | None):
     snap.to_dict.return_value = doc_data or {}
     ref.get.return_value = snap
     return ref
+
+
+def _mock_turn_ref():
+    """Bare turn-doc ref; tests inspect txn.update calls by positional arg."""
+    return MagicMock(name="turn_ref")
 
 
 # ── _fenced_update_logic ────────────────────────────────────────────────────
@@ -86,16 +93,42 @@ def test_takeover_first_delivery_queued_transitions_to_running():
         "userId": "alice",
         "lastHeartbeat": None,
     })
+    turn_ref = _mock_turn_ref()
     txn = MagicMock()
-    out = _takeover_logic(txn, ref, "alice", "run-1", "w-1")
+    out = _takeover_logic(txn, ref, turn_ref, "alice", "run-1", "w-1")
     assert out == {"action": "run", "attempt": 1}
-    txn.update.assert_called_once()
-    updates = txn.update.call_args[0][1]
+    # Two update calls in one transaction: session + turn.
+    assert txn.update.call_count == 2
+    session_call = next(c for c in txn.update.call_args_list if c[0][0] is ref)
+    turn_call = next(c for c in txn.update.call_args_list if c[0][0] is turn_ref)
+    updates = session_call[0][1]
     assert updates["status"] == "running"
     assert updates["currentWorkerId"] == "w-1"
     assert updates["currentAttempt"] == 1
     # Plan: takeover must NOT rewrite currentRunId.
     assert "currentRunId" not in updates
+    # Turn doc flipped to running atomically (pin #4).
+    assert turn_call[0][1] == {"status": "running"}
+
+
+def test_takeover_writes_turn_status_running_in_same_transaction():
+    # Pin #4 from the verification-report checklist: session + turn writes
+    # must land inside the same fenced transaction; no follow-up write.
+    ref = _mock_session_ref({
+        "status": "queued",
+        "currentRunId": "run-1",
+        "currentAttempt": 0,
+        "userId": "alice",
+        "lastHeartbeat": None,
+    })
+    turn_ref = _mock_turn_ref()
+    txn = MagicMock()
+    _takeover_logic(txn, ref, turn_ref, "alice", "run-1", "w-1")
+    refs_updated = [c[0][0] for c in txn.update.call_args_list]
+    assert ref in refs_updated
+    assert turn_ref in refs_updated
+    # Exactly these two — no third spurious write.
+    assert len(refs_updated) == 2
 
 
 def test_takeover_increments_attempt_after_stale_heartbeat():
@@ -106,11 +139,13 @@ def test_takeover_increments_attempt_after_stale_heartbeat():
         "userId": "alice",
         "lastHeartbeat": _fresh_now() - timedelta(seconds=STALE_HEARTBEAT_S + 60),
     })
+    turn_ref = _mock_turn_ref()
     txn = MagicMock()
-    out = _takeover_logic(txn, ref, "alice", "run-1", "w-2")
+    out = _takeover_logic(txn, ref, turn_ref, "alice", "run-1", "w-2")
     assert out["action"] == "run"
     assert out["attempt"] == 2
-    txn.update.assert_called_once()
+    # Session + turn updates in same txn.
+    assert txn.update.call_count == 2
 
 
 def test_takeover_fresh_heartbeat_returns_poll():
@@ -121,8 +156,9 @@ def test_takeover_fresh_heartbeat_returns_poll():
         "userId": "alice",
         "lastHeartbeat": _fresh_now(),
     })
+    turn_ref = _mock_turn_ref()
     txn = MagicMock()
-    out = _takeover_logic(txn, ref, "alice", "run-1", "w-2")
+    out = _takeover_logic(txn, ref, turn_ref, "alice", "run-1", "w-2")
     assert out == {"action": "poll"}
     txn.update.assert_not_called()
 
@@ -136,8 +172,9 @@ def test_takeover_stale_run_redelivery_returns_noop_stale_and_does_not_write():
         "userId": "alice",
         "lastHeartbeat": _fresh_now(),
     })
+    turn_ref = _mock_turn_ref()
     txn = MagicMock()
-    out = _takeover_logic(txn, ref, "alice", "run-1", "w-3")
+    out = _takeover_logic(txn, ref, turn_ref, "alice", "run-1", "w-3")
     assert out == {"action": "noop_stale"}
     txn.update.assert_not_called()
 
@@ -150,8 +187,9 @@ def test_takeover_already_complete_returns_noop_complete():
         "userId": "alice",
         "lastHeartbeat": _fresh_now(),
     })
+    turn_ref = _mock_turn_ref()
     txn = MagicMock()
-    out = _takeover_logic(txn, ref, "alice", "run-1", "w-1")
+    out = _takeover_logic(txn, ref, turn_ref, "alice", "run-1", "w-1")
     assert out == {"action": "noop_complete"}
     txn.update.assert_not_called()
 
@@ -164,33 +202,126 @@ def test_takeover_already_error_returns_noop_complete():
         "userId": "alice",
         "lastHeartbeat": _fresh_now(),
     })
+    turn_ref = _mock_turn_ref()
     txn = MagicMock()
-    out = _takeover_logic(txn, ref, "alice", "run-1", "w-1")
+    out = _takeover_logic(txn, ref, turn_ref, "alice", "run-1", "w-1")
     assert out == {"action": "noop_complete"}
 
 
 def test_takeover_missing_doc_raises_500():
     from fastapi import HTTPException
     ref = _mock_session_ref(None)
+    turn_ref = _mock_turn_ref()
     txn = MagicMock()
     with pytest.raises(HTTPException) as e:
-        _takeover_logic(txn, ref, "alice", "run-1", "w-1")
+        _takeover_logic(txn, ref, turn_ref, "alice", "run-1", "w-1")
     assert e.value.status_code == 500
 
 
-def test_takeover_userid_mismatch_raises_500():
+def test_takeover_userid_mismatch_raises_500_when_creator_uid_does_not_match():
+    """Defensive check at worker_main.py:257 — under server-stored sessions,
+    agentStream puts `session.userId` (the creator UID) into the task body.
+    If those disagree it's a bug in agentStream; the worker refuses to
+    continue so Cloud Tasks surfaces it via retries. Complements the
+    creator-UID-on-followup test below which exercises the NO-raise path."""
     from fastapi import HTTPException
     ref = _mock_session_ref({
         "status": "queued",
         "currentRunId": "run-1",
-        "userId": "alice",
+        "userId": "alice",  # stored creator
         "currentAttempt": 0,
     })
+    turn_ref = _mock_turn_ref()
     txn = MagicMock()
     with pytest.raises(HTTPException) as e:
-        _takeover_logic(txn, ref, "bob", "run-1", "w-1")
+        # Task body would carry some UID other than alice → bug.
+        _takeover_logic(txn, ref, turn_ref, "bob", "run-1", "w-1")
     assert e.value.status_code == 500
     assert "userId mismatch" in e.value.detail
+
+
+def test_takeover_userid_check_passes_when_body_carries_creator_uid():
+    """Complements the mismatch test: under server-stored sessions,
+    agentStream computes creatorUid from the session's stored userId (or
+    the submitter on first turn) and puts that value into the Cloud Task
+    body. So on follow-up turns the body carries the ORIGINAL creator UID
+    even when a different visitor submitted — and the defensive check
+    passes because session.userId == body.userId by contract.
+
+    This is the load-bearing invariant from the plan: ADK
+    `VertexAiSessionService.get_session` enforces
+    `session.user_id == passed user_id`, so the creator UID must reach the
+    worker's Runner call without being overwritten by the submitter UID
+    en route."""
+    ref = _mock_session_ref({
+        "status": "queued",
+        "currentRunId": "run-1",
+        "currentAttempt": 0,
+        "userId": "alice-creator",  # original chat creator, per plan §5/§8
+        "lastHeartbeat": None,
+    })
+    turn_ref = _mock_turn_ref()
+    txn = MagicMock()
+    # agentStream puts session.userId in the task body; it's what reaches
+    # the worker as body.userId. So even on a follow-up from visitor bob,
+    # body.userId == alice-creator here.
+    out = _takeover_logic(txn, ref, turn_ref, "alice-creator", "run-1", "w-1")
+    assert out == {"action": "run", "attempt": 1}
+
+
+# ── _fenced_update_session_and_turn_logic ──────────────────────────────────
+
+
+def test_fenced_update_session_and_turn_commits_both_when_ids_match():
+    ref = _mock_session_ref({
+        "currentAttempt": 2,
+        "currentWorkerId": "w-1",
+    })
+    turn_ref = _mock_turn_ref()
+    txn = MagicMock()
+    session_updates = {"status": "complete"}
+    turn_updates = {"status": "complete", "reply": "ok"}
+    _fenced_update_session_and_turn_logic(
+        txn, ref, turn_ref, 2, "w-1", session_updates, turn_updates
+    )
+    assert txn.update.call_count == 2
+    # Every call's first positional arg is the ref; partition by identity.
+    refs = [c[0][0] for c in txn.update.call_args_list]
+    data = {id(c[0][0]): c[0][1] for c in txn.update.call_args_list}
+    assert ref in refs
+    assert turn_ref in refs
+    assert data[id(ref)] == session_updates
+    assert data[id(turn_ref)] == turn_updates
+
+
+def test_fenced_update_session_and_turn_raises_on_attempt_mismatch():
+    ref = _mock_session_ref({"currentAttempt": 3, "currentWorkerId": "w-1"})
+    turn_ref = _mock_turn_ref()
+    txn = MagicMock()
+    with pytest.raises(OwnershipLost):
+        _fenced_update_session_and_turn_logic(
+            txn, ref, turn_ref, 2, "w-1", {"status": "complete"}, {}
+        )
+    # Neither write landed.
+    txn.update.assert_not_called()
+
+
+def test_fenced_update_session_and_turn_raises_on_worker_mismatch():
+    ref = _mock_session_ref({"currentAttempt": 2, "currentWorkerId": "other-w"})
+    turn_ref = _mock_turn_ref()
+    txn = MagicMock()
+    with pytest.raises(OwnershipLost):
+        _fenced_update_session_and_turn_logic(
+            txn, ref, turn_ref, 2, "w-1", {}, {}
+        )
+    txn.update.assert_not_called()
+
+
+def test_turn_doc_key_zero_pads_to_four_digits():
+    # Pin #3: turn index travels as integer; doc key is the formatted string.
+    assert _turn_doc_key(1) == "0001"
+    assert _turn_doc_key(10) == "0010"
+    assert _turn_doc_key(9999) == "9999"
 
 
 # ── Source accumulator ─────────────────────────────────────────────────────
@@ -355,6 +486,7 @@ def _build_run_request():
     return RunRequest(
         sessionId="sid-1",
         runId="run-1",
+        turnIdx=1,
         adkSessionId="adk-1",
         userId="alice",
         queryText="[Date: 2026-04-20] hello",
@@ -395,11 +527,18 @@ async def test_runner_exception_writes_status_error_and_returns_200(monkeypatch)
     monkeypatch.setattr(worker_main, "_takeover_txn", lambda *a, **k: {"action": "run", "attempt": 1})
 
     # Heartbeat + fenced update cancellation: make them awaitable-no-ops, and
-    # record which writes were attempted.
-    fenced_writes = []
+    # record which writes were attempted. Both single-doc (heartbeat-style)
+    # and two-doc (terminal) writes flow through the same capture list so
+    # the error assertions below don't care which primitive lands it.
+    fenced_writes: list[dict] = []
 
     async def fake_fenced_update(sid, attempt, worker_id, updates):
         fenced_writes.append(updates)
+
+    async def fake_fenced_update_session_and_turn(
+        sid, turn_idx, attempt, worker_id, session_updates, turn_updates
+    ):
+        fenced_writes.append(session_updates)
 
     hb_cancel_calls = []
 
@@ -407,6 +546,11 @@ async def test_runner_exception_writes_status_error_and_returns_200(monkeypatch)
         hb_cancel_calls.append(True)
 
     monkeypatch.setattr(worker_main, "_fenced_update", fake_fenced_update)
+    monkeypatch.setattr(
+        worker_main,
+        "_fenced_update_session_and_turn",
+        fake_fenced_update_session_and_turn,
+    )
     monkeypatch.setattr(worker_main, "_cancel_heartbeat", fake_cancel_heartbeat)
     monkeypatch.setattr(worker_main, "_heartbeat_loop", lambda *a, **k: asyncio.sleep(0))
 
@@ -422,7 +566,7 @@ async def test_runner_exception_writes_status_error_and_returns_200(monkeypatch)
     # `test_pipeline_exception_cancels_heartbeat_before_error_write` is
     # the canonical ordering assertion; this one just verifies basic flow.
     assert len(hb_cancel_calls) >= 1
-    # Error state written via fenced update.
+    # Error state written via (two-doc) fenced update.
     error_writes = [u for u in fenced_writes if u.get("status") == "error"]
     assert len(error_writes) == 1
     assert "RuntimeError" in error_writes[0]["error"]
@@ -451,7 +595,8 @@ async def test_pipeline_exception_cancels_heartbeat_before_error_write(monkeypat
 
     # Shared event-order recorder. Captures `('cancel',)` and `('fenced',
     # <updates_dict>)` as they happen; ordering across the two mocks is
-    # what we assert.
+    # what we assert. The terminal error path uses the two-doc primitive
+    # — we record its session-side updates.
     calls: list[tuple] = []
 
     async def recording_cancel():
@@ -460,8 +605,18 @@ async def test_pipeline_exception_cancels_heartbeat_before_error_write(monkeypat
     async def recording_fenced_update(sid, attempt, worker_id, updates):
         calls.append(("fenced", updates))
 
+    async def recording_fenced_update_session_and_turn(
+        sid, turn_idx, attempt, worker_id, session_updates, turn_updates
+    ):
+        calls.append(("fenced", session_updates))
+
     monkeypatch.setattr(worker_main, "_cancel_heartbeat", recording_cancel)
     monkeypatch.setattr(worker_main, "_fenced_update", recording_fenced_update)
+    monkeypatch.setattr(
+        worker_main,
+        "_fenced_update_session_and_turn",
+        recording_fenced_update_session_and_turn,
+    )
     monkeypatch.setattr(worker_main, "_heartbeat_loop", lambda *a, **k: asyncio.sleep(0))
 
     body = _build_run_request()
@@ -619,10 +774,28 @@ def _install_run_harness(monkeypatch, *, events, emissions):
 
     monkeypatch.setattr(worker_main, "write_event_doc", fake_write_event_doc)
 
+    # Capture both single-doc (progress/heartbeat) and two-doc (terminal)
+    # fenced writes in a single list. The existing tests assert on session-
+    # level shape (e.g., status='complete', reply=...) — under server-stored
+    # sessions the reply/sources/turnSummary live on the turn doc, so the
+    # test harness surfaces the TURN-doc updates under the same dict keys
+    # the old tests expected on the session. Session-only fields (status,
+    # title, updatedAt) are merged in so tests that look at `title` and
+    # `status` keep working without further rewrites.
     fenced_writes: list[dict] = []
 
     async def fake_fenced_update(sid, attempt, worker_id, updates):
         fenced_writes.append(updates)
+
+    async def fake_fenced_update_session_and_turn(
+        sid, turn_idx, attempt, worker_id, session_updates, turn_updates
+    ):
+        # Record a merged view so test assertions about `status`, `reply`,
+        # `sources`, `turnSummary`, and `title` all find their data on one
+        # entry. This preserves the old single-doc assertions while the
+        # production path writes two docs atomically.
+        merged = {**session_updates, **turn_updates}
+        fenced_writes.append(merged)
 
     hb_cancel_calls: list[bool] = []
 
@@ -630,6 +803,11 @@ def _install_run_harness(monkeypatch, *, events, emissions):
         hb_cancel_calls.append(True)
 
     monkeypatch.setattr(worker_main, "_fenced_update", fake_fenced_update)
+    monkeypatch.setattr(
+        worker_main,
+        "_fenced_update_session_and_turn",
+        fake_fenced_update_session_and_turn,
+    )
     monkeypatch.setattr(worker_main, "_cancel_heartbeat", fake_cancel_heartbeat)
     monkeypatch.setattr(worker_main, "_heartbeat_loop", lambda *a, **k: asyncio.sleep(0))
     # Avoid the Gemini Flash title call in tests; deterministic fake.
@@ -870,6 +1048,7 @@ async def test_title_lands_in_same_fenced_write_as_terminal_status(monkeypatch):
     body = RunRequest(
         sessionId="sid-1",
         runId="run-1",
+        turnIdx=1,
         adkSessionId="adk-1",
         userId="alice",
         queryText="[Date: 2026-04-20] hello",
@@ -911,6 +1090,7 @@ async def test_title_task_failure_falls_back_and_completion_still_lands(monkeypa
     body = RunRequest(
         sessionId="sid-1",
         runId="run-1",
+        turnIdx=1,
         adkSessionId="adk-1",
         userId="alice",
         queryText="[Date: 2026-04-20] What's going on at Noma?",
@@ -990,9 +1170,21 @@ async def test_note_tasks_are_cancelled_before_turn_summary_is_serialized(monkey
         order.append(f"write:{updates.get('status', 'progress')}")
         fenced_writes.append(updates)
 
+    async def _record_fenced_update_session_and_turn(
+        _sid, _turn_idx, _attempt, _worker_id, session_updates, turn_updates
+    ):
+        merged = {**session_updates, **turn_updates}
+        order.append(f"write:{merged.get('status', 'progress')}")
+        fenced_writes.append(merged)
+
     monkeypatch.setattr(wm, "_generate_timeline_note", _slow_note)
     monkeypatch.setattr(wm, "_cancel_background_tasks", _record_cancel)
     monkeypatch.setattr(wm, "_fenced_update", _record_fenced_update)
+    monkeypatch.setattr(
+        wm,
+        "_fenced_update_session_and_turn",
+        _record_fenced_update_session_and_turn,
+    )
 
     result = await wm.run(_build_run_request(), _fake_request())
 
@@ -1088,7 +1280,7 @@ async def test_poll_until_resolved_times_out_after_seven_minutes(monkeypatch):
     monkeypatch.setattr(asyncio, "sleep", fake_sleep)
 
     with pytest.raises(HTTPException) as excinfo:
-        await worker_main._poll_until_resolved("sid-1", "run-1", "w-1")
+        await worker_main._poll_until_resolved("sid-1", 1, "run-1", "w-1")
     assert excinfo.value.status_code == 500
     assert "poll_timeout" in excinfo.value.detail
 
@@ -1164,3 +1356,342 @@ async def test_short_synth_reply_now_passes_sanity_gate(monkeypatch):
     complete_writes = [u for u in fenced_writes if u.get("status") == "complete"]
     assert len(complete_writes) == 1
     assert complete_writes[0]["reply"] == short
+
+
+# ── Turn-doc lifecycle (plan §5 / §8 — server-stored sessions) ─────────────
+#
+# The tests above lean on the harness's merged-dict shortcut to assert
+# terminal shape. The tests below pin down the split itself: session doc
+# holds metadata (status, updatedAt, title on first turn), turn doc holds
+# reply/sources/turnSummary/completedAt. Both writes land via
+# `_fenced_update_session_and_turn`, i.e. inside a single transaction.
+
+
+def _install_split_harness(monkeypatch, *, events, emissions):
+    """Variant of `_install_run_harness` that keeps session- and turn-level
+    terminal updates separate so tests can assert the data partition
+    directly. Returns three lists: single-doc fenced writes (heartbeats /
+    adkSessionId persistence), session-side terminal writes, turn-side
+    terminal writes."""
+    import worker_main
+
+    assert len(events) == len(emissions)
+
+    fake_runner = MagicMock()
+    fake_runner.run_async = lambda **kwargs: _AsyncIterEvents(events)
+
+    fake_fs = MagicMock()
+    fake_fs.collection.return_value.document.return_value = MagicMock()
+    fake_fs.transaction.return_value = MagicMock()
+
+    monkeypatch.setattr(worker_main, "_runner", fake_runner)
+    monkeypatch.setattr(worker_main, "_fs", fake_fs)
+    monkeypatch.setattr(worker_main, "_session_svc", MagicMock())
+    monkeypatch.setattr(
+        worker_main, "_takeover_txn", lambda *a, **k: {"action": "run", "attempt": 1}
+    )
+
+    emission_iter = iter(_translate_emission(e) for e in emissions)
+
+    def fake_map_event(event, state=None):
+        try:
+            return next(emission_iter)
+        except StopIteration:
+            return _empty_mapping()
+
+    monkeypatch.setattr(worker_main, "map_event", fake_map_event)
+
+    async def fake_write_event_doc(**kwargs):
+        return {"type": kwargs["event_type"], "data": kwargs["data"]}
+
+    monkeypatch.setattr(worker_main, "write_event_doc", fake_write_event_doc)
+
+    progress_writes: list[dict] = []
+    session_terminal_writes: list[dict] = []
+    turn_terminal_writes: list[dict] = []
+    turn_idx_captured: list[int] = []
+
+    async def fake_fenced_update(_sid, _attempt, _worker_id, updates):
+        progress_writes.append(updates)
+
+    async def fake_fenced_update_session_and_turn(
+        _sid, turn_idx, _attempt, _worker_id, session_updates, turn_updates
+    ):
+        turn_idx_captured.append(turn_idx)
+        session_terminal_writes.append(session_updates)
+        turn_terminal_writes.append(turn_updates)
+
+    async def fake_cancel_heartbeat():
+        pass
+
+    monkeypatch.setattr(worker_main, "_fenced_update", fake_fenced_update)
+    monkeypatch.setattr(
+        worker_main,
+        "_fenced_update_session_and_turn",
+        fake_fenced_update_session_and_turn,
+    )
+    monkeypatch.setattr(worker_main, "_cancel_heartbeat", fake_cancel_heartbeat)
+    monkeypatch.setattr(
+        worker_main, "_heartbeat_loop", lambda *a, **k: asyncio.sleep(0)
+    )
+
+    async def _fake_title(_q: str) -> str:
+        return "My Chat"
+
+    monkeypatch.setattr(worker_main, "_generate_title", _fake_title)
+
+    return progress_writes, session_terminal_writes, turn_terminal_writes, turn_idx_captured
+
+
+@pytest.mark.asyncio
+async def test_terminal_success_splits_content_to_turn_doc(monkeypatch):
+    """Plan §5: session doc holds metadata (status, updatedAt, title on
+    first turn); turn doc holds reply, sources, turnSummary, completedAt.
+    The split lands via a single two-doc fenced transaction."""
+    import worker_main as wm
+
+    events = [_mk_event({"final_report": "The answer."}, author="synthesizer")]
+    emissions = [
+        {
+            "type": "complete",
+            "data": {
+                "reply": "The answer.",
+                "sources": [{"title": "Src", "url": "https://src.example"}],
+            },
+        }
+    ]
+
+    progress, session_writes, turn_writes, turn_idxs = _install_split_harness(
+        monkeypatch, events=events, emissions=emissions
+    )
+
+    from worker_main import RunRequest
+
+    body = RunRequest(
+        sessionId="sid-1",
+        runId="run-1",
+        turnIdx=2,
+        adkSessionId="adk-1",
+        userId="alice",
+        queryText="[Date: 2026-04-20] hello",
+        isFirstMessage=False,  # not first → no title
+    )
+    result = await wm.run(body, _fake_request())
+
+    assert result["ok"] is True
+    assert result["action"] == "complete"
+
+    # Exactly one terminal two-doc write.
+    assert len(session_writes) == 1
+    assert len(turn_writes) == 1
+    assert turn_idxs == [2]
+
+    # Session-side fields: status, updatedAt. No reply/sources/turnSummary.
+    session_u = session_writes[0]
+    assert session_u["status"] == "complete"
+    assert "updatedAt" in session_u
+    for field in ("reply", "sources", "turnSummary", "completedAt"):
+        assert field not in session_u, (
+            f"{field} must live on the turn doc, not the session doc"
+        )
+    # No title on follow-up turns.
+    assert "title" not in session_u
+
+    # Turn-side fields: status, reply, sources, turnSummary, completedAt.
+    turn_u = turn_writes[0]
+    assert turn_u["status"] == "complete"
+    assert turn_u["reply"] == "The answer."
+    assert [s["url"] for s in turn_u["sources"]] == ["https://src.example"]
+    assert "turnSummary" in turn_u
+    assert "completedAt" in turn_u
+
+
+@pytest.mark.asyncio
+async def test_terminal_success_on_first_turn_writes_title_to_session(monkeypatch):
+    """First-turn completion adds `title` to the session-side update
+    specifically — the sidebar reads `session.title` under the new schema.
+    Title never lands on the turn doc."""
+    import worker_main as wm
+
+    events = [_mk_event({"final_report": "Answer."}, author="synthesizer")]
+    emissions = [
+        {"type": "complete", "data": {"reply": "Answer.", "sources": []}}
+    ]
+
+    _p, session_writes, turn_writes, _idxs = _install_split_harness(
+        monkeypatch, events=events, emissions=emissions
+    )
+
+    from worker_main import RunRequest
+
+    body = RunRequest(
+        sessionId="sid-1",
+        runId="run-1",
+        turnIdx=1,
+        adkSessionId="adk-1",
+        userId="alice",
+        queryText="hello",
+        isFirstMessage=True,
+    )
+    await wm.run(body, _fake_request())
+
+    assert session_writes[0]["title"] == "My Chat"
+    assert "title" not in turn_writes[0]
+
+
+@pytest.mark.asyncio
+async def test_terminal_error_propagates_to_both_docs(monkeypatch):
+    """Pipeline-error path writes `status='error'` to both session and turn
+    docs in the same fenced transaction. Session gets `updatedAt` bump;
+    both carry the error reason."""
+    import worker_main as wm
+
+    fake_runner = MagicMock()
+    fake_runner.run_async = lambda **kwargs: _AsyncIterError(RuntimeError("boom"))
+
+    fake_fs = MagicMock()
+    fake_fs.collection.return_value.document.return_value = MagicMock()
+    fake_fs.transaction.return_value = MagicMock()
+
+    monkeypatch.setattr(wm, "_runner", fake_runner)
+    monkeypatch.setattr(wm, "_fs", fake_fs)
+    monkeypatch.setattr(wm, "_session_svc", MagicMock())
+    monkeypatch.setattr(
+        wm, "_takeover_txn", lambda *a, **k: {"action": "run", "attempt": 1}
+    )
+
+    session_writes: list[dict] = []
+    turn_writes: list[dict] = []
+    turn_idxs: list[int] = []
+
+    async def fake_fenced_update(*_a, **_k):
+        pass
+
+    async def fake_fenced_update_session_and_turn(
+        _sid, turn_idx, _attempt, _worker_id, session_updates, turn_updates
+    ):
+        turn_idxs.append(turn_idx)
+        session_writes.append(session_updates)
+        turn_writes.append(turn_updates)
+
+    async def fake_cancel_heartbeat():
+        pass
+
+    monkeypatch.setattr(wm, "_fenced_update", fake_fenced_update)
+    monkeypatch.setattr(
+        wm, "_fenced_update_session_and_turn", fake_fenced_update_session_and_turn
+    )
+    monkeypatch.setattr(wm, "_cancel_heartbeat", fake_cancel_heartbeat)
+    monkeypatch.setattr(wm, "_heartbeat_loop", lambda *a, **k: asyncio.sleep(0))
+
+    body = _build_run_request()  # turnIdx=1
+    result = await wm.run(body, _fake_request())
+
+    assert result["ok"] is False
+    assert result["action"] == "pipeline_error"
+
+    assert len(session_writes) == 1
+    assert len(turn_writes) == 1
+    assert turn_idxs == [1]
+    assert session_writes[0]["status"] == "error"
+    assert "RuntimeError" in session_writes[0]["error"]
+    assert "updatedAt" in session_writes[0]
+    assert turn_writes[0]["status"] == "error"
+    assert "RuntimeError" in turn_writes[0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_sanity_fail_error_propagates_to_both_docs(monkeypatch):
+    """Empty-reply sanity-fail path is a terminal error too — must flip
+    both session and turn doc to status='error'."""
+    import worker_main as wm
+
+    events = [_mk_event({"places_context": "some place"})]
+    emissions = [None]  # mapper emits nothing terminal
+
+    _p, session_writes, turn_writes, turn_idxs = _install_split_harness(
+        monkeypatch, events=events, emissions=emissions
+    )
+
+    body = _build_run_request()
+    result = await wm.run(body, _fake_request())
+
+    assert result["ok"] is False
+    assert result["action"] == "empty_or_malformed_reply"
+    assert len(session_writes) == 1
+    assert len(turn_writes) == 1
+    assert session_writes[0]["status"] == "error"
+    assert session_writes[0]["error"] == "empty_or_malformed_reply"
+    assert "updatedAt" in session_writes[0]
+    assert turn_writes[0]["status"] == "error"
+    assert turn_writes[0]["error"] == "empty_or_malformed_reply"
+
+
+@pytest.mark.asyncio
+async def test_creator_uid_flows_through_to_runner_call(monkeypatch):
+    """Verify that `body.userId` (the creator UID populated by agentStream
+    on every turn — even follow-ups from other visitors) is what reaches
+    the ADK Runner. Under server-stored sessions `session.userId` is never
+    overwritten; the submitter UID is tracked separately in
+    `session.participants`.
+
+    This is the load-bearing invariant behind
+    `VertexAiSessionService.get_session`'s user_id equality check."""
+    import worker_main as wm
+
+    captured_user_ids: list[str] = []
+
+    class _CapturingAsyncIter:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            raise StopAsyncIteration
+
+    def fake_run_async(**kwargs):
+        captured_user_ids.append(kwargs.get("user_id"))
+        return _CapturingAsyncIter()
+
+    fake_runner = MagicMock()
+    fake_runner.run_async = fake_run_async
+
+    fake_fs = MagicMock()
+    fake_fs.collection.return_value.document.return_value = MagicMock()
+    fake_fs.transaction.return_value = MagicMock()
+
+    monkeypatch.setattr(wm, "_runner", fake_runner)
+    monkeypatch.setattr(wm, "_fs", fake_fs)
+    monkeypatch.setattr(wm, "_session_svc", MagicMock())
+    monkeypatch.setattr(
+        wm, "_takeover_txn", lambda *a, **k: {"action": "run", "attempt": 1}
+    )
+
+    async def _noop_fenced(*_a, **_k):
+        pass
+
+    monkeypatch.setattr(wm, "_fenced_update", _noop_fenced)
+    monkeypatch.setattr(wm, "_fenced_update_session_and_turn", _noop_fenced)
+
+    async def fake_cancel_heartbeat():
+        pass
+
+    monkeypatch.setattr(wm, "_cancel_heartbeat", fake_cancel_heartbeat)
+    monkeypatch.setattr(wm, "_heartbeat_loop", lambda *a, **k: asyncio.sleep(0))
+
+    from worker_main import RunRequest
+
+    # Simulate a follow-up submitted by visitor bob: agentStream reads the
+    # session's stored creator UID (alice) and puts THAT into the task body.
+    # So body.userId == "alice" even though the submitter was bob.
+    body = RunRequest(
+        sessionId="sid-1",
+        runId="run-2",
+        turnIdx=2,
+        adkSessionId="adk-existing",
+        userId="alice",  # creator UID from session.userId, per agentStream
+        queryText="follow-up",
+        isFirstMessage=False,
+    )
+    await wm.run(body, _fake_request())
+
+    assert captured_user_ids == ["alice"]

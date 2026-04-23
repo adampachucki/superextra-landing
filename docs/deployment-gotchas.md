@@ -65,25 +65,38 @@ minBackoff=10s, maxBackoff=60s` (Phase 6).
 ## Firestore
 
 - **Composite indexes must be rolled out before traffic hits
-  `agentStream`.** `firestore.indexes.json` declares four indexes:
-  `events (userId, runId, attempt, seqInAttempt)` collection-group for the
-  client observer; plus three `sessions` indexes for the watchdog's
-  status+queuedAt / lastHeartbeat / lastEventAt sweeps. First `firebase
-deploy --only firestore:indexes` takes ~5 min to reach ACTIVE; agentStream
-  will fail reads until then.
-- **Events write via plain `ref.set(...)` — unfenced.** The client observer
-  in `src/lib/firestore-stream.ts` deliberately ignores `type='complete'`/
-  `'error'` event docs to prevent a fenced-out stale worker from leaking a
-  terminal via the events stream. The **session doc** (fenced via
-  `_fenced_update` in the worker) is the only terminal source.
-- **Events carry `userId` denormalized.** The collection-group rule
-  (`match /{path=**}/events/{eid}` in `firestore.rules:17-22`) reads
-  `resource.data.userId` directly — no `get()` into the parent session. The
-  client query MUST include `where('userId','==',uid)` or it 403s.
-- **TTL does NOT cascade.** Two separate TTL policies: `sessions.expiresAt`
-  (30-day) and the `events` collection-group `expiresAt` (30-day). Enabled
-  via `gcloud firestore fields ttls update`; events TTL spends ~hours in
-  `CREATING` before it becomes `ACTIVE`.
+  `agentStream`.** `firestore.indexes.json` declares: the three `sessions`
+  indexes for the watchdog's status+queuedAt / lastHeartbeat / lastEventAt
+  sweeps, a `sessions(participants array-contains, updatedAt desc)` composite
+  for the client sidebar listener, and the legacy
+  `events (userId, runId, attempt, seqInAttempt)` collection-group index
+  (unused after the per-session events listener migration — remove in a
+  follow-up cleanup). First `firebase deploy --only firestore:indexes` on a
+  new project takes ~5 min to reach ACTIVE; on an existing project with an
+  empty `participants` field the composite becomes ACTIVE almost instantly.
+- **Data shape is three-layer.** `sessions/{sid}` holds lightweight
+  metadata + operational state (no terminal content). `sessions/{sid}/turns/{nnnn}`
+  holds per-turn user message, reply, sources, and turn summary. `sessions/{sid}/events/{eid}`
+  holds live activity for the in-flight turn.
+- **Terminal source is the TURN doc.** The worker's `_fenced_update_session_and_turn`
+  writes `status=complete` + `reply`/`sources`/`turnSummary` to the turn doc
+  atomically with `status=complete` + `updatedAt` on the session doc. Old
+  code (pre-rearchitecture) wrote terminal content to the session doc; that
+  path is gone.
+- **Events are per-session now.** The client observer queries
+  `collection(db, 'sessions', sid, 'events')` with `where('runId','==',runId)`
+  - `orderBy(attempt, seqInAttempt)`. No `userId` filter needed — reads are
+    gated by the path-scoped rule. The legacy collection-group events query is
+    no longer used.
+- **Capability-URL rules.** `sessions/{sid}` allows `get` for any signed-in
+  visitor; `list` requires `where('participants','array-contains',uid)` to
+  match the rule; all writes are Admin-SDK-only. Subcollections
+  (`turns`, `events`) allow path-scoped `read` for any signed-in visitor;
+  writes server-only.
+- **TTL only on events.** `events.expiresAt` is 3 days (was 30 days before
+  the rearchitecture; bumped down because events are operational artifacts,
+  not permanent transcript data). Sessions and turns have NO TTL — they
+  persist until the creator deletes the chat via `agentDelete`.
 
 ## Watchdog (`functions/watchdog.js`)
 
@@ -132,8 +145,9 @@ gcloud run services delete superextra-agent \
 - **Worker health** (resolve URL first — the hash portion is project-stable
   but never hardcode it in one-off checks):
   `URL=$(gcloud run services describe superextra-worker --region=us-central1 --project=superextra-site --format='value(status.url)') && TOKEN=$(gcloud auth print-identity-token --audiences=$URL) && curl -H "Authorization: Bearer $TOKEN" $URL/healthz`
-- **Cloud Function `agentCheck` from shell** (needs a Firebase ID token):
-  `curl "https://us-central1-superextra-site.cloudfunctions.net/agentCheck?sid=SID&runId=RID" -H "Authorization: Bearer $ID_TOKEN"`
+- **Cloud Function `agentDelete` from shell** (needs a Firebase ID token; only
+  the creator's UID succeeds — contributors get 403):
+  `curl -X POST "https://us-central1-superextra-site.cloudfunctions.net/agentDelete" -H "Authorization: Bearer $ID_TOKEN" -H "Content-Type: application/json" -d '{"sid":"SID"}'`
 - **IAM check**: Cloud Function SA
   `907466498524-compute@developer.gserviceaccount.com` needs
   `roles/cloudtasks.enqueuer` on the `agent-dispatch` queue; worker SA
@@ -148,7 +162,8 @@ and stitch the signals together. No harness, no automation, no new code;
 all of this relies on observability that already exists (structured JSON
 logs keyed by `sid`, Cloud Trace IDs embedded in every log line, sid in the
 URL, Chrome DevTools MCP). Runs cost real Gemini/Places/SerpAPI/Apify
-tokens and leave a 30-day-TTL session doc; use sparingly, not as a CI gate.
+tokens and leave a permanent session + per-turn doc until the creator
+deletes it via `agentDelete`; use sparingly, not as a CI gate.
 
 1. **Navigate.** Chrome MCP `new_page` → `http://localhost:5199/agent/chat`.
    Anonymous Firebase auth bootstraps silently; no login or modal blocks
@@ -170,9 +185,11 @@ tokens and leave a 30-day-TTL session doc; use sparingly, not as a CI gate.
    Every line also has `logging.googleapis.com/trace`. Open that URL in
    Cloud Trace — full waterfall across router → enricher → orchestrator →
    specialists → synthesizer. Usually the fastest way in.
-5. **Firestore state.** Session doc `sessions/<sid>` (terminal status,
-   fencing info, heartbeats) and events subcollection `sessions/<sid>/events`.
-   Firebase console works; so does
+5. **Firestore state.** Session doc `sessions/<sid>` (run status, fencing
+   info, heartbeats, participants); turn docs `sessions/<sid>/turns/<nnnn>`
+   (terminal reply, sources, turnSummary — this is the terminal source,
+   not the session doc); events subcollection `sessions/<sid>/events`
+   (in-flight activity, 3-day TTL). Firebase console works; so does
    `gcloud firestore documents describe sessions/<sid>`.
 
 For backend-only reproduction (UI is innocent, want to isolate the worker),

@@ -11,7 +11,7 @@
 //     ADK events — specialist stuck on a hung tool call, etc.)
 
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const QUEUED_MAX_AGE_MS = 30 * 60 * 1000;
 const HEARTBEAT_MAX_AGE_MS = 10 * 60 * 1000;
@@ -161,11 +161,29 @@ export async function runWatchdog(db, nowMs = Date.now()) {
 				if (fieldMillis !== null && fieldMillis > thresholdMillis) {
 					return 'field_freshened';
 				}
+				// Server-stored sessions (plan §8): propagate the error to the
+				// in-flight turn doc in the same transaction. agentStream
+				// enforces that `turns/{lastTurnIndex}` is the doc for
+				// `currentRunId`, so the predicates already validated above
+				// keep that invariant intact. If `lastTurnIndex` is missing
+				// (e.g., a partial-enqueue legacy doc), skip the turn write
+				// rather than fail the flip — the session update is still the
+				// meaningful signal.
 				tx.update(ref, {
 					status: 'error',
 					error: reason,
-					errorDetails
+					errorDetails,
+					updatedAt: FieldValue.serverTimestamp()
 				});
+				const lastTurnIndex = data.lastTurnIndex;
+				if (typeof lastTurnIndex === 'number' && lastTurnIndex > 0) {
+					const turnKey = String(lastTurnIndex).padStart(4, '0');
+					const turnRef = ref.collection('turns').doc(turnKey);
+					tx.update(turnRef, {
+						status: 'error',
+						error: reason
+					});
+				}
 				return 'flipped';
 			});
 			if (result === 'flipped') {

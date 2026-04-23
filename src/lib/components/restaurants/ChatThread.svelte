@@ -100,13 +100,6 @@
 
 	const SOURCES_LIMIT = 19;
 	let expandedSources: Record<number, boolean> = $state({});
-
-	async function retryLast() {
-		const recovered = await chatState.recover();
-		if (recovered) return;
-		const lastUser = [...chatState.messages].reverse().find((m) => m.role === 'user');
-		if (lastUser) chatState.send(lastUser.text);
-	}
 </script>
 
 <div bind:this={scrollEl} class="px-5 py-6 md:px-6">
@@ -274,7 +267,7 @@
 					/>
 				</div>
 			</div>
-		{:else if chatState.loading && !chatState.recovering}
+		{:else if chatState.loading}
 			<div class="msg-appear flex justify-start">
 				<div class="max-w-[95%] px-1 py-1">
 					<div class="flex flex-col gap-2">
@@ -285,23 +278,6 @@
 							Starting research…
 						</div>
 					</div>
-				</div>
-			</div>
-		{/if}
-
-		{#if chatState.recovering && chatState.loading}
-			<div class="msg-appear flex justify-start">
-				<div
-					class="flex items-center gap-2 rounded-2xl border border-amber-200/50 bg-amber-50/50 px-5 py-3 dark:border-amber-400/20 dark:bg-amber-900/10"
-				>
-					<span class="loading-dots flex gap-1">
-						<span class="h-1 w-1 rounded-full bg-amber-400"></span>
-						<span class="h-1 w-1 rounded-full bg-amber-500"></span>
-						<span class="h-1 w-1 rounded-full bg-amber-400"></span>
-					</span>
-					<span class="text-[13px] text-amber-600/80 dark:text-amber-400/80"
-						>Reconnecting to the session...</span
-					>
 				</div>
 			</div>
 		{/if}
@@ -323,14 +299,6 @@
 							? 'The analysis took longer than expected and was cut short.'
 							: chatState.error}
 					</span>
-					<button
-						onclick={retryLast}
-						class="cursor-pointer rounded-full border px-3 py-1 text-[12px] whitespace-nowrap transition-colors {isTimeout
-							? 'border-amber-200/50 text-amber-600/60 hover:bg-amber-100/50 dark:border-amber-400/20 dark:text-amber-400/60 dark:hover:bg-amber-900/20'
-							: 'border-red-200/50 text-red-600/60 hover:bg-red-100/50 dark:border-red-400/20 dark:text-red-400/60 dark:hover:bg-red-900/20'}"
-					>
-						Try again
-					</button>
 				</div>
 			</div>
 		{/if}
@@ -350,29 +318,6 @@
 		to {
 			opacity: 1;
 			transform: translateY(0);
-		}
-	}
-
-	.loading-dots span {
-		animation: dotWave 1.4s ease-in-out infinite;
-	}
-	.loading-dots span:nth-child(2) {
-		animation-delay: 0.15s;
-	}
-	.loading-dots span:nth-child(3) {
-		animation-delay: 0.3s;
-	}
-
-	@keyframes dotWave {
-		0%,
-		60%,
-		100% {
-			opacity: 0.35;
-			transform: translateY(0);
-		}
-		30% {
-			opacity: 1;
-			transform: translateY(-2px);
 		}
 	}
 </style>

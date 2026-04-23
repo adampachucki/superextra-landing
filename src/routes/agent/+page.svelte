@@ -21,7 +21,7 @@
 		place: { name: string; secondary: string; placeId: string };
 	}) {
 		leaving = true;
-		chatState.start(query, place);
+		void chatState.startNewChat(query, place);
 		setTimeout(() => goto('/agent/chat'), 250);
 	}
 

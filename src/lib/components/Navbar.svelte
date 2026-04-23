@@ -19,7 +19,7 @@
 	onMount(() => handleScroll());
 
 	let over = $derived(transparent && !scrolled && !mobileOpen);
-	let chatCount = $derived(minimal ? chatState.conversations.length : 0);
+	let chatCount = $derived(minimal ? chatState.sessionsList.length : 0);
 
 	function smoothScroll(e: MouseEvent) {
 		const href = (e.currentTarget as HTMLAnchorElement).getAttribute('href');

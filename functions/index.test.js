@@ -3,20 +3,41 @@ import assert from 'node:assert/strict';
 
 // ── Mock external modules before importing index.js ──
 
-// Firestore mock supports point-doc set/get/update AND runTransaction(cb).
+// Firestore mock — refs carry a `_path` so assertions can distinguish session
+// writes (`sessions/{sid}`) from turn writes (`sessions/{sid}/turns/{turnKey}`).
 // The txn object exposes the same get/set/update surface as the real txn,
 // but without isolation semantics (tests drive sequences manually).
+function makeRef(path) {
+	const ref = {
+		_path: path,
+		collection: (name) => ({
+			doc: (id) => makeRef(`${path}/${name}/${id}`)
+		}),
+		// Direct reads/writes outside a transaction (agentCheck read, enqueue
+		// fallback write) delegate to the same spies used inside transactions,
+		// so assertions see every mutation regardless of execution path.
+		get: () => mockDb.get(ref),
+		update: (data) => mockDb.update(ref, data),
+		set: (data) => mockDb.set(ref, data)
+	};
+	return ref;
+}
+
+// Named after the signature (ref, …) so test assertions can introspect which
+// path a mutation hit.
 const mockDb = {
-	collection: () => mockDb,
-	doc: () => mockDb,
+	collection: (name) => ({
+		doc: (id) => makeRef(`${name}/${id}`)
+	}),
 	get: mock.fn(async () => ({ exists: false })),
 	set: mock.fn(async () => {}),
 	update: mock.fn(async () => {}),
+	recursiveDelete: mock.fn(async () => {}),
 	runTransaction: mock.fn(async (cb) => {
 		const txn = {
-			get: mockDb.get,
-			set: mockDb.set,
-			update: mockDb.update
+			get: async (ref) => mockDb.get(ref),
+			set: (ref, data) => mockDb.set(ref, data),
+			update: (ref, data) => mockDb.update(ref, data)
 		};
 		return cb(txn);
 	})
@@ -45,7 +66,8 @@ mock.module('firebase-admin/firestore', {
 	namedExports: {
 		getFirestore: mock.fn(() => mockDb),
 		FieldValue: {
-			serverTimestamp: () => '__server_timestamp__'
+			serverTimestamp: () => '__server_timestamp__',
+			arrayUnion: (...values) => ({ __arrayUnion: values })
 		}
 	}
 });
@@ -87,7 +109,7 @@ mock.module('@google-cloud/tasks', {
 // Set WORKER_URL before importing so the Cloud Task target resolves.
 process.env.WORKER_URL = 'https://worker-test.run.app';
 
-const { intake, agentStream, agentCheck, sttToken, tts } = await import('./index.js');
+const { intake, agentStream, agentCheck, agentDelete, sttToken, tts } = await import('./index.js');
 
 // ── Test helpers ──
 
@@ -148,10 +170,12 @@ beforeEach(() => {
 	mockDb.get.mock.resetCalls();
 	mockDb.set.mock.resetCalls();
 	mockDb.update.mock.resetCalls();
+	mockDb.recursiveDelete.mock.resetCalls();
 	mockDb.runTransaction.mock.resetCalls();
 	tasksClient.createTask.mock.resetCalls();
 	authInstance.verifyIdToken.mock.resetCalls();
 	mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+	mockDb.recursiveDelete.mock.mockImplementation(async () => {});
 });
 
 afterEach(() => {
@@ -355,6 +379,28 @@ describe('agentStream', () => {
 		});
 	}
 
+	// Returns `set` / `update` calls partitioned by the ref path the handler
+	// hit inside the transaction. Tests want to assert separately on the
+	// session doc vs. the turn doc, so this helper isolates the noise.
+	function partitionWrites(sessionPath) {
+		const sessionSets = mockDb.set.mock.calls
+			.filter((c) => c.arguments[0]?._path === sessionPath)
+			.map((c) => c.arguments[1]);
+		const sessionUpdates = mockDb.update.mock.calls
+			.filter((c) => c.arguments[0]?._path === sessionPath)
+			.map((c) => c.arguments[1]);
+		const turnSets = mockDb.set.mock.calls
+			.filter((c) => c.arguments[0]?._path?.startsWith(`${sessionPath}/turns/`))
+			.map((c) => ({ path: c.arguments[0]._path, data: c.arguments[1] }));
+		return { sessionSets, sessionUpdates, turnSets };
+	}
+
+	function decodeTaskBody(taskCall) {
+		return JSON.parse(
+			Buffer.from(taskCall.arguments[0].task.httpRequest.body, 'base64').toString('utf8')
+		);
+	}
+
 	it('rejects non-POST with 405', async () => {
 		const res = mockRes();
 		await agentStream(mockReq({ method: 'GET' }), res);
@@ -379,7 +425,7 @@ describe('agentStream', () => {
 		assert.equal(res._status, 400);
 	});
 
-	it('returns 202 and enqueues a task on success (new session)', async () => {
+	it('first turn creates session + turns/0001 in one transaction', async () => {
 		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
 		const res = mockRes();
 		await agentStream(authedReq(), res);
@@ -389,8 +435,47 @@ describe('agentStream', () => {
 		assert.equal(res._json.sessionId, 'sess-1');
 		assert.match(res._json.runId, /^[0-9a-f-]{36}$/);
 
-		// Exactly one transaction, one task enqueue.
+		// Exactly one transaction.
 		assert.equal(mockDb.runTransaction.mock.callCount(), 1);
+
+		const { sessionSets, sessionUpdates, turnSets } = partitionWrites('sessions/sess-1');
+
+		// First turn: set session (no update), set turn 0001.
+		assert.equal(sessionUpdates.length, 0);
+		assert.equal(sessionSets.length, 1);
+		const sessionDoc = sessionSets[0];
+		assert.equal(sessionDoc.userId, 'user-good-token');
+		assert.deepEqual(sessionDoc.participants, ['user-good-token']);
+		assert.equal(sessionDoc.lastTurnIndex, 1);
+		assert.equal(sessionDoc.status, 'queued');
+		assert.equal(sessionDoc.title, null);
+		assert.equal(sessionDoc.adkSessionId, null);
+		assert.equal(sessionDoc.updatedAt, '__server_timestamp__');
+		assert.equal(sessionDoc.queuedAt, '__server_timestamp__');
+		assert.equal(sessionDoc.createdAt, '__server_timestamp__');
+		// Terminal content fields must NOT be on the session doc anymore.
+		assert.ok(!('reply' in sessionDoc));
+		assert.ok(!('sources' in sessionDoc));
+		assert.ok(!('turnSummary' in sessionDoc));
+		// expiresAt removed entirely from the session schema.
+		assert.ok(!('expiresAt' in sessionDoc));
+
+		// Turn 0001 doc.
+		assert.equal(turnSets.length, 1);
+		assert.equal(turnSets[0].path, 'sessions/sess-1/turns/0001');
+		const turnDoc = turnSets[0].data;
+		assert.equal(turnDoc.turnIndex, 1);
+		assert.equal(turnDoc.runId, res._json.runId);
+		assert.equal(turnDoc.userMessage, 'What is the menu like?');
+		assert.equal(turnDoc.status, 'pending');
+		assert.equal(turnDoc.reply, null);
+		assert.equal(turnDoc.sources, null);
+		assert.equal(turnDoc.turnSummary, null);
+		assert.equal(turnDoc.completedAt, null);
+		assert.equal(turnDoc.error, null);
+		assert.equal(turnDoc.createdAt, '__server_timestamp__');
+
+		// Cloud Task body.
 		assert.equal(tasksClient.createTask.mock.callCount(), 1);
 		const taskArg = tasksClient.createTask.mock.calls[0].arguments[0];
 		assert.equal(
@@ -406,65 +491,28 @@ describe('agentStream', () => {
 		);
 		assert.equal(taskArg.task.httpRequest.oidcToken.audience, 'https://worker-test.run.app');
 
-		// Body is base64'd JSON — decode and inspect.
-		const body = JSON.parse(Buffer.from(taskArg.task.httpRequest.body, 'base64').toString('utf8'));
+		const body = decodeTaskBody(tasksClient.createTask.mock.calls[0]);
 		assert.equal(body.sessionId, 'sess-1');
 		assert.equal(body.runId, res._json.runId);
+		// Creator UID equals submitter UID on the first turn.
 		assert.equal(body.userId, 'user-good-token');
+		// turnIdx travels as an integer, not a zero-padded string.
+		assert.equal(body.turnIdx, 1);
+		assert.equal(typeof body.turnIdx, 'number');
 		assert.equal(body.isFirstMessage, true);
 		assert.equal(body.adkSessionId, null);
-		// Date prefix present, Context prefix also present for first message.
 		assert.match(body.queryText, /^\[Date: /);
 	});
 
-	it('returns 403 when sessionId is owned by a different user', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({ userId: 'user-other-token', status: 'complete' })
-		}));
-
-		const res = mockRes();
-		await agentStream(authedReq(), res);
-
-		assert.equal(res._status, 403);
-		assert.equal(tasksClient.createTask.mock.callCount(), 0);
-	});
-
-	it('returns 403 when existing session doc is missing userId (legacy/malformed)', async () => {
-		// Audit Finding 3 — old guard short-circuited when `userId` was
-		// missing. Legacy docs without `userId` must be rejected.
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({ status: 'complete' }) // no userId
-		}));
-
-		const res = mockRes();
-		await agentStream(authedReq(), res);
-
-		assert.equal(res._status, 403);
-		assert.equal(tasksClient.createTask.mock.callCount(), 0);
-	});
-
-	it('returns 409 when previous turn is still in flight', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({ userId: 'user-good-token', status: 'running', currentRunId: 'prior-run' })
-		}));
-
-		const res = mockRes();
-		await agentStream(authedReq(), res);
-
-		assert.equal(res._status, 409);
-		assert.equal(tasksClient.createTask.mock.callCount(), 0);
-	});
-
-	it('reuses adkSessionId + isFirstMessage=false on follow-up turns', async () => {
+	it('follow-up from the same user arrayUnion-keeps participants and increments lastTurnIndex', async () => {
 		mockDb.get.mock.mockImplementation(async () => ({
 			exists: true,
 			data: () => ({
 				userId: 'user-good-token',
+				participants: ['user-good-token'],
 				status: 'complete',
 				adkSessionId: 'adk-existing',
+				lastTurnIndex: 1,
 				placeContext: { name: 'Umami', secondary: 'Berlin', placeId: 'ChIJ...' },
 				title: 'Prior chat'
 			})
@@ -474,73 +522,187 @@ describe('agentStream', () => {
 		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
 
 		assert.equal(res._status, 202);
-		assert.equal(tasksClient.createTask.mock.callCount(), 1);
-		const body = JSON.parse(
-			Buffer.from(
-				tasksClient.createTask.mock.calls[0].arguments[0].task.httpRequest.body,
-				'base64'
-			).toString('utf8')
-		);
+		const { sessionSets, sessionUpdates, turnSets } = partitionWrites('sessions/sess-1');
+
+		// Follow-up: update session (no set), set new turn.
+		assert.equal(sessionSets.length, 0);
+		assert.equal(sessionUpdates.length, 1);
+		const sessionUpdate = sessionUpdates[0];
+		assert.equal(sessionUpdate.lastTurnIndex, 2);
+		assert.equal(sessionUpdate.status, 'queued');
+		assert.equal(sessionUpdate.updatedAt, '__server_timestamp__');
+		// arrayUnion carries the submitter UID; Firestore dedups duplicates
+		// server-side so the resulting array stays [user-good-token].
+		assert.deepEqual(sessionUpdate.participants, { __arrayUnion: ['user-good-token'] });
+		// userId is not overwritten.
+		assert.ok(!('userId' in sessionUpdate));
+
+		assert.equal(turnSets.length, 1);
+		assert.equal(turnSets[0].path, 'sessions/sess-1/turns/0002');
+		assert.equal(turnSets[0].data.turnIndex, 2);
+
+		// Cloud Task body — creator UID still equals the original creator.
+		const body = decodeTaskBody(tasksClient.createTask.mock.calls[0]);
+		assert.equal(body.turnIdx, 2);
+		assert.equal(body.userId, 'user-good-token');
 		assert.equal(body.adkSessionId, 'adk-existing');
 		assert.equal(body.isFirstMessage, false);
-		// Follow-up turn must NOT re-inject [Context: ...] — state handles it.
+		// Follow-up must NOT re-inject [Context: ...] — ADK state holds it.
 		assert.ok(!body.queryText.includes('[Context:'));
 	});
 
-	it('preserves existing expiresAt when it extends beyond now+30d (never shrinks)', async () => {
-		// Existing session with expiresAt 60 days in the future. A follow-up
-		// enqueue must NOT reset that to now+30d.
-		const farFutureMs = Date.now() + 60 * 24 * 60 * 60 * 1000;
+	it('follow-up from a different user (shared URL) preserves creator UID and arrayUnions participants', async () => {
 		mockDb.get.mock.mockImplementation(async () => ({
 			exists: true,
 			data: () => ({
-				userId: 'user-good-token',
+				userId: 'user-creator-token',
+				participants: ['user-creator-token'],
 				status: 'complete',
-				adkSessionId: 'adk-existing',
-				expiresAt: { toMillis: () => farFutureMs }
+				adkSessionId: 'adk-shared',
+				lastTurnIndex: 2
 			})
 		}));
 
 		const res = mockRes();
-		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
+		await agentStream(
+			authedReq({
+				headers: { authorization: 'Bearer visitor-token' },
+				body: { message: 'visitor follow-up', sessionId: 'sess-1' }
+			}),
+			res
+		);
 
 		assert.equal(res._status, 202);
-		assert.equal(mockDb.update.mock.callCount(), 1);
-		// Inside the txn, `t.update(ref, perTurn)` — arguments[0] is the ref,
-		// arguments[1] is the perTurn payload with expiresAt.
-		const perTurn = mockDb.update.mock.calls[0].arguments[1];
-		// `newExpiresAt = new Date(max(existing, now+30d))`. With existing at
-		// now+60d, result must be a Date whose ms equals the existing one.
-		assert.ok(perTurn.expiresAt instanceof Date, 'expiresAt should be a Date');
-		assert.equal(perTurn.expiresAt.getTime(), farFutureMs);
+		const { sessionUpdates, turnSets } = partitionWrites('sessions/sess-1');
+
+		assert.equal(sessionUpdates.length, 1);
+		const sessionUpdate = sessionUpdates[0];
+		// session.userId must NOT be overwritten.
+		assert.ok(!('userId' in sessionUpdate));
+		// arrayUnion adds the visitor UID; Firestore will merge it into the
+		// stored [creator, visitor] set server-side.
+		assert.deepEqual(sessionUpdate.participants, { __arrayUnion: ['user-visitor-token'] });
+		assert.equal(sessionUpdate.lastTurnIndex, 3);
+
+		assert.equal(turnSets.length, 1);
+		assert.equal(turnSets[0].path, 'sessions/sess-1/turns/0003');
+
+		// Cloud Task body: userId = original creator, NOT the submitter.
+		const body = decodeTaskBody(tasksClient.createTask.mock.calls[0]);
+		assert.equal(body.turnIdx, 3);
+		assert.equal(body.userId, 'user-creator-token');
+		assert.equal(body.adkSessionId, 'adk-shared');
+		assert.equal(body.isFirstMessage, false);
 	});
 
-	it('extends expiresAt to now+30d when existing is shorter', async () => {
-		// Existing session expires in 5 days — too short. Must extend to ~now+30d.
-		const soonMs = Date.now() + 5 * 24 * 60 * 60 * 1000;
+	it('returns 409 turn_cap_reached when lastTurnIndex is already 10', async () => {
 		mockDb.get.mock.mockImplementation(async () => ({
 			exists: true,
 			data: () => ({
 				userId: 'user-good-token',
+				participants: ['user-good-token'],
 				status: 'complete',
-				expiresAt: { toMillis: () => soonMs }
+				lastTurnIndex: 10
 			})
 		}));
 
-		const before = Date.now();
 		const res = mockRes();
-		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
-		const after = Date.now();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 409);
+		assert.equal(res._json.error, 'turn_cap_reached');
+		assert.equal(tasksClient.createTask.mock.callCount(), 0);
+	});
+
+	it('boundary: lastTurnIndex=9 still admits one more turn and becomes 10', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				participants: ['user-good-token'],
+				status: 'complete',
+				lastTurnIndex: 9
+			})
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
 
 		assert.equal(res._status, 202);
-		const perTurn = mockDb.update.mock.calls[0].arguments[1];
-		const got = perTurn.expiresAt.getTime();
-		const THIRTY_D = 30 * 24 * 60 * 60 * 1000;
-		// now + 30d — allow a small window for the internal Date.now() inside
-		// the handler relative to the test's `before`/`after` measurements.
-		assert.ok(
-			got >= before + THIRTY_D - 100 && got <= after + THIRTY_D + 100,
-			`expected expiresAt near now+30d; got ${got - before}ms from test start`
+		const { sessionUpdates, turnSets } = partitionWrites('sessions/sess-1');
+		assert.equal(sessionUpdates[0].lastTurnIndex, 10);
+		assert.equal(turnSets[0].path, 'sessions/sess-1/turns/0010');
+
+		const body = decodeTaskBody(tasksClient.createTask.mock.calls[0]);
+		assert.equal(body.turnIdx, 10);
+	});
+
+	it('bumps updatedAt on enqueue via serverTimestamp (not just on terminal)', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				participants: ['user-good-token'],
+				status: 'complete',
+				lastTurnIndex: 1
+			})
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 202);
+		const { sessionUpdates } = partitionWrites('sessions/sess-1');
+		assert.equal(sessionUpdates[0].updatedAt, '__server_timestamp__');
+	});
+
+	it('one-in-flight: returns 409 when existing status=queued', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				status: 'queued',
+				currentRunId: 'prior-run',
+				lastTurnIndex: 1
+			})
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 409);
+		assert.equal(res._json.error, 'previous_turn_in_flight');
+		assert.equal(tasksClient.createTask.mock.callCount(), 0);
+	});
+
+	it('one-in-flight: returns 409 when existing status=running', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				status: 'running',
+				currentRunId: 'prior-run',
+				lastTurnIndex: 1
+			})
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 409);
+		assert.equal(res._json.error, 'previous_turn_in_flight');
+		assert.equal(tasksClient.createTask.mock.callCount(), 0);
+	});
+
+	it('task dedup name uses runId', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		const taskArg = tasksClient.createTask.mock.calls[0].arguments[0];
+		assert.equal(
+			taskArg.task.name,
+			`projects/superextra-site/locations/us-central1/queues/agent-dispatch/tasks/${res._json.runId}`
 		);
 	});
 
@@ -555,11 +717,16 @@ describe('agentStream', () => {
 
 		assert.equal(res._status, 502);
 		assert.equal(res._json.error, 'enqueue_failed');
-		// Post-enqueue recovery: session should be flipped to status=error.
-		assert.equal(mockDb.update.mock.callCount(), 1);
-		const updateArg = mockDb.update.mock.calls[0].arguments[0];
-		assert.equal(updateArg.status, 'error');
-		assert.equal(updateArg.error, 'enqueue_failed');
+
+		// Post-enqueue recovery: the session doc (and only the session doc)
+		// should be flipped to status=error. The txn already ran so its writes
+		// are in the set/update history — we want the extra recovery update.
+		const recoveryUpdates = mockDb.update.mock.calls
+			.filter((c) => c.arguments[0]?._path === 'sessions/sess-1')
+			.map((c) => c.arguments[1]);
+		const flipped = recoveryUpdates.find((u) => u.status === 'error');
+		assert.ok(flipped, 'recovery update with status=error should have run');
+		assert.equal(flipped.error, 'enqueue_failed');
 	});
 });
 
@@ -711,5 +878,150 @@ describe('agentCheck', () => {
 		await agentCheck(authedCheck('sid-1', { query: { runId: 'run-stale' } }), res);
 		assert.equal(res._json.ok, true);
 		assert.equal(res._json.reply, 'Latest reply.');
+	});
+});
+
+// ══════════════════════════════════════════════════════
+// agentDelete
+// ══════════════════════════════════════════════════════
+
+describe('agentDelete', () => {
+	function authedDelete(sid, overrides = {}) {
+		return mockReq({
+			method: 'POST',
+			body: { sid, ...(overrides.body || {}) },
+			headers: { authorization: 'Bearer good-token', ...(overrides.headers || {}) }
+		});
+	}
+
+	it('rejects non-POST with 405', async () => {
+		const res = mockRes();
+		await agentDelete(mockReq({ method: 'GET' }), res);
+		assert.equal(res._status, 405);
+		assert.equal(res._json.ok, false);
+	});
+
+	it('returns 401 when Authorization header is missing', async () => {
+		const res = mockRes();
+		await agentDelete(mockReq({ method: 'POST', body: { sid: 'sess-1' } }), res);
+		assert.equal(res._status, 401);
+		assert.equal(mockDb.recursiveDelete.mock.callCount(), 0);
+	});
+
+	it('returns 401 when token verification fails', async () => {
+		const res = mockRes();
+		await agentDelete(
+			authedDelete('sess-1', { headers: { authorization: 'Bearer bad-token' } }),
+			res
+		);
+		assert.equal(res._status, 401);
+		assert.equal(mockDb.recursiveDelete.mock.callCount(), 0);
+	});
+
+	it('returns 400 when sid is missing or not a string', async () => {
+		const res = mockRes();
+		await agentDelete(
+			mockReq({
+				method: 'POST',
+				body: {},
+				headers: { authorization: 'Bearer good-token' }
+			}),
+			res
+		);
+		assert.equal(res._status, 400);
+
+		const res2 = mockRes();
+		await agentDelete(
+			mockReq({
+				method: 'POST',
+				body: { sid: 42 },
+				headers: { authorization: 'Bearer good-token' }
+			}),
+			res2
+		);
+		assert.equal(res2._status, 400);
+		assert.equal(mockDb.recursiveDelete.mock.callCount(), 0);
+	});
+
+	it('returns 404 session_not_found when session doc does not exist', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+
+		const res = mockRes();
+		await agentDelete(authedDelete('missing'), res);
+
+		assert.equal(res._status, 404);
+		assert.equal(res._json.ok, false);
+		assert.equal(res._json.error, 'session_not_found');
+		assert.equal(mockDb.recursiveDelete.mock.callCount(), 0);
+	});
+
+	it('returns 403 not_creator when caller is a contributor, not the creator', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-creator-token',
+				participants: ['user-creator-token', 'user-good-token']
+			})
+		}));
+
+		const res = mockRes();
+		await agentDelete(authedDelete('sess-1'), res);
+
+		assert.equal(res._status, 403);
+		assert.equal(res._json.ok, false);
+		assert.equal(res._json.error, 'not_creator');
+		assert.equal(mockDb.recursiveDelete.mock.callCount(), 0);
+	});
+
+	it('returns 200 and recursively deletes when caller is the creator', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				participants: ['user-good-token']
+			})
+		}));
+
+		const res = mockRes();
+		await agentDelete(authedDelete('sess-1'), res);
+
+		assert.equal(res._status, 200);
+		assert.equal(res._json.ok, true);
+		assert.equal(mockDb.recursiveDelete.mock.callCount(), 1);
+		const deletedRef = mockDb.recursiveDelete.mock.calls[0].arguments[0];
+		assert.equal(deletedRef._path, 'sessions/sess-1');
+	});
+
+	it('returns 500 delete_failed and logs when recursiveDelete rejects', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				participants: ['user-good-token']
+			})
+		}));
+		mockDb.recursiveDelete.mock.mockImplementationOnce(async () => {
+			throw new Error('firestore outage');
+		});
+
+		const errs = [];
+		const origError = console.error;
+		console.error = (...args) => errs.push(args);
+		try {
+			const res = mockRes();
+			await agentDelete(authedDelete('sess-1'), res);
+
+			assert.equal(res._status, 500);
+			assert.equal(res._json.ok, false);
+			assert.equal(res._json.error, 'delete_failed');
+			assert.equal(mockDb.recursiveDelete.mock.callCount(), 1);
+			// Logged the error along with the sid so operators can trace.
+			assert.ok(
+				errs.some((line) => line.some((v) => typeof v === 'string' && v.includes('sess-1'))),
+				'expected console.error to include the sid'
+			);
+		} finally {
+			console.error = origError;
+		}
 	});
 });
