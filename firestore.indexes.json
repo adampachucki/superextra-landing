@@ -41,6 +41,15 @@
 				{ "fieldPath": "participants", "arrayConfig": "CONTAINS" },
 				{ "fieldPath": "updatedAt", "order": "DESCENDING" }
 			]
+		},
+		{
+			"collectionGroup": "events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{ "fieldPath": "runId", "order": "ASCENDING" },
+				{ "fieldPath": "attempt", "order": "ASCENDING" },
+				{ "fieldPath": "seqInAttempt", "order": "ASCENDING" }
+			]
 		}
 	],
 	"fieldOverrides": [
