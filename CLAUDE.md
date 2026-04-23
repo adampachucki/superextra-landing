@@ -110,6 +110,10 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 - Pipeline: Router → Context Enricher → Research Orchestrator → Specialists (via AgentTool) → Synthesizer
 - Agent code lives in `agent/superextra_agent/`, instructions in `agent/superextra_agent/instructions/`
 - **Read `instructions/AUTHORING.md` before writing or modifying any agent instruction file**
+- **ADK reference:** when writing or debugging ADK code, consult the official live docs — don't rely on training knowledge:
+  - Docs index: `https://adk.dev/llms.txt` (top-level TOC; follow links into specific pages)
+  - Canonical patterns: `https://github.com/google/adk-samples` (sample agents, actively maintained)
+  - Python source: `https://github.com/google/adk-python` (for API signatures and recent changes)
 
 ## Transport architecture
 
