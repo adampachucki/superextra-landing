@@ -4,11 +4,10 @@ import type { Firestore } from 'firebase/firestore';
 
 // Firebase web config is public — all fields are safe in client code
 // (the API key identifies the project, it does NOT authorize access; rules do).
-// We fetch it at runtime from /__/firebase/init.json, which Firebase Hosting
-// auto-generates. In dev we fall back to the production hosting URL — same
-// public config.
-const DEV_CONFIG_URL = 'https://agent.superextra.ai/__/firebase/init.json';
-
+// Always fetched same-origin from `/__/firebase/init.json`, which Firebase
+// Hosting auto-generates in production. In dev, vite proxies that path to
+// `agent.superextra.ai` (see vite.config.ts) — Firebase Hosting doesn't set
+// CORS on the endpoint, so cross-origin fetch isn't an option.
 export interface FirebaseHandle {
 	app: FirebaseApp;
 	auth: Auth;
@@ -17,20 +16,8 @@ export interface FirebaseHandle {
 
 let handlePromise: Promise<FirebaseHandle> | null = null;
 
-function isLocalOrigin(): boolean {
-	if (typeof window === 'undefined') return false;
-	const host = window.location.hostname;
-	return (
-		host === 'localhost' ||
-		host === '127.0.0.1' ||
-		host.startsWith('192.168.') ||
-		host.startsWith('10.') ||
-		host.endsWith('.local')
-	);
-}
-
 async function loadConfig(): Promise<Record<string, string>> {
-	const url = isLocalOrigin() ? DEV_CONFIG_URL : '/__/firebase/init.json';
+	const url = '/__/firebase/init.json';
 	const response = await fetch(url);
 	if (!response.ok) {
 		throw new Error(`Firebase config fetch failed: ${response.status} at ${url}`);

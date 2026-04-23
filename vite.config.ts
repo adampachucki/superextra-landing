@@ -25,6 +25,15 @@ export default defineConfig({
 			ignored: ['agent/**', 'functions/**', 'docs/**', '.firebase/**']
 		},
 		proxy: {
+			// Firebase Hosting auto-generates `/__/firebase/init.json` per site;
+			// Vite doesn't serve it. Firebase Hosting doesn't set CORS on it
+			// either, so we can't fetch it cross-origin from a dev page — proxy
+			// it same-origin instead. Works from localhost, private LAN, the
+			// public VM IP (mobile/remote testing), preview tunnels, etc.
+			'/__/firebase/init.json': {
+				target: 'https://agent.superextra.ai',
+				changeOrigin: true
+			},
 			'/api/intake': 'https://superextra-landing.web.app',
 			'/api/agent/check': {
 				target: 'https://us-central1-superextra-site.cloudfunctions.net',

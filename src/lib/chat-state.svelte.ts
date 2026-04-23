@@ -614,12 +614,31 @@ async function resumeIfInFlight(sessionId: string): Promise<void> {
 		recovering = false;
 	} catch (err) {
 		console.warn('resumeIfInFlight error:', err);
-		if (currentId === sessionId) {
-			await recover().catch(() => {
-				error = 'Could not subscribe to progress. Please try again.';
-				loading = false;
-				recovering = false;
-			});
+		if (currentId !== sessionId) return;
+		// `getDoc` failed — Firestore rules reject reads of a missing doc
+		// (rule references `resource.data.userId`), or Firebase init couldn't
+		// bootstrap at all. Try REST recovery; if it has nothing to poll
+		// (no runId — the runId lives only in memory and is lost on reload)
+		// `recover()` returns false without throwing, so we explicitly clear
+		// the optimistic loading/recovering flags set above. Without this
+		// reset the UI would stay stuck on "Reconnecting to the session…"
+		// indefinitely.
+		let recovered = false;
+		let recoverThrew = false;
+		try {
+			recovered = await recover();
+		} catch {
+			recoverThrew = true;
+		}
+		if (recovered) return;
+		if (currentId === sessionId && (loading || recovering)) {
+			error = recoverThrew
+				? 'Could not subscribe to progress. Please try again.'
+				: 'Session not found. Please start a new conversation.';
+			loading = false;
+			recovering = false;
+			liveTimeline = [];
+			currentTurnStartedAtMs = null;
 		}
 	}
 }
