@@ -958,3 +958,74 @@ Contributor2's sidebar did NOT pick up the new chat via the live listener — on
 Just this log file. No code changes.
 
 **Completed:** 2026-04-23 18:38 — Verification: PASS. The headline product feature (shared-URL chats continuable by anyone with the URL) works end-to-end in production, and the single most failure-prone code path (ADK user_id swap for contributor follow-ups) is empirically verified.
+
+---
+
+## Stage 12 — Production bug hotfix: missing events listener index
+
+**Started:** 2026-04-23 18:55
+**Agent:** Main session (triggered by user screenshot showing stuck "Starting research…" UI)
+
+### The bug
+
+User reported stuck UI on session `98bf0c88-a5de-4970-a270-0fa491c3d7a5`:
+timer counting up (1m 34s) but live activity stuck on "Starting research…"
+for the whole run. Backend was healthy — 7 events written, heartbeat fresh,
+turn eventually completed with a full answer.
+
+### Root cause
+
+The events listener's query
+
+```
+collection(db, 'sessions', sid, 'events')
+  .where('runId','==', runId)
+  .orderBy('attempt').orderBy('seqInAttempt')
+```
+
+requires a composite index on `sessions/{sid}/events (runId asc, attempt asc, seqInAttempt asc)` (COLLECTION scope, not COLLECTION_GROUP). Plan §5 declared it in the index requirements table, but Stage 1's `firestore.indexes.json` edit only added the sidebar composite and missed this one. Production Firestore returned `FAILED_PRECONDITION: The query requires an index`. The client's try/catch in `attachEventsListener` absorbed the error → empty `liveTimeline` → UI stuck on the initial "Starting research…" fallback text.
+
+Turns still completed because the TURN doc is the terminal source, not the events listener. Users saw stuck live timeline → eventual answer. The bug was "live activity feed is silently empty," not "chats broken."
+
+### Why testing missed it
+
+- Rules emulator tests (Stage 1): rules only, no composite index coverage.
+- Vitest frontend tests (Stages 5–6): mock onSnapshot at the JS-module boundary. Real Firestore query-planning never runs.
+- Stage 10 production smoke: the initial owner-flow chat's live timeline rendered correctly — but that was served by cache from my earlier dev-server sessions where Vite may have delivered events via a slightly different path, or the index simply built within the first minute of real traffic on a small collection. Either way, "timeline visible during Stage 10 smoke" was a false-positive.
+- Stage 11 E2E: the contributor-continue test ran AFTER the creator's first turn completed — the events listener only attached briefly during turn 2 (which finished in 3s), below the latency for the missing-index symptom to matter.
+
+### The fix
+
+Two steps:
+
+1. **Live hotfix via gcloud** (fastest to unstick users):
+
+   ```
+   gcloud firestore indexes composite create \
+     --collection-group=events --query-scope=COLLECTION \
+     --field-config=field-path=runId,order=ascending \
+     --field-config=field-path=attempt,order=ascending \
+     --field-config=field-path=seqInAttempt,order=ascending \
+     --project=superextra-site --async
+   ```
+
+   CREATING → READY in ~4 minutes.
+
+2. **Codify in version control** — added the index to `firestore.indexes.json` in commit `63dceb9`. Push to main fired GitHub Actions; `firebase deploy --only firestore:indexes` noops since the live index already exists.
+
+### Verification
+
+Reloaded the stuck session URL in a fresh isolated browser context. Events listener now delivers; turn doc's terminal content renders fully. No `FAILED_PRECONDITION` in console.
+
+### Handoff / what I learned
+
+- Plan §5 index requirements should be deploy-verified by STATIC check, not just by "listener attaches and Stage 1 tests pass." Next time: after `firestore.indexes.json` is edited, diff against plan §5's table explicitly.
+- The try/catch in `attachEventsListener` hides index errors. That's per the "no weird-case creep" rule (don't add defensive reconnect logic), but it means index regressions can only be caught by observing the UX, not by log spam. Consider letting the error bubble to console.error (not warn) so ops alerting can catch it, while keeping the UI resilient.
+- The events listener bug was latent: product still "worked" (answers landed), just with a degraded live-progress view. A subtler failure mode than "nothing works." Ops should watch for spikes in Firestore `FAILED_PRECONDITION` if we want earlier signal on this class of bug.
+
+### Files changed
+
+- `firestore.indexes.json` — added the events composite. `1ea5a6b` missed it; `63dceb9` fixed it.
+- This log.
+
+**Completed:** 2026-04-23 19:03 — Verification: PASS (live timeline renders on reloaded production session).
