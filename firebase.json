@@ -78,10 +78,6 @@
 			],
 			"rewrites": [
 				{
-					"source": "/api/agent/check",
-					"function": "agentCheck"
-				},
-				{
 					"source": "/api/agent/stream",
 					"function": "agentStream"
 				},

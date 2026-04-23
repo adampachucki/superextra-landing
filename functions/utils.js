@@ -24,15 +24,6 @@ export function validatePlaceContext(pc) {
 	};
 }
 
-/**
- * Validate history array from request body.
- * Returns a trimmed array or empty array if invalid.
- */
-export function validateHistory(h) {
-	if (!Array.isArray(h)) return [];
-	return h.slice(0, 50);
-}
-
 // --- HTML helpers (email templates) ---
 
 export function esc(s) {

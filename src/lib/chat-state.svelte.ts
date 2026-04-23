@@ -22,8 +22,15 @@
  */
 
 import type { Unsubscribe } from 'firebase/firestore';
-import type { ChatSource, TimelineEvent, TurnCounts, TurnSummary } from '$lib/firestore-stream';
+import type { ChatSource, TimelineEvent, TurnCounts, TurnSummary } from '$lib/chat-types';
 import { ensureAnonAuth, getFirebase, getIdToken } from '$lib/firebase';
+
+/** True iff `err` is `FirebaseUnavailableInSSRError` from `$lib/firebase`.
+ *  Checked by name rather than `instanceof` so test-time module mocks that
+ *  omit the class still compile. */
+function isSSRBootstrapSkip(err: unknown): boolean {
+	return err instanceof Error && err.name === 'FirebaseUnavailableInSSRError';
+}
 
 /** crypto.randomUUID() is only available in secure contexts (HTTPS / localhost).
  *  Fall back to crypto.getRandomValues() which works everywhere. */
@@ -240,7 +247,11 @@ async function attachSidebarListener() {
 			}
 		);
 	} catch (err) {
-		console.warn('[chat-state] sidebar listener bootstrap failed:', err);
+		// In SSR/prerender, Firebase can't bootstrap — swallow silently.
+		// Any real runtime error on the client still logs.
+		if (!isSSRBootstrapSkip(err)) {
+			console.warn('[chat-state] sidebar listener bootstrap failed:', err);
+		}
 		sidebarAttachStarted = false;
 	}
 }
@@ -538,7 +549,6 @@ async function startNewChat(query: string, place: PlaceContext | null): Promise<
 		sessionId: sid,
 		message: trimmed,
 		placeContext: place,
-		history: [],
 		isFirstMessage: true
 	});
 	selectSession(sid);
@@ -555,7 +565,6 @@ async function sendFollowUp(message: string): Promise<void> {
 		sessionId: sid,
 		message: trimmed,
 		placeContext: placeContextState,
-		history: [],
 		isFirstMessage: false
 	});
 }

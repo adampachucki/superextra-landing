@@ -6,8 +6,7 @@ import {
 	confirmationHtml,
 	stripMarkdown,
 	checkRateLimit,
-	validatePlaceContext,
-	validateHistory
+	validatePlaceContext
 } from './utils.js';
 
 // --- esc ---
@@ -150,7 +149,7 @@ describe('checkRateLimit', () => {
 	});
 });
 
-// --- validatePlaceContext / validateHistory ---
+// --- validatePlaceContext ---
 
 describe('validatePlaceContext', () => {
 	it('sanitizes valid input and rejects invalid input', () => {
@@ -179,16 +178,6 @@ describe('validatePlaceContext', () => {
 			{ name: 123 }
 		]) {
 			assert.equal(validatePlaceContext(bad), null, `expected null for ${JSON.stringify(bad)}`);
-		}
-	});
-});
-
-describe('validateHistory', () => {
-	it('passes arrays through (capped at 50) and rejects non-arrays', () => {
-		assert.deepEqual(validateHistory([1, 2]), [1, 2]);
-		assert.equal(validateHistory(Array.from({ length: 60 })).length, 50);
-		for (const bad of [null, 'str', {}, undefined]) {
-			assert.deepEqual(validateHistory(bad), []);
 		}
 	});
 });

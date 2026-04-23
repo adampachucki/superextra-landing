@@ -758,7 +758,7 @@ describe('chatState (Firestore-driven)', () => {
 			expect(body.sessionId).toBe(sid);
 			expect(body.message).toBe('hello');
 			expect(body.placeContext).toMatchObject({ placeId: 'p1' });
-			expect(body.history).toEqual([]);
+			expect(body.history).toBeUndefined();
 			expect(init.headers).toMatchObject({
 				Authorization: 'Bearer mock-id-token'
 			});
