@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { pickPills, type TopicPillItem } from '$lib/topic-pills-shuffle';
 
 	let {
@@ -167,13 +166,32 @@
 	];
 
 	const VISIBLE_COUNT = 6;
+	const STAGGER = 50;
+
+	function byLabel(label: string): TopicPillItem {
+		const p = PILL_POOL.find((x) => x.label === label);
+		if (!p) throw new Error(`TopicPills: no pill with label "${label}"`);
+		return p;
+	}
+
+	// Deterministic, wrap-balanced initial set. Order follows the short/long
+	// interleave that pickPills applies on reshuffle (shortest, longest,
+	// 2nd-shortest, 2nd-longest, mid-short, mid-long) so flex-wrap rows stay
+	// balanced.
+	const INITIAL_TOPICS: TopicPillItem[] = [
+		'Who opened nearby',
+		"Who's getting the traffic",
+		'Emerging food trends',
+		'Local market performance',
+		'What guests are saying',
+		'Lunch price positioning'
+	].map(byLabel);
 
 	let pillGen = $state(0);
-	let topics = $state<TopicPillItem[]>([]);
+	let topics = $state<TopicPillItem[]>(INITIAL_TOPICS);
 
-	onMount(() => {
-		topics = pickPills(PILL_POOL, VISIBLE_COUNT, isMobile);
-	});
+	const firstDelay = $derived(pillGen === 0 ? 350 : 150);
+	const buttonDelay = $derived(firstDelay + (VISIBLE_COUNT + 1) * STAGGER);
 
 	function reshuffle() {
 		pillGen++;
@@ -181,10 +199,19 @@
 	}
 </script>
 
-{#if pillGen === 0}
-	<div class="mx-auto mt-12 flex flex-wrap justify-center gap-2 md:mt-12" style="max-width: 750px;">
+{#key pillGen}
+	<!--
+		max-width: 680px is load-bearing. Below ~673 the reshuffle button drops to
+		its own row; above ~682 row 1 can fit 4 pills (the original 4+2 bug).
+		Calibrated to current PILL_POOL label widths at 13px font — re-measure if
+		pool, font size, or pill padding changes.
+	-->
+	<div class="mx-auto mt-12 flex flex-wrap justify-center gap-2 md:mt-12" style="max-width: 680px;">
 		{#each topics as topic, i (topic.label)}
-			<div class="hero-fade" style="animation-delay: {350 + i * 50}ms">
+			<div
+				class={pillGen === 0 ? 'pill-fade-slide' : 'pill-fade'}
+				style="animation-delay: {firstDelay + i * STAGGER}ms"
+			>
 				<button
 					onclick={() => onPick(topic.query)}
 					class="topic-pill inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] whitespace-nowrap text-black/55 transition-all duration-200 hover:border-black/[0.30] hover:text-black/75 active:border-black/[0.30] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75 dark:active:border-white/[0.30] dark:active:text-white/75"
@@ -195,7 +222,10 @@
 				</button>
 			</div>
 		{/each}
-		<div class="hero-fade" style="animation-delay: {350 + VISIBLE_COUNT * 50 + 50}ms">
+		<div
+			class={pillGen === 0 ? 'pill-fade-slide' : 'pill-fade'}
+			style="animation-delay: {buttonDelay}ms"
+		>
 			<button
 				onclick={reshuffle}
 				aria-label="Show different suggestions"
@@ -217,55 +247,18 @@
 			</button>
 		</div>
 	</div>
-{:else}
-	{#key pillGen}
-		<div
-			class="mx-auto mt-12 flex flex-wrap justify-center gap-2 md:mt-12"
-			style="max-width: 750px;"
-		>
-			{#each topics as topic, i (topic.label)}
-				<div class="topic-pill-shuffle" style="animation-delay: {150 + i * 100}ms">
-					<button
-						onclick={() => onPick(topic.query)}
-						class="topic-pill inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] whitespace-nowrap text-black/55 transition-all duration-200 hover:border-black/[0.30] hover:text-black/75 active:border-black/[0.30] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75 dark:active:border-white/[0.30] dark:active:text-white/75"
-					>
-						<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"
-						></span>
-						{isMobile ? topic.mobile : topic.label}
-					</button>
-				</div>
-			{/each}
-			<div class="topic-pill-shuffle" style="animation-delay: {150 + VISIBLE_COUNT * 100}ms">
-				<button
-					onclick={reshuffle}
-					aria-label="Show different suggestions"
-					class="shuffle-btn group inline-flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full border border-black/[0.12] dark:border-white/[0.12]"
-				>
-					<svg
-						class="h-3.5 w-3.5 text-black opacity-30 transition-opacity duration-200 group-hover:opacity-55 dark:text-white"
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="square"
-						stroke-linejoin="miter"
-					>
-						<polyline points="23 4 23 10 17 10" />
-						<path d="M21.17 8A9 9 0 0012 3 9 9 0 003 12a9 9 0 0016.5 5" />
-					</svg>
-				</button>
-			</div>
-		</div>
-	{/key}
-{/if}
+{/key}
 
 <style>
-	.hero-fade {
-		animation: fadeIn 0.7s ease-out both;
+	.pill-fade-slide {
+		animation: fadeInSlide 0.7s ease-out both;
 	}
 
-	@keyframes fadeIn {
+	.pill-fade {
+		animation: fadeIn 0.6s ease-out both;
+	}
+
+	@keyframes fadeInSlide {
 		from {
 			opacity: 0;
 			transform: translateY(8px);
@@ -276,11 +269,7 @@
 		}
 	}
 
-	.topic-pill-shuffle {
-		animation: pillShuffle 0.6s ease-out both;
-	}
-
-	@keyframes pillShuffle {
+	@keyframes fadeIn {
 		from {
 			opacity: 0;
 		}
