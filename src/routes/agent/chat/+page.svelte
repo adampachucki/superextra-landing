@@ -162,10 +162,10 @@
 			mounted = true;
 		});
 
-		// Auto-recover if last message was from user (interrupted fetch)
+		// Reattach mid-flight runs after URL/localStorage restoration.
 		const msgs = chatState.messages;
 		if (chatState.activeId && msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
-			chatState.recover();
+			void chatState.resumeCurrentIfNeeded();
 		}
 
 		// Recover from Safari (and other browsers) killing SSE connections when backgrounded

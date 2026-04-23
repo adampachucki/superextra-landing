@@ -515,7 +515,8 @@ export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (r
 				status: 'complete',
 				reply,
 				sources: data.sources && data.sources.length ? data.sources : undefined,
-				title: data.title || undefined
+				title: data.title || undefined,
+				turnSummary: data.turnSummary || undefined
 			});
 			return;
 		}

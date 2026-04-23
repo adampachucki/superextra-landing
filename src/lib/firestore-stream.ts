@@ -36,28 +36,64 @@ export interface ChatSource {
 	domain?: string;
 }
 
-export interface ActivityEvent {
-	id: string;
-	category: 'data' | 'search' | 'read' | 'analyze';
-	status: 'pending' | 'running' | 'complete' | 'all-complete';
-	label: string;
-	detail?: string;
-	url?: string;
-	agent?: string;
-	specialists?: string[];
-	sources?: ChatSource[];
+export interface TurnCounts {
+	webQueries: number;
+	sources: number;
+	venues: number;
+	platforms: number;
 }
 
+export interface TurnSummary {
+	startedAtMs: number;
+	finishedAtMs: number;
+	elapsedMs: number;
+	notes: Array<{
+		text: string;
+		noteSource: 'deterministic' | 'llm';
+		counts: TurnCounts;
+	}>;
+	finalCounts: TurnCounts;
+}
+
+export type TimelineEvent =
+	| {
+			kind: 'note';
+			id: string;
+			text: string;
+			noteSource: 'deterministic' | 'llm';
+			counts: TurnCounts;
+			ts?: number;
+	  }
+	| {
+			kind: 'detail';
+			id: string;
+			group: 'search' | 'platform' | 'source' | 'warning';
+			family:
+				| 'Searching the web'
+				| 'Google Maps'
+				| 'TripAdvisor'
+				| 'Google reviews'
+				| 'Public sources'
+				| 'Warnings';
+			text: string;
+			ts?: number;
+	  }
+	| {
+			kind: 'drafting';
+			id: string;
+			text: 'Drafting the answer…';
+			ts?: number;
+	  };
+
 export interface StreamCallbacks {
-	onProgress: (
-		stage: string,
-		status: string,
-		label: string,
-		previews?: Array<{ name: string; preview: string }>
+	onTimelineEvent?: (event: TimelineEvent) => void;
+	onComplete: (
+		reply: string,
+		sources: ChatSource[],
+		title?: string,
+		turnSummary?: TurnSummary
 	) => void;
-	onComplete: (reply: string, sources: ChatSource[], title?: string) => void;
 	onError: (error: string) => void;
-	onActivity?: (activity: ActivityEvent) => void;
 	/** Emitted when the session doc's `currentAttempt` increases mid-run.
 	 *  Caller should clear streaming UI + render a brief "Retrying…" cue. */
 	onAttemptChange?: (attempt: number) => void;
@@ -177,7 +213,8 @@ export async function subscribeToSession(
 				callbacks.onComplete(
 					reply,
 					(data.sources as ChatSource[] | undefined) ?? [],
-					(data.title as string | undefined) ?? undefined
+					(data.title as string | undefined) ?? undefined,
+					(data.turnSummary as TurnSummary | undefined) ?? undefined
 				);
 			} else if (status === 'error') {
 				if (fromCache) return;
@@ -207,16 +244,8 @@ export async function subscribeToSession(
 
 				const payload = (doc.data ?? {}) as Record<string, unknown>;
 				switch (doc.type) {
-					case 'progress':
-						callbacks.onProgress(
-							(payload.stage as string) || '',
-							(payload.status as string) || '',
-							(payload.label as string) || '',
-							payload.previews as Array<{ name: string; preview: string }> | undefined
-						);
-						break;
-					case 'activity':
-						callbacks.onActivity?.(payload as unknown as ActivityEvent);
+					case 'timeline':
+						callbacks.onTimelineEvent?.(payload as TimelineEvent);
 						break;
 					// `type='complete'` / `type='error'` are deliberately ignored —
 					// event writes are unfenced so a stale worker could leak one

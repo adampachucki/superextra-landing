@@ -88,8 +88,7 @@ function eventsSnap(
 }
 
 function buildCallbacks(): StreamCallbacks & {
-	progress: Array<unknown[]>;
-	activities: Array<unknown>;
+	timeline: Array<unknown>;
 	completes: Array<unknown[]>;
 	errors: string[];
 	attempts: number[];
@@ -97,8 +96,7 @@ function buildCallbacks(): StreamCallbacks & {
 	firstSnapshotTimeout: number;
 } {
 	const spy = {
-		progress: [] as Array<unknown[]>,
-		activities: [] as Array<unknown>,
+		timeline: [] as Array<unknown>,
 		completes: [] as Array<unknown[]>,
 		errors: [] as string[],
 		attempts: [] as number[],
@@ -106,8 +104,7 @@ function buildCallbacks(): StreamCallbacks & {
 		firstSnapshotTimeout: 0
 	};
 	return Object.assign(spy, {
-		onProgress: (...args: unknown[]) => spy.progress.push(args),
-		onActivity: (a: unknown) => spy.activities.push(a),
+		onTimelineEvent: (event: unknown) => spy.timeline.push(event),
 		onComplete: (...args: unknown[]) => spy.completes.push(args),
 		onError: (e: string) => spy.errors.push(e),
 		onAttemptChange: (n: number) => spy.attempts.push(n),
@@ -149,7 +146,7 @@ describe('subscribeToSession', () => {
 			})
 		);
 		expect(cbs.completes).toEqual([
-			['final answer', [{ url: 'https://s.example', title: 's' }], 'My Chat']
+			['final answer', [{ url: 'https://s.example', title: 's' }], 'My Chat', undefined]
 		]);
 	});
 
@@ -304,7 +301,7 @@ describe('subscribeToSession', () => {
 		expect(cbs.attempts).toEqual([2]);
 	});
 
-	it('events snapshot dispatches progress + activity by type', async () => {
+	it('events snapshot dispatches timeline rows by type', async () => {
 		const obs = captureObservers();
 		const cbs = buildCallbacks();
 		await subscribeToSession('sid-1', 'run-1', cbs);
@@ -314,21 +311,33 @@ describe('subscribeToSession', () => {
 				eventChange('added', {
 					attempt: 1,
 					seqInAttempt: 1,
-					type: 'progress',
-					data: { stage: 'context', status: 'complete', label: 'Place data gathered' }
+					type: 'timeline',
+					data: {
+						kind: 'note',
+						id: 'n1',
+						text: 'Checking the venue',
+						noteSource: 'deterministic',
+						counts: { webQueries: 0, sources: 0, venues: 1, platforms: 1 }
+					}
 				}),
 				eventChange('added', {
 					attempt: 1,
 					seqInAttempt: 2,
-					type: 'activity',
-					data: { id: 'data-primary', category: 'data', status: 'running', label: 'Loading' }
+					type: 'timeline',
+					data: {
+						kind: 'detail',
+						id: 'd1',
+						group: 'platform',
+						family: 'Google Maps',
+						text: 'Profile for Umami'
+					}
 				})
 			])
 		);
 
-		expect(cbs.progress).toEqual([['context', 'complete', 'Place data gathered', undefined]]);
-		expect(cbs.activities).toHaveLength(1);
-		expect(cbs.activities[0]).toMatchObject({ id: 'data-primary', status: 'running' });
+		expect(cbs.timeline).toHaveLength(2);
+		expect(cbs.timeline[0]).toMatchObject({ kind: 'note', id: 'n1' });
+		expect(cbs.timeline[1]).toMatchObject({ kind: 'detail', id: 'd1', family: 'Google Maps' });
 	});
 
 	it('events-stream type=complete does NOT fire onComplete (session doc is sole terminal)', async () => {
@@ -391,12 +400,12 @@ describe('subscribeToSession', () => {
 				eventChange('added', {
 					attempt: 1,
 					seqInAttempt: 1,
-					type: 'activity',
-					data: { id: 'a1', category: 'data', status: 'running', label: 'L' }
+					type: 'timeline',
+					data: { kind: 'detail', id: 'a1', group: 'platform', family: 'Google Maps', text: 'L' }
 				})
 			])
 		);
-		expect(cbs.activities).toHaveLength(1);
+		expect(cbs.timeline).toHaveLength(1);
 
 		// Second snapshot replays the same doc — skip.
 		obs.events.onNext(
@@ -404,12 +413,12 @@ describe('subscribeToSession', () => {
 				eventChange('added', {
 					attempt: 1,
 					seqInAttempt: 1,
-					type: 'activity',
-					data: { id: 'a1', category: 'data', status: 'running', label: 'L' }
+					type: 'timeline',
+					data: { kind: 'detail', id: 'a1', group: 'platform', family: 'Google Maps', text: 'L' }
 				})
 			])
 		);
-		expect(cbs.activities).toHaveLength(1);
+		expect(cbs.timeline).toHaveLength(1);
 	});
 
 	it('PERMISSION_DENIED on either observer fires onPermissionDenied exactly once', async () => {

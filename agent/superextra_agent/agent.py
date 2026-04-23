@@ -171,6 +171,12 @@ def _classify_synth_response(llm_response) -> str:
     return "ok"
 
 
+def _mark_drafting(*, callback_context):
+    """Emit a durable lifecycle marker before synthesis starts."""
+    callback_context.state["_drafting_started"] = True
+    return None
+
+
 def _make_synthesizer(name="synthesizer"):
     """Create a synthesizer instance. Text-only — charts are emitted as
     ```chart <JSON>``` fenced blocks and rendered by the frontend.
@@ -189,6 +195,7 @@ def _make_synthesizer(name="synthesizer"):
         output_key="final_report",
         include_contents="none",
         generate_content_config=THINKING_CONFIG,
+        before_agent_callback=_mark_drafting,
         after_model_callback=_synth_fallback_callback,
     )
 

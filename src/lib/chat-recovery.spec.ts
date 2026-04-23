@@ -3,13 +3,14 @@ import { recoverStream, type RecoveryContext } from './chat-recovery';
 
 function makeCtx(overrides: Partial<RecoveryContext> = {}): {
 	ctx: RecoveryContext;
-	calls: { reply: Array<[string, unknown]>; error: string[] };
+	calls: { reply: Array<[string, unknown, unknown, unknown]>; error: string[] };
 } {
-	const calls = { reply: [] as Array<[string, unknown]>, error: [] as string[] };
+	const calls = { reply: [] as Array<[string, unknown, unknown, unknown]>, error: [] as string[] };
 	const ctx: RecoveryContext = {
 		getSession: () => ({ sessionId: 'sid-1', runId: 'run-1' }),
 		isCurrentSession: () => true,
-		onReply: (reply, sources) => calls.reply.push([reply, sources]),
+		onReply: (reply, sources, title, turnSummary) =>
+			calls.reply.push([reply, sources, title, turnSummary]),
 		onError: (msg) => calls.error.push(msg),
 		checkUrl: (sid, runId) => `https://example.test/check?sid=${sid}&runId=${runId}`,
 		...overrides
@@ -37,7 +38,7 @@ describe('recoverStream', () => {
 		const { ctx, calls } = makeCtx();
 		const result = await recoverStream(ctx);
 		expect(result).toBe(true);
-		expect(calls.reply).toEqual([['Hello', [{ url: 'u', title: 't' }]]]);
+		expect(calls.reply).toEqual([['Hello', [{ url: 'u', title: 't' }], undefined, undefined]]);
 	});
 
 	it('forwards the server-generated title to onReply when agentCheck returns one', async () => {
@@ -46,13 +47,14 @@ describe('recoverStream', () => {
 		// conversation title gets synced after REST fallback, not just after
 		// the Firestore observer path.
 		const calls = {
-			reply: [] as Array<[string, unknown, unknown]>,
+			reply: [] as Array<[string, unknown, unknown, unknown]>,
 			error: [] as string[]
 		};
 		const ctx: RecoveryContext = {
 			getSession: () => ({ sessionId: 'sid-1', runId: 'run-1' }),
 			isCurrentSession: () => true,
-			onReply: (reply, sources, title) => calls.reply.push([reply, sources, title]),
+			onReply: (reply, sources, title, turnSummary) =>
+				calls.reply.push([reply, sources, title, turnSummary]),
 			onError: (msg) => calls.error.push(msg),
 			checkUrl: (sid, runId) => `https://example.test/check?sid=${sid}&runId=${runId}`
 		};
@@ -70,19 +72,20 @@ describe('recoverStream', () => {
 		const result = await recoverStream(ctx);
 		expect(result).toBe(true);
 		expect(calls.reply).toEqual([
-			['Hello', [{ url: 'u', title: 't' }], 'Weeknight pasta menu review']
+			['Hello', [{ url: 'u', title: 't' }], 'Weeknight pasta menu review', undefined]
 		]);
 	});
 
 	it('passes undefined title when agentCheck omits it', async () => {
 		const calls = {
-			reply: [] as Array<[string, unknown, unknown]>,
+			reply: [] as Array<[string, unknown, unknown, unknown]>,
 			error: [] as string[]
 		};
 		const ctx: RecoveryContext = {
 			getSession: () => ({ sessionId: 'sid-1', runId: 'run-1' }),
 			isCurrentSession: () => true,
-			onReply: (reply, sources, title) => calls.reply.push([reply, sources, title]),
+			onReply: (reply, sources, title, turnSummary) =>
+				calls.reply.push([reply, sources, title, turnSummary]),
 			onError: (msg) => calls.error.push(msg),
 			checkUrl: (sid, runId) => `https://example.test/check?sid=${sid}&runId=${runId}`
 		};
@@ -95,6 +98,7 @@ describe('recoverStream', () => {
 		);
 		await recoverStream(ctx);
 		expect(calls.reply[0][2]).toBeUndefined();
+		expect(calls.reply[0][3]).toBeUndefined();
 	});
 
 	it('treats session_not_found as terminal failure', async () => {
@@ -142,7 +146,7 @@ describe('recoverStream', () => {
 		const result = await p;
 		expect(result).toBe(true);
 		expect(call).toBeGreaterThanOrEqual(3);
-		expect(calls.reply).toEqual([['Done', undefined]]);
+		expect(calls.reply).toEqual([['Done', undefined, undefined, undefined]]);
 	});
 
 	it('returns false without calling onReply/onError when session changes', async () => {

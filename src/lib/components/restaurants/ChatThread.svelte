@@ -3,18 +3,34 @@
 	import { chatState } from '$lib/chat-state.svelte';
 	import { tts } from '$lib/tts.svelte';
 	import { splitChartSegments } from '$lib/chart-blocks';
+	import { createTypewriter } from '$lib/typewriter';
+	import type { TurnCounts } from '$lib/firestore-stream';
 	import ChartBlock from './ChartBlock.svelte';
 	import StreamingProgress from './StreamingProgress.svelte';
 
 	marked.setOptions({ breaks: true, gfm: true });
 
 	let scrollEl: HTMLDivElement | undefined = $state();
+	let typedReply = $state('');
+	let activeTypedTimestamp: number | null = null;
+	let now = $state(Date.now());
+
+	const replyTyper = createTypewriter({
+		onUpdate: (value) => {
+			typedReply = value;
+		},
+		onDone: () => {
+			if (chatState.typingMessageTimestamp === activeTypedTimestamp) {
+				chatState.typingMessageTimestamp = null;
+			}
+		},
+		charsPerFrame: 4
+	});
 
 	$effect(() => {
 		chatState.messages.length;
 		chatState.loading;
-		chatState.streamingProgress;
-		chatState.streamingActivities;
+		chatState.liveTimeline.length;
 		if (scrollEl) {
 			requestAnimationFrame(() => {
 				window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
@@ -22,34 +38,65 @@
 		}
 	});
 
+	$effect(() => {
+		now = Date.now();
+		const timer = setInterval(() => {
+			now = Date.now();
+		}, 1000);
+		return () => clearInterval(timer);
+	});
+
+	$effect(() => {
+		const ts = chatState.typingMessageTimestamp;
+		if (!ts) {
+			activeTypedTimestamp = null;
+			typedReply = '';
+			replyTyper.stop();
+			return;
+		}
+		if (activeTypedTimestamp === ts) return;
+		const message = [...chatState.messages].reverse().find((msg) => msg.timestamp === ts);
+		if (!message) return;
+		activeTypedTimestamp = ts;
+		typedReply = '';
+		replyTyper.reset();
+		replyTyper.setTarget(message.text);
+		return () => {
+			replyTyper.stop();
+		};
+	});
+
 	function renderMarkdown(text: string): string {
 		return marked.parse(text) as string;
 	}
 
-	let hasStreamingContent = $derived(
-		chatState.streamingProgress.length > 0 || chatState.streamingActivities.length > 0
-	);
-
-	// Elapsed timer — ticks while any step is "running"
-	let elapsedMs = $state(0);
-	let elapsedInterval: ReturnType<typeof setInterval> | null = null;
-
-	$effect(() => {
-		const hasRunning = chatState.streamingProgress.some((s) => s.status === 'running');
-		if (hasRunning && !elapsedInterval) {
-			elapsedMs = 0;
-			elapsedInterval = setInterval(() => {
-				elapsedMs += 1000;
-			}, 1000);
-		} else if (!hasRunning && elapsedInterval) {
-			clearInterval(elapsedInterval);
-			elapsedInterval = null;
+	function displayText(text: string, timestamp: number): string {
+		if (chatState.typingMessageTimestamp === timestamp && activeTypedTimestamp === timestamp) {
+			return typedReply;
 		}
-		return () => {
-			if (elapsedInterval) clearInterval(elapsedInterval);
-			elapsedInterval = null;
-		};
-	});
+		return text;
+	}
+
+	function formatDuration(ms: number): string {
+		const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+		const minutes = Math.floor(totalSeconds / 60);
+		const seconds = totalSeconds % 60;
+		if (minutes > 0) return `${minutes}m ${seconds}s`;
+		return `${seconds}s`;
+	}
+
+	function formatCounts(counts: TurnCounts): string {
+		const parts: string[] = [];
+		if (counts.webQueries > 0)
+			parts.push(`Searched ${counts.webQueries} quer${counts.webQueries === 1 ? 'y' : 'ies'}`);
+		if (counts.sources > 0)
+			parts.push(`Opened ${counts.sources} source${counts.sources === 1 ? '' : 's'}`);
+		if (counts.venues > 0)
+			parts.push(`Checked ${counts.venues} venue${counts.venues === 1 ? '' : 's'}`);
+		if (counts.platforms > 0)
+			parts.push(`Reviewed ${counts.platforms} platform${counts.platforms === 1 ? '' : 's'}`);
+		return parts.join(', ') || 'Worked';
+	}
 
 	const SOURCES_LIMIT = 19;
 	let expandedSources: Record<number, boolean> = $state({});
@@ -65,13 +112,6 @@
 <div bind:this={scrollEl} class="px-5 py-6 md:px-6">
 	<div class="mx-auto flex max-w-[700px] flex-col gap-5">
 		{#each chatState.messages as msg, i}
-			{#if i === chatState.messages.length - 1 && msg.role === 'agent' && chatState.streamingActivities.length > 0 && !chatState.loading}
-				<div class="msg-appear flex justify-start">
-					<div class="max-w-[95%] px-1 py-1">
-						<StreamingProgress activities={chatState.streamingActivities} />
-					</div>
-				</div>
-			{/if}
 			<div class="msg-appear flex {msg.role === 'user' ? 'justify-end' : 'justify-start'}">
 				{#if msg.role === 'user'}
 					<div
@@ -84,7 +124,7 @@
 						<div
 							class="prose max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
 						>
-							{#each splitChartSegments(msg.text) as seg, segIdx (segIdx)}
+							{#each splitChartSegments(displayText(msg.text, msg.timestamp)) as seg, segIdx (segIdx)}
 								{#if seg.kind === 'chart'}
 									<ChartBlock spec={seg.spec} />
 								{:else}
@@ -143,6 +183,30 @@
 								{/if}
 							</button>
 						</div>
+
+						{#if msg.turnSummary}
+							{@const summary = msg.turnSummary}
+							<details
+								class="mt-4 rounded-2xl border border-black/6 px-4 py-3 dark:border-white/10"
+							>
+								<summary class="cursor-pointer text-[13px] text-black/55 dark:text-white/55">
+									Worked for {formatDuration(summary.elapsedMs)}
+								</summary>
+								<div class="mt-4 flex flex-col gap-4">
+									{#each summary.notes as note, noteIdx (noteIdx)}
+										<div class="flex flex-col gap-1">
+											<div class="text-[14px] leading-relaxed text-black/82 dark:text-white/82">
+												{note.text}
+											</div>
+											<div class="text-[12px] text-black/38 dark:text-white/38">
+												{formatCounts(note.counts)}
+											</div>
+										</div>
+									{/each}
+								</div>
+							</details>
+						{/if}
+
 						{#if msg.sources?.length}
 							{@const showAll = expandedSources[i]}
 							{@const visible = showAll ? msg.sources : msg.sources.slice(0, SOURCES_LIMIT)}
@@ -201,49 +265,26 @@
 			</div>
 		{/each}
 
-		{#if chatState.streamingActivities.length > 0 && chatState.loading}
+		{#if chatState.loading && chatState.liveTimeline.length > 0}
 			<div class="msg-appear flex justify-start">
 				<div class="max-w-[95%] px-1 py-1">
 					<StreamingProgress
-						activities={chatState.streamingActivities}
-						loading={chatState.loading}
+						events={chatState.liveTimeline}
+						startedAtMs={chatState.currentTurnStartedAtMs}
 					/>
 				</div>
 			</div>
-		{/if}
-
-		{#if chatState.loading && !chatState.recovering}
+		{:else if chatState.loading && !chatState.recovering}
 			<div class="msg-appear flex justify-start">
 				<div class="max-w-[95%] px-1 py-1">
-					{#if hasStreamingContent && chatState.streamingActivities.length === 0}
-						<div class="flex flex-col gap-1.5">
-							{#each chatState.streamingProgress as step}
-								<div class="flex items-center gap-2 text-[13px]">
-									{#if step.status === 'complete'}
-										<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
-										<span class="text-black/40 dark:text-white/40">{step.label}</span>
-									{:else}
-										<span class="stage-pulse h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"></span>
-										<span class="text-black/60 dark:text-white/60"
-											>{step.label}{#if elapsedMs > 0}
-												<span class="ml-1 text-black/25 dark:text-white/25"
-													>{Math.floor(elapsedMs / 1000)}s</span
-												>{/if}</span
-										>
-									{/if}
-								</div>
-							{/each}
+					<div class="flex flex-col gap-2">
+						<div class="text-[14px] text-black/55 dark:text-white/55">
+							Working for {formatDuration(now - (chatState.currentTurnStartedAtMs ?? now))}
 						</div>
-					{:else if chatState.streamingActivities.length === 0}
-						<div class="flex items-center gap-2">
-							<span class="loading-dots flex gap-1">
-								<span class="h-1 w-1 rounded-full bg-[#6ee7b3]"></span>
-								<span class="h-1 w-1 rounded-full bg-[#a78bfa]"></span>
-								<span class="h-1 w-1 rounded-full bg-[#f472b6]"></span>
-							</span>
-							<span class="shimmer-text text-[13px]">Researching...</span>
+						<div class="text-[15px] leading-relaxed text-black/82 dark:text-white/82">
+							Starting research…
 						</div>
-					{/if}
+					</div>
 				</div>
 			</div>
 		{/if}
@@ -259,7 +300,7 @@
 						<span class="h-1 w-1 rounded-full bg-amber-400"></span>
 					</span>
 					<span class="text-[13px] text-amber-600/80 dark:text-amber-400/80"
-						>Reconnecting to your session...</span
+						>Reconnecting to the session...</span
 					>
 				</div>
 			</div>
@@ -324,81 +365,14 @@
 
 	@keyframes dotWave {
 		0%,
-		80%,
+		60%,
 		100% {
-			opacity: 0.4;
+			opacity: 0.35;
 			transform: translateY(0);
 		}
-		40% {
+		30% {
 			opacity: 1;
-			transform: translateY(-3px);
-		}
-	}
-
-	.shimmer-text {
-		color: transparent;
-		background: linear-gradient(
-			90deg,
-			rgba(0, 0, 0, 0.35) 0%,
-			rgba(0, 0, 0, 0.5) 40%,
-			rgba(0, 0, 0, 0.35) 80%
-		);
-		background-size: 200% 100%;
-		background-clip: text;
-		-webkit-background-clip: text;
-		animation: shimmer 5s ease-in-out infinite;
-	}
-
-	:global(.dark) .shimmer-text {
-		background: linear-gradient(
-			90deg,
-			rgba(255, 255, 255, 0.35) 0%,
-			rgba(255, 255, 255, 0.5) 40%,
-			rgba(255, 255, 255, 0.35) 80%
-		);
-		background-size: 200% 100%;
-		background-clip: text;
-		-webkit-background-clip: text;
-	}
-
-	.preview-stagger {
-		animation: previewIn 0.4s ease-out both;
-	}
-
-	@keyframes previewIn {
-		from {
-			opacity: 0;
-			transform: translateY(4px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	.stage-pulse {
-		animation: stagePulse 1.5s ease-in-out infinite;
-	}
-
-	@keyframes stagePulse {
-		0%,
-		100% {
-			opacity: 0.4;
-		}
-		50% {
-			opacity: 1;
-		}
-	}
-
-	@keyframes shimmer {
-		0% {
-			background-position: 200% 0;
-		}
-		50% {
-			background-position: -200% 0;
-		}
-		100% {
-			background-position: -200% 0;
+			transform: translateY(-2px);
 		}
 	}
 </style>
