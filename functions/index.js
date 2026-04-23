@@ -11,8 +11,7 @@ import {
 	confirmationHtml,
 	stripMarkdown,
 	checkRateLimit,
-	validatePlaceContext,
-	validateHistory
+	validatePlaceContext
 } from './utils.js';
 export { watchdog } from './watchdog.js';
 
@@ -223,7 +222,6 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 	// 3. Input validation.
 	const { message, sessionId } = req.body || {};
 	const placeContext = validatePlaceContext(req.body?.placeContext);
-	const history = validateHistory(req.body?.history);
 	if (!message || typeof message !== 'string' || !sessionId) {
 		res.status(400).json({ ok: false, error: 'message and sessionId are required' });
 		return;
@@ -367,8 +365,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 				userId: creatorUid,
 				queryText,
 				isFirstMessage,
-				placeContext: placeContext || null,
-				history
+				placeContext: placeContext || null
 			}
 		});
 	} catch (err) {
@@ -487,106 +484,6 @@ export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (re
 	} catch (err) {
 		console.error('ElevenLabs TTS fetch failed:', err);
 		res.status(503).json({ ok: false, error: 'Speech service unreachable' });
-	}
-});
-
-// --- Agent check endpoint (REST fallback when Firestore snapshot is blocked) ---
-//
-// Post-migration: reads directly from the session doc (worker writes reply +
-// sources + status there on completion). No more calls into the ADK Cloud
-// Run service — that service is being retired in Phase 8.
-//
-// Security:
-//   - Firebase ID token required (same as agentStream).
-//   - Explicit `session.userId == decodedToken.uid` check — Admin SDK
-//     bypasses Firestore rules, so the browser-side read rule does NOT
-//     protect this path.
-//
-// `runId` is optional on the query. When provided, it's informational —
-// the response is always based on the session's `currentRunId` state.
-// This matches the plan's default for stale-runId semantics (ownership
-// check still runs, so only the owner sees anything).
-export const agentCheck = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
-	if (req.method !== 'GET') {
-		res.status(405).json({ ok: false, error: 'Method not allowed' });
-		return;
-	}
-
-	const sid = req.query.sid;
-	if (!sid || typeof sid !== 'string') {
-		res.status(400).json({ ok: false, error: 'sid query parameter is required' });
-		return;
-	}
-
-	// 1. Verify Firebase ID token.
-	const authHeader = req.headers.authorization || '';
-	const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
-	if (!tokenMatch) {
-		res.status(401).json({ ok: false, error: 'Authorization header required' });
-		return;
-	}
-	let uid;
-	try {
-		const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
-		uid = decoded.uid;
-	} catch (e) {
-		console.warn('agentCheck verifyIdToken rejected:', e.code || e.message);
-		res.status(401).json({ ok: false, error: 'Invalid auth token' });
-		return;
-	}
-
-	try {
-		const doc = await db.collection('sessions').doc(sid).get();
-		if (!doc.exists) {
-			res.json({ ok: false, reason: 'session_not_found' });
-			return;
-		}
-
-		const data = doc.data() || {};
-
-		// 2. Explicit ownership check (Admin SDK bypasses Firestore rules).
-		// Rejects on missing `userId` too — a legacy/malformed doc without
-		// `userId` must not silently pass the check (audit Finding 3).
-		if (!data.userId || data.userId !== uid) {
-			res.status(403).json({ ok: false, reason: 'ownership_mismatch' });
-			return;
-		}
-
-		const status = data.status || null;
-		const reply = data.reply || null;
-
-		if (status === 'complete' && reply) {
-			res.json({
-				ok: true,
-				status: 'complete',
-				reply,
-				sources: data.sources && data.sources.length ? data.sources : undefined,
-				title: data.title || undefined,
-				turnSummary: data.turnSummary || undefined
-			});
-			return;
-		}
-
-		if (status === 'error') {
-			res.json({
-				ok: false,
-				reason: 'pipeline_error',
-				error: data.error || null
-			});
-			return;
-		}
-
-		// status is 'queued' or 'running' — still processing. Return a soft
-		// "keep polling" shape. Frontend's chat-recovery treats this as
-		// "not yet" and will retry on the next interval.
-		res.json({
-			ok: true,
-			status: status || 'processing',
-			reply: null
-		});
-	} catch (err) {
-		console.error('Agent check error:', err.message || err);
-		res.json({ ok: false, reason: 'agent_unavailable' });
 	}
 });
 

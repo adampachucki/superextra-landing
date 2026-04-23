@@ -4,7 +4,7 @@
 	import { tts } from '$lib/tts.svelte';
 	import { splitChartSegments } from '$lib/chart-blocks';
 	import { createTypewriter } from '$lib/typewriter';
-	import type { TurnCounts } from '$lib/firestore-stream';
+	import type { TurnCounts } from '$lib/chat-types';
 	import ChartBlock from './ChartBlock.svelte';
 	import StreamingProgress from './StreamingProgress.svelte';
 

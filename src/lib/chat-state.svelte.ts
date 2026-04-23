@@ -22,8 +22,15 @@
  */
 
 import type { Unsubscribe } from 'firebase/firestore';
-import type { ChatSource, TimelineEvent, TurnCounts, TurnSummary } from '$lib/firestore-stream';
+import type { ChatSource, TimelineEvent, TurnCounts, TurnSummary } from '$lib/chat-types';
 import { ensureAnonAuth, getFirebase, getIdToken } from '$lib/firebase';
+
+/** True iff `err` is `FirebaseUnavailableInSSRError` from `$lib/firebase`.
+ *  Checked by name rather than `instanceof` so test-time module mocks that
+ *  omit the class still compile. */
+function isSSRBootstrapSkip(err: unknown): boolean {
+	return err instanceof Error && err.name === 'FirebaseUnavailableInSSRError';
+}
 
 /** crypto.randomUUID() is only available in secure contexts (HTTPS / localhost).
  *  Fall back to crypto.getRandomValues() which works everywhere. */
@@ -240,7 +247,11 @@ async function attachSidebarListener() {
 			}
 		);
 	} catch (err) {
-		console.warn('[chat-state] sidebar listener bootstrap failed:', err);
+		// In SSR/prerender, Firebase can't bootstrap — swallow silently.
+		// Any real runtime error on the client still logs.
+		if (!isSSRBootstrapSkip(err)) {
+			console.warn('[chat-state] sidebar listener bootstrap failed:', err);
+		}
 		sidebarAttachStarted = false;
 	}
 }
@@ -531,17 +542,17 @@ async function startNewChat(query: string, place: PlaceContext | null): Promise<
 	const trimmed = query.trim();
 	if (!trimmed) throw new Error('empty_message');
 	const sid = uuid();
-	// Attach listeners first so the session/turn docs we're about to write
-	// stream in through the listener rather than through a separate fetch.
-	selectSession(sid);
-	placeContextState = place;
+	// POST first. Only after the server has accepted the request do we flip
+	// local state — otherwise a rejected send leaves the URL on an orphan sid
+	// and the user sees "Couldn't load this chat" 10 seconds later.
 	await postAgentStream({
 		sessionId: sid,
 		message: trimmed,
 		placeContext: place,
-		history: [],
 		isFirstMessage: true
 	});
+	selectSession(sid);
+	placeContextState = place;
 	return sid;
 }
 
@@ -554,7 +565,6 @@ async function sendFollowUp(message: string): Promise<void> {
 		sessionId: sid,
 		message: trimmed,
 		placeContext: placeContextState,
-		history: [],
 		isFirstMessage: false
 	});
 }

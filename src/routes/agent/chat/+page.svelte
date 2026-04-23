@@ -145,14 +145,24 @@
 							secondary: params.get('placeSecondary') ?? ''
 						}
 					: null;
-			void chatState.startNewChat(q, placeContext);
-			// Strip query params so reload doesn't re-send
-			const clean = new URL(window.location.href);
-			clean.searchParams.delete('q');
-			clean.searchParams.delete('placeName');
-			clean.searchParams.delete('placeSecondary');
-			clean.searchParams.delete('placeId');
-			history.replaceState(history.state, '', clean);
+			// Await: only strip the prefilled params on success. On failure keep
+			// the composer state + URL intact and surface the error.
+			chatState
+				.startNewChat(q, placeContext)
+				.then(() => {
+					const clean = new URL(window.location.href);
+					clean.searchParams.delete('q');
+					clean.searchParams.delete('placeName');
+					clean.searchParams.delete('placeSecondary');
+					clean.searchParams.delete('placeId');
+					history.replaceState(history.state, '', clean);
+				})
+				.catch((err: unknown) => {
+					query = q;
+					if (placeContext) place.select(placeContext);
+					sendError =
+						err instanceof Error ? err.message : 'Could not start chat. Please try again.';
+				});
 		} else if (sid) {
 			chatState.selectSession(sid);
 		}
@@ -177,13 +187,21 @@
 		}
 	});
 
-	function handleSend() {
+	async function handleSend() {
 		const trimmed = query.trim();
 		if (!trimmed || chatState.loading) return;
+		sendError = null;
 		if (chatState.active) {
-			void chatState.sendFollowUp(trimmed);
 			query = '';
 			resizeTextarea();
+			try {
+				await chatState.sendFollowUp(trimmed);
+			} catch (err) {
+				query = trimmed;
+				resizeTextarea();
+				sendError =
+					err instanceof Error ? err.message : 'Could not send message. Please try again.';
+			}
 		} else {
 			if (!selectedPlace) {
 				placeNudge = true;
@@ -192,9 +210,17 @@
 				return;
 			}
 			placeNudge = false;
-			void chatState.startNewChat(trimmed, selectedPlace);
+			const placeForSend = selectedPlace;
 			query = '';
 			resizeTextarea();
+			try {
+				await chatState.startNewChat(trimmed, placeForSend);
+			} catch (err) {
+				query = trimmed;
+				resizeTextarea();
+				sendError =
+					err instanceof Error ? err.message : 'Could not start chat. Please try again.';
+			}
 		}
 	}
 
@@ -253,6 +279,10 @@
 	let contextExpanded = $derived(contextOpen && !selectedPlace);
 	let contextOverflow = $state(false);
 	let placeInputEl: HTMLInputElement | undefined = $state();
+
+	// --- Request-action error state (Fix 1: surface transport failures) ---
+	let sendError = $state<string | null>(null);
+	let deleteError = $state<string | null>(null);
 
 	$effect(() => {
 		if (contextExpanded) {
@@ -429,7 +459,10 @@
 					>
 						<button
 							onclick={() => {
-								if (confirmDeleteId && confirmDeleteId !== sess.sid) confirmDeleteId = null;
+								if (confirmDeleteId && confirmDeleteId !== sess.sid) {
+									confirmDeleteId = null;
+									deleteError = null;
+								}
 								if (confirmDeleteId === sess.sid) return;
 								chatState.selectSession(sess.sid);
 								if (!isDesktop) sidebarOpen = false;
@@ -474,17 +507,33 @@
 									<span
 										role="button"
 										tabindex="0"
-										onclick={(e) => {
+										onclick={async (e) => {
 											e.stopPropagation();
-											void chatState.deleteSession(sess.sid);
-											confirmDeleteId = null;
+											deleteError = null;
+											try {
+												await chatState.deleteSession(sess.sid);
+												confirmDeleteId = null;
+											} catch (err) {
+												deleteError =
+													err instanceof Error
+														? err.message
+														: 'Could not delete. Please try again.';
+											}
 										}}
-										onkeydown={(e) => {
+										onkeydown={async (e) => {
 											if (e.key === 'Enter' || e.key === ' ') {
 												e.preventDefault();
 												e.stopPropagation();
-												void chatState.deleteSession(sess.sid);
-												confirmDeleteId = null;
+												deleteError = null;
+												try {
+													await chatState.deleteSession(sess.sid);
+													confirmDeleteId = null;
+												} catch (err) {
+													deleteError =
+														err instanceof Error
+															? err.message
+															: 'Could not delete. Please try again.';
+												}
 											}
 										}}
 										class="cursor-pointer text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
@@ -497,12 +546,14 @@
 										onclick={(e) => {
 											e.stopPropagation();
 											confirmDeleteId = null;
+											deleteError = null;
 										}}
 										onkeydown={(e) => {
 											if (e.key === 'Enter' || e.key === ' ') {
 												e.preventDefault();
 												e.stopPropagation();
 												confirmDeleteId = null;
+												deleteError = null;
 											}
 										}}
 										class="cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
@@ -510,6 +561,14 @@
 									>
 								</div>
 							</div>
+							{#if confirmDeleteId === sess.sid && deleteError}
+								<div
+									class="mt-1 truncate text-[11px] text-red-600 dark:text-red-400"
+									role="alert"
+								>
+									{deleteError}
+								</div>
+							{/if}
 						</button>
 						{#if canDeleteRow}
 							<button
@@ -655,6 +714,11 @@
 		class="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-[var(--color-cream)]/60 to-transparent"
 	></div>
 	<div class="mx-auto max-w-[800px] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6">
+		{#if sendError}
+			<div class="mb-2 px-1 text-[13px] text-red-600 dark:text-red-400" role="alert">
+				{sendError}
+			</div>
+		{/if}
 		{#if chatState.active}
 			<div
 				onclick={() => inputEl?.focus()}

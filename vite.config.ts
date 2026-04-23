@@ -35,11 +35,6 @@ export default defineConfig({
 				changeOrigin: true
 			},
 			'/api/intake': 'https://superextra-landing.web.app',
-			'/api/agent/check': {
-				target: 'https://us-central1-superextra-site.cloudfunctions.net',
-				changeOrigin: true,
-				rewrite: (path: string) => path.replace(/^\/api\/agent\/check/, '/agentCheck')
-			},
 			'/api/agent/delete': {
 				target: 'https://us-central1-superextra-site.cloudfunctions.net',
 				changeOrigin: true,

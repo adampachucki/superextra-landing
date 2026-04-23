@@ -13,9 +13,10 @@ function makeRef(path) {
 		collection: (name) => ({
 			doc: (id) => makeRef(`${path}/${name}/${id}`)
 		}),
-		// Direct reads/writes outside a transaction (agentCheck read, enqueue
-		// fallback write) delegate to the same spies used inside transactions,
-		// so assertions see every mutation regardless of execution path.
+		// Direct reads/writes outside a transaction (e.g., agentDelete's session
+		// pre-read, enqueue-failure status flip) delegate to the same spies used
+		// inside transactions, so assertions see every mutation regardless of
+		// execution path.
 		get: () => mockDb.get(ref),
 		update: (data) => mockDb.update(ref, data),
 		set: (data) => mockDb.set(ref, data)
@@ -109,7 +110,7 @@ mock.module('@google-cloud/tasks', {
 // Set WORKER_URL before importing so the Cloud Task target resolves.
 process.env.WORKER_URL = 'https://worker-test.run.app';
 
-const { intake, agentStream, agentCheck, agentDelete, sttToken, tts } = await import('./index.js');
+const { intake, agentStream, agentDelete, sttToken, tts } = await import('./index.js');
 
 // ── Test helpers ──
 
@@ -727,157 +728,6 @@ describe('agentStream', () => {
 		const flipped = recoveryUpdates.find((u) => u.status === 'error');
 		assert.ok(flipped, 'recovery update with status=error should have run');
 		assert.equal(flipped.error, 'enqueue_failed');
-	});
-});
-
-// ══════════════════════════════════════════════════════
-// agentCheck
-// ══════════════════════════════════════════════════════
-
-describe('agentCheck', () => {
-	function authedCheck(sid, overrides = {}) {
-		return mockReq({
-			method: 'GET',
-			query: { sid, ...(overrides.query || {}) },
-			headers: { authorization: 'Bearer good-token', ...(overrides.headers || {}) }
-		});
-	}
-
-	it('rejects non-GET with 405', async () => {
-		const res = mockRes();
-		await agentCheck(mockReq({ method: 'POST' }), res);
-		assert.equal(res._status, 405);
-	});
-
-	it('returns 400 when sid is missing', async () => {
-		const res = mockRes();
-		await agentCheck(mockReq({ method: 'GET', query: {} }), res);
-		assert.equal(res._status, 400);
-		assert.match(res._json.error, /sid/);
-	});
-
-	it('returns 401 when Authorization header is missing', async () => {
-		const res = mockRes();
-		await agentCheck(mockReq({ method: 'GET', query: { sid: 'x' } }), res);
-		assert.equal(res._status, 401);
-	});
-
-	it('returns 401 when token verification fails', async () => {
-		const res = mockRes();
-		await agentCheck(
-			mockReq({
-				method: 'GET',
-				query: { sid: 'x' },
-				headers: { authorization: 'Bearer bad-token' }
-			}),
-			res
-		);
-		assert.equal(res._status, 401);
-	});
-
-	it('returns session_not_found when session does not exist', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
-		const res = mockRes();
-		await agentCheck(authedCheck('unknown'), res);
-		assert.equal(res._json.ok, false);
-		assert.equal(res._json.reason, 'session_not_found');
-	});
-
-	it('returns 403 when session userId does not match caller', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({ userId: 'user-other-token', status: 'complete', reply: 'r' })
-		}));
-		const res = mockRes();
-		await agentCheck(authedCheck('sid-1'), res);
-		assert.equal(res._status, 403);
-		assert.equal(res._json.reason, 'ownership_mismatch');
-	});
-
-	it('returns 403 when session doc is missing userId (legacy/malformed)', async () => {
-		// Audit Finding 3 — old `data.userId && data.userId !== uid` let
-		// docs without `userId` slip through. New guard rejects.
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({ status: 'complete', reply: 'should not return' })
-		}));
-		const res = mockRes();
-		await agentCheck(authedCheck('sid-1'), res);
-		assert.equal(res._status, 403);
-		assert.equal(res._json.reason, 'ownership_mismatch');
-	});
-
-	it('returns complete reply + sources + title when status=complete', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({
-				userId: 'user-good-token',
-				status: 'complete',
-				reply: 'The final report.',
-				sources: [{ title: 'S1', url: 'https://s1.example' }],
-				title: 'Chat title'
-			})
-		}));
-
-		const res = mockRes();
-		await agentCheck(authedCheck('known'), res);
-		assert.equal(res._json.ok, true);
-		assert.equal(res._json.status, 'complete');
-		assert.equal(res._json.reply, 'The final report.');
-		assert.deepEqual(res._json.sources, [{ title: 'S1', url: 'https://s1.example' }]);
-		assert.equal(res._json.title, 'Chat title');
-	});
-
-	it('returns pipeline_error when status=error', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({
-				userId: 'user-good-token',
-				status: 'error',
-				error: 'synthesizer_failed'
-			})
-		}));
-
-		const res = mockRes();
-		await agentCheck(authedCheck('errored'), res);
-		assert.equal(res._json.ok, false);
-		assert.equal(res._json.reason, 'pipeline_error');
-		assert.equal(res._json.error, 'synthesizer_failed');
-	});
-
-	it('returns status=running with null reply while pipeline is in flight', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({
-				userId: 'user-good-token',
-				status: 'running',
-				currentRunId: 'run-1',
-				reply: null
-			})
-		}));
-
-		const res = mockRes();
-		await agentCheck(authedCheck('pending'), res);
-		assert.equal(res._json.ok, true);
-		assert.equal(res._json.status, 'running');
-		assert.equal(res._json.reply, null);
-	});
-
-	it('accepts (and ignores) a stale runId query param — returns current state', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({
-				userId: 'user-good-token',
-				status: 'complete',
-				reply: 'Latest reply.',
-				currentRunId: 'run-latest'
-			})
-		}));
-
-		const res = mockRes();
-		await agentCheck(authedCheck('sid-1', { query: { runId: 'run-stale' } }), res);
-		assert.equal(res._json.ok, true);
-		assert.equal(res._json.reply, 'Latest reply.');
 	});
 });
 

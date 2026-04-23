@@ -16,6 +16,21 @@ export interface FirebaseHandle {
 
 let handlePromise: Promise<FirebaseHandle> | null = null;
 
+/** Sentinel: Firebase can't bootstrap server-side because the config is at a
+ *  browser-relative URL (`/__/firebase/init.json`) with no origin in Node.
+ *  Callers (e.g. `attachSidebarListener`) recognise this by message and
+ *  swallow it silently during prerender — vs. logging real errors on the
+ *  client. */
+class FirebaseUnavailableInSSRError extends Error {
+	constructor() {
+		super('Firebase bootstrap skipped: server-side');
+		this.name = 'FirebaseUnavailableInSSRError';
+	}
+}
+export function isFirebaseUnavailableInSSR(err: unknown): boolean {
+	return err instanceof FirebaseUnavailableInSSRError;
+}
+
 async function loadConfig(): Promise<Record<string, string>> {
 	const url = '/__/firebase/init.json';
 	const response = await fetch(url);
@@ -26,6 +41,13 @@ async function loadConfig(): Promise<Record<string, string>> {
 }
 
 export function getFirebase(): Promise<FirebaseHandle> {
+	// In SSR/prerender there's no origin to resolve `/__/firebase/init.json`
+	// against. Reject cleanly with a recognisable sentinel so callers can
+	// swallow the error silently during prerender, and log real errors
+	// normally on the client.
+	if (typeof window === 'undefined') {
+		return Promise.reject(new FirebaseUnavailableInSSRError());
+	}
 	if (handlePromise) return handlePromise;
 	handlePromise = (async () => {
 		const [{ initializeApp, getApps }, authMod, firestoreMod] = await Promise.all([
@@ -100,7 +122,7 @@ export async function ensureAnonAuth(): Promise<string> {
 
 /**
  * Fetch a Firebase ID token for the current anonymous user, for sending to
- * server-side endpoints (agentStream, agentCheck) that verify via Admin SDK.
+ * server-side endpoints (agentStream, agentDelete) that verify via Admin SDK.
  * We pass `forceRefresh=false` — the Firebase Auth SDK automatically refreshes
  * the token ~5 min before expiry, so forcing refresh on every call would just
  * add latency without improving safety.

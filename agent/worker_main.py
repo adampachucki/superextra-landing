@@ -161,7 +161,6 @@ class RunRequest(BaseModel):
     queryText: str
     isFirstMessage: bool = Field(default=False)
     placeContext: dict | None = None
-    history: list | None = None
 
 
 class OwnershipLost(Exception):

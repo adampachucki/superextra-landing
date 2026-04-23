@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TimelineEvent, TurnCounts } from '$lib/firestore-stream';
+	import type { TimelineEvent, TurnCounts } from '$lib/chat-types';
 
 	let {
 		events,

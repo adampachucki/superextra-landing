@@ -758,7 +758,7 @@ describe('chatState (Firestore-driven)', () => {
 			expect(body.sessionId).toBe(sid);
 			expect(body.message).toBe('hello');
 			expect(body.placeContext).toMatchObject({ placeId: 'p1' });
-			expect(body.history).toEqual([]);
+			expect(body.history).toBeUndefined();
 			expect(init.headers).toMatchObject({
 				Authorization: 'Bearer mock-id-token'
 			});
@@ -791,6 +791,35 @@ describe('chatState (Firestore-driven)', () => {
 			captureObservers();
 
 			await expect(chatState.startNewChat('go', null)).rejects.toThrow('previous_turn_in_flight');
+		});
+
+		it('does NOT select the session when the POST rejects (Fix 1 guarantee)', async () => {
+			const fetchMock = vi.fn(
+				async () =>
+					({
+						ok: false,
+						status: 500,
+						json: async () => ({ error: 'upstream_down' })
+					}) as unknown as Response
+			);
+			vi.stubGlobal('fetch', fetchMock);
+			const obs = captureObservers();
+
+			await expect(chatState.startNewChat('hello', null)).rejects.toThrow('upstream_down');
+			// Transport order: POST first, selectSession only on success.
+			// A rejected send must NOT leave the app pointing at an orphan sid
+			// — otherwise the listener flips to 'loadTimedOut' / 'missing' and
+			// the user sees "Couldn't load this chat" on a chat they just tried to create.
+			expect(chatState.activeSid).toBeNull();
+			// Only the sidebar listener (if any) should have attached; no active
+			// session / turns / events listeners for any sid.
+			const activeListeners = obs.all.filter(
+				(c) =>
+					(c.ref._kind === 'doc' && String(c.ref._path ?? '').startsWith('sessions/')) ||
+					String(c.ref._ref?._path ?? '').includes('/turns') ||
+					String(c.ref._ref?._path ?? '').includes('/events')
+			);
+			expect(activeListeners).toHaveLength(0);
 		});
 	});
 
