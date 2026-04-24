@@ -299,15 +299,25 @@ class TestFindTripadvisorRestaurant:
 
 
 class TestFindTripadvisorRestaurantSourceWrite:
-    """On high-confidence match, the tool writes a provider entry under a
-    unique `_tool_src_<uuid>` state key so parallel tool calls batched
-    into one ADK event's state_delta all survive."""
+    """Source-pill gate uses `google_place_id == _target_place_id` — same
+    pattern as `apify_tools.get_google_reviews`. TripAdvisor's external API
+    doesn't speak Google IDs; the arg is purely local gating metadata."""
 
     @pytest.mark.asyncio
-    async def test_writes_source_on_high_confidence(self):
+    async def test_writes_source_despite_search_string_drift(self):
+        """Regression test for the name-drift bug that motivated the gate
+        rewrite. The 2026-04-22 worker logs showed the agent passing
+        `name="Noma restaurant"` while the stored displayName was `"Noma"`;
+        the old string-equality gate silently rejected that as a mismatch
+        and no pill rendered, even though the agent was querying the target.
+
+        With the `google_place_id` gate, the source writes correctly regardless
+        of how the agent phrased the search string. Fixture deliberately
+        omits `_place_name_*` — the new gate must not depend on name-based
+        state at all."""
         class MockCtx:
             def __init__(self):
-                self.state = {}
+                self.state = {"_target_place_id": "ChIJtarget"}
 
         ctx = MockCtx()
         mock_client = AsyncMock()
@@ -319,8 +329,9 @@ class TestFindTripadvisorRestaurantSourceWrite:
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
             await find_tripadvisor_restaurant(
-                "Umami", "Berlin",
+                "Noma restaurant", "Berlin",   # LLM-drifted search string
                 address="Knaackstr. 16-18, 10405 Berlin",
+                google_place_id="ChIJtarget",
                 tool_context=ctx,
             )
 
@@ -339,7 +350,7 @@ class TestFindTripadvisorRestaurantSourceWrite:
         into user-visible citations."""
         class MockCtx:
             def __init__(self):
-                self.state = {}
+                self.state = {"_target_place_id": "ChIJtarget"}
 
         ctx = MockCtx()
         mock_client = AsyncMock()
@@ -353,24 +364,21 @@ class TestFindTripadvisorRestaurantSourceWrite:
             await find_tripadvisor_restaurant(
                 "Umami", "Berlin",
                 address="Completely Different Street 99, 99999 Munich",
+                google_place_id="ChIJtarget",
                 tool_context=ctx,
             )
 
         assert not any(k.startswith("_tool_src_") for k in ctx.state)
 
     @pytest.mark.asyncio
-    async def test_skips_source_when_name_is_a_competitor(self):
-        """If review_analyst's LLM deviates from the target-only invariant
-        and looks up a competitor on TripAdvisor, the source write is gated
-        by the target-name check so the pill doesn't end up linking to a
-        competitor's TripAdvisor page. Regression guard for the bug caught
-        in the 2026-04-24 E2E run (Geranium pill on a Noma brief)."""
+    async def test_skips_source_when_place_id_is_competitor(self):
+        """Competitor lookup (`google_place_id != _target_place_id`) must not
+        register a TripAdvisor pill — otherwise the surviving pill would link
+        to whichever competitor finished first. Regression guard for the bug
+        caught in the 2026-04-24 E2E run (Geranium pill on a Noma brief)."""
         class MockCtx:
             def __init__(self):
-                self.state = {
-                    "_target_place_id": "ChIJnomaxx",
-                    "_place_name_ChIJnomaxx": "Noma",
-                }
+                self.state = {"_target_place_id": "ChIJnoma"}
 
         ctx = MockCtx()
         mock_client = AsyncMock()
@@ -384,21 +392,20 @@ class TestFindTripadvisorRestaurantSourceWrite:
             await find_tripadvisor_restaurant(
                 "Geranium", "Copenhagen",
                 address="Per Henrik Lings Allé 4, 2100 København",
+                google_place_id="ChIJgeranium",
                 tool_context=ctx,
             )
 
         assert not any(k.startswith("_tool_src_") for k in ctx.state)
 
     @pytest.mark.asyncio
-    async def test_writes_source_when_name_matches_target(self):
-        """Case/whitespace-tolerant comparison: LLM-authored name string
-        resolves against the target's stored displayName."""
+    async def test_skips_source_when_place_id_missing(self):
+        """If the agent forgets to pass `google_place_id`, no pill — same
+        strictness as `apify_tools.get_google_reviews`. Better to miss a pill
+        than to show the wrong one."""
         class MockCtx:
             def __init__(self):
-                self.state = {
-                    "_target_place_id": "ChIJumami",
-                    "_place_name_ChIJumami": "Umami",
-                }
+                self.state = {"_target_place_id": "ChIJtarget"}
 
         ctx = MockCtx()
         mock_client = AsyncMock()
@@ -410,14 +417,13 @@ class TestFindTripadvisorRestaurantSourceWrite:
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
             await find_tripadvisor_restaurant(
-                "  umami  ", "Berlin",   # casing + whitespace drift
+                "Umami", "Berlin",
                 address="Knaackstr. 16-18, 10405 Berlin",
                 tool_context=ctx,
+                # google_place_id deliberately omitted
             )
 
-        source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
-        assert len(source_keys) == 1
-        assert ctx.state[source_keys[0]]["provider"] == "tripadvisor"
+        assert not any(k.startswith("_tool_src_") for k in ctx.state)
 
 
 class TestGetTripadvisorReviews:

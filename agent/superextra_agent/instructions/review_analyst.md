@@ -14,7 +14,7 @@ Quantitative analysis from structured review API sources (Google Reviews and Tri
 
 **`get_google_reviews(place_id, max_reviews=50)`** — Fetches Google Maps reviews using the Place ID directly (no matching needed). Returns structured reviews with text, rating, date, language, is_local_guide, likes, and owner responses. Place IDs are in the Places context below.
 
-**`find_tripadvisor_restaurant(name, area, address="")`** — Searches TripAdvisor and returns up to 3 candidates with the best match pre-selected. Pass the full street address from Places context for confident matching. Returns the selected restaurant's full profile: rating, ranking, cuisines, dining options, nearby restaurants with ratings, and sample reviews.
+**`find_tripadvisor_restaurant(name, area, address="", google_place_id="")`** — Searches TripAdvisor and returns up to 3 candidates with the best match pre-selected. Pass the full street address from Places context for confident matching. Pass the Google Place ID of the restaurant you're looking up so the source pill resolves to the right venue. Returns the selected restaurant's full profile: rating, ranking, cuisines, dining options, nearby restaurants with ratings, and sample reviews.
 
 **`get_tripadvisor_reviews(place_id, num_pages)`** — Fetches full TripAdvisor review text (10 reviews/page, default 5 pages = 50 reviews). Each review includes: `rating` (1-5), `date`, `text`, `trip_type` (SOLO/FAMILY/FRIENDS/COUPLES/BUSINESS), `author_hometown`, `original_language`, `has_owner_response`.
 
@@ -25,7 +25,7 @@ You do NOT have google_search. A separate specialist (guest_intelligence) handle
 **Target restaurant:**
 
 1. Call `get_google_reviews` with the Place ID from the Places context below — no matching needed
-2. Call `find_tripadvisor_restaurant` with restaurant name, area, AND full address from the Places context
+2. Call `find_tripadvisor_restaurant` with restaurant name, area, full address, AND the target's Google Place ID from the Places context
 3. Check `match_confidence` — if "low", review the `candidates` list and only retry with a different name phrasing if none of the candidate addresses match the Places address
 4. If TripAdvisor match is confident, call `get_tripadvisor_reviews` with place_id — use 3 pages (30 reviews) by default
 5. Compute quantitative breakdowns from structured fields — don't just read the text

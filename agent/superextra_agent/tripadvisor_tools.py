@@ -1,9 +1,12 @@
 import atexit
+import logging
 import os
 import re
 import uuid
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://serpapi.com/search.json"
 
@@ -55,7 +58,13 @@ def _address_match_score(a: str, b: str) -> float:
     return len(overlap) / min(len(words_a), len(words_b))
 
 
-async def find_tripadvisor_restaurant(name: str, area: str, address: str = "", tool_context=None) -> dict:
+async def find_tripadvisor_restaurant(
+    name: str,
+    area: str,
+    address: str = "",
+    google_place_id: str = "",
+    tool_context=None,
+) -> dict:
     """Find a restaurant on TripAdvisor and return its full profile.
 
     Searches TripAdvisor for the restaurant, then fetches detailed place data
@@ -72,7 +81,19 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "", t
         name: Restaurant name (e.g. 'Umami P-Berg').
         area: City or neighborhood for search context (e.g. 'Prenzlauer Berg Berlin').
         address: Optional full street address from Google Places for matching confidence.
+        google_place_id: The Google Place ID of the restaurant being looked up
+            (from the Places context). Used only for source-pill attribution —
+            TripAdvisor never sees it. Pass the target's Place ID so the
+            "TripAdvisor" source pill resolves to the right venue.
     """
+    # TEMP (tripadvisor-place-id-gate-plan 2026-04-24): rollout verification of
+    # prompt adoption. Remove in a follow-up commit once Cloud Logging shows
+    # google_place_id is reliably populated on target calls.
+    logger.info(
+        "tripadvisor_call name=%r google_place_id=%r",
+        name,
+        google_place_id or "<empty>",
+    )
     try:
         client = _get_client()
         api_key = _get_api_key()
@@ -166,27 +187,25 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "", t
             sample_reviews.append(review)
 
         # Register one "TripAdvisor" provider source on high-confidence
-        # matches — target only. This tool has no `place_id` arg, so we
-        # gate on the `name` arg matching the target's stored displayName
-        # (`_place_name_<_target_place_id>`, first-written by the enricher's
-        # Places call). Needed because review_analyst's LLM sometimes calls
-        # TripAdvisor for competitors too, and without this gate the
-        # surviving pill would link to whichever competitor finished first.
-        # Lowercase/strip comparison tolerates casing and whitespace drift
-        # between the Places displayName and whatever the LLM queried with.
+        # matches — target only. Gate on `google_place_id == _target_place_id`,
+        # mirroring `apify_tools.get_google_reviews`. TripAdvisor's external
+        # API doesn't speak Google IDs, so the `google_place_id` arg is purely
+        # local gating metadata and is never forwarded to SerpAPI. If the LLM
+        # forgets to pass it, no pill — same strictness as Google Reviews.
         selected_link = match.get("link")
-        if tool_context and match_confidence == "high" and selected_link:
-            target_pid = tool_context.state.get("_target_place_id")
-            target_name = (
-                tool_context.state.get(f"_place_name_{target_pid}") or ""
-            ).strip().lower()
-            if not target_name or name.strip().lower() == target_name:
-                tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
-                    "provider": "tripadvisor",
-                    "title": "TripAdvisor",
-                    "url": selected_link,
-                    "domain": "tripadvisor.com",
-                }
+        if (
+            tool_context
+            and match_confidence == "high"
+            and selected_link
+            and google_place_id
+            and tool_context.state.get("_target_place_id") == google_place_id
+        ):
+            tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
+                "provider": "tripadvisor",
+                "title": "TripAdvisor",
+                "url": selected_link,
+                "domain": "tripadvisor.com",
+            }
 
         return {
             "status": "success" if match_confidence == "high" else "low_confidence",
