@@ -182,27 +182,35 @@
 							</button>
 						</div>
 
-						{#if msg.turnSummary}
+						{#if msg.turnSummary && msg.turnSummary.elapsedMs >= 30000}
 							{@const summary = msg.turnSummary}
-							<details
-								class="mt-4 rounded-2xl border border-black/6 px-4 py-3 dark:border-white/10"
-							>
-								<summary class="cursor-pointer text-[13px] text-black/55 dark:text-white/55">
+							{#if msg.sources?.length}
+								<details
+									class="mt-4 rounded-2xl border border-black/6 px-4 py-3 dark:border-white/10"
+								>
+									<summary class="cursor-pointer text-[13px] text-black/55 dark:text-white/55">
+										Worked for {formatDuration(summary.elapsedMs)}
+									</summary>
+									<div class="mt-4 flex flex-col gap-4">
+										{#each summary.notes as note, noteIdx (noteIdx)}
+											<div class="flex flex-col gap-1">
+												<div class="text-[14px] leading-relaxed text-black/82 dark:text-white/82">
+													{note.text}
+												</div>
+												<div class="text-[12px] text-black/38 dark:text-white/38">
+													{formatCounts(note.counts)}
+												</div>
+											</div>
+										{/each}
+									</div>
+								</details>
+							{:else}
+								<div
+									class="mt-4 rounded-2xl border border-black/6 px-4 py-3 text-[13px] text-black/55 dark:border-white/10 dark:text-white/55"
+								>
 									Worked for {formatDuration(summary.elapsedMs)}
-								</summary>
-								<div class="mt-4 flex flex-col gap-4">
-									{#each summary.notes as note, noteIdx (noteIdx)}
-										<div class="flex flex-col gap-1">
-											<div class="text-[14px] leading-relaxed text-black/82 dark:text-white/82">
-												{note.text}
-											</div>
-											<div class="text-[12px] text-black/38 dark:text-white/38">
-												{formatCounts(note.counts)}
-											</div>
-										</div>
-									{/each}
 								</div>
-							</details>
+							{/if}
 						{/if}
 
 						{#if msg.sources?.length}
