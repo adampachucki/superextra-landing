@@ -115,11 +115,14 @@ describe('ChatThread', () => {
 						userMessage: 'review summary',
 						status: 'complete',
 						reply: 'Agent reply',
-						sources: [],
+						// Summary expandable is now gated on elapsedMs >= 30s AND
+						// non-empty sources (c9ce679) — fixture must satisfy both
+						// or the "Opened 1 source" note text won't render.
+						sources: [{ title: 'Source A', url: 'https://example.com/a' }],
 						turnSummary: {
 							startedAtMs: 0,
-							finishedAtMs: 10_000,
-							elapsedMs: 10_000,
+							finishedAtMs: 35_000,
+							elapsedMs: 35_000,
 							notes: [
 								{
 									text: 'I checked the strongest signals.',
@@ -130,7 +133,7 @@ describe('ChatThread', () => {
 							finalCounts: { webQueries: 0, sources: 1, venues: 0, platforms: 0 }
 						},
 						createdAt: { toMillis: () => 1000 },
-						completedAt: { toMillis: () => 11_000 }
+						completedAt: { toMillis: () => 36_000 }
 					}
 				}
 			])
