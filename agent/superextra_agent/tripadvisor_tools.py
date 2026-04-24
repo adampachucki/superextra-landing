@@ -274,7 +274,6 @@ async def get_tripadvisor_reviews(place_id: str, num_pages: int = 5) -> dict:
 
         all_reviews = []
         total_reviews = None
-        partial = False
 
         for page in range(num_pages):
             resp = await client.get(BASE_URL, params={
@@ -286,7 +285,6 @@ async def get_tripadvisor_reviews(place_id: str, num_pages: int = 5) -> dict:
             if resp.status_code != 200:
                 if page == 0:
                     return {"status": "error", "error_message": f"SerpAPI reviews error {resp.status_code}: {resp.text}"}
-                partial = True
                 break  # Return what we have if a later page fails
 
             data = resp.json()
@@ -316,20 +314,15 @@ async def get_tripadvisor_reviews(place_id: str, num_pages: int = 5) -> dict:
                 review["has_owner_response"] = "response" in r
                 all_reviews.append(review)
 
-        if total_reviews and len(all_reviews) < total_reviews:
-            partial = True
-
-        # Source attribution for TripAdvisor is handled at the
-        # `find_tripadvisor_restaurant` boundary (which has the URL). This
-        # tool only fetches additional pages; the final `sources[]` already
-        # carries the TripAdvisor entry.
+        # The TripAdvisor source pill is written by find_tripadvisor_restaurant
+        # on verified matches. This tool only fetches additional review pages
+        # for an already-resolved place_id.
 
         return {
             "status": "success",
             "place_id": place_id,
             "total_reviews": total_reviews,
             "fetched_reviews": len(all_reviews),
-            "partial": partial,
             "reviews": all_reviews,
         }
     except Exception as e:
