@@ -113,6 +113,49 @@ class TestGetRestaurantDetails:
 
     @respx.mock
     @pytest.mark.asyncio
+    async def test_target_with_no_location_is_not_overwritten_by_competitor(self):
+        """Degraded-data regression: if the target's Places response omits
+        `location`, a subsequent competitor fetch must NOT silently write
+        competitor coordinates into `_target_lat/lng`. Otherwise downstream
+        geo-bias and TripAdvisor verification point at the wrong venue.
+        Target identity still lands (`_target_place_id`); coords stay absent."""
+        # Target responds without coords.
+        respx.get(f"{BASE_URL}/places/target").mock(
+            return_value=httpx.Response(200, json={
+                "displayName": {"text": "Target (no coords)"},
+                "googleMapsUri": "https://maps.google.com/?cid=target",
+            })
+        )
+        # Competitor responds WITH coords.
+        respx.get(f"{BASE_URL}/places/comp").mock(
+            return_value=httpx.Response(200, json={
+                "displayName": {"text": "Competitor"},
+                "location": {"latitude": 55.6989, "longitude": 12.5896},
+                "googleMapsUri": "https://maps.google.com/?cid=comp",
+            })
+        )
+
+        ctx = MockToolCtx()
+        # Enricher flow: target solo first, then competitor batch.
+        await get_restaurant_details("target", tool_context=ctx)
+        await get_batch_restaurant_details(["comp"], tool_context=ctx)
+
+        assert ctx.state["_target_place_id"] == "target"
+        # Target coords are absent because the target response had no location.
+        # Crucially, competitor coords did NOT leak into _target_lat/lng.
+        assert "_target_lat" not in ctx.state
+        assert "_target_lng" not in ctx.state
+        # Only the target's Google Maps source pill was written; the competitor
+        # fetch skipped both coord write and pill write.
+        google_maps_srcs = [
+            v for k, v in ctx.state.items()
+            if k.startswith("_tool_src_") and v.get("provider") == "google_maps"
+        ]
+        assert len(google_maps_srcs) == 1
+        assert google_maps_srcs[0]["url"] == "https://maps.google.com/?cid=target"
+
+    @respx.mock
+    @pytest.mark.asyncio
     async def test_missing_display_name_does_not_write_place_name(self):
         """If the Places API omits displayName, don't write a garbage key —
         leave it absent so get_google_reviews falls back to its generic

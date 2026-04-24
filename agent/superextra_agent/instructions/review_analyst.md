@@ -41,8 +41,6 @@ Copy this exact string when calling `find_tripadvisor_restaurant(... google_plac
 
 {places_context}
 
-Use Place ID for `get_google_reviews` and restaurant name + address for TripAdvisor lookup.
-
 ## Answer specifics
 
 - Lead with structured data tables and quantified findings.

@@ -20,6 +20,7 @@ from worker_main import (  # noqa: E402
     AGENT_ENGINE_ID,
     OwnershipLost,
     STALE_HEARTBEAT_S,
+    TurnSummaryBuilder,
     _fallback_title,
     _fenced_update_logic,
     _fenced_update_session_and_turn_logic,
@@ -350,6 +351,76 @@ def test_merge_source_skips_entries_without_url():
     _merge_source(sources, seen, "not a dict")  # wrong type
     _merge_source(sources, seen, {"url": ""})  # empty url
     assert sources == []
+
+
+# ── TurnSummaryBuilder: find_tripadvisor_restaurant accumulation ───────────
+
+
+def _event_with_tripadvisor_response(response: dict) -> SimpleNamespace:
+    """Minimal event shape that TurnSummaryBuilder.observe_event can read."""
+    fr = SimpleNamespace(name="find_tripadvisor_restaurant", response=response)
+    part = SimpleNamespace(text=None, function_call=None, function_response=fr)
+    return SimpleNamespace(
+        author="review_analyst",
+        id="evt-ta",
+        content=SimpleNamespace(parts=[part]),
+        actions=SimpleNamespace(state_delta=None),
+        grounding_metadata=None,
+        is_final_response=lambda: False,
+    )
+
+
+def test_tripadvisor_success_response_accumulates_link_and_name():
+    """Regression guard for the `status == "success"` branch of
+    TurnSummaryBuilder.observe_event. A verified TripAdvisor match puts
+    its URL into `sources` and its display name into `venues`."""
+    builder = TurnSummaryBuilder(started_at_ms=0)
+    event = _event_with_tripadvisor_response({
+        "status": "success",
+        "tripadvisor_link": "https://www.tripadvisor.com/Restaurant_Review-123-Noma",
+        "name": "Noma",
+    })
+
+    builder.observe_event(event, state={})
+
+    assert any("Restaurant_Review-123-Noma" in src for src in builder.sources)
+    assert "noma" in builder.venues
+
+
+def test_tripadvisor_unverified_response_skips_accumulation():
+    """Regression guard for the defense-in-depth status gate added in
+    the coord-verification refactor. An `unverified` response — even if
+    it somehow carried a `tripadvisor_link` or `name` — must not leak
+    into the timeline counters. Protects against silent misattribution
+    if a future tool change partially re-populates the payload."""
+    builder = TurnSummaryBuilder(started_at_ms=0)
+    event = _event_with_tripadvisor_response({
+        "status": "unverified",
+        "error_message": "coords didn't match",
+        # Defensive: simulate a hypothetical partial payload leak.
+        "tripadvisor_link": "https://www.tripadvisor.com/Restaurant_Review-999-Wrong",
+        "name": "Wrong Venue",
+    })
+
+    builder.observe_event(event, state={})
+
+    assert not any("Restaurant_Review-999-Wrong" in src for src in builder.sources)
+    assert "wrong venue" not in builder.venues
+
+
+def test_tripadvisor_error_response_skips_accumulation():
+    """Transport failures also skip accumulation — distinct from unverified
+    in status wording but equivalent in source-gating behavior."""
+    builder = TurnSummaryBuilder(started_at_ms=0)
+    event = _event_with_tripadvisor_response({
+        "status": "error",
+        "error_message": "SerpAPI 500",
+    })
+
+    builder.observe_event(event, state={})
+
+    assert builder.sources == set()
+    assert builder.venues == set()
 
 
 # ── Title fallback ─────────────────────────────────────────────────────────

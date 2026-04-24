@@ -113,27 +113,31 @@ async def get_restaurant_details(place_id: str, tool_context=None) -> dict:
         # get_google_reviews) can cite the right restaurant without extra API
         # calls. `_place_name_<pid>` is per-place and written every call —
         # batch competitor fetches need to populate it too. `_target_place_id`
-        # and `_target_lat`/`_target_lng` are target-only; first write wins,
-        # relying on the enricher's convention of calling target before the
-        # competitor batch. `_target_place_id` is written independently of
-        # coords so target identity survives a location-less Places response.
+        # is set on the first Places call (the enricher's target fetch by
+        # convention) and independent of whether location came back, so target
+        # identity survives a location-less response. `_target_lat`/`_target_lng`
+        # and the Google Maps source pill are gated on the current call being
+        # the target — without that gate, a later competitor batch could
+        # silently overwrite missing target coords with the competitor's, and
+        # downstream geo-bias / TripAdvisor verification would point at the
+        # wrong venue.
         if tool_context:
             if "_target_place_id" not in tool_context.state:
                 tool_context.state["_target_place_id"] = place_id
-
-            loc = place.get("location", {})
-            if (
-                loc.get("latitude") and loc.get("longitude")
-                and "_target_lat" not in tool_context.state
-            ):
-                tool_context.state["_target_lat"] = loc["latitude"]
-                tool_context.state["_target_lng"] = loc["longitude"]
 
             name = (place.get("displayName") or {}).get("text")
             if name:
                 tool_context.state[f"_place_name_{place_id}"] = name
 
             if tool_context.state.get("_target_place_id") == place_id:
+                loc = place.get("location", {})
+                if (
+                    loc.get("latitude") and loc.get("longitude")
+                    and "_target_lat" not in tool_context.state
+                ):
+                    tool_context.state["_target_lat"] = loc["latitude"]
+                    tool_context.state["_target_lng"] = loc["longitude"]
+
                 maps_uri = place.get("googleMapsUri")
                 if maps_uri:
                     tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
