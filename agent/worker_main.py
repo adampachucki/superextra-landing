@@ -703,7 +703,10 @@ class TurnSummaryBuilder:
                         text = display_name.get("text")
                         if isinstance(text, str) and text.strip():
                             self.venues.add(text.strip().lower())
-            elif name == "find_tripadvisor_restaurant":
+            elif name == "find_tripadvisor_restaurant" and status == "success":
+                # Only accumulate on a verified match. Unverified/error responses
+                # now strip these fields, but gate explicitly in case the tool
+                # ever returns a partial payload on a non-success path.
                 trip_link = response.get("tripadvisor_link")
                 if isinstance(trip_link, str) and trip_link.strip():
                     self.sources.add(_normalize_url(trip_link))

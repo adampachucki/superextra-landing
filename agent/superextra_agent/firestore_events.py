@@ -328,13 +328,13 @@ def _map_function_response(
 
     if name == "find_tripadvisor_restaurant":
         display_name = str(response.get("name") or "").strip() or str(response.get("title") or "").strip()
-        if status == "low_confidence":
+        if status == "unverified":
             rows.append(
                 _detail(
                     row_id,
                     "warning",
                     "Warnings",
-                    f"TripAdvisor match uncertain for {display_name or 'the venue'}",
+                    f"TripAdvisor match not verified for {display_name or 'the venue'}",
                 )
             )
             return rows

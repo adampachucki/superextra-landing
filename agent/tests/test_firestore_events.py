@@ -112,19 +112,23 @@ def test_google_maps_response_uses_place_name():
     assert mapped["timeline_events"][0]["text"] == "Profile for Umami Berlin"
 
 
-def test_tripadvisor_low_confidence_becomes_warning():
+def test_tripadvisor_unverified_becomes_warning():
+    """Unverified status (coord check failed or no coords available) renders
+    as a timeline warning row. On unverified the tool strips `name`, so the
+    mapper falls back to 'the venue'."""
     ev = _event(
         author="review_analyst",
         function_responses=[
             (
                 "find_tripadvisor_restaurant",
-                {"status": "low_confidence", "name": "Umami Berlin"},
+                {"status": "unverified", "error_message": "coords didn't match"},
             )
         ],
     )
     mapped = map_event(ev, {})
     assert mapped["timeline_events"][0]["family"] == "Warnings"
-    assert "uncertain" in mapped["timeline_events"][0]["text"].lower()
+    assert "not verified" in mapped["timeline_events"][0]["text"].lower()
+    assert "the venue" in mapped["timeline_events"][0]["text"].lower()
 
 
 def test_google_reviews_uses_saved_place_name():
