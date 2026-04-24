@@ -166,22 +166,27 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "", t
             sample_reviews.append(review)
 
         # Register one "TripAdvisor" provider source on high-confidence
-        # matches. Unlike apify_tools.get_google_reviews, this tool has no
-        # `place_id` parameter, so we can't gate on `_target_place_id` for
-        # defense in depth. Instead we rely on a prompt-level invariant:
-        # `instructions/review_analyst.md` calls `find_tripadvisor_restaurant`
-        # for the target only. If that instruction ever changes to look up
-        # competitors, this write will produce duplicate TripAdvisor pills —
-        # add a code-level gate (e.g., first-write-wins on a state flag) at
-        # that point.
+        # matches — target only. This tool has no `place_id` arg, so we
+        # gate on the `name` arg matching the target's stored displayName
+        # (`_place_name_<_target_place_id>`, first-written by the enricher's
+        # Places call). Needed because review_analyst's LLM sometimes calls
+        # TripAdvisor for competitors too, and without this gate the
+        # surviving pill would link to whichever competitor finished first.
+        # Lowercase/strip comparison tolerates casing and whitespace drift
+        # between the Places displayName and whatever the LLM queried with.
         selected_link = match.get("link")
         if tool_context and match_confidence == "high" and selected_link:
-            tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
-                "provider": "tripadvisor",
-                "title": "TripAdvisor",
-                "url": selected_link,
-                "domain": "tripadvisor.com",
-            }
+            target_pid = tool_context.state.get("_target_place_id")
+            target_name = (
+                tool_context.state.get(f"_place_name_{target_pid}") or ""
+            ).strip().lower()
+            if not target_name or name.strip().lower() == target_name:
+                tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
+                    "provider": "tripadvisor",
+                    "title": "TripAdvisor",
+                    "url": selected_link,
+                    "domain": "tripadvisor.com",
+                }
 
         return {
             "status": "success" if match_confidence == "high" else "low_confidence",

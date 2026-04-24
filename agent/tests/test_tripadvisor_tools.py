@@ -358,6 +358,67 @@ class TestFindTripadvisorRestaurantSourceWrite:
 
         assert not any(k.startswith("_tool_src_") for k in ctx.state)
 
+    @pytest.mark.asyncio
+    async def test_skips_source_when_name_is_a_competitor(self):
+        """If review_analyst's LLM deviates from the target-only invariant
+        and looks up a competitor on TripAdvisor, the source write is gated
+        by the target-name check so the pill doesn't end up linking to a
+        competitor's TripAdvisor page. Regression guard for the bug caught
+        in the 2026-04-24 E2E run (Geranium pill on a Noma brief)."""
+        class MockCtx:
+            def __init__(self):
+                self.state = {
+                    "_target_place_id": "ChIJnomaxx",
+                    "_place_name_ChIJnomaxx": "Noma",
+                }
+
+        ctx = MockCtx()
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            await find_tripadvisor_restaurant(
+                "Geranium", "Copenhagen",
+                address="Per Henrik Lings Allé 4, 2100 København",
+                tool_context=ctx,
+            )
+
+        assert not any(k.startswith("_tool_src_") for k in ctx.state)
+
+    @pytest.mark.asyncio
+    async def test_writes_source_when_name_matches_target(self):
+        """Case/whitespace-tolerant comparison: LLM-authored name string
+        resolves against the target's stored displayName."""
+        class MockCtx:
+            def __init__(self):
+                self.state = {
+                    "_target_place_id": "ChIJumami",
+                    "_place_name_ChIJumami": "Umami",
+                }
+
+        ctx = MockCtx()
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            await find_tripadvisor_restaurant(
+                "  umami  ", "Berlin",   # casing + whitespace drift
+                address="Knaackstr. 16-18, 10405 Berlin",
+                tool_context=ctx,
+            )
+
+        source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
+        assert len(source_keys) == 1
+        assert ctx.state[source_keys[0]]["provider"] == "tripadvisor"
+
 
 class TestGetTripadvisorReviews:
     @pytest.mark.asyncio
