@@ -1147,10 +1147,6 @@
 		will-change: translate, margin-left;
 	}
 
-	.is-mounted .sidebar-overlay {
-		transition: opacity 0.3s ease;
-	}
-
 	.toggle-float {
 		transition:
 			background-color 0.2s ease,
@@ -1267,16 +1263,4 @@
 		transform: translateY(0);
 	}
 
-	.chat-input-enter {
-		opacity: 0;
-		transform: translateY(24px);
-		transition:
-			opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.1s,
-			transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.1s;
-	}
-
-	.chat-input-enter.is-mounted {
-		opacity: 1;
-		transform: translateY(0);
-	}
 </style>

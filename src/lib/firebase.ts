@@ -18,17 +18,13 @@ let handlePromise: Promise<FirebaseHandle> | null = null;
 
 /** Sentinel: Firebase can't bootstrap server-side because the config is at a
  *  browser-relative URL (`/__/firebase/init.json`) with no origin in Node.
- *  Callers (e.g. `attachSidebarListener`) recognise this by message and
- *  swallow it silently during prerender — vs. logging real errors on the
- *  client. */
+ *  Callers recognise this by `err.name === 'FirebaseUnavailableInSSRError'`
+ *  and swallow it silently during prerender. */
 class FirebaseUnavailableInSSRError extends Error {
 	constructor() {
 		super('Firebase bootstrap skipped: server-side');
 		this.name = 'FirebaseUnavailableInSSRError';
 	}
-}
-export function isFirebaseUnavailableInSSR(err: unknown): boolean {
-	return err instanceof FirebaseUnavailableInSSRError;
 }
 
 async function loadConfig(): Promise<Record<string, string>> {

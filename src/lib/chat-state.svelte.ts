@@ -22,7 +22,7 @@
  */
 
 import type { Unsubscribe } from 'firebase/firestore';
-import type { ChatSource, TimelineEvent, TurnCounts, TurnSummary } from '$lib/chat-types';
+import type { ChatSource, TimelineEvent, TurnSummary } from '$lib/chat-types';
 import { ensureAnonAuth, getFirebase, getIdToken } from '$lib/firebase';
 
 /** True iff `err` is `FirebaseUnavailableInSSRError` from `$lib/firebase`.
@@ -103,11 +103,6 @@ const LOAD_TIMEOUT_MS = 10_000;
 /** Events listener attaches only while latest turn is in these statuses. */
 const IN_FLIGHT_STATUSES = new Set(['queued', 'running', 'pending']);
 
-/** Turn doc IDs are zero-padded 4-digit strings (plan §5 / Stage 4). */
-function turnDocKey(turnIdx: number): string {
-	return String(turnIdx).padStart(4, '0');
-}
-
 function toMillis(value: unknown): number | null {
 	if (typeof value === 'number' && Number.isFinite(value)) return value;
 	if (
@@ -123,21 +118,6 @@ function toMillis(value: unknown): number | null {
 		}
 	}
 	return null;
-}
-
-function zeroCounts(): TurnCounts {
-	return { webQueries: 0, sources: 0, venues: 0, platforms: 0 };
-}
-
-// Optional pin #5 localStorage cleanup: clear the legacy browser-local
-// conversation store on module init. Deletable ~1 month after cutover.
-if (typeof localStorage !== 'undefined') {
-	try {
-		localStorage.removeItem('se_chats');
-		localStorage.removeItem('se_chat');
-	} catch {
-		// Ignore — private mode / storage quota / etc.
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -713,7 +693,5 @@ export const _testing = {
 	// For tests that want to avoid the real attach path.
 	markSidebarAttached() {
 		sidebarAttachStarted = true;
-	},
-	/** Coverage for zeroCounts / toMillis helpers — not used in production. */
-	_helpers: { zeroCounts, toMillis, turnDocKey }
+	}
 };
