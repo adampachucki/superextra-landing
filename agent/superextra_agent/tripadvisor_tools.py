@@ -86,9 +86,13 @@ async def find_tripadvisor_restaurant(
             TripAdvisor never sees it. Pass the target's Place ID so the
             "TripAdvisor" source pill resolves to the right venue.
     """
-    # TEMP (tripadvisor-place-id-gate-plan 2026-04-24): rollout verification of
-    # prompt adoption. Remove in a follow-up commit once Cloud Logging shows
-    # google_place_id is reliably populated on target calls.
+    # TEMP (tripadvisor-place-id-gate-plan 2026-04-24, commit 7ea2a47):
+    # rollout verification of prompt adoption. Remove in a follow-up commit
+    # once Cloud Logging confirms google_place_id is reliably populated on
+    # target calls. Grep Cloud Logging filter:
+    #   resource.type=cloud_run_revision
+    #   resource.labels.service_name=superextra-worker
+    #   textPayload:"tripadvisor_call"
     logger.info(
         "tripadvisor_call name=%r google_place_id=%r",
         name,
