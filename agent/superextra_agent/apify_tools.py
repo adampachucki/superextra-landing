@@ -112,7 +112,6 @@ async def get_google_reviews(place_id: str, max_reviews: int = 50, tool_context=
         # doesn't care how many entries there are.
         if (
             tool_context
-            and reviews
             and tool_context.state.get("_target_place_id") == place_id
         ):
             tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
