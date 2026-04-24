@@ -327,9 +327,10 @@ class TestFindTripadvisorRestaurantSourceWrite:
         source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
         assert len(source_keys) == 1
         entry = ctx.state[source_keys[0]]
+        assert entry["provider"] == "tripadvisor"
+        assert entry["title"] == "TripAdvisor"
         assert entry["domain"] == "tripadvisor.com"
         assert entry["url"] == "https://www.tripadvisor.com/Restaurant_Review-umami-p-berg"
-        assert "Umami P-Berg" in entry["title"]
 
     @pytest.mark.asyncio
     async def test_skips_source_on_low_confidence(self):

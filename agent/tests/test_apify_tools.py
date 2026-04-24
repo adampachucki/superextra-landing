@@ -136,22 +136,18 @@ class TestGetGoogleReviews:
 
 
 class TestGoogleReviewsSourceWrite:
-    """Per-place citations: URL is derived deterministically from the
-    `place_id` argument (Google Maps shortlink format); pill label reads
-    the name from `_place_name_<pid>` with a generic fallback if missing.
-    Each call writes a UNIQUE `_tool_src_<uuid>` state key so parallel
-    calls batched into one ADK event's state_delta all survive."""
+    """One "Google Reviews" provider source per turn, target only. The
+    enricher sets `_target_place_id` on its first Places call; Apify calls
+    for competitors skip the source write so the final sources list stays
+    one-pill-per-provider."""
 
     @pytest.mark.asyncio
-    async def test_writes_distinct_source_per_call(self):
-        """Two consecutive calls for different place_ids write to distinct
-        state keys — both survive in state (not overwritten)."""
+    async def test_target_call_writes_provider_source(self):
+        """When `place_id == state._target_place_id`, write one canonical
+        Google Reviews source entry."""
         class MockCtx:
             def __init__(self):
-                self.state = {
-                    "_place_name_ChIJtarget": "Noma",
-                    "_place_name_ChIJcomp": "Alchemist",
-                }
+                self.state = {"_target_place_id": "ChIJtarget"}
 
         ctx = MockCtx()
         mock_client = AsyncMock()
@@ -160,24 +156,38 @@ class TestGoogleReviewsSourceWrite:
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
             await get_google_reviews("ChIJtarget", tool_context=ctx)
-            await get_google_reviews("ChIJcomp", tool_context=ctx)
 
-        # Two distinct `_tool_src_<uuid>` keys — one per call.
         source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
-        assert len(source_keys) == 2
-        entries = [ctx.state[k] for k in source_keys]
-        urls = {e["url"] for e in entries}
-        titles = {e["title"] for e in entries}
-        assert urls == {
-            "https://www.google.com/maps/place/?q=place_id:ChIJtarget",
-            "https://www.google.com/maps/place/?q=place_id:ChIJcomp",
-        }
-        assert titles == {"Google Reviews — Noma", "Google Reviews — Alchemist"}
+        assert len(source_keys) == 1
+        entry = ctx.state[source_keys[0]]
+        assert entry["provider"] == "google_reviews"
+        assert entry["title"] == "Google Reviews"
+        assert entry["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJtarget"
+        assert entry["domain"] == "google.com"
 
     @pytest.mark.asyncio
-    async def test_falls_back_to_generic_name_when_place_key_missing(self):
-        """If the enricher didn't run (or this is an ad-hoc call), cite the
-        provider with a generic label rather than dropping the citation."""
+    async def test_competitor_call_skips_source_write(self):
+        """Calls for non-target place_ids don't add a second Google Reviews
+        pill. The target's pill already covers the provider."""
+        class MockCtx:
+            def __init__(self):
+                self.state = {"_target_place_id": "ChIJtarget"}
+
+        ctx = MockCtx()
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=_mock_response(APIFY_DATASET_RESPONSE))
+
+        with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
+            await get_google_reviews("ChIJcomp", tool_context=ctx)
+
+        source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
+        assert len(source_keys) == 0
+
+    @pytest.mark.asyncio
+    async def test_no_target_id_skips_source_write(self):
+        """Degraded run: if the enricher never set `_target_place_id`, don't
+        guess. No pill is better than a wrong one."""
         class MockCtx:
             def __init__(self):
                 self.state = {}
@@ -191,8 +201,4 @@ class TestGoogleReviewsSourceWrite:
             await get_google_reviews("ChIJunknown", tool_context=ctx)
 
         source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
-        assert len(source_keys) == 1
-        entry = ctx.state[source_keys[0]]
-        assert entry["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJunknown"
-        assert entry["title"] == "Google Reviews — restaurant"
-        assert entry["domain"] == "google.com"
+        assert len(source_keys) == 0

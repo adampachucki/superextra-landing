@@ -165,16 +165,20 @@ async def find_tripadvisor_restaurant(name: str, area: str, address: str = "", t
                 review["author_hometown"] = author["hometown"]
             sample_reviews.append(review)
 
-        # Attach a provider source on high-confidence matches. Writes a
-        # UNIQUE state key per tool call (`_tool_src_<uuid>`) so that when
-        # ADK batches multiple parallel tool calls into one event's
-        # state_delta, all of the writes survive as distinct keys rather
-        # than overwriting each other. See apify_tools.get_google_reviews
-        # for the same pattern and its reasoning.
+        # Register one "TripAdvisor" provider source on high-confidence
+        # matches. Unlike apify_tools.get_google_reviews, this tool has no
+        # `place_id` parameter, so we can't gate on `_target_place_id` for
+        # defense in depth. Instead we rely on a prompt-level invariant:
+        # `instructions/review_analyst.md` calls `find_tripadvisor_restaurant`
+        # for the target only. If that instruction ever changes to look up
+        # competitors, this write will produce duplicate TripAdvisor pills —
+        # add a code-level gate (e.g., first-write-wins on a state flag) at
+        # that point.
         selected_link = match.get("link")
         if tool_context and match_confidence == "high" and selected_link:
             tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
-                "title": f"TripAdvisor — {place_data.get('name') or match.get('title') or 'restaurant page'}",
+                "provider": "tripadvisor",
+                "title": "TripAdvisor",
                 "url": selected_link,
                 "domain": "tripadvisor.com",
             }

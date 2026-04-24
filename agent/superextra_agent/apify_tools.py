@@ -103,21 +103,22 @@ async def get_google_reviews(place_id: str, max_reviews: int = 50, tool_context=
                 review["owner_response"] = owner_resp
             reviews.append(review)
 
-        # Attach a per-place provider source entry under a UNIQUE state key
-        # per tool call. ADK batches parallel tool calls into one event with
-        # one state_delta — if multiple calls wrote to the same key, only
-        # the last survives. A unique `_tool_src_<uuid>` key per call means
-        # all parallel writes appear as distinct keys in state_delta, so the
-        # worker accumulator drains every one. Also immune to cross-turn
-        # leakage: old turn's keys persist in session state but never appear
-        # in a future event's state_delta (nothing writes to them), so the
-        # drain doesn't see them.
-        if tool_context and reviews:
-            maps_uri = f"https://www.google.com/maps/place/?q=place_id:{place_id}"
-            name = tool_context.state.get(f"_place_name_{place_id}", "restaurant")
+        # Register one "Google Reviews" provider source — target only. The
+        # enricher writes `_target_place_id` on the first Places call, so by
+        # the time this tool runs the key is set; competitor calls silently
+        # skip. The unique `_tool_src_<uuid>` key pattern is still needed for
+        # the worker-side drain even though we now write at most once per
+        # turn, because other tools use the same pattern and the drain
+        # doesn't care how many entries there are.
+        if (
+            tool_context
+            and reviews
+            and tool_context.state.get("_target_place_id") == place_id
+        ):
             tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
-                "title": f"Google Reviews — {name}",
-                "url": maps_uri,
+                "provider": "google_reviews",
+                "title": "Google Reviews",
+                "url": f"https://www.google.com/maps/place/?q=place_id:{place_id}",
                 "domain": "google.com",
             }
 

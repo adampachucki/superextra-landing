@@ -4,7 +4,7 @@
 	import { tts } from '$lib/tts.svelte';
 	import { splitChartSegments } from '$lib/chart-blocks';
 	import { createTypewriter } from '$lib/typewriter';
-	import type { TurnCounts } from '$lib/chat-types';
+	import type { ChatSourceProvider, TurnCounts } from '$lib/chat-types';
 	import ChartBlock from './ChartBlock.svelte';
 	import StreamingProgress from './StreamingProgress.svelte';
 
@@ -99,6 +99,11 @@
 	}
 
 	const SOURCES_LIMIT = 19;
+	const PROVIDER_LABELS: Record<ChatSourceProvider, string> = {
+		google_maps: 'Google Maps',
+		google_reviews: 'Google Reviews',
+		tripadvisor: 'TripAdvisor'
+	};
 	let expandedSources: Record<number, boolean> = $state({});
 </script>
 
@@ -222,6 +227,9 @@
 											})() ||
 											src.title ||
 											''}
+										{@const label = src.provider
+											? PROVIDER_LABELS[src.provider]
+											: domain || src.title}
 										<a
 											href={src.url}
 											target="_blank"
@@ -236,7 +244,7 @@
 											<span
 												class="text-[12px] leading-snug text-black/50 transition-colors group-hover:text-black/70 dark:text-white/50 dark:group-hover:text-white/70"
 											>
-												{domain || src.title}
+												{label}
 											</span>
 										</a>
 									{/each}

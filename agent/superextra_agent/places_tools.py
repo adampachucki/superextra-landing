@@ -2,6 +2,7 @@ import atexit
 import asyncio
 import logging
 import os
+import uuid
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -111,12 +112,15 @@ async def get_restaurant_details(place_id: str, tool_context=None) -> dict:
         # Stash per-place metadata so downstream tools (esp. apify_tools.
         # get_google_reviews) can cite the right restaurant without extra API
         # calls. `_place_name_<pid>` is per-place and written every call —
-        # batch competitor fetches need to populate it too. `_target_lat` /
-        # `_target_lng` are target-only (consumed by `_inject_geo_bias` to
-        # bias google_search toward the target) and must NOT be overwritten
-        # by later competitor fetches; first write wins. The enricher calls
-        # target first by convention, so this protects the intended coords.
+        # batch competitor fetches need to populate it too. `_target_place_id`
+        # and `_target_lat`/`_target_lng` are target-only; first write wins,
+        # relying on the enricher's convention of calling target before the
+        # competitor batch. `_target_place_id` is written independently of
+        # coords so target identity survives a location-less Places response.
         if tool_context:
+            if "_target_place_id" not in tool_context.state:
+                tool_context.state["_target_place_id"] = place_id
+
             loc = place.get("location", {})
             if (
                 loc.get("latitude") and loc.get("longitude")
@@ -124,9 +128,20 @@ async def get_restaurant_details(place_id: str, tool_context=None) -> dict:
             ):
                 tool_context.state["_target_lat"] = loc["latitude"]
                 tool_context.state["_target_lng"] = loc["longitude"]
+
             name = (place.get("displayName") or {}).get("text")
             if name:
                 tool_context.state[f"_place_name_{place_id}"] = name
+
+            if tool_context.state.get("_target_place_id") == place_id:
+                maps_uri = place.get("googleMapsUri")
+                if maps_uri:
+                    tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
+                        "provider": "google_maps",
+                        "title": "Google Maps",
+                        "url": maps_uri,
+                        "domain": "google.com",
+                    }
         return {"status": "success", "place": place}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}

@@ -9,10 +9,13 @@
  * in any runtime.
  */
 
+export type ChatSourceProvider = 'google_maps' | 'google_reviews' | 'tripadvisor';
+
 export interface ChatSource {
 	title: string;
 	url: string;
 	domain?: string;
+	provider?: ChatSourceProvider;
 }
 
 export interface TurnCounts {
