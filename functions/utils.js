@@ -1,11 +1,4 @@
 // Pure utility functions extracted from index.js for testability.
-//
-// The SSE-era helpers (`parseADKStream`, `sendSSE`, `extractSourcesFromText`,
-// `extractLastSentence`, `TOOL_LABELS`, `SPECIALIST_OUTPUT_KEYS`,
-// `SPECIALIST_RESULT_KEYS`, `PLACES_TOOL_LABELS`) lived here until the
-// pipeline-decoupling refactor retired the SSE path. Source extraction now
-// happens in `agent/superextra_agent/firestore_events.py`; the worker writes
-// mapped events directly to Firestore. These exports were removed post-smoke.
 
 // --- Input validation ---
 

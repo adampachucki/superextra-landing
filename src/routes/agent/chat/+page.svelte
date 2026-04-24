@@ -5,6 +5,7 @@
 	import { theme } from '$lib/theme.svelte';
 	import { dictation } from '$lib/dictation.svelte';
 	import { createPlaceSearch } from '$lib/place-search.svelte';
+	import { formatRelativeTime } from '$lib/format-time';
 
 	const PREFIX = 'Ask Superextra ';
 	const PROMPTS = [
@@ -327,18 +328,6 @@
 		if (!target.closest('.sb-item')) confirmDeleteId = null;
 	}
 
-	function formatRelativeTime(ts: number): string {
-		const diff = Date.now() - ts;
-		const minutes = Math.floor(diff / 60000);
-		if (minutes < 1) return 'just now';
-		if (minutes < 60) return `${minutes}m ago`;
-		const hours = Math.floor(minutes / 60);
-		if (hours < 24) return `${hours}h ago`;
-		const days = Math.floor(hours / 24);
-		if (days === 1) return 'yesterday';
-		if (days < 7) return `${days}d ago`;
-		return new Date(ts).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
-	}
 </script>
 
 <svelte:window onclick={handleWindowClick} />

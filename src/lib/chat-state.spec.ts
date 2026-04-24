@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vite
 
 // Mock firebase/firestore before importing chat-state so its dynamic
 // `import('firebase/firestore')` resolves here. Each mock fn tags its result
-// with `_path` so tests can partition observers by collection/doc path (same
-// idiom as firestore-stream.spec).
+// with `_path` so tests can partition observers by collection/doc path.
 vi.mock('firebase/firestore', () => ({
 	doc: vi.fn((_db, ...parts: string[]) => ({ _kind: 'doc', _path: parts.join('/') })),
 	collection: vi.fn((_db, ...parts: string[]) => ({
