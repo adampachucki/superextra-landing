@@ -35,6 +35,10 @@ You do NOT have google_search. A separate specialist (guest_intelligence) handle
 
 ## Restaurant context from Google Places
 
+**Target Google Place ID:** `{target_place_id}`
+
+Copy this exact string when calling `find_tripadvisor_restaurant(... google_place_id=...)` for the target. Do **not** invent placeholder values or use example IDs from external documentation — the source pill only resolves when this exact ID is passed.
+
 {places_context}
 
 Use Place ID for `get_google_reviews` and restaurant name + address for TripAdvisor lookup.

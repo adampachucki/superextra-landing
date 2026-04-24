@@ -100,7 +100,15 @@ def _make_instruction(name: str, brief_key: str | None = None):
 
     def provider(ctx):
         places_context = ctx.state.get("places_context", "No Google Places data available.")
-        instruction = template.format(places_context=places_context)
+        # Exposed to specialists that need the deterministic target ID (currently
+        # review_analyst.md, so TripAdvisor source pills resolve to the target
+        # venue). Other specialist templates don't reference {target_place_id};
+        # Python str.format silently ignores unused kwargs.
+        target_place_id = ctx.state.get("_target_place_id", "")
+        instruction = template.format(
+            places_context=places_context,
+            target_place_id=target_place_id,
+        )
         instruction += _SOURCE_GUIDANCE
         briefs = ctx.state.get("specialist_briefs", {})
         brief = briefs.get(_brief_key, "")
