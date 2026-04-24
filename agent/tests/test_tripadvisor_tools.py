@@ -140,6 +140,7 @@ class TestFindTripadvisorRestaurant:
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
             result = await find_tripadvisor_restaurant(
                 "Umami", "Prenzlauer Berg Berlin",
+                google_place_id="ChIJdummy",
                 address="Knaackstr. 16-18, 10405 Berlin",
             )
 
@@ -167,7 +168,9 @@ class TestFindTripadvisorRestaurant:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await find_tripadvisor_restaurant("Umami", "Prenzlauer Berg Berlin")
+            result = await find_tripadvisor_restaurant(
+                "Umami", "Prenzlauer Berg Berlin", google_place_id="ChIJdummy"
+            )
 
         assert len(result["candidates"]) == 3
         assert result["candidates"][0]["title"] == "Umami P-Berg"
@@ -187,7 +190,9 @@ class TestFindTripadvisorRestaurant:
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
             # PLACE_RESPONSE has address "Knaackstr. 16-18, 10405 Berlin"
             result = await find_tripadvisor_restaurant(
-                "Umami", "Berlin", address="Knaackstr. 16-18, 10405 Berlin"
+                "Umami", "Berlin",
+                google_place_id="ChIJdummy",
+                address="Knaackstr. 16-18, 10405 Berlin",
             )
 
         assert result["match_confidence"] == "high"
@@ -207,7 +212,9 @@ class TestFindTripadvisorRestaurant:
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
             await find_tripadvisor_restaurant(
-                "Umami", "Berlin", address="Knaackstr. 16-18, 10405 Berlin"
+                "Umami", "Berlin",
+                google_place_id="ChIJdummy",
+                address="Knaackstr. 16-18, 10405 Berlin",
             )
 
         # First call is the tripadvisor search; inspect its params.
@@ -227,7 +234,9 @@ class TestFindTripadvisorRestaurant:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            await find_tripadvisor_restaurant("Umami", "Prenzlauer Berg Berlin")
+            await find_tripadvisor_restaurant(
+                "Umami", "Prenzlauer Berg Berlin", google_place_id="ChIJdummy"
+            )
 
         first_call_params = mock_client.get.call_args_list[0].kwargs["params"]
         assert first_call_params["q"] == "Umami Prenzlauer Berg Berlin"
@@ -246,7 +255,9 @@ class TestFindTripadvisorRestaurant:
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
             result = await find_tripadvisor_restaurant(
-                "Umami", "Berlin", address="Completely Different Street 99, 99999 Munich"
+                "Umami", "Berlin",
+                google_place_id="ChIJdummy",
+                address="Completely Different Street 99, 99999 Munich",
             )
 
         assert result["status"] == "low_confidence"
@@ -267,7 +278,9 @@ class TestFindTripadvisorRestaurant:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await find_tripadvisor_restaurant("Umami", "Berlin")
+            result = await find_tripadvisor_restaurant(
+                "Umami", "Berlin", google_place_id="ChIJdummy"
+            )
 
         assert result["status"] == "low_confidence"
         assert result["selected_index"] == 0
@@ -280,7 +293,9 @@ class TestFindTripadvisorRestaurant:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await find_tripadvisor_restaurant("Nonexistent", "Nowhere")
+            result = await find_tripadvisor_restaurant(
+                "Nonexistent", "Nowhere", google_place_id="ChIJdummy"
+            )
 
         assert result["status"] == "error"
         assert "No TripAdvisor results" in result["error_message"]
@@ -292,7 +307,9 @@ class TestFindTripadvisorRestaurant:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await find_tripadvisor_restaurant("Umami", "Berlin")
+            result = await find_tripadvisor_restaurant(
+                "Umami", "Berlin", google_place_id="ChIJdummy"
+            )
 
         assert result["status"] == "error"
         assert "500" in result["error_message"]
@@ -399,10 +416,11 @@ class TestFindTripadvisorRestaurantSourceWrite:
         assert not any(k.startswith("_tool_src_") for k in ctx.state)
 
     @pytest.mark.asyncio
-    async def test_skips_source_when_place_id_missing(self):
-        """If the agent forgets to pass `google_place_id`, no pill — same
-        strictness as `apify_tools.get_google_reviews`. Better to miss a pill
-        than to show the wrong one."""
+    async def test_skips_source_when_place_id_empty(self):
+        """Defense in depth: even if `google_place_id` arrives empty (e.g.
+        the LLM passed `""` despite the schema marking it required), the
+        gate's truthiness check keeps a stray pill from appearing. Better
+        to miss a pill than to show the wrong one."""
         class MockCtx:
             def __init__(self):
                 self.state = {"_target_place_id": "ChIJtarget"}
@@ -418,9 +436,9 @@ class TestFindTripadvisorRestaurantSourceWrite:
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
             await find_tripadvisor_restaurant(
                 "Umami", "Berlin",
+                google_place_id="",   # empty despite schema marking it required
                 address="Knaackstr. 16-18, 10405 Berlin",
                 tool_context=ctx,
-                # google_place_id deliberately omitted
             )
 
         assert not any(k.startswith("_tool_src_") for k in ctx.state)
@@ -526,6 +544,8 @@ class TestApiKeyRequired:
     async def test_missing_key_raises(self):
         with patch.dict("os.environ", {}, clear=True), \
              patch("superextra_agent.tripadvisor_tools._client", None):
-            result = await find_tripadvisor_restaurant("Test", "Berlin")
+            result = await find_tripadvisor_restaurant(
+                "Test", "Berlin", google_place_id="ChIJdummy"
+            )
             assert result["status"] == "error"
             assert "SERPAPI_API_KEY" in result["error_message"]

@@ -61,8 +61,8 @@ def _address_match_score(a: str, b: str) -> float:
 async def find_tripadvisor_restaurant(
     name: str,
     area: str,
+    google_place_id: str,
     address: str = "",
-    google_place_id: str = "",
     tool_context=None,
 ) -> dict:
     """Find a restaurant on TripAdvisor and return its full profile.
@@ -80,11 +80,12 @@ async def find_tripadvisor_restaurant(
     Args:
         name: Restaurant name (e.g. 'Umami P-Berg').
         area: City or neighborhood for search context (e.g. 'Prenzlauer Berg Berlin').
+        google_place_id: REQUIRED. The Google Place ID of the restaurant being
+            looked up, copied from the Places context (e.g.
+            'ChIJN1t_tDeuEmsRUsoyG83frY4'). Used only for source-pill
+            attribution — TripAdvisor never sees it. Without this, the
+            "TripAdvisor" source pill cannot resolve to the right venue.
         address: Optional full street address from Google Places for matching confidence.
-        google_place_id: The Google Place ID of the restaurant being looked up
-            (from the Places context). Used only for source-pill attribution —
-            TripAdvisor never sees it. Pass the target's Place ID so the
-            "TripAdvisor" source pill resolves to the right venue.
     """
     # TEMP (tripadvisor-place-id-gate-plan 2026-04-24, commit 7ea2a47):
     # rollout verification of prompt adoption. Remove in a follow-up commit
