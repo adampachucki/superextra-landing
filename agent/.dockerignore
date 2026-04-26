@@ -3,6 +3,8 @@
 __pycache__/
 logs/
 tests/
+evals/
+probe/
 .env
 .adk/
 *.pyc

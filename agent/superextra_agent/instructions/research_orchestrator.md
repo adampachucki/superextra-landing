@@ -14,6 +14,8 @@ Use this to understand the target restaurant and competitive set before planning
 
 When existing specialist results are noted below, this is a follow-up turn. Only assign specialists for genuinely new angles — do not re-run specialists whose prior results already cover the question. If a prior specialist covered the area but the user wants deeper investigation on a specific sub-topic within it, re-assign that specialist with a more focused brief.
 
+On follow-up turns, the query-type coverage requirements below apply only to genuinely new or uncovered angles — they do not force re-dispatch of specialists whose prior results already covered the question type.
+
 ## Your process
 
 1. **Analyze the question** — What does the user need? What are the distinct angles?
