@@ -1,0 +1,60 @@
+{
+  "queries": [
+    {
+      "id": "q1_openings_closings",
+      "pill_category": "competitor_tracking",
+      "pill_color": "cyan",
+      "primary_probe": true,
+      "text": "What has opened or closed in my area recently?"
+    },
+    {
+      "id": "q2_closures_lessons",
+      "pill_category": "market_shifts",
+      "pill_color": "red",
+      "primary_probe": true,
+      "text": "What has closed nearby recently and what can I learn from it?"
+    },
+    {
+      "id": "q3_price_comparison",
+      "pill_category": "price_positioning",
+      "pill_color": "amber",
+      "primary_probe": true,
+      "text": "How does our menu pricing compare to competitors within 1 km?"
+    },
+    {
+      "id": "q4_sentiment_themes",
+      "pill_category": "sentiment_trends",
+      "pill_color": "orange",
+      "primary_probe": false,
+      "text": "What are the real sentiment themes across our reviews and competitors?"
+    },
+    {
+      "id": "q5_thriving_formats",
+      "pill_category": "concept_validation",
+      "pill_color": "pink",
+      "primary_probe": false,
+      "text": "Which formats and cuisines are thriving in this neighbourhood?"
+    },
+    {
+      "id": "q6_market_saturation",
+      "pill_category": "site_selection",
+      "pill_color": "purple",
+      "primary_probe": false,
+      "text": "How saturated is the food and drink market within 1 km of this location?"
+    },
+    {
+      "id": "q7_market_performance",
+      "pill_category": "market_context",
+      "pill_color": "indigo",
+      "primary_probe": false,
+      "text": "How is the local food and drink market performing compared to six months ago?"
+    },
+    {
+      "id": "q8_wage_benchmarks",
+      "pill_category": "wage_benchmarking",
+      "pill_color": "green",
+      "primary_probe": false,
+      "text": "What are restaurants near us actually paying for every role?"
+    }
+  ]
+}

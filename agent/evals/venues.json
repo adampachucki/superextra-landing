@@ -1,0 +1,25 @@
+{
+  "venues": [
+    {
+      "key": "monsun",
+      "name": "Monsun",
+      "secondary": "Świętojańska, Gdynia, Poland",
+      "context_note": "high street retail context",
+      "place_id": "ChIJ48HwEQCn_UYRmVqYQULc9pM"
+    },
+    {
+      "key": "bar_leon",
+      "name": "Bar Leon",
+      "secondary": "Stągiewna, Gdańsk, Poland",
+      "context_note": "touristy island (Wyspa Spichrzów), investment-heavy",
+      "place_id": "ChIJEX41qZlz_UYRWEr0Sgd_T3U"
+    },
+    {
+      "key": "sliwka_w_kompot",
+      "name": "Śliwka w Kompot",
+      "secondary": "Sopot, Poland",
+      "context_note": "resort-town context",
+      "place_id": "ChIJ7ZaTw5EK_UYRO3MOsVS1e_0"
+    }
+  ]
+}

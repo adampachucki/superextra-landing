@@ -1,0 +1,16 @@
+{
+  "winner": "B",
+  "supporting_urls": [
+    "https://entwicklungsstadt.de/",
+    "https://berlinfoodstories.com/"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0_holdout/zeit_fur_brot__hq3_dinner_traffic_changes.json",
+  "input_b_path": "evals/results/V2_3_holdout/zeit_fur_brot__hq3_dinner_traffic_changes.json",
+  "venue_key": "zeit_fur_brot",
+  "query_id": "hq3_dinner_traffic_changes",
+  "raw_response": "Variant B is substantially more useful for an operator. It provides superior, actionable intelligence by directly refuting a critical misconception about the Torstraße construction, confirming the project won't start until Q3 2026. This single fact changes my entire short-term planning. B's analysis of recent closures is also more specific and reassuring, attributing them to isolated business issues rather than neighborhood decline, which bolsters my confidence to invest. Crucially, B includes a detailed breakdown of competitor strategies on delivery platforms like Wolt—a vital component of the modern dinner market that A completely misses. The report's high signal-to-noise ratio, data-driven insights from Google Reviews, and identification of a specific \"white space\" in the market (vegan/vegetarian) give me concrete, tactical steps I can evaluate this week. A tells a compelling but overly dramatic story; B delivers the grounded, verifiable facts I need to run my business.\n\n```json\n{\"winner\": \"B\", \"supporting_urls\": [\"https://entwicklungsstadt.de/\", \"https://berlinfoodstories.com/\"]}\n```",
+  "parse_error": null
+}

@@ -1,0 +1,16 @@
+{
+  "winner": "A",
+  "supporting_urls": [
+    "https://www.google.com/maps/place/Zeit+f%C3%BCr+Brot/",
+    "https://www.tip-berlin.de/"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0_holdout/zeit_fur_brot__hq5_one_change_synthesis.json",
+  "input_b_path": "evals/results/V2_3_holdout/zeit_fur_brot__hq5_one_change_synthesis.json",
+  "venue_key": "zeit_fur_brot",
+  "query_id": "hq5_one_change_synthesis",
+  "raw_response": "As the owner of Zeit für Brot, I find Variant A to be the more useful and immediately valuable report. While both analyses correctly identify similar market dynamics—namely the opportunity in savory items and the friction from a lack of English—Variant A’s recommendations are grounded in operational reality. Its proposal to simply heat our existing savory items is a brilliant, low-cost way to elevate the menu and compete with the brunch crowd at SOFI, without the massive R&D and supply chain overhaul suggested by Variant B. Variant A’s analysis correctly identifies that our core cinnamon roll is a strength to be protected, not a weakness, and its data-driven dismissal of the Cinnamood threat allows me to focus on the real opportunity: monetizing the lunch crowd we already have. It provides a clear, incremental path to improvement that respects our current high-volume reality and can be implemented immediately.\n\n```json\n{\"winner\": \"A\", \"supporting_urls\": [\"https://www.google.com/maps/place/Zeit+f%C3%BCr+Brot/\", \"https://www.tip-berlin.de/\"]}\n```",
+  "parse_error": null
+}

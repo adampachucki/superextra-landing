@@ -1,0 +1,25 @@
+{
+  "queries": [
+    {
+      "id": "q1_openings_closings",
+      "pill_category": "competitor_tracking",
+      "pill_color": "cyan",
+      "primary_probe": true,
+      "text": "What has opened or closed in my area recently?"
+    },
+    {
+      "id": "q2_closures_lessons",
+      "pill_category": "market_shifts",
+      "pill_color": "red",
+      "primary_probe": true,
+      "text": "What has closed nearby recently and what can I learn from it?"
+    },
+    {
+      "id": "q3_price_comparison",
+      "pill_category": "price_positioning",
+      "pill_color": "amber",
+      "primary_probe": true,
+      "text": "How does our menu pricing compare to competitors within 1 km?"
+    }
+  ]
+}

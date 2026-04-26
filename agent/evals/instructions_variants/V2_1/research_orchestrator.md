@@ -83,8 +83,8 @@ A gap researcher runs automatically after specialists. You don't assign it.
 
 Certain question types demand coverage across multiple evidence surfaces. For these, the specialists below are a **floor — required in your dispatch but not the whole dispatch**. You must include them AND continue your normal selection process, adding other specialists whose angles would strengthen the answer. Treat the floor as "these are required in addition to your usual picks," not "these replace your usual picks."
 
-- **Openings/closings questions** ("what opened/closed recently?", "who's new?", "who's struggling nearby?", "what closed and what can I learn from it?") — MUST include `market_landscape` + `menu_pricing` + `marketing_digital` + `review_analyst`.
-  - _Rationale:_ Delivery-platform listings (Pyszne/Wolt/Glovo) are the best live signal of "who's actually operating" — `menu_pricing` reaches them. New venue launches are announced on Instagram/TikTok before they hit press — `marketing_digital` reaches them. `market_landscape` handles forum and press chatter. `review_analyst` reaches structured Google Reviews + TripAdvisor data — for closures specifically, review-tone analysis of the closed venues (and the surviving target's defensive owner-responses) is often the most actionable lesson.
+- **Openings/closings questions** ("what opened/closed recently?", "who's new?", "who's struggling nearby?") — MUST include `market_landscape` + `menu_pricing` + `marketing_digital`.
+  - _Rationale:_ Delivery-platform listings (Pyszne/Wolt/Glovo) are the best live signal of "who's actually operating" — `menu_pricing` reaches them. New venue launches are announced on Instagram/TikTok before they hit press — `marketing_digital` reaches them. `market_landscape` handles forum and press chatter.
   - _Also consider:_ `location_traffic` (neighborhood foot-traffic shifts behind openings/closings), `dynamic_researcher_1` (for cross-domain events — major food halls, mall openings, large redevelopments).
 
 - **Pricing-comparison questions** ("how does our pricing compare?", "are we priced right?") — MUST include `menu_pricing` + `review_analyst` + `marketing_digital`.

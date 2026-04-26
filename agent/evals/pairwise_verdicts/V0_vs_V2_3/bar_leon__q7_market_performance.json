@@ -1,0 +1,16 @@
+{
+  "winner": "B",
+  "supporting_urls": [
+    "https://trojmiasto.pl/",
+    "https://www.gdansk.pl/"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0/bar_leon__q7_market_performance.json",
+  "input_b_path": "evals/results/V2_3/bar_leon__q7_market_performance.json",
+  "venue_key": "bar_leon",
+  "query_id": "q7_market_performance",
+  "raw_response": "Variant B is the more useful report for an operator. While both correctly identify critical issues like new competition and internal service frictions, B provides a superior strategic framework. It masterfully contextualizes the market within Gdańsk's role as the European Capital of Gastronomic Culture, explaining the paradox of high traffic and severe margin pressure. Its data is more nuanced and comparative, contrasting Bar Leon’s performance directly against key competitors through metrics like review velocity and owner response rates (0% vs. Magari's 63%). Crucially, B delivers deeper business intelligence by identifying the successful owners of Woosabi as the force behind the new competitor, Ulu. This level of detail, combined with memorable insights like the consumer sentiment of *\"Jemy poza domem, ale liczymy\"*, provides a richer, more actionable understanding of the competitive landscape, moving beyond simple diagnostics to strategic market intelligence.\n\n```json\n{\"winner\": \"B\", \"supporting_urls\": [\"https://trojmiasto.pl/\", \"https://www.gdansk.pl/\"]}\n```",
+  "parse_error": null
+}

@@ -25,6 +25,7 @@ from .specialists import (
 )
 from .places_tools import get_restaurant_details, get_batch_restaurant_details, find_nearby_restaurants, search_restaurants
 from .chat_logger import ChatLoggerPlugin
+import os
 from pathlib import Path
 
 # Fast model for simple tasks (routing, follow-up) — no thinking needed.
@@ -33,7 +34,8 @@ from pathlib import Path
 # handles for specialists).
 _FAST_MODEL = _make_gemini("gemini-2.5-flash", force_global=True)
 
-INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
+_dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
+INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
 
 # --- Instruction providers (inject session state into templates) ---
 

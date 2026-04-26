@@ -1,0 +1,34 @@
+{
+  "queries": [
+    {
+      "id": "hq1_winners_vs_weakspots",
+      "primary_probe": true,
+      "buckets": ["openings_closings", "thriving_formats", "competitor_analysis"],
+      "text": "A few places near us seem busy but others keep closing. What is actually separating the winners from the weak spots around here?"
+    },
+    {
+      "id": "hq2_pricing_exposed_by_delivery",
+      "primary_probe": true,
+      "buckets": ["pricing", "marketing_digital", "delivery_platforms"],
+      "text": "Are nearby restaurants discounting or using delivery apps in ways that make our current pricing look exposed?"
+    },
+    {
+      "id": "hq3_dinner_traffic_changes",
+      "primary_probe": true,
+      "buckets": ["openings_closings", "location_traffic", "daypart"],
+      "text": "What changed in this neighborhood recently that could affect dinner traffic, not just lunch or tourist traffic?"
+    },
+    {
+      "id": "hq4_competitor_vulnerability",
+      "primary_probe": false,
+      "buckets": ["competitor_analysis", "own_venue_forecast", "closure_risk"],
+      "text": "Which competitors look most vulnerable right now, and what warning signs should we watch for in our own business?"
+    },
+    {
+      "id": "hq5_one_change_synthesis",
+      "primary_probe": true,
+      "buckets": ["pricing", "marketing", "market_landscape", "synthesis"],
+      "text": "If we had to make one menu or positioning change this month based on the local market, what would the evidence support?"
+    }
+  ]
+}

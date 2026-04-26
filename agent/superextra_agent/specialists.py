@@ -20,7 +20,8 @@ from .web_tools import fetch_web_content
 
 logger = logging.getLogger(__name__)
 
-INSTRUCTIONS_DIR = Path(__file__).parent / "instructions"
+_dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
+INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
 
 _version = os.environ.get("GEMINI_VERSION", "3.1")
 

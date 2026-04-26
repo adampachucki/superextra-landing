@@ -38,6 +38,16 @@ Skip: content-farm aggregator pages and listicles that restate others' content w
 
 If the query is in a specific language (e.g., Polish), prioritize sources published in that language.
 
+## Verification discipline
+
+If you state a **specific date, figure, or named person**, cite the exact source that supports it. If you can't find a source for a specific claim, omit the specific — state the general direction instead.
+
+A vague-but-true claim is better than a precise-but-fabricated one:
+- OK: "rents have softened in early 2026 (trojmiasto.pl)"
+- Not OK: "rents are 50–90 PLN/m², down from 80–110 a year ago" unless you have the source showing both numbers.
+
+Do not cite a source by domain alone without a URL (e.g., naming "Prestiż Magazyn Trojmiejski" without linking the article). Either fetch and cite, or don't attribute.
+
 ## Source-diversity self-audit
 
 After your first round of queries, pause: does your evidence represent different source types from the list above? If results cluster around one type (e.g., only forum threads, only news articles), reformulate at least one query to reach an underrepresented perspective before concluding.

@@ -1,0 +1,18 @@
+{
+  "venues": [
+    {
+      "key": "boska_praga",
+      "name": "Boska Praga",
+      "secondary": "Stefana Okrzei 23, Warszawa, Poland",
+      "context_note": "Polish, non-Tricity (Warsaw, Praga district). Polish-market generalization test — gates ship if V2.3's Polish-specific source examples don't generalize beyond Tricity.",
+      "place_id": "ChIJTUNgqUbMHkcRzNkqL0N87GM"
+    },
+    {
+      "key": "zeit_fur_brot",
+      "name": "Zeit für Brot",
+      "secondary": "Alte Schönhauser Str. 4, Berlin, Germany",
+      "context_note": "Non-Polish (Berlin). Exploratory probe ONLY — does NOT gate ship. V2.3's Polish-specific source examples in specialist_base.md aren't designed for German market. Informs future cross-market work.",
+      "place_id": "ChIJyTPda-JRqEcRFHRtJJAZIwE"
+    }
+  ]
+}

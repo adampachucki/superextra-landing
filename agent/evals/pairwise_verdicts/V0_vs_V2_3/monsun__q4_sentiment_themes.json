@@ -1,0 +1,17 @@
+{
+  "winner": "B",
+  "supporting_urls": [
+    "google.com",
+    "wolt.com",
+    "pyszne.pl"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0/monsun__q4_sentiment_themes.json",
+  "input_b_path": "evals/results/V2_3/monsun__q4_sentiment_themes.json",
+  "venue_key": "monsun",
+  "query_id": "q4_sentiment_themes",
+  "raw_response": "Variant B is the more useful report for an operator. While both correctly identify core issues like kitchen inconsistency and a polarized customer base, B provides superior strategic tools. Its quantitative price comparison chart is a standout feature, immediately visualizing Monsun’s premium pricing against four distinct competitors and making the value-for-money problem undeniable. B also paints a more sophisticated market map by introducing the \"authentic\" competitor (MIWO), framing the landscape as a spectrum from \"pop\" to \"traditional\" to \"utility.\" This provides a clearer strategic context. Finally, its hyper-specific details, such as naming the owner and quoting a defensive review response, deliver feedback that is more personal, credible, and impossible for management to ignore. The combination of a powerful data visualization, a more nuanced competitive analysis, and direct, verifiable feedback makes B the more actionable and impactful choice.\n\n```json\n{\"winner\": \"B\", \"supporting_urls\": [\"google.com\", \"wolt.com\", \"pyszne.pl\"]}\n```",
+  "parse_error": null
+}

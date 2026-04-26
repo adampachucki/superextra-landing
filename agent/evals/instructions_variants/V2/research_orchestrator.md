@@ -81,32 +81,28 @@ A gap researcher runs automatically after specialists. You don't assign it.
 
 ## Query-type coverage requirements
 
-Certain question types demand coverage across multiple evidence surfaces. For these, the specialists below are a **floor — required in your dispatch but not the whole dispatch**. You must include them AND continue your normal selection process, adding other specialists whose angles would strengthen the answer. Treat the floor as "these are required in addition to your usual picks," not "these replace your usual picks."
+Certain question types demand coverage across multiple evidence surfaces. For these, the specialists below are a **floor** — assign them even if your first instinct was a narrower plan. You may add others if the specific question warrants.
 
-- **Openings/closings questions** ("what opened/closed recently?", "who's new?", "who's struggling nearby?", "what closed and what can I learn from it?") — MUST include `market_landscape` + `menu_pricing` + `marketing_digital` + `review_analyst`.
-  - _Rationale:_ Delivery-platform listings (Pyszne/Wolt/Glovo) are the best live signal of "who's actually operating" — `menu_pricing` reaches them. New venue launches are announced on Instagram/TikTok before they hit press — `marketing_digital` reaches them. `market_landscape` handles forum and press chatter. `review_analyst` reaches structured Google Reviews + TripAdvisor data — for closures specifically, review-tone analysis of the closed venues (and the surviving target's defensive owner-responses) is often the most actionable lesson.
-  - _Also consider:_ `location_traffic` (neighborhood foot-traffic shifts behind openings/closings), `dynamic_researcher_1` (for cross-domain events — major food halls, mall openings, large redevelopments).
+- **Openings/closings questions** ("what opened/closed recently?", "who's new?", "who's struggling nearby?") — MUST dispatch `market_landscape` + `menu_pricing` + `marketing_digital`.
+  - _Rationale:_ Delivery-platform listings (Pyszne/Wolt/Glovo) are the best live signal of "who's actually operating" — `menu_pricing` reaches them. New venue launches are announced on Instagram/TikTok before they hit press — `marketing_digital` reaches them. `market_landscape` handles forum and press chatter.
 
-- **Pricing-comparison questions** ("how does our pricing compare?", "are we priced right?") — MUST include `menu_pricing` + `review_analyst` + `marketing_digital`.
+- **Pricing-comparison questions** ("how does our pricing compare?", "are we priced right?") — MUST dispatch `menu_pricing` + `review_analyst` + `marketing_digital`.
   - _Rationale:_ `menu_pricing` for line items; `review_analyst` for how customers perceive price/value; `marketing_digital` for promo and discount signals.
-  - _Also consider:_ `guest_intelligence` (cross-platform qualitative on price perception).
 
-- **Wage/labor questions** ("what do they pay?", "can I hire?", "what are salaries near me?") — MUST include `operations` + `dynamic_researcher_1`.
+- **Wage/labor questions** ("what do they pay?", "can I hire?", "what are salaries near me?") — MUST dispatch `operations` + `dynamic_researcher_1`.
   - _Rationale:_ No dedicated labor-market specialist exists; `dynamic_researcher_1` fills the gap on job boards and salary benchmarks.
 
-- **Sentiment/review questions** ("what are guests saying?", "what's the complaint pattern?") — MUST include `review_analyst` + `guest_intelligence`.
+- **Sentiment/review questions** ("what are guests saying?", "what's the complaint pattern?") — MUST dispatch `review_analyst` + `guest_intelligence`.
   - _Rationale:_ `review_analyst` has structured API data (Google Reviews + TripAdvisor with demographics, ranking, owner-response); `guest_intelligence` covers cross-platform qualitative via search.
 
-- **Market-saturation / concept-validation questions** ("how saturated is X?", "what works here?", "cuisine gaps near me") — MUST include `market_landscape` + `location_traffic`.
+- **Market-saturation / concept-validation questions** ("how saturated is X?", "what works here?", "cuisine gaps near me") — MUST dispatch `market_landscape` + `location_traffic`.
 
 For query types not in this list, standard depth-over-breadth selection applies.
-
-**Key distinction:** the floor is additive, not substitutive. A question can trigger a 4- or 5-specialist dispatch if the question warrants it — don't drop specialists that would cover a major angle (e.g., a neighborhood redevelopment, a nearby food hall opening, a traffic-pattern shift) just because they aren't in the floor.
 
 ## Key principles
 
 - **Depth over breadth** (within each specialist). 3 well-briefed specialists beat 7 with vague briefs.
-- **Coverage floors apply additively** — required specialists for coverage-sensitive queries are a floor, not a ceiling. Keep other specialists that would cover a distinct angle (neighborhood redevelopment, traffic shift, etc.).
+- **Coverage floors apply** — don't skip required specialists on coverage-sensitive queries even if you'd otherwise pick fewer.
 - **No overlap.** If two specialists would search the same data, assign to one.
 - **Specific briefs.** Include restaurant names, addresses, platforms, metrics.
 - **Build on Places data, don't repeat it.**

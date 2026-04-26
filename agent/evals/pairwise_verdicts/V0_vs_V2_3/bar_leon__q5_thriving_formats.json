@@ -1,0 +1,16 @@
+{
+  "winner": "B",
+  "supporting_urls": [
+    "https://www.trojmiasto.pl/wiadomosci/Wyspa-Spichrzow-jako-Park-Kulturowy-Koniec-z-halasem-w-nocy-n187345.html",
+    "https://whitemad.pl/ulu-soulfood-oasis-nowe-miejsce-w-gdansku-zaprojektowane-przez-cudo-studio/"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0/bar_leon__q5_thriving_formats.json",
+  "input_b_path": "evals/results/V2_3/bar_leon__q5_thriving_formats.json",
+  "venue_key": "bar_leon",
+  "query_id": "q5_thriving_formats",
+  "raw_response": "Variant B is substantially more useful for my operations at Bar Leon. Its intelligence is both more specific and more immediately actionable. The report’s identification of a new, direct competitor in my exact niche (ULU Soulfood Oasis) and the looming municipal \"Cultural Park\" regulations that threaten my crucial outdoor seating are urgent, high-stakes threats I need to address this week. While Variant A provides a solid strategic framework, its recommendations are less critical. Variant B’s granular detail, from competitor menu pricing and non-alcoholic drink strategies to its pinpoint analysis of my service speed as a core vulnerability, provides a tactical roadmap. It feels less like a market summary and more like a genuine competitive intelligence briefing, giving me concrete data to protect my business and improve my P&L right now.\n\n```json\n{\"winner\": \"B\", \"supporting_urls\": [\"https://www.trojmiasto.pl/wiadomosci/Wyspa-Spichrzow-jako-Park-Kulturowy-Koniec-z-halasem-w-nocy-n187345.html\", \"https://whitemad.pl/ulu-soulfood-oasis-nowe-miejsce-w-gdansku-zaprojektowane-przez-cudo-studio/\"]}\n```",
+  "parse_error": null
+}

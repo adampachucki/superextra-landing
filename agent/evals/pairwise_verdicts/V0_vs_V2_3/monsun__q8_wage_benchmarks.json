@@ -1,0 +1,16 @@
+{
+  "winner": "B",
+  "supporting_urls": [
+    "https://www.trojmiasto.pl/",
+    "https://poradnikrestauratora.pl/"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0/monsun__q8_wage_benchmarks.json",
+  "input_b_path": "evals/results/V2_3/monsun__q8_wage_benchmarks.json",
+  "venue_key": "monsun",
+  "query_id": "q8_wage_benchmarks",
+  "raw_response": "Variant B is demonstrably more useful for me as the operator of Monsun. It provides a higher level of strategic, business-oriented advice tailored specifically to my venue. While both reports correctly identify the core labor market dynamics in Gdynia, such as the minimum wage anchor and the importance of student contracts, Variant B goes further. It directly references my restaurant's specific menu items (\"Biang Biang noodles\") and connects this to a crucial operational insight: that my lower food costs as a Chinese restaurant provide more flexibility for higher BOH labor costs. This \"Operational Health Context\" section, with its specific labor and food cost benchmarks (25-30% and 25-35% respectively), is immediately actionable for financial planning. Furthermore, B introduces more sophisticated compensation strategies like B2B contracts for senior staff and the tactical use of \"Tip Transparency\" in job ads, making it a more comprehensive and valuable tool for a restaurant operator.\n\n```json\n{\"winner\": \"B\", \"supporting_urls\": [\"https://www.trojmiasto.pl/\", \"https://poradnikrestauratora.pl/\"]}\n```",
+  "parse_error": null
+}

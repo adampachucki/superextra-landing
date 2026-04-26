@@ -1,0 +1,16 @@
+{
+  "winner": "A",
+  "supporting_urls": [
+    "https://www.trojmiasto.pl/",
+    "https://zdiz.gdynia.pl/"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0/monsun__q1_openings_closings.json",
+  "input_b_path": "evals/results/V2_3/monsun__q1_openings_closings.json",
+  "venue_key": "monsun",
+  "query_id": "q1_openings_closings",
+  "raw_response": "As the owner of Monsun, Variant A is significantly more useful. While both reports correctly identify the recent openings and closures, Variant A provides a crucial strategic insight that reframes my entire understanding of the local market. Its central thesis—that the recent \"closure wave\" is driven by new parking regulations decimating casual foot traffic, not high rents—is a game-changer. This explains *why* my specialized, \"destination\" concept is thriving while more generic restaurants fail. This intelligence is highly actionable: it validates my current strategy, directs me to focus on marketing that overcomes travel friction, and alerts me to the critical threat of further street access changes like pedestrianization. Variant B offers excellent tactical advice on operations and marketing, but Variant A delivers a foundational, macro-level understanding of my environment that is far more valuable for long-term planning and survival.\n\n```json\n{\"winner\": \"A\", \"supporting_urls\": [\"https://www.trojmiasto.pl/\", \"https://zdiz.gdynia.pl/\"]}\n```",
+  "parse_error": null
+}

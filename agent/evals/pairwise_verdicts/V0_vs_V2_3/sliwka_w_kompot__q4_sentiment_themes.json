@@ -1,0 +1,16 @@
+{
+  "winner": "B",
+  "supporting_urls": [
+    "https://www.trojmiasto.pl/",
+    "https://www.tripadvisor.com/"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0/sliwka_w_kompot__q4_sentiment_themes.json",
+  "input_b_path": "evals/results/V2_3/sliwka_w_kompot__q4_sentiment_themes.json",
+  "venue_key": "sliwka_w_kompot",
+  "query_id": "q4_sentiment_themes",
+  "raw_response": "As the owner of Śliwka w Kompot, Report B is infinitely more useful. It speaks my language and reflects the reality of my operation on the ground. It correctly identifies our core identity—the \"Queue Phenomenon,\" the generous comfort food like our famous ribs, and the high-energy vibe. The \"Service Paradox\" insight is brilliant; naming my star employees like Oliwia and Gosia while also flagging the kitchen's rigidity gives me immediate, actionable steps for both staff recognition and operational improvement. In contrast, Report A is built on a bizarre and frankly useless hallucination about a \"2025 expansion\" that never happened, making all of its conclusions untrustworthy. Report B provides a clear, credible roadmap: engage with tourists on TripAdvisor, investigate the inconsistent cod, and double down on the warm service that differentiates us from competitors who are fumbling with hidden fees or collapsing under pressure. It gives me a real playbook for this week, not a fantasy from the future.\n\n```json\n{\"winner\": \"B\", \"supporting_urls\": [\"https://www.trojmiasto.pl/\", \"https://www.tripadvisor.com/\"]}\n```",
+  "parse_error": null
+}

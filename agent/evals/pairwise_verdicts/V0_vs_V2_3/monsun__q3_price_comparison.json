@@ -1,0 +1,17 @@
+{
+  "winner": "B",
+  "supporting_urls": [
+    "https://wolt.com",
+    "https://pyszne.pl",
+    "https://trojmiasto.pl"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0/monsun__q3_price_comparison.json",
+  "input_b_path": "evals/results/V2_3/monsun__q3_price_comparison.json",
+  "venue_key": "monsun",
+  "query_id": "q3_price_comparison",
+  "raw_response": "Variant B is substantially more useful as an operator. While both reports correctly identify my premium market position and the role of portion size in justifying price, Variant B provides a critical, actionable insight that Variant A misses entirely: the \"Lunch Market Gap.\" By highlighting my 1:00 PM opening time against competitors who open at 11 AM or 12 PM, it pinpoints a significant, untapped revenue stream. The specific intelligence on Chinese Wok's \"30% off\" promotion on Pyszne.pl is the kind of tactical detail I can act on immediately. Variant A validates my current strategy, which is useful, but Variant B gives me a concrete plan to grow my business this week by adjusting operating hours to capture the early lunch crowd. It offers not just analysis, but a clear operational directive.\n\n```json\n{\"winner\": \"B\", \"supporting_urls\": [\"https://wolt.com\", \"https://pyszne.pl\", \"https://trojmiasto.pl\"]}\n```",
+  "parse_error": null
+}

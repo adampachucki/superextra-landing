@@ -1,0 +1,16 @@
+{
+  "winner": "B",
+  "supporting_urls": [
+    "https://www.google.com/maps/place/Bar+Leon/",
+    "https://www.google.com/maps/place/TLEN+cocktail+bar/"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0/bar_leon__q4_sentiment_themes.json",
+  "input_b_path": "evals/results/V2_3/bar_leon__q4_sentiment_themes.json",
+  "venue_key": "bar_leon",
+  "query_id": "q4_sentiment_themes",
+  "raw_response": "As the owner of Bar Leon, I'm looking for intelligence that helps me make better decisions, fast. Both of these reports are good, but one is clearly better for the reality of running a restaurant.\n\nI'm choosing Variant B. While both reports correctly identify the core tension between my modern concept and tourist value expectations, B is more immediately actionable and provides sharper, more challenging insights. Its identification of my next-door neighbor, TLEN, as the service benchmark is a hyper-local, powerful piece of intelligence I can act on this evening. The inclusion of a direct customer quote in Polish about pricing and the stark bar chart showing my 0% review response rate are visceral, high-signal details that cut through the noise. Furthermore, B's explicit correction of a prior assumption about a competitor (Magari) demonstrates a more dynamic and trustworthy analytical process. Report A is a solid market overview, but Report B feels like a true operational partner, providing specific, verifiable, and urgent points for improvement that are directly relevant to my daily business.\n\n```json\n{\"winner\": \"B\", \"supporting_urls\": [\"https://www.google.com/maps/place/Bar+Leon/\", \"https://www.google.com/maps/place/TLEN+cocktail+bar/\"]}\n```",
+  "parse_error": null
+}

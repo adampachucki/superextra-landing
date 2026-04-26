@@ -1,0 +1,16 @@
+{
+  "winner": "B",
+  "supporting_urls": [
+    "https://trojmiasto.pl",
+    "https://google.com"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V0",
+  "b_label": "V2_3",
+  "input_a_path": "evals/results/V0/sliwka_w_kompot__q2_closures_lessons.json",
+  "input_b_path": "evals/results/V2_3/sliwka_w_kompot__q2_closures_lessons.json",
+  "venue_key": "sliwka_w_kompot",
+  "query_id": "q2_closures_lessons",
+  "raw_response": "Variant B is substantially more useful for a restaurant operator. It provides highly specific, tactical, and immediately actionable advice, such as launching targeted local digital ads and developing winter event packages to combat the off-season slump. Its analysis is grounded in granular operational details—from competitor's dirty bathrooms and hostile staff to my own restaurant's successful promotions and named high-performing employees—which builds significant credibility. While Variant A offers a solid strategic overview, its recommendations are too high-level and long-term to be acted upon this week. Variant B's superior source coverage and focus on ground-level realities, like differentiating from the new food hall across the street, provide a concrete playbook for navigating the immediate market challenges. It's not just an analysis; it's a direct operational briefing that empowers me to make informed decisions right now.\n\n```json\n{\"winner\": \"B\", \"supporting_urls\": [\"https://trojmiasto.pl\", \"https://google.com\"]}\n```",
+  "parse_error": null
+}
