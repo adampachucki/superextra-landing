@@ -124,7 +124,7 @@ The dispatch-thesis from Stage 1 still holds: forcing `marketing_digital` and `m
 
 > _Correction 2026-04-25: an earlier version of this section claimed the V2.2 orchestrator dispatched `{market_landscape, marketing_digital, menu_pricing, operations}` — no review_analyst — and concluded the "MUST include" framing was being ignored. That was incorrect. The artifacts (`agent/evals/results/V2_2/monsun__q2_closures_lessons.json` and `evals/scores/V2_2.csv`) show V2.2 actually dispatched `{market_landscape, marketing_digital, menu_pricing, operations, review_analyst}` — five specialists, including review_analyst as required._
 
-So V2.2 obeyed the rule on this run. The failure (top_dom 0.82, 1 category, drawer 11) happened _despite_ review_analyst being dispatched, not because of its absence. Adding more specialists alone did not guarantee a better answer — the bottleneck wasn't dispatch, it was specialist behavior.
+So V2.2 obeyed the rule on this run. The failure (top*dom 0.82, 1 category, drawer 11) happened \_despite* review_analyst being dispatched, not because of its absence. Adding more specialists alone did not guarantee a better answer — the bottleneck wasn't dispatch, it was specialist behavior.
 
 That changes the diagnosis of why V2.3 is better than V2.2 on this combo:
 

@@ -41,7 +41,7 @@ This plan does **not** propose a new variant. V2.3 stays the candidate. It propo
 
 Edit `docs/research-depth-stage2-results-2026-04-25.md` only:
 
-1. Replace the "V2.2 ignored its review_analyst mandate on monsun q2" passage. New diagnosis: V2.2 _did_ dispatch review_analyst (verified in `evals/results/V2_2/monsun__q2_closures_lessons.json`); V2.2 still failed because more specialists alone don't guarantee a better answer; V2.3's gain over V2.2 is from V1's source-priors block in `specialist_base.md`, not from any orchestrator-obedience improvement.
+1. Replace the "V2.2 ignored its review*analyst mandate on monsun q2" passage. New diagnosis: V2.2 \_did* dispatch review_analyst (verified in `evals/results/V2_2/monsun__q2_closures_lessons.json`); V2.2 still failed because more specialists alone don't guarantee a better answer; V2.3's gain over V2.2 is from V1's source-priors block in `specialist_base.md`, not from any orchestrator-obedience improvement.
 2. Remove the recommendation "Don't bundle V2.2's review_analyst mandate." V2.3 already includes it. Replace with: "Ship V2.3 exactly as tested in `evals/instructions_variants/V2_3/`. Do not strengthen or weaken the dispatch rules."
 3. Correct the cost section. V2.3 vs V0: +8.8% tokens / −10.9% elapsed. V2.3 vs V2.1: +13.7% tokens / +17.0% elapsed. V2.3 vs V2.2: +3.4% tokens / −8.3% elapsed.
 4. Soften "wall overlap is best" to "wall overlap ties V2.2 (1.17 vs 1.21) — both materially better than V0's 0.46."

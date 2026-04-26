@@ -12,7 +12,7 @@ Berlin probe is informative — V2.3 stays functional on a non-Polish venue with
 
 Six factual corrections applied to `docs/research-depth-stage2-results-2026-04-25.md`:
 
-1. ✅ Replaced "V2.2 ignored review_analyst mandate" passage with verified diagnosis (V2.2 _did_ dispatch review_analyst on monsun q2; failed despite obeying the rule). Reframed V2.3's win story as "specialist-level source priors" not "orchestrator obedience."
+1. ✅ Replaced "V2.2 ignored review*analyst mandate" passage with verified diagnosis (V2.2 \_did* dispatch review_analyst on monsun q2; failed despite obeying the rule). Reframed V2.3's win story as "specialist-level source priors" not "orchestrator obedience."
 2. ✅ Removed contradictory "don't bundle V2.2's review_analyst mandate" recommendation. New recommendation: ship V2.3 exactly as tested.
 3. ✅ Cost numbers corrected. V2.3 vs V0: +8.8% tokens / −10.9% elapsed. V2.3 vs V2.1: +13.7% tokens / +17.0% elapsed. V2.3 vs V2.2: +3.4% tokens / −8.3% elapsed.
 4. ✅ Wall overlap softened to "tied with V2.2 (1.17 vs 1.21)."
