@@ -2,6 +2,8 @@ import logging
 import os
 from pathlib import Path
 
+from typing import Any
+
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_response import LlmResponse
@@ -28,6 +30,36 @@ _version = os.environ.get("GEMINI_VERSION", "3.1")
 RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=60.0)
 
 
+class GeminiGlobalEndpoint(Gemini):
+    """Gemini variant whose `api_client` is constructed lazily, routed via
+    the global Vertex AI endpoint (`location='global'`).
+
+    Eager construction (the previous `g.api_client = Client(...)` pattern)
+    is unpicklable: the live Client carries a `_thread.lock` that
+    cloudpickle can't serialise, blocking `agent_engines.create(...)`
+    deploys. See adk-python#3628 and probe round R2.4 for the empirical
+    trace. Lazy construction defers Client creation until first access on
+    the deployed runtime, so pickle time never sees a live client.
+    """
+
+    @property
+    def api_client(self) -> Client:  # type: ignore[override]
+        client = self.__dict__.get("_lazy_global_client")
+        if client is not None:
+            return client
+        client = Client(
+            vertexai=True,
+            location="global",
+            http_options=types.HttpOptions(retry_options=RETRY),
+        )
+        self.__dict__["_lazy_global_client"] = client
+        return client
+
+    @api_client.setter
+    def api_client(self, value: Any) -> None:
+        self.__dict__["_lazy_global_client"] = value
+
+
 def _make_gemini(model: str, *, force_global: bool = False) -> Gemini:
     """Create a Gemini instance.
 
@@ -37,18 +69,14 @@ def _make_gemini(model: str, *, force_global: bool = False) -> Gemini:
 
     ADK bakes `GOOGLE_CLOUD_LOCATION=us-central1` into the container
     (matching the Cloud Run region), but several model families don't serve
-    from that location. Overriding `api_client` to use `location='global'`
-    routes model calls to `https://aiplatform.googleapis.com/` while the
-    rest of ADK (sessions, Agent Engine) stays on us-central1.
+    from that location. The `GeminiGlobalEndpoint` subclass returns a
+    lazily-built `Client` with `location='global'` so model calls hit
+    `https://aiplatform.googleapis.com/` while the rest of ADK (sessions,
+    Agent Engine) stays on us-central1.
     """
-    g = Gemini(model=model, retry_options=RETRY)
     if _version == "3.1" or force_global:
-        g.api_client = Client(
-            vertexai=True,
-            location="global",
-            http_options=types.HttpOptions(retry_options=RETRY),
-        )
-    return g
+        return GeminiGlobalEndpoint(model=model, retry_options=RETRY)
+    return Gemini(model=model, retry_options=RETRY)
 
 
 if _version == "3.1":
