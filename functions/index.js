@@ -153,7 +153,8 @@ const WORKER_URL = () => process.env.WORKER_URL || DEFAULT_WORKER_URL;
 // scenarios via parameters (no module-state mutation). `resetGearAllowlist`
 // is a test-only helper used in `beforeEach` to keep cases isolated.
 export const GEAR_ALLOWLIST = new Set([
-	'feadLLD5IuUrJNeQTPPu9QIg3wg1' // adam@finebite.co prod (agent.superextra.ai) — Stage A
+	'feadLLD5IuUrJNeQTPPu9QIg3wg1', // adam@finebite.co prod (agent.superextra.ai) — Stage A
+	'UqQvmOsaBifkwzzLBugbnYj8kUt2' // adam@finebite.co dev (34.38.81.215:5199) — Stage A
 ]);
 export const GEAR_DEFAULT = 'cloudrun'; // flip to 'gear' for Stage B
 
