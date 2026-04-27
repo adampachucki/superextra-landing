@@ -87,7 +87,25 @@ Branch is ready for staging deploy.
 
 (none — Stage A is live as of 2026-04-27; see "Stage A live" entry under "Verification artifacts" for the deployed state)
 
-## Stage A operator state (current as of 2026-04-27)
+## Stage B live (2026-04-27)
+
+**`GEAR_DEFAULT` flipped from `'cloudrun'` to `'gear'`.** Committed at `f4ff1bf`; `agentStream` redeployed. Verification: a fresh non-allowlisted MCP UID (`tFQ7GU4...`) submitted a chat (`28a969e0-6806-4a1f-9b32-4db525bb2f16`) and Firestore shows `transport=gear`, `currentWorkerId=None`, heartbeat alive — proving the default branch is taking it (the allowlist-hit path would require the UID to be allowlisted).
+
+**Why Stage B without the full week-long Stage A soak**: Stage A canary smokes (commit `aeb196c`) covered the load-bearing risks live: disconnect survival, sticky transport on follow-ups, allowlist containment, legacy-session preservation, all complete. Adam's dogfooding across prod and dev origins produced clean production-quality runs (5m56s + 9.5s + 3m22s + 58s, no warnings). The 1-week wait was conservative; with real-traffic results in hand the marginal value dropped below the daily cost of holding rollout.
+
+**Test updates required for Stage B**: 4 cases in `functions/index.test.js` needed adjustment for `default='gear'`:
+
+- "first turn creates session + turns/0001 in one transaction": rewritten to assert gear routing (matches new default) — gearHandoff arg checks + session doc records `transport: 'gear'`. Cloud Task body assertions removed.
+- "task dedup name uses runId" + "writes status=error if Cloud Tasks enqueue fails": rescoped to follow-ups on sticky-cloudrun sessions (`existing.transport: 'cloudrun'`) so they exercise the Cloud Tasks dispatch path explicitly.
+- `beforeEach`: also resets `tasksClient.createTask` mock implementation (not just call counts) — without this, a queued `mockImplementationOnce(throw)` from one test that took the gear path would leak into the next test taking cloudrun, producing a confusing 502 cascade.
+
+**Rollback procedure (unchanged in shape from Stage A)**: `GEAR_DEFAULT = 'cloudrun'` in `functions/index.js`, then `firebase deploy --only functions:agentStream --project=superextra-site`. Sticky-per-session means in-flight gear sessions are never rerouted; only new sessions go cloudrun once again.
+
+**`GEAR_ALLOWLIST` is now redundant for routing** but kept in place as an emergency partial-revert mechanism (e.g., flip default back to 'cloudrun' but keep specific UIDs on gear, or vice versa).
+
+What's next: drain (existing `transport: 'cloudrun'` sessions complete naturally on the legacy worker — most chats live <48h; long-tail rare). After ~1 week of clean traffic on gear with the worker idle, run Phase 9 cleanup (decommission Cloud Tasks + Cloud Run, delete `worker_main.py`/`Dockerfile`/`enqueueRunTask`/`deploy-worker` GHA, Firestore migration to drop `currentAttempt`/`currentWorkerId`/`adkSessionId` fields, archive `agent/probe/`).
+
+## Stage A operator state (now superseded by Stage B above; kept for reference)
 
 - **Staging Reasoning Engine:** `projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288` (display name `superextra-agent-staging`, deployed from gear-migration HEAD).
 - **`agentStream` Cloud Function:** deployed from gear-migration; env var `GEAR_REASONING_ENGINE_RESOURCE` set to the resource above; six functions on the live URLs (agentStream, agentDelete, intake, sttToken, tts, watchdog).
