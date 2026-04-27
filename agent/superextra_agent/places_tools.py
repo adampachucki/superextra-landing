@@ -5,6 +5,8 @@ import os
 import uuid
 import httpx
 
+from .secrets import get_secret
+
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://places.googleapis.com/v1"
@@ -81,10 +83,7 @@ atexit.register(_cleanup_client)
 
 
 def _get_api_key() -> str:
-    key = os.environ.get("GOOGLE_PLACES_API_KEY", "")
-    if not key:
-        raise RuntimeError("GOOGLE_PLACES_API_KEY environment variable is not set")
-    return key
+    return get_secret("GOOGLE_PLACES_API_KEY")
 
 
 async def get_restaurant_details(place_id: str, tool_context=None) -> dict:

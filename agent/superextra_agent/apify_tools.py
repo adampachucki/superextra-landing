@@ -1,9 +1,10 @@
 import atexit
 import logging
-import os
 import uuid
 
 import httpx
+
+from .secrets import get_secret
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +37,7 @@ atexit.register(_cleanup_client)
 
 
 def _get_api_key() -> str:
-    key = os.environ.get("APIFY_TOKEN", "")
-    if not key:
-        raise RuntimeError("APIFY_TOKEN environment variable is not set")
-    return key
+    return get_secret("APIFY_TOKEN")
 
 
 async def get_google_reviews(place_id: str, max_reviews: int = 50, tool_context=None) -> dict:

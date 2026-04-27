@@ -555,8 +555,12 @@ class TestGetTripadvisorReviews:
 class TestApiKeyRequired:
     @pytest.mark.asyncio
     async def test_missing_key_raises(self):
+        # Clear env AND block the Secret Manager fallback. Without the SM
+        # patch this test would reach production Secret Manager from CI.
         with patch.dict("os.environ", {}, clear=True), \
-             patch("superextra_agent.tripadvisor_tools._client", None):
+             patch("superextra_agent.tripadvisor_tools._client", None), \
+             patch("superextra_agent.secrets._get_client",
+                   side_effect=RuntimeError("sm unreachable in test")):
             result = await find_tripadvisor_restaurant(
                 "Test", "Berlin", google_place_id="ChIJdummy"
             )
