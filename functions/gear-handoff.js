@@ -40,19 +40,18 @@ const VERTEX_BASE = 'https://us-central1-aiplatform.googleapis.com';
 export const HANDOFF_DEADLINE_MS = 75_000;
 
 /**
- * Production Reasoning Engine resource name. Set via `--update-env-vars`
- * in the deploy workflow once Phase 8's staging deploy lands. Format:
- *   projects/907466498524/locations/us-central1/reasoningEngines/{ID}
- *
- * Returning the literal here would couple the code to a not-yet-existing
- * resource; the env var keeps deploy-time configuration explicit.
+ * Production Reasoning Engine resource. The default below mirrors the
+ * value the deploy workflow writes into functions/.env.superextra-site,
+ * matching the WORKER_URL pattern (DEFAULT_WORKER_URL + env override at
+ * index.js:136). Tests can override by setting GEAR_REASONING_ENGINE_RESOURCE
+ * before importing. Belt-and-suspenders against a deploy that ships with
+ * an empty .env (which is exactly how Stage B broke transiently on
+ * 2026-04-27 — see commit history).
  */
+const DEFAULT_RESOURCE =
+	'projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288';
 function getResource() {
-	const r = process.env.GEAR_REASONING_ENGINE_RESOURCE;
-	if (!r) {
-		throw new Error('GEAR_REASONING_ENGINE_RESOURCE env var not set');
-	}
-	return r;
+	return process.env.GEAR_REASONING_ENGINE_RESOURCE || DEFAULT_RESOURCE;
 }
 
 let _auth = null;

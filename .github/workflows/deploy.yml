@@ -156,13 +156,20 @@ jobs:
       - run: cd functions && npm ci
 
       # firebase-functions v2 loads `.env.<projectId>` into process.env at
-      # deploy time. WORKER_URL is the one runtime value that depends on the
-      # deployed Cloud Run hash, so we write it before the firebase deploy
-      # from the URL captured above.
-      - name: Write WORKER_URL to functions .env
+      # deploy time AND `firebase deploy` REPLACES the deployed function's
+      # env vars with whatever the .env file declares. So every var the
+      # function needs at runtime must be in this file at deploy time —
+      # anything missing gets stripped on each deploy. WORKER_URL depends on
+      # the live Cloud Run hash so we read it dynamically; the rest are
+      # static project-level constants.
+      - name: Write functions .env (WORKER_URL + GEAR resource)
         run: |
-          echo "WORKER_URL=${{ steps.worker_url.outputs.url }}" > functions/.env.superextra-site
-          echo "✓ wrote functions/.env.superextra-site"
+          {
+            echo "WORKER_URL=${{ steps.worker_url.outputs.url }}"
+            echo "GEAR_REASONING_ENGINE_RESOURCE=projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288"
+          } > functions/.env.superextra-site
+          echo "✓ wrote functions/.env.superextra-site:"
+          cat functions/.env.superextra-site | sed 's/=.*/=***/'
 
       # Single firebase-tools deploy for hosting + functions + firestore
       # rules + indexes. Separate `--only hosting` then `--only functions`
