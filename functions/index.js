@@ -5,6 +5,7 @@ import { CloudTasksClient } from '@google-cloud/tasks';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { gearHandoff, gearHandoffCleanup } from './gear-handoff.js';
 import {
 	esc,
 	row,
@@ -135,6 +136,28 @@ const DISPATCH_DEADLINE_S = 1800; // plan-mandated — overrides 10-min default
 const DEFAULT_WORKER_URL = 'https://superextra-worker-22b3fxahka-uc.a.run.app';
 const WORKER_URL = () => process.env.WORKER_URL || DEFAULT_WORKER_URL;
 
+// ── GEAR transport selection ────────────────────────────────────────────────
+//
+// Phase 7's two-stage rollout: Stage A puts a tiny developer allowlist on
+// 'gear' while everyone else stays on 'cloudrun'; Stage B flips the default
+// for new sessions to 'gear'. Sticky per-session — only first-turn-of-a-new-
+// session ever picks. Legacy sessions written before the `transport` field
+// existed are caught by the `existing` branch in the agentStream txn and
+// stay on 'cloudrun' forever.
+//
+// Adam: add a UID here to route that account to GEAR while soaking. Keep
+// the list to 1–2 entries through the soak. Flip GEAR_DEFAULT to 'gear'
+// when ready for Stage B.
+const GEAR_ALLOWLIST = new Set([
+	// 'add-uid-here'
+]);
+const GEAR_DEFAULT = 'cloudrun'; // flip to 'gear' for Stage B
+
+function chooseInitialTransport(submitterUid) {
+	if (GEAR_ALLOWLIST.has(submitterUid)) return 'gear';
+	return GEAR_DEFAULT;
+}
+
 let _tasksClient;
 function getTasksClient() {
 	if (!_tasksClient) _tasksClient = new CloudTasksClient();
@@ -174,7 +197,7 @@ class AgentStreamError extends Error {
 	}
 }
 
-export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
+export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (req, res) => {
 	if (req.method !== 'POST') {
 		res.status(405).json({ ok: false, error: 'Method not allowed' });
 		return;
@@ -250,6 +273,11 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 	let isFirstMessage = false;
 	let creatorUid = submitterUid;
 	let newTurnIdx = 1;
+	// Captured inside the txn callback on every attempt (re-runs on
+	// contention re-pick `existing` from the latest snapshot). The
+	// post-commit branch reads this to decide between the legacy Cloud
+	// Run path and the GEAR direct-handoff path.
+	let transport = 'cloudrun';
 	try {
 		await db.runTransaction(async (t) => {
 			const snap = await t.get(sessionRef);
@@ -271,6 +299,14 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 			existingAdkSessionId = existing?.adkSessionId || null;
 			creatorUid = existing?.userId || submitterUid;
 			newTurnIdx = lastTurnIndex + 1;
+			// plan §v3.9 — branch on `existing` (not on the field). Legacy
+			// sessions written before the `transport` field existed have
+			// no field at all; treating absence as 'cloudrun' keeps them
+			// on their original codepath. Only first-turn-of-a-new-session
+			// picks the initial transport.
+			transport = existing
+				? (existing.transport ?? 'cloudrun')
+				: chooseInitialTransport(submitterUid);
 
 			const perTurn = {
 				currentRunId: runId,
@@ -293,12 +329,15 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 					adkSessionId: null, // worker creates on first turn
 					placeContext: placeContext || null,
 					title: null,
+					transport, // sticky for the lifetime of this session
 					...perTurn
 				});
 			} else {
 				// Preserve userId / createdAt / adkSessionId / placeContext / title.
 				// `participants` arrays-union'd so shared-URL contributors pin
 				// the chat to their sidebar without overwriting prior UIDs.
+				// IMPORTANT: do NOT include `transport` here — the existing
+				// value is preserved across follow-ups (sticky-per-session).
 				t.update(sessionRef, {
 					...perTurn,
 					participants: FieldValue.arrayUnion(submitterUid)
@@ -346,43 +385,75 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 30 }, async (
 		queryText = `[Context: asking about ${placeContext.name}, ${placeContext.secondary || ''} (Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
 	}
 
-	// 7. Enqueue Cloud Task. On enqueue failure, flip the freshly-queued
-	// session to status=error so the watchdog doesn't sweep it, and surface
-	// a 502 so the client can retry deterministically.
-	//
-	// Cloud Task body carries the creator UID (not the submitter UID) because
-	// the worker uses it for Vertex Agent Engine session ownership. `turnIdx`
-	// is sent as an integer; the worker formats to a zero-padded doc key on
-	// its side.
-	try {
-		await enqueueRunTask({
-			runId,
-			body: {
-				sessionId,
-				runId,
-				turnIdx: newTurnIdx,
-				adkSessionId: existingAdkSessionId,
-				userId: creatorUid,
-				queryText,
-				isFirstMessage,
-				placeContext: placeContext || null
-			}
-		});
-	} catch (err) {
-		console.error('Cloud Tasks enqueue failed:', err.message || err);
+	// 7. Dispatch the run. Two transports coexist through the GEAR rollback
+	// window (plan §"Coexistence rule"): legacy sessions and explicit-cloudrun
+	// new sessions go via Cloud Tasks → Cloud Run worker; gear sessions go
+	// direct to Vertex AI Agent Engine via gearHandoff.
+	if (transport === 'cloudrun') {
+		// Cloud Tasks body carries the creator UID (not the submitter UID)
+		// because the worker uses it for Vertex Agent Engine session
+		// ownership. `turnIdx` is sent as an integer; the worker formats
+		// to a zero-padded doc key on its side.
 		try {
-			await sessionRef.update({
-				status: 'error',
-				error: 'enqueue_failed'
+			await enqueueRunTask({
+				runId,
+				body: {
+					sessionId,
+					runId,
+					turnIdx: newTurnIdx,
+					adkSessionId: existingAdkSessionId,
+					userId: creatorUid,
+					queryText,
+					isFirstMessage,
+					placeContext: placeContext || null
+				}
 			});
-		} catch (e2) {
-			console.error('Post-enqueue status=error write failed:', e2.message || e2);
+		} catch (err) {
+			console.error('Cloud Tasks enqueue failed:', err.message || err);
+			try {
+				await sessionRef.update({
+					status: 'error',
+					error: 'enqueue_failed'
+				});
+			} catch (e2) {
+				console.error('Post-enqueue status=error write failed:', e2.message || e2);
+			}
+			res.status(502).json({ ok: false, error: 'enqueue_failed' });
+			return;
 		}
-		res.status(502).json({ ok: false, error: 'enqueue_failed' });
+
+		res.status(202).json({ ok: true, sessionId, runId });
 		return;
 	}
 
-	res.status(202).json({ ok: true, sessionId, runId });
+	// transport === 'gear' — direct handoff to Vertex AI Agent Engine.
+	// Cleanup on failure mirrors `watchdog.js:172-186`: session+turn flip
+	// to status='error' atomically inside a `currentRunId`-fenced txn.
+	try {
+		await gearHandoff({
+			sid: sessionId,
+			runId,
+			turnIdx: newTurnIdx,
+			userId: creatorUid,
+			message: queryText,
+			isFirstMessage
+		});
+		res.status(202).json({ ok: true, sessionId, runId });
+	} catch (err) {
+		console.error('gearHandoff failed:', err.message || err);
+		try {
+			await gearHandoffCleanup(
+				db,
+				sessionId,
+				runId,
+				newTurnIdx,
+				`gear_handoff_failed:${err.message || 'unknown'}`
+			);
+		} catch (cleanupErr) {
+			console.error('gearHandoff cleanup write failed:', cleanupErr.message || cleanupErr);
+		}
+		res.status(502).json({ ok: false, error: 'handoff_failed' });
+	}
 });
 
 // --- STT token endpoint (mints single-use ElevenLabs Scribe tokens) ---

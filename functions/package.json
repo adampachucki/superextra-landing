@@ -6,7 +6,7 @@
 	},
 	"main": "index.js",
 	"scripts": {
-		"test": "node --test utils.test.js && node --experimental-test-module-mocks --test index.test.js watchdog.test.js"
+		"test": "node --test utils.test.js && node --experimental-test-module-mocks --test index.test.js watchdog.test.js gear-handoff.test.js"
 	},
 	"dependencies": {
 		"@google-cloud/tasks": "^6.2.1",
