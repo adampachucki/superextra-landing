@@ -4,7 +4,7 @@
 **Branch:** `gear-migration` (15 commits ahead of main)
 **Staging Reasoning Engine:** `projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288`
 **Allowlisted UIDs:** `feadLLD5IuUrJNeQTPPu9QIg3wg1` (prod), `UqQvmOsaBifkwzzLBugbnYj8kUt2` (dev origin)
-**`GEAR_DEFAULT`:** `'cloudrun'` (non-allowlisted users stay on legacy worker)
+**`GEAR_DEFAULT`:** `'cloudrun'` at the time these smokes were defined; **flipped to `'gear'` (Stage B) after Smoke 1–4 + 6a passed.** Smoke 5 (non-allowlisted control) is consequently STALE — there is no "default-cloudrun" cohort to test against any more. See Smoke 5 note below.
 
 **Companion docs:**
 
@@ -101,7 +101,9 @@ The R3.2 probe verified the platform survives caller disconnect for ≥240s. Thi
 
 If this fails, the migration's value proposition is not realized; debug before continuing.
 
-### Smoke 5 recipe (non-allowlisted control)
+### Smoke 5 recipe (non-allowlisted control) — STALE under Stage B
+
+> **Stage B note (2026-04-27):** `GEAR_DEFAULT='gear'` shipped, so non-allowlisted UIDs now route to `'gear'` by default — there is no "control" cohort to verify containment against any more. This smoke was meaningful only while `GEAR_DEFAULT='cloudrun'` and is preserved here as historical record. To re-run it under Stage B, temporarily flip `GEAR_DEFAULT` back to `'cloudrun'` (which is what the rollback drill exercises).
 
 1. Open an incognito browser window. Anon-auth produces a different UID than the allowlist.
 2. Submit a query.
@@ -109,7 +111,7 @@ If this fails, the migration's value proposition is not realized; debug before c
 4. Verify Cloud Run worker (`superextra-worker`) receives traffic via Cloud Tasks.
 5. Confirm normal completion (`status: 'complete'`, reply + sources rendered).
 
-This proves containment: only allowlisted UIDs hit GEAR; everyone else stays on the legacy worker.
+This proved containment under Stage A: only allowlisted UIDs hit GEAR; everyone else stayed on the legacy worker.
 
 ### Smoke 6a recipe (legacy session sticky)
 
