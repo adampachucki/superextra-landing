@@ -821,15 +821,18 @@ describe('chatState (Firestore-driven)', () => {
 			expect(chatState.loadState).toBe('idle');
 		});
 
-		// NB: a paired "post-Firestore failure" test (POST rejects 502 + getDoc
-		// returns exists=true → no local rollback) was attempted but vitest's
-		// vi.mock of `firebase/firestore` doesn't propagate to chat-state's
-		// dynamic `await import('firebase/firestore')` reliably — `doc()`
-		// inside the catch block resolves to the real Firebase fn and throws
-		// on the empty `db: {}` mock. The behavior is exercised end-to-end via
-		// the manual UX smoke (Chrome DevTools MCP) covered in the
-		// gear-migration execution log; the unit-level guarantee here is the
-		// pre-Firestore rollback above.
+		// NB: paired tests for the post-Firestore-failure branch (POST 502 +
+		// getDoc returns exists=true → no rollback) and the v3.9 P2
+		// regression (getFirebase throws inside the catch → rollback) were
+		// attempted but vitest's `vi.mock('firebase/firestore', ...)` does
+		// NOT propagate to chat-state's dynamic
+		// `await import('firebase/firestore')` — the catch block's `doc()`
+		// call resolves to the real Firebase fn and throws on the empty
+		// `db: {}` mock. F1's fallback: cover both branches via the manual
+		// Chrome DevTools MCP smoke (force-offline mid-POST recipe in the
+		// Phase 6 smoke section of the execution log) rather than silently
+		// skipping. The pre-Firestore rollback above already proves the
+		// rollback machinery via the same dynamic-import-throws path.
 
 		it('listener race: optimisticPendingSid suppresses missing flip during POST window', async () => {
 			// When startNewChat fires the POST, the active-session listener is

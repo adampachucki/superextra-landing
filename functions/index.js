@@ -148,14 +148,26 @@ const WORKER_URL = () => process.env.WORKER_URL || DEFAULT_WORKER_URL;
 // Adam: add a UID here to route that account to GEAR while soaking. Keep
 // the list to 1–2 entries through the soak. Flip GEAR_DEFAULT to 'gear'
 // when ready for Stage B.
-const GEAR_ALLOWLIST = new Set([
+//
+// Exported so unit tests can verify allowlist hit/miss + default-flipped
+// scenarios via parameters (no module-state mutation). `resetGearAllowlist`
+// is a test-only helper used in `beforeEach` to keep cases isolated.
+export const GEAR_ALLOWLIST = new Set([
 	// 'add-uid-here'
 ]);
-const GEAR_DEFAULT = 'cloudrun'; // flip to 'gear' for Stage B
+export const GEAR_DEFAULT = 'cloudrun'; // flip to 'gear' for Stage B
 
-function chooseInitialTransport(submitterUid) {
-	if (GEAR_ALLOWLIST.has(submitterUid)) return 'gear';
-	return GEAR_DEFAULT;
+export function chooseInitialTransport(
+	submitterUid,
+	allowlist = GEAR_ALLOWLIST,
+	defaultTransport = GEAR_DEFAULT
+) {
+	if (allowlist.has(submitterUid)) return 'gear';
+	return defaultTransport;
+}
+
+export function resetGearAllowlist() {
+	GEAR_ALLOWLIST.clear();
 }
 
 let _tasksClient;

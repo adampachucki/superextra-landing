@@ -107,10 +107,31 @@ mock.module('@google-cloud/tasks', {
 	}
 });
 
+// Mock ./gear-handoff.js BEFORE the index.js import. Putting this inside a
+// describe block would be too late — index.js captures the real exports at
+// import time. F2 P1 from the post-review plan.
+const gearHandoffMock = mock.fn(async () => ({ ok: true }));
+const gearHandoffCleanupMock = mock.fn(async () => {});
+mock.module('./gear-handoff.js', {
+	namedExports: {
+		gearHandoff: gearHandoffMock,
+		gearHandoffCleanup: gearHandoffCleanupMock
+	}
+});
+
 // Set WORKER_URL before importing so the Cloud Task target resolves.
 process.env.WORKER_URL = 'https://worker-test.run.app';
 
-const { intake, agentStream, agentDelete, sttToken, tts } = await import('./index.js');
+const {
+	intake,
+	agentStream,
+	agentDelete,
+	sttToken,
+	tts,
+	chooseInitialTransport,
+	GEAR_ALLOWLIST,
+	resetGearAllowlist
+} = await import('./index.js');
 
 // ── Test helpers ──
 
@@ -175,8 +196,15 @@ beforeEach(() => {
 	mockDb.runTransaction.mock.resetCalls();
 	tasksClient.createTask.mock.resetCalls();
 	authInstance.verifyIdToken.mock.resetCalls();
+	gearHandoffMock.mock.resetCalls();
+	gearHandoffCleanupMock.mock.resetCalls();
 	mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
 	mockDb.recursiveDelete.mock.mockImplementation(async () => {});
+	// F2 P3: reset mock IMPLEMENTATIONS too — a failed/interrupted
+	// `mockImplementationOnce` from a prior test could otherwise leak.
+	gearHandoffMock.mock.mockImplementation(async () => ({ ok: true }));
+	gearHandoffCleanupMock.mock.mockImplementation(async () => {});
+	resetGearAllowlist();
 });
 
 afterEach(() => {
@@ -728,6 +756,136 @@ describe('agentStream', () => {
 		const flipped = recoveryUpdates.find((u) => u.status === 'error');
 		assert.ok(flipped, 'recovery update with status=error should have run');
 		assert.equal(flipped.error, 'enqueue_failed');
+	});
+
+	// ── GEAR transport branch (Phase 5+7 + post-review fixes) ──────────────
+
+	it('first turn with submitter in GEAR_ALLOWLIST routes to gearHandoff (no Cloud Task)', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+		GEAR_ALLOWLIST.add('user-good-token');
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 202);
+		assert.equal(tasksClient.createTask.mock.callCount(), 0);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+
+		const handoffArgs = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.equal(handoffArgs.sid, 'sess-1');
+		assert.match(handoffArgs.runId, /^[0-9a-f-]{36}$/);
+		assert.equal(handoffArgs.turnIdx, 1);
+		assert.equal(handoffArgs.userId, 'user-good-token');
+		assert.equal(handoffArgs.isFirstMessage, true);
+		assert.match(handoffArgs.message, /^\[Date: /);
+
+		// The session doc set call should record transport='gear' so the
+		// session is sticky for follow-ups.
+		const { sessionSets } = partitionWrites('sessions/sess-1');
+		assert.equal(sessionSets.length, 1);
+		assert.equal(sessionSets[0].transport, 'gear');
+	});
+
+	it('gearHandoff failure → gearHandoffCleanup called, 502 returned', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+		GEAR_ALLOWLIST.add('user-good-token');
+		gearHandoffMock.mock.mockImplementationOnce(async () => {
+			throw new Error('streamQuery_not_ok:502');
+		});
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 502);
+		assert.equal(res._json.error, 'handoff_failed');
+		assert.equal(gearHandoffCleanupMock.mock.callCount(), 1);
+		const cleanupArgs = gearHandoffCleanupMock.mock.calls[0].arguments;
+		// (db, sid, runId, turnIdx, errorReason)
+		assert.equal(cleanupArgs[1], 'sess-1');
+		assert.match(cleanupArgs[2], /^[0-9a-f-]{36}$/);
+		assert.equal(cleanupArgs[3], 1);
+		assert.match(cleanupArgs[4], /^gear_handoff_failed:streamQuery_not_ok/);
+	});
+
+	it('sticky transport: follow-up on existing gear session stays gear (no allowlist needed)', async () => {
+		// Submitter is NOT in allowlist; default is 'cloudrun'. The existing
+		// session's stored `transport: 'gear'` must override and route to
+		// gearHandoff regardless.
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				participants: ['user-good-token'],
+				status: 'complete',
+				transport: 'gear',
+				adkSessionId: 'adk-existing',
+				lastTurnIndex: 1,
+				placeContext: { name: 'Umami', secondary: 'Berlin', placeId: 'ChIJ...' },
+				title: 'Prior chat'
+			})
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
+
+		assert.equal(res._status, 202);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		assert.equal(tasksClient.createTask.mock.callCount(), 0);
+
+		// Follow-up must NOT include `transport` in the t.update payload —
+		// preserves the sticky value.
+		const { sessionUpdates } = partitionWrites('sessions/sess-1');
+		assert.equal(sessionUpdates.length, 1);
+		assert.ok(
+			!('transport' in sessionUpdates[0]),
+			'follow-up must not write transport (preserves sticky existing value)'
+		);
+	});
+
+	it('v3.9 P1 regression: legacy session with no transport field stays cloudrun', async () => {
+		// Submitter IS in allowlist (would pick 'gear' on a NEW session) but
+		// the existing session has no `transport` field at all (legacy data
+		// written before the field existed). Branch must read `existing` and
+		// default to 'cloudrun', NOT call chooseInitialTransport.
+		GEAR_ALLOWLIST.add('user-good-token');
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				participants: ['user-good-token'],
+				status: 'complete',
+				adkSessionId: 'adk-existing',
+				lastTurnIndex: 1
+				// no transport field
+			})
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
+
+		assert.equal(res._status, 202);
+		assert.equal(
+			tasksClient.createTask.mock.callCount(),
+			1,
+			'legacy session must route to cloudrun'
+		);
+		assert.equal(gearHandoffMock.mock.callCount(), 0);
+
+		// And the t.update payload still doesn't include `transport` — the
+		// field stays nullish on legacy sessions until they naturally drain.
+		const { sessionUpdates } = partitionWrites('sessions/sess-1');
+		assert.equal(sessionUpdates.length, 1);
+		assert.ok(!('transport' in sessionUpdates[0]));
+	});
+
+	it('chooseInitialTransport: allowlist hit/miss + default-flipped scenarios', () => {
+		// Pure unit test via parameters — no module-state mutation.
+		assert.equal(chooseInitialTransport('user-x', new Set(), 'cloudrun'), 'cloudrun');
+		assert.equal(chooseInitialTransport('user-x', new Set(['user-x']), 'cloudrun'), 'gear');
+		// GEAR_DEFAULT-flipped scenario (Stage B):
+		assert.equal(chooseInitialTransport('user-x', new Set(), 'gear'), 'gear');
+		// Allowlist for a different user → default applies:
+		assert.equal(chooseInitialTransport('user-x', new Set(['user-y']), 'cloudrun'), 'cloudrun');
 	});
 });
 

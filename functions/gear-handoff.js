@@ -94,18 +94,6 @@ export async function _readFirstNdjsonLine(reader) {
 	}
 }
 
-function _deadlineReject(ms) {
-	let timer;
-	const promise = new Promise((_resolve, reject) => {
-		timer = setTimeout(() => reject(new Error(`gearHandoff_deadline_exceeded:${ms}ms`)), ms);
-	});
-	// Expose the timer so the caller can clear it once the race settles
-	// — otherwise the loser-side timeout keeps Node's event loop alive
-	// for the full deadline (e.g. 75 s under tests with no real network).
-	promise.cancel = () => clearTimeout(timer);
-	return promise;
-}
-
 async function _doHandoff({
 	controller,
 	resource,
@@ -193,12 +181,37 @@ async function _doHandoff({
  * AbortController. Returns `{ ok: true }` on success. Throws on any
  * failure shape — caller must call `gearHandoffCleanup` to flip the
  * session+turn to status='error'.
+ *
+ * `deadlineMs` defaults to `HANDOFF_DEADLINE_MS` (75 s) for production
+ * use. Tests override to a small value to exercise the deadline-fires-
+ * abort path without real wall-clock waits.
  */
-export async function gearHandoff({ sid, runId, turnIdx, userId, message, isFirstMessage }) {
+export async function gearHandoff({
+	sid,
+	runId,
+	turnIdx,
+	userId,
+	message,
+	isFirstMessage,
+	deadlineMs = HANDOFF_DEADLINE_MS
+}) {
 	const resource = getResource();
 	const controller = new AbortController();
-	const deadlineTimer = setTimeout(() => controller.abort(), HANDOFF_DEADLINE_MS);
-	const deadlinePromise = _deadlineReject(HANDOFF_DEADLINE_MS);
+	// Single deadline timer that both aborts the in-flight fetches AND
+	// rejects the race promise. Two parallel timers (one for abort, one
+	// for the reject) would race against each other: in-flight fetches
+	// notice the abort and reject _doHandoff with AbortError on a
+	// microtask, which can settle the Promise.race BEFORE the rejection
+	// timer fires. Caller would see AbortError instead of the intended
+	// `gearHandoff_deadline_exceeded` message. Collapsing to one timer
+	// makes the synchronous reject() settle the race deterministically.
+	let deadlineTimer;
+	const deadlinePromise = new Promise((_resolve, reject) => {
+		deadlineTimer = setTimeout(() => {
+			controller.abort();
+			reject(new Error(`gearHandoff_deadline_exceeded:${deadlineMs}ms`));
+		}, deadlineMs);
+	});
 	try {
 		return await Promise.race([
 			_doHandoff({
@@ -215,16 +228,12 @@ export async function gearHandoff({ sid, runId, turnIdx, userId, message, isFirs
 		]);
 	} finally {
 		clearTimeout(deadlineTimer);
-		// The deadlinePromise has its own internal timer too (it wraps a
-		// `setTimeout` for the rejection); explicitly cancel so the loser
-		// side doesn't keep the event loop alive for the full deadline.
-		deadlinePromise.cancel();
 		// Suppress "unhandled rejection" warning when _doHandoff wins the
-		// race — we don't await this branch so its rejection has no
-		// listener.
+		// race — we don't await the deadline branch so its rejection has
+		// no listener.
 		deadlinePromise.catch(() => {});
-		// Idempotent — calling abort() ensures any straggler fetch that
-		// survived the race also gets cancelled.
+		// Idempotent — ensures any straggler fetch that survived the race
+		// also gets cancelled.
 		controller.abort();
 	}
 }

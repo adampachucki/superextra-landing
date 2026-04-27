@@ -327,6 +327,57 @@ describe('gearHandoff', () => {
 		assert.ok(HANDOFF_DEADLINE_MS > 0);
 	});
 
+	it('deadline fires abort across all three fetches and rejects deterministically', async () => {
+		// plan §"Cross-cutting" + F2 P1 — the deadline must abort the shared
+		// controller AND reject the race promise. Pre-fix, two parallel
+		// timers raced: the abort fired first and the in-flight fetch
+		// rejected _doHandoff with AbortError on a microtask, settling the
+		// race BEFORE the rejection-timer fired. Caller saw AbortError
+		// instead of `gearHandoff_deadline_exceeded`. Post-fix, one timer
+		// aborts AND rejects synchronously, so the message is deterministic.
+		const captured = [];
+		const fetchMock = mock.fn(async (url, init) => {
+			captured.push(init.signal);
+			if (url.includes('/sessions?sessionId=')) return mockJsonResponse({});
+			if (url.includes(':appendEvent')) return mockJsonResponse({});
+			if (url.includes(':streamQuery')) {
+				// Stream that hangs on read until the signal aborts.
+				const reader = {
+					read: () =>
+						new Promise((_resolve, reject) => {
+							init.signal.addEventListener('abort', () => {
+								const err = new Error('aborted');
+								err.name = 'AbortError';
+								reject(err);
+							});
+						}),
+					cancel: async () => {}
+				};
+				return { ok: true, status: 200, body: { getReader: () => reader } };
+			}
+			throw new Error(`unexpected: ${url}`);
+		});
+		globalThis.fetch = fetchMock;
+
+		await assert.rejects(
+			gearHandoff({
+				sid: 'sid1',
+				runId: 'run1',
+				turnIdx: 1,
+				userId: 'user1',
+				message: 'stuck',
+				isFirstMessage: true,
+				deadlineMs: 100
+			}),
+			/gearHandoff_deadline_exceeded:100ms/
+		);
+
+		// All three fetches saw the same signal, and it ended aborted.
+		assert.equal(captured.length, 3);
+		assert.ok(captured[0] === captured[1] && captured[1] === captured[2]);
+		assert.equal(captured[0].aborted, true);
+	});
+
 	it('throws when GEAR_REASONING_ENGINE_RESOURCE is unset', async () => {
 		const saved = process.env.GEAR_REASONING_ENGINE_RESOURCE;
 		delete process.env.GEAR_REASONING_ENGINE_RESOURCE;
