@@ -133,6 +133,15 @@ let liveTimeline = $state<TimelineEvent[]>([]);
 let loadState = $state<LoadState>('idle');
 let placeContextState = $state<PlaceContext | null>(null);
 let typingMessageTimestamp = $state<number | null>(null);
+// While a startNewChat POST is in flight, the active-session listener can
+// race it: the listener attaches optimistically and the first server-
+// confirmed snapshot can land before agentStream's Firestore txn does (gap
+// is ~0.5–1.5 s). Without this guard, `loadState` would briefly flip to
+// 'missing' and the user would see "Couldn't load this chat". The guard
+// suppresses that transition while a POST for `optimisticPendingSid` is
+// still in flight. Cleared on POST success (listener takes over) or on
+// pre-Firestore-failure local rollback.
+let optimisticPendingSid: string | null = null;
 
 // Listener unsubscribes — kept outside $state because they're opaque cleanup
 // handles, not reactive values.
@@ -309,7 +318,19 @@ async function attachActiveListeners(sid: string) {
 					clearTimeout(loadTimeoutHandle);
 					loadTimeoutHandle = null;
 				}
-				loadState = exists ? 'loaded' : 'missing';
+				if (exists) {
+					loadState = 'loaded';
+					// Doc materialized — clear pending guard if it was for this sid.
+					if (optimisticPendingSid === sid) optimisticPendingSid = null;
+				} else if (optimisticPendingSid !== sid) {
+					// Only flip to 'missing' once the optimistic window has closed.
+					// While a startNewChat POST is in flight for this sid, the
+					// pre-txn gap can show exists=false; suppress the flip and
+					// stay in 'loading' until the doc materializes (success path)
+					// or the POST rejects and clears the guard (failure path).
+					loadState = 'missing';
+				}
+				// else: keep loadState='loading'.
 			} else if (exists) {
 				// Cache-only but the doc exists — safe to flip to loaded
 				// for render purposes; the server version will confirm soon.
@@ -522,17 +543,60 @@ async function startNewChat(query: string, place: PlaceContext | null): Promise<
 	const trimmed = query.trim();
 	if (!trimmed) throw new Error('empty_message');
 	const sid = uuid();
-	// POST first. Only after the server has accepted the request do we flip
-	// local state — otherwise a rejected send leaves the URL on an orphan sid
-	// and the user sees "Couldn't load this chat" 10 seconds later.
-	await postAgentStream({
-		sessionId: sid,
-		message: trimmed,
-		placeContext: place,
-		isFirstMessage: true
-	});
+	// Optimistic submission (plan §6). agentStream now blocks ~60–90 s on
+	// the gear path waiting for the first NDJSON line; without this flip
+	// the user sees a blank screen until the POST returns. Flip local state
+	// FIRST so the chat panel renders immediately; the snapshot listener
+	// attaches with `optimisticPendingSid === sid` so the pre-txn
+	// `exists=false` snapshot doesn't briefly flip `loadState` to 'missing'.
+	optimisticPendingSid = sid;
 	selectSession(sid);
 	placeContextState = place;
+
+	try {
+		await postAgentStream({
+			sessionId: sid,
+			message: trimmed,
+			placeContext: place,
+			isFirstMessage: true
+		});
+		// Success: doc has materialized (or will any moment). Listener takes
+		// over for normal lifecycle.
+		if (optimisticPendingSid === sid) optimisticPendingSid = null;
+	} catch (err) {
+		// Distinguish pre-Firestore failure (POST rejected before txn ran —
+		// no doc materialized) from post-Firestore failure (txn ran, then
+		// gearHandoff failed and gearHandoffCleanup wrote status='error').
+		// Single getDoc check tells us which side of the fence we're on.
+		// IMPORTANT (plan §v3.9 P2): wrap getFirebase + dynamic import inside
+		// the same try — both can throw (offline import failure, Firebase
+		// init error, auth missing). Without the wrap, a Firebase-bootstrap
+		// failure would propagate from the catch and skip the local
+		// rollback, leaving the session selected with no doc ever
+		// materializing.
+		let docExists = false;
+		try {
+			const { db } = await getFirebase();
+			const firestoreMod = await import('firebase/firestore');
+			const snap = await firestoreMod.getDoc(firestoreMod.doc(db, 'sessions', sid));
+			docExists = snap.exists();
+		} catch (e) {
+			// any read/bootstrap error → treat as pre-Firestore failure
+			console.warn('[chat-state] getDoc check failed; treating as pre-Firestore failure:', e);
+		}
+		if (optimisticPendingSid === sid) optimisticPendingSid = null;
+		if (!docExists && activeSid === sid) {
+			// Pre-Firestore failure — clean up local state.
+			detachActiveListeners();
+			clearActiveState();
+			activeSid = null;
+			loadState = 'idle';
+		}
+		// Otherwise post-Firestore failure: doc has status='error' from
+		// gearHandoffCleanup; the listener renders the error state via the
+		// existing loadState machinery. No frontend rollback needed.
+		throw err;
+	}
 	return sid;
 }
 

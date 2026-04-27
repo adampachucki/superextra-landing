@@ -12,7 +12,8 @@ vi.mock('firebase/firestore', () => ({
 	query: vi.fn((ref, ...constraints) => ({ _kind: 'query', _ref: ref, _constraints: constraints })),
 	where: vi.fn((f, op, v) => ({ _kind: 'where', f, op, v })),
 	orderBy: vi.fn((f) => ({ _kind: 'orderBy', f })),
-	onSnapshot: vi.fn()
+	onSnapshot: vi.fn(),
+	getDoc: vi.fn(async () => ({ exists: () => false }))
 }));
 
 vi.mock('$lib/firebase', () => ({
@@ -792,7 +793,14 @@ describe('chatState (Firestore-driven)', () => {
 			await expect(chatState.startNewChat('go', null)).rejects.toThrow('previous_turn_in_flight');
 		});
 
-		it('does NOT select the session when the POST rejects (Fix 1 guarantee)', async () => {
+		it('pre-Firestore failure: POST rejects + no doc materialized → rolls back to idle (plan §6)', async () => {
+			// Phase 6 swapped the order: selectSession runs BEFORE postAgentStream
+			// so the chat panel renders immediately during the ~60–90 s gear
+			// dispatch wait. On POST rejection the helper does a single getDoc
+			// check to distinguish pre-Firestore failure (doc never materialized
+			// — local rollback required) from post-Firestore failure (txn ran,
+			// gearHandoff failed, status='error' already on the doc — listener
+			// renders error state, no rollback).
 			const fetchMock = vi.fn(
 				async () =>
 					({
@@ -802,23 +810,61 @@ describe('chatState (Firestore-driven)', () => {
 					}) as unknown as Response
 			);
 			vi.stubGlobal('fetch', fetchMock);
-			const obs = captureObservers();
+			captureObservers();
 
 			await expect(chatState.startNewChat('hello', null)).rejects.toThrow('upstream_down');
-			// Transport order: POST first, selectSession only on success.
-			// A rejected send must NOT leave the app pointing at an orphan sid
-			// — otherwise the listener flips to 'loadTimedOut' / 'missing' and
-			// the user sees "Couldn't load this chat" on a chat they just tried to create.
+			// Pre-Firestore failure path: getDoc throws because the mock at the
+			// top of this file doesn't expose `getDoc` — treated as no-doc, so
+			// the catch block runs the local rollback (detachActiveListeners +
+			// clearActiveState + activeSid = null + loadState = 'idle').
 			expect(chatState.activeSid).toBeNull();
-			// Only the sidebar listener (if any) should have attached; no active
-			// session / turns / events listeners for any sid.
-			const activeListeners = obs.all.filter(
-				(c) =>
-					(c.ref._kind === 'doc' && String(c.ref._path ?? '').startsWith('sessions/')) ||
-					String(c.ref._ref?._path ?? '').includes('/turns') ||
-					String(c.ref._ref?._path ?? '').includes('/events')
-			);
-			expect(activeListeners).toHaveLength(0);
+			expect(chatState.loadState).toBe('idle');
+		});
+
+		// NB: a paired "post-Firestore failure" test (POST rejects 502 + getDoc
+		// returns exists=true → no local rollback) was attempted but vitest's
+		// vi.mock of `firebase/firestore` doesn't propagate to chat-state's
+		// dynamic `await import('firebase/firestore')` reliably — `doc()`
+		// inside the catch block resolves to the real Firebase fn and throws
+		// on the empty `db: {}` mock. The behavior is exercised end-to-end via
+		// the manual UX smoke (Chrome DevTools MCP) covered in the
+		// gear-migration execution log; the unit-level guarantee here is the
+		// pre-Firestore rollback above.
+
+		it('listener race: optimisticPendingSid suppresses missing flip during POST window', async () => {
+			// When startNewChat fires the POST, the active-session listener is
+			// already attached. If a server-confirmed `exists=false` snapshot
+			// arrives BEFORE agentStream's Firestore txn lands (the gap is
+			// ~0.5–1.5 s), `loadState` would briefly flip to 'missing' without
+			// the optimisticPendingSid guard. This test simulates that race.
+			let resolveFetch: (value: Response) => void;
+			const fetchPromise = new Promise<Response>((resolve) => {
+				resolveFetch = resolve;
+			});
+			const fetchMock = vi.fn(async () => fetchPromise);
+			vi.stubGlobal('fetch', fetchMock);
+
+			const obs = captureObservers();
+			const startPromise = chatState.startNewChat('hello', null);
+
+			// Wait for the optimistic selectSession() to attach listeners.
+			await waitUntil(() => !!obs.all.find((c) => c.ref._kind === 'doc'));
+
+			// Fire a server-confirmed exists=false snapshot — simulates the
+			// listener seeing the pre-txn gap.
+			const sessionObs = obs.all.find((c) => c.ref._kind === 'doc')!;
+			sessionObs.onNext({
+				metadata: { fromCache: false },
+				exists: () => false
+			});
+
+			// loadState should NOT have flipped to 'missing' — the
+			// optimisticPendingSid guard kept it 'loading'.
+			expect(chatState.loadState).toBe('loading');
+
+			// Resolve the POST so startNewChat returns cleanly.
+			resolveFetch!({ ok: true, status: 200, json: async () => ({}) } as unknown as Response);
+			await startPromise;
 		});
 	});
 
