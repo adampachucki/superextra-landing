@@ -816,9 +816,10 @@ describe('agentStream', () => {
 	});
 
 	it('sticky transport: follow-up on existing gear session stays gear (no allowlist needed)', async () => {
-		// Submitter is NOT in allowlist; default is 'cloudrun'. The existing
-		// session's stored `transport: 'gear'` must override and route to
-		// gearHandoff regardless.
+		// Submitter is NOT in allowlist. Under Stage A (default='cloudrun')
+		// or Stage B (default='gear'), the existing session's stored
+		// `transport: 'gear'` must override and route to gearHandoff
+		// regardless of the default — that's the sticky-per-session contract.
 		mockDb.get.mock.mockImplementation(async () => ({
 			exists: true,
 			data: () => ({

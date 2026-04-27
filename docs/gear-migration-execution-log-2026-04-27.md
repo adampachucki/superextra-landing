@@ -85,7 +85,7 @@ Branch is ready for staging deploy.
 
 ## Blockers
 
-(none — Stage A is live as of 2026-04-27; see "Stage A live" entry under "Verification artifacts" for the deployed state)
+(none — **Stage B is live** as of 2026-04-27 (`f4ff1bf`); see the "Stage B live" entry below. Stage A artifacts that follow are kept as historical record but **superseded**.)
 
 ## Stage B live (2026-04-27)
 
@@ -135,7 +135,11 @@ firebase deploy --only functions:agentStream --project=superextra-site
 
 Sticky-per-session means in-flight chats are never rerouted by either flow; the change only affects new chats from the un-allowlisted UIDs (or, after Stage B, all UIDs).
 
-## Phase 8 handoff — operator notes for Adam-driven rollout
+## Phase 8 handoff — operator notes (HISTORICAL — superseded by "Stage B live" above)
+
+> The runbook below describes the rollout flow as planned before Stages A and B
+> were both completed in a single afternoon. Steps 1–4 are done; current state
+> is the Stage B section above. Kept for reference only.
 
 1. **Deploy** the agent code to the staging Vertex AI Agent Engine via:
 
@@ -163,7 +167,7 @@ Sticky-per-session means in-flight chats are never rerouted by either flow; the 
 
 2. **Configure agentStream**: set `GEAR_REASONING_ENGINE_RESOURCE` env var on the deployed Cloud Function via the deploy workflow (or `gcloud functions deploy ... --update-env-vars=GEAR_REASONING_ENGINE_RESOURCE=...`). Without it, the gear branch fast-fails with `GEAR_REASONING_ENGINE_RESOURCE env var not set`.
 
-3. **Stage A — allowlist soak** (~1 week, **CURRENTLY LIVE**): two developer UIDs are in `GEAR_ALLOWLIST` (Adam's prod + dev origins — see the "Stage A operator state" section above). Watch:
+3. **Stage A — allowlist soak** (~1 week — **DONE 2026-04-27, ran ~3 hours not 1 week**; see "Stage B live" above for the rationale). Was: two developer UIDs in `GEAR_ALLOWLIST` (Adam's prod + dev origins). Watch items kept for Phase 2 dogfooding:
    - `gcloud logging read 'resource.type="cloud_function" AND severity>=WARNING'` for handoff failures.
    - Firestore `sessions/*` for `transport: 'gear'` docs reaching `status: 'complete'`.
    - Watchdog for stuck `status: 'running'` sessions (none expected).
@@ -174,7 +178,7 @@ Sticky-per-session means in-flight chats are never rerouted by either flow; the 
 
 6. **Phase 9 cutover** (after 30-day rollback window): decommission Cloud Tasks + Cloud Run, delete worker_main.py / Dockerfile / enqueueRunTask, remove `adkSessionId`/`currentAttempt`/`currentWorkerId` fields via Firestore migration script, archive `agent/probe/` + `functions/probe-stream-query.js` to `docs/archived/`, delete `probeHandoffAbort` + `probeHandoffLeaveOpen`.
 
-**Rollback at any stage:** see the "Stage A rollback procedure" section above. Both `GEAR_ALLOWLIST` and `GEAR_DEFAULT` are JS module constants (not Cloud Function env vars), so rollback always requires a code change + `firebase deploy --only functions:agentStream`. Sticky-per-session means in-flight chats are never rerouted.
+**Rollback at any stage:** see the "Stage B live" section near the top — current rollback procedure is `GEAR_DEFAULT = 'cloudrun'` + `firebase deploy --only functions:agentStream`. Both `GEAR_ALLOWLIST` and `GEAR_DEFAULT` are JS module constants (not Cloud Function env vars), so rollback always requires a code change + redeploy. Sticky-per-session means in-flight chats are never rerouted.
 
 ---
 
@@ -294,7 +298,7 @@ gcloud projects get-iam-policy superextra-site \
 
 **Allowlist ops during testing:** the chrome-mcp transient UID `tFQ7GU4lagdFB0gFe5O0HRUuki42` was added to `GEAR_ALLOWLIST` for Smokes 4 + 6a (where allowlisted-submitter behavior was the test predicate), then removed and `agentStream` redeployed. Live function back to two entries (Adam prod + Adam dev).
 
-**Stage A is open.** Phase 1 fully green. Phase 2 soak begins; rollback procedure documented above.
+**Stage A was opened ~16:26 UTC and superseded by Stage B at 19:22 UTC the same day** (commit `f4ff1bf`). Phase 1 stayed fully green throughout; Phase 2 soak now runs under Stage B. Current rollback: see the "Stage B live" section near the top.
 
 ## Verification artifacts
 
@@ -302,7 +306,7 @@ gcloud projects get-iam-policy superextra-site \
 - **Probe Cloud Functions never deployed to production (2026-04-27).** `gcloud functions list --regions=us-central1 --project=superextra-site --v2` returns 6 functions (agentStream, agentDelete, watchdog, intake, sttToken, tts) — no `probeHandoff*`. `curl` to the expected URLs returns 404. R3 probe round must have run them locally or via `firebase emulators` only. Step 2 of the post-staging plan is a no-op cloud-side; the source-side delete in commit `bfeb5b0` is the full cleanup.
 - **Phase 8 staging Agent Engine deployed (2026-04-27).** `agent_engines.create(...)` from `agent/superextra_agent/agent.py` (gear-migration branch HEAD) succeeded in **4m 39s**. Resource: `projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288`, display name `superextra-agent-staging`. Code pickled cleanly (Phase 2 GeminiGlobalEndpoint subclass). Final requirements list locked: `google-adk==1.28.0`, `httpx==0.28.1`, `fastapi==0.136.0`, `uvicorn[standard]==0.39.0`, `google-cloud-firestore==2.22.0`, `google-cloud-secret-manager==2.27.0`, `pydantic==2.12.5`, `cloudpickle==3.1.2`.
 
-- **Stage A live (2026-04-27 — `firebase deploy --only functions` from `gear-migration` branch HEAD).** All six Cloud Functions redeployed successfully (agentStream, agentDelete, intake, sttToken, tts, watchdog). `agentStream` now has `GEAR_REASONING_ENGINE_RESOURCE=projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288` env var set (verified via `gcloud functions describe`). `GEAR_ALLOWLIST` contains `IusLcXEvM4QYAvaXX1ZvCoRtVAz2` (adam@finebite.co dev UID, identified as the dominant session creator — 12 of 20 most recent sessions, 60%). `GEAR_DEFAULT='cloudrun'` — only the allowlisted UID routes to GEAR; everyone else stays on Cloud Run worker. Sticky-per-session means in-flight chats are never rerouted. Reverting Stage A is one commit (drop the UID + redeploy) or two env-var tweaks via `gcloud functions deploy --update-env-vars`.
+- **Stage A live (2026-04-27, **HISTORICAL — superseded by Stage B at `f4ff1bf` the same day**).** First deploy (`firebase deploy --only functions` from `gear-migration` branch HEAD): six Cloud Functions redeployed; `agentStream` got `GEAR_REASONING_ENGINE_RESOURCE=projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288`. Initial `GEAR_ALLOWLIST` had a wrong UID (`IusLcXEvM4QYAvaXX1ZvCoRtVAz2` — picked from Firestore session-history analysis) which routed Adam's first prod test to cloudrun; corrected at commit `5636357` to `feadLLD5IuUrJNeQTPPu9QIg3wg1` (prod) and at `9718cf8` added `UqQvmOsaBifkwzzLBugbnYj8kUt2` (dev). With `GEAR_DEFAULT='cloudrun'`, only the two allowlisted UIDs routed to GEAR. Stage A rollback was always code-change + redeploy (NOT env-var tweak — earlier commit-message wording on this point was wrong; allowlist + default are JS constants, never env vars).
 
 - **ADC scope/quota workaround for manual GCP work (2026-04-27).** GCP API calls from the VM (`agent_engines.list/create/get`, `firebase deploy`) hit `403 ACCESS_TOKEN_SCOPE_INSUFFICIENT` or `403 quota project not set` when using the default ADC path (compute SA from GCE metadata). Workaround: prepend each command with `GOOGLE_APPLICATION_CREDENTIALS=/home/adam/.config/gcloud/legacy_credentials/adam@finebite.co/adc.json GOOGLE_CLOUD_QUOTA_PROJECT=superextra-site`. The legacy authorized-user creds (with `cloud-platform` scope + quota project pinned) work where the GCE metadata token doesn't. CI uses Workload Identity so this only affects local manual ops.
 - **Phase 6 Chrome DevTools MCP smoke (2026-04-27).** Recipe per the post-review fixes plan: `new_page` → `http://localhost:5199/agent/chat` → fill input → pick a venue → press Enter. Result: URL flipped to `?sid=f23a7e46-...` immediately, chat panel rendered with the user message + "Working for 5s" + "Starting research…" placeholder, sidebar showed the new "Untitled chat" entry. **No "Couldn't load this chat" flash** anywhere through the optimistic window — listener-race-suppression confirmed. Screenshot: [`gear-phase6-smoke-2026-04-27.png`](./gear-phase6-smoke-2026-04-27.png). Smoke ran against the live cloudrun path (Phase 5/7 changes not yet deployed); end-to-end gear smoke deferred to Stage A allowlist soak per plan §6.
