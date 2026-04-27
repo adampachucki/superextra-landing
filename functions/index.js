@@ -138,25 +138,29 @@ const WORKER_URL = () => process.env.WORKER_URL || DEFAULT_WORKER_URL;
 
 // ── GEAR transport selection ────────────────────────────────────────────────
 //
-// Phase 7's two-stage rollout: Stage A puts a tiny developer allowlist on
-// 'gear' while everyone else stays on 'cloudrun'; Stage B flips the default
-// for new sessions to 'gear'. Sticky per-session — only first-turn-of-a-new-
-// session ever picks. Legacy sessions written before the `transport` field
-// existed are caught by the `existing` branch in the agentStream txn and
-// stay on 'cloudrun' forever.
+// **Stage B is live (2026-04-27): `GEAR_DEFAULT = 'gear'`.** All NEW sessions
+// route to the GEAR Reasoning Engine. Existing `transport: 'cloudrun'`
+// sessions stay sticky per-session and drain naturally on the legacy worker.
+// Legacy sessions written BEFORE the `transport` field existed (no field at
+// all) are caught by the `existing` branch in the agentStream txn and stay
+// on 'cloudrun' forever — this is the v3.9 P1 invariant.
 //
-// Adam: add a UID here to route that account to GEAR while soaking. Keep
-// the list to 1–2 entries through the soak. Flip GEAR_DEFAULT to 'gear'
-// when ready for Stage B.
+// `GEAR_ALLOWLIST` is now redundant for routing (everything routes to gear
+// regardless), but the mechanism is kept in case we need a partial revert
+// (flip default back to 'cloudrun' but keep specific UIDs on gear, or vice
+// versa). Allowlist entries are harmless with default='gear'.
+//
+// Rollback to Stage A: change `GEAR_DEFAULT` back to 'cloudrun' and redeploy.
+// Sticky-per-session means in-flight gear sessions are never rerouted; only
+// new sessions get cloudrun once again.
 //
 // Exported so unit tests can verify allowlist hit/miss + default-flipped
-// scenarios via parameters (no module-state mutation). `resetGearAllowlist`
-// is a test-only helper used in `beforeEach` to keep cases isolated.
+// scenarios via parameters (no module-state mutation).
 export const GEAR_ALLOWLIST = new Set([
-	'feadLLD5IuUrJNeQTPPu9QIg3wg1', // adam@finebite.co prod (agent.superextra.ai) — Stage A
-	'UqQvmOsaBifkwzzLBugbnYj8kUt2' // adam@finebite.co dev (34.38.81.215:5199) — Stage A
+	'feadLLD5IuUrJNeQTPPu9QIg3wg1', // adam@finebite.co prod (agent.superextra.ai)
+	'UqQvmOsaBifkwzzLBugbnYj8kUt2' // adam@finebite.co dev (34.38.81.215:5199)
 ]);
-export const GEAR_DEFAULT = 'cloudrun'; // flip to 'gear' for Stage B
+export const GEAR_DEFAULT = 'gear'; // Stage B — flip back to 'cloudrun' to revert
 
 export function chooseInitialTransport(
 	submitterUid,

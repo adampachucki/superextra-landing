@@ -192,10 +192,13 @@ beforeEach(() => {
 	gearHandoffCleanupMock.mock.resetCalls();
 	mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
 	mockDb.recursiveDelete.mock.mockImplementation(async () => {});
-	// F2 P3: reset mock IMPLEMENTATIONS too — a failed/interrupted
-	// `mockImplementationOnce` from a prior test could otherwise leak.
+	// Reset mock IMPLEMENTATIONS too — a failed/interrupted
+	// `mockImplementationOnce` from a prior test could otherwise leak
+	// (e.g., a queued `throw` that wasn't consumed because the test
+	// took a different code path under Stage B's `default='gear'`).
 	gearHandoffMock.mock.mockImplementation(async () => ({ ok: true }));
 	gearHandoffCleanupMock.mock.mockImplementation(async () => {});
+	tasksClient.createTask.mock.mockImplementation(async (opts) => [opts.task]);
 	GEAR_ALLOWLIST.clear();
 });
 
@@ -496,33 +499,22 @@ describe('agentStream', () => {
 		assert.equal(turnDoc.error, null);
 		assert.equal(turnDoc.createdAt, '__server_timestamp__');
 
-		// Cloud Task body.
-		assert.equal(tasksClient.createTask.mock.callCount(), 1);
-		const taskArg = tasksClient.createTask.mock.calls[0].arguments[0];
-		assert.equal(
-			taskArg.parent,
-			'projects/superextra-site/locations/us-central1/queues/agent-dispatch'
-		);
-		assert.ok(taskArg.task.name.endsWith(`/tasks/${res._json.runId}`));
-		assert.equal(taskArg.task.dispatchDeadline.seconds, 1800);
-		assert.equal(taskArg.task.httpRequest.url, 'https://worker-test.run.app/run');
-		assert.equal(
-			taskArg.task.httpRequest.oidcToken.serviceAccountEmail,
-			'superextra-worker@superextra-site.iam.gserviceaccount.com'
-		);
-		assert.equal(taskArg.task.httpRequest.oidcToken.audience, 'https://worker-test.run.app');
-
-		const body = decodeTaskBody(tasksClient.createTask.mock.calls[0]);
-		assert.equal(body.sessionId, 'sess-1');
-		assert.equal(body.runId, res._json.runId);
+		// Stage B: GEAR_DEFAULT='gear' so first turns from any submitter
+		// (allowlisted or not) route to gearHandoff, not Cloud Tasks.
+		// Cloud Tasks is only used by sticky-cloudrun existing sessions.
+		assert.equal(tasksClient.createTask.mock.callCount(), 0);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.equal(handoffArg.sid, 'sess-1');
+		assert.equal(handoffArg.runId, res._json.runId);
 		// Creator UID equals submitter UID on the first turn.
-		assert.equal(body.userId, 'user-good-token');
-		// turnIdx travels as an integer, not a zero-padded string.
-		assert.equal(body.turnIdx, 1);
-		assert.equal(typeof body.turnIdx, 'number');
-		assert.equal(body.isFirstMessage, true);
-		assert.equal(body.adkSessionId, null);
-		assert.match(body.queryText, /^\[Date: /);
+		assert.equal(handoffArg.userId, 'user-good-token');
+		assert.equal(handoffArg.turnIdx, 1);
+		assert.equal(typeof handoffArg.turnIdx, 'number');
+		assert.equal(handoffArg.isFirstMessage, true);
+		assert.match(handoffArg.message, /^\[Date: /);
+		// Session doc records the gear transport so follow-ups stay sticky.
+		assert.equal(sessionDoc.transport, 'gear');
 	});
 
 	it('follow-up from the same user arrayUnion-keeps participants and increments lastTurnIndex', async () => {
@@ -715,10 +707,23 @@ describe('agentStream', () => {
 		assert.equal(tasksClient.createTask.mock.callCount(), 0);
 	});
 
-	it('task dedup name uses runId', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+	it('task dedup name uses runId (sticky-cloudrun follow-up)', async () => {
+		// Stage B (default='gear') means first turns route to gear.
+		// To exercise the Cloud Tasks dispatch path explicitly, this test
+		// uses a follow-up on an existing transport='cloudrun' session.
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				participants: ['user-good-token'],
+				status: 'complete',
+				transport: 'cloudrun',
+				adkSessionId: 'adk-existing',
+				lastTurnIndex: 1
+			})
+		}));
 		const res = mockRes();
-		await agentStream(authedReq(), res);
+		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
 
 		const taskArg = tasksClient.createTask.mock.calls[0].arguments[0];
 		assert.equal(
@@ -727,21 +732,32 @@ describe('agentStream', () => {
 		);
 	});
 
-	it('writes status=error if Cloud Tasks enqueue fails', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+	it('writes status=error if Cloud Tasks enqueue fails (sticky-cloudrun follow-up)', async () => {
+		// Same Stage B caveat as above — force cloudrun via sticky session.
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'user-good-token',
+				participants: ['user-good-token'],
+				status: 'complete',
+				transport: 'cloudrun',
+				adkSessionId: 'adk-existing',
+				lastTurnIndex: 1
+			})
+		}));
 		tasksClient.createTask.mock.mockImplementationOnce(async () => {
 			throw new Error('quota exceeded');
 		});
 
 		const res = mockRes();
-		await agentStream(authedReq(), res);
+		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
 
 		assert.equal(res._status, 502);
 		assert.equal(res._json.error, 'enqueue_failed');
 
-		// Post-enqueue recovery: the session doc (and only the session doc)
-		// should be flipped to status=error. The txn already ran so its writes
-		// are in the set/update history — we want the extra recovery update.
+		// Post-enqueue recovery: the session doc should be flipped to
+		// status=error. The txn already ran so its writes are in the
+		// set/update history — we want the extra recovery update.
 		const recoveryUpdates = mockDb.update.mock.calls
 			.filter((c) => c.arguments[0]?._path === 'sessions/sess-1')
 			.map((c) => c.arguments[1]);
