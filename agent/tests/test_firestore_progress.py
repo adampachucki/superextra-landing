@@ -352,9 +352,12 @@ def _mock_invocation_context(*, sid: str, run_id: str, turn_idx: int, invocation
 
 
 @pytest.mark.asyncio
-async def test_plugin_before_run_halts_when_state_missing(monkeypatch):
-    """If session.state has no runId, before_run returns a `types.Content`
-    so the runner short-circuits cleanly via ADK's early-exit branch."""
+async def test_plugin_before_run_noops_when_state_missing(monkeypatch):
+    """If session.state has no runId, before_run returns None so the
+    runner proceeds normally. The legacy Cloud Run worker shares the
+    same `App` and runs without populating runId into ADK state — the
+    plugin must let that run through, not halt it. (Halting was the
+    2026-04-27 cloudrun-broken-by-plugin regression.)"""
     plugin = FirestoreProgressPlugin(project="superextra-site")
 
     bad_session = SimpleNamespace(id="se-x", state={})
@@ -365,7 +368,10 @@ async def test_plugin_before_run_halts_when_state_missing(monkeypatch):
         user_content=None,
     )
     out = await plugin.before_run_callback(invocation_context=ctx)
-    assert isinstance(out, types.Content)
+    assert out is None, (
+        "plugin must no-op (return None) when runId is missing — halting "
+        "kills the legacy worker pipeline that shares the same App"
+    )
 
 
 @pytest.mark.asyncio

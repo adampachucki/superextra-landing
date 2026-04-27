@@ -341,7 +341,19 @@ class FirestoreProgressPlugin(BasePlugin):
         fs = self._client()
         state = _build_state(fs, invocation_context)
         if state is None:
-            return _halt_content("invocation_state_missing")
+            # No gear-context runId in session.state. Two cases:
+            #   1. Legacy Cloud Run worker is running the same App — it
+            #      doesn't set runId into ADK session.state, so the plugin
+            #      simply has nothing to mirror. Returning None lets the
+            #      runner proceed normally; the worker writes progress
+            #      itself via its own Firestore writes.
+            #   2. A genuinely malformed gear handoff arrived without
+            #      runId. The agentStream txn upsert already wrote the
+            #      session doc with currentRunId, so the watchdog will
+            #      catch any stuck state at the 5-min lastEventAt fence.
+            # Halting here was the wrong choice — it killed the legacy
+            # cloudrun path the moment the plugin landed globally on App.
+            return None
 
         try:
             await _retry_critical(lambda: claim_invocation(fs, state))
