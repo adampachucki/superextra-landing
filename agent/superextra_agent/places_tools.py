@@ -1,11 +1,10 @@
 import atexit
 import asyncio
-import logging
 import os
 import uuid
 import httpx
 
-logger = logging.getLogger(__name__)
+from .secrets import get_secret
 
 BASE_URL = "https://places.googleapis.com/v1"
 
@@ -52,10 +51,6 @@ DETAIL_FIELDS = ",".join([
     "outdoorSeating",
 ])
 
-# Warn early if API key is missing (actual RuntimeError raised on first call)
-if not os.environ.get("GOOGLE_PLACES_API_KEY"):
-    logger.warning("GOOGLE_PLACES_API_KEY not set — Places API calls will fail")
-
 # Lazy-initialized client and API key
 _client: httpx.AsyncClient | None = None
 
@@ -81,10 +76,7 @@ atexit.register(_cleanup_client)
 
 
 def _get_api_key() -> str:
-    key = os.environ.get("GOOGLE_PLACES_API_KEY", "")
-    if not key:
-        raise RuntimeError("GOOGLE_PLACES_API_KEY environment variable is not set")
-    return key
+    return get_secret("GOOGLE_PLACES_API_KEY")
 
 
 async def get_restaurant_details(place_id: str, tool_context=None) -> dict:

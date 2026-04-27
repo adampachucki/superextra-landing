@@ -1,10 +1,11 @@
 import atexit
 import math
-import os
 import re
 import uuid
 
 import httpx
+
+from .secrets import get_secret
 
 BASE_URL = "https://serpapi.com/search.json"
 
@@ -43,10 +44,7 @@ atexit.register(_cleanup_client)
 
 
 def _get_api_key() -> str:
-    key = os.environ.get("SERPAPI_API_KEY", "")
-    if not key:
-        raise RuntimeError("SERPAPI_API_KEY environment variable is not set")
-    return key
+    return get_secret("SERPAPI_API_KEY")
 
 
 def _extract_coords_from_address_link(address_link: str) -> tuple[float, float] | None:

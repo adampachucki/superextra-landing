@@ -294,8 +294,15 @@ class TestGetBatchRestaurantDetails:
 
 class TestGetApiKey:
     def test_missing_env_var(self, monkeypatch):
-        """Missing GOOGLE_PLACES_API_KEY raises RuntimeError."""
+        """Missing GOOGLE_PLACES_API_KEY raises RuntimeError when Secret
+        Manager is also unreachable."""
         monkeypatch.delenv("GOOGLE_PLACES_API_KEY", raising=False)
+        # Block the Secret Manager fallback — otherwise this test would
+        # reach production Secret Manager from CI.
+        monkeypatch.setattr(
+            "superextra_agent.secrets._get_client",
+            lambda: (_ for _ in ()).throw(RuntimeError("sm unreachable in test")),
+        )
 
         with pytest.raises(RuntimeError):
             _get_api_key()

@@ -29,7 +29,7 @@ The Vite dev server is managed by a **systemd user service** — it runs automat
 - `npm run lint` — Prettier check + ESLint
 - `npm run format` — auto-format all files
 - `npm run test` — run Vitest unit tests (Firestore stream client, chat state)
-- `cd functions && npm test` — run Cloud Function tests (agentStream, agentCheck, watchdog, utils)
+- `cd functions && npm test` — run Cloud Function tests (agentStream, gearHandoff, watchdog, utils)
 - `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — run agent Python tests
 - `npm run test:rules` — Firestore rules emulator tests (needs Java + Firestore emulator)
 - Deploy: push to `main` → GitHub Actions → Firebase (project: superextra-site)
@@ -47,7 +47,7 @@ The Vite dev server is managed by a **systemd user service** — it runs automat
 Four test suites — **run all before pushing changes to chat transport, Cloud Functions, worker, or agent code**:
 
 - `npm run test` — Vitest: Firestore stream client, chat state machine, chat-recovery, plus any `.spec.ts`/`.test.ts` files
-- `cd functions && npm test` — Node test runner: agentStream, agentCheck, watchdog, utils
+- `cd functions && npm test` — Node test runner: agentStream, gearHandoff, watchdog, utils
 - `npm run test:rules` — Firestore rules emulator (sessions + events collection-group reads/writes)
 - `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — pytest: worker, Firestore-event mapper, source extraction, Places tools, instruction providers
 - `npm run test:evals` — live Gemini eval calls for router instructions (not in CI)
@@ -117,11 +117,22 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 
 ## Transport architecture
 
-- Browser POSTs to `agentStream` (Cloud Function) → enqueues a Cloud Task to the private Cloud Run worker.
-- Worker (`superextra-worker`, Python + ADK in-process) runs the pipeline and writes progress + terminal state to Firestore.
-- Browser reads state via two `onSnapshot` observers (`sessions/{sid}` for terminal; `collectionGroup('events')` for progress). REST fallback via `agentCheck` when Firestore is blocked.
-- Watchdog (scheduled Cloud Function, every 2 min) flips stuck sessions to `status=error` inside a fenced transaction.
-- See `docs/pipeline-decoupling-plan.md` for the full design and `docs/pipeline-decoupling-fixes-plan.md` for post-implementation fixes.
+Two coexisting transports, picked per-session at first turn and sticky for the rest of that session's life:
+
+- **gear** (Vertex AI Agent Engine — current default): Browser POSTs to `agentStream` → it directly handoffs to a deployed Reasoning Engine (`GEAR_REASONING_ENGINE_RESOURCE`) via `gearHandoff()`. The agent runs inside Agent Engine; `FirestoreProgressPlugin` (in `agent/superextra_agent/firestore_progress.py`) writes progress + terminal state to Firestore from inside the engine. Survives client disconnect for ≥240s.
+- **cloudrun** (legacy): Browser POSTs to `agentStream` → enqueues a Cloud Task to the private Cloud Run worker (`superextra-worker`, Python + ADK in-process) → worker writes progress + terminal state to Firestore. Kept warm during the GEAR rollback window for sticky sessions and rollback.
+
+Routing decision in `functions/index.js:agentStream`:
+
+- Existing session → reuse `existing.transport` (legacy sessions with no field default to `'cloudrun'`).
+- New session → `chooseInitialTransport(uid, GEAR_ALLOWLIST, GEAR_DEFAULT)`. `GEAR_DEFAULT='gear'` (Stage B), `GEAR_ALLOWLIST` is an explicit-route override.
+- Rollback = flip `GEAR_DEFAULT` back to `'cloudrun'` and redeploy `agentStream`. Sticky-per-session means in-flight chats don't change transport mid-conversation.
+
+Read path is shared: browser reads state via two `onSnapshot` observers (`sessions/{sid}` for terminal; `collectionGroup('events')` for progress).
+
+Watchdog (`watchdog.js`, scheduled every 2 min) flips stuck sessions to `status=error` inside a fenced transaction — covers both transports identically.
+
+Plans: `docs/gear-migration-implementation-plan-2026-04-26.md` (current), `docs/pipeline-decoupling-plan.md` (legacy cloudrun design), `docs/pipeline-decoupling-fixes-plan.md` (cloudrun fixes).
 
 ## Deployment
 

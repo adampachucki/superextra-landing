@@ -41,6 +41,8 @@ __pycache__
 # Live-test harness artifacts (Phase 0 measurement, E2E smokes). The .py
 # harness scripts are versioned; their logs + JSON reports are not.
 firestore-debug.log
+firebase-debug.log
+firebase-debug.*.log
 agent/tests/phase0_*.log
 agent/tests/phase0_*.json
 agent/tests/e2e_worker_live*.log

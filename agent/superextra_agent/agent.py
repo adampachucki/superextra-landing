@@ -25,6 +25,7 @@ from .specialists import (
 )
 from .places_tools import get_restaurant_details, get_batch_restaurant_details, find_nearby_restaurants, search_restaurants
 from .chat_logger import ChatLoggerPlugin
+from .firestore_progress import FirestoreProgressPlugin
 import os
 from pathlib import Path
 
@@ -284,6 +285,11 @@ _router = LlmAgent(
 app = App(
     name="superextra_agent",
     root_agent=_router,
-    plugins=[ChatLoggerPlugin()],
+    plugins=[
+        ChatLoggerPlugin(),
+        FirestoreProgressPlugin(
+            project=os.environ.get("GOOGLE_CLOUD_PROJECT", "superextra-site")
+        ),
+    ],
 )
 root_agent = _router

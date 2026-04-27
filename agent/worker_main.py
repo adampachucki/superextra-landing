@@ -25,7 +25,6 @@ import asyncio
 import json
 import logging
 import os
-import re
 import signal
 import sys
 import uuid
@@ -38,7 +37,7 @@ from google.adk.runners import Runner
 from google.adk.sessions.vertex_ai_session_service import VertexAiSessionService
 from google.api_core.exceptions import GoogleAPICallError
 from google.cloud import firestore
-from google.genai import Client as GenaiClient, types
+from google.genai import types
 from pydantic import BaseModel, Field
 
 from superextra_agent.log_ctx import worker_sid as _worker_sid_ctx
@@ -48,6 +47,16 @@ from superextra_agent.firestore_events import (
     map_event,
     write_event_doc,
 )
+from superextra_agent.notes import (
+    NOTE_TIMEOUT_S,
+    TITLE_TIMEOUT_S,
+    _deterministic_note,
+    _emit_note_task,
+    _fallback_title,
+    _generate_title,
+    _strip_query_prefixes,
+)
+from superextra_agent.timeline import TimelineWriter, TurnSummaryBuilder
 
 
 # ── Structured logging ──────────────────────────────────────────────────────
@@ -116,16 +125,14 @@ def _trace_from_header(value: str | None) -> str | None:
 PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "superextra-site")
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
 AGENT_ENGINE_ID = os.environ.get("AGENT_ENGINE_ID", "2746721333428617216")
-TITLE_MODEL = os.environ.get("TITLE_MODEL", "gemini-2.5-flash")
-NOTE_MODEL = os.environ.get("NOTE_MODEL", "gemini-2.5-flash")
 
 # Tunables — all match plan §Design-decisions / §Phase 3.
+# TITLE_TIMEOUT_S and NOTE_TIMEOUT_S are owned by `superextra_agent.notes`
+# and re-exported here for the call sites that still reference them.
 HEARTBEAT_INTERVAL_S = 30
 POLL_WAIT_MAX_S = 420  # 7 min — matches plan's active-owner poll ceiling
 POLL_INTERVAL_S = 5
 STALE_HEARTBEAT_S = 120  # 2 min — takeover threshold
-TITLE_TIMEOUT_S = 5.0
-NOTE_TIMEOUT_S = 8.0
 
 
 # ── Module singletons, initialised in lifespan ─────────────────────────────
@@ -133,7 +140,6 @@ NOTE_TIMEOUT_S = 8.0
 _session_svc: VertexAiSessionService | None = None
 _runner: Runner | None = None
 _fs: firestore.Client | None = None
-_genai_client: GenaiClient | None = None
 _heartbeat_task: asyncio.Task | None = None
 
 # Tracks which run the *current request* owns, so the SIGTERM handler can
@@ -171,17 +177,15 @@ class OwnershipLost(Exception):
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    global _session_svc, _runner, _fs, _genai_client
+    global _session_svc, _runner, _fs
     _session_svc = VertexAiSessionService(
         project=PROJECT, location=LOCATION, agent_engine_id=AGENT_ENGINE_ID
     )
     _runner = Runner(app=adk_app, session_service=_session_svc)
     _fs = firestore.Client(project=PROJECT)
-    # Title generation uses a vanilla GenAI client (not through ADK) — route
-    # to the global endpoint so flash 2.5 is available.
-    _genai_client = GenaiClient(
-        vertexai=True, project=PROJECT, location="global"
-    )
+    # Title + note generation pulls a lazy GenAI client out of
+    # `superextra_agent.notes._get_genai_client()` on first use; no eager
+    # init needed here.
     log.info(
         "worker ready",
         extra={
@@ -462,460 +466,6 @@ async def _cancel_heartbeat() -> None:
         except (asyncio.CancelledError, asyncio.TimeoutError):
             pass
     _heartbeat_task = None
-
-
-# ── Title generation (best-effort, first turn only) ─────────────────────────
-
-
-_QUERY_CONTEXT_PREFIXES = ("[Date:", "[Context:")
-
-
-def _strip_query_prefixes(text: str) -> str:
-    """Remove agentStream-added [Date: ...] and [Context: ...] prefixes so the
-    fallback title isn't just "[Date: 2026-04-20]"."""
-    cleaned = text
-    while True:
-        cleaned = cleaned.lstrip()
-        if not any(cleaned.startswith(p) for p in _QUERY_CONTEXT_PREFIXES):
-            break
-        end = cleaned.find("]")
-        if end == -1:
-            break
-        cleaned = cleaned[end + 1:]
-    return cleaned.strip()
-
-
-def _fallback_title(query_text: str) -> str:
-    cleaned = _strip_query_prefixes(query_text)
-    if not cleaned:
-        return "Untitled"
-    return cleaned[:40] if len(cleaned) <= 40 else cleaned[:40].rsplit(" ", 1)[0]
-
-
-async def _generate_title(query_text: str) -> str:
-    """≤ TITLE_TIMEOUT_S call to Gemini Flash. Returns a short title or the
-    deterministic fallback on any error / timeout."""
-    assert _genai_client is not None
-    cleaned_query = _strip_query_prefixes(query_text)
-    prompt = (
-        "Summarize this message into a short title, max 4 words.\n"
-        "Rules:\n"
-        "- Use the SAME LANGUAGE as the message\n"
-        "- No markdown, no quotes, no punctuation, no numbering\n"
-        "- Do not answer the question — just label the topic\n"
-        "- Reply with ONLY the title, nothing else\n\n"
-        f"Message: \"{cleaned_query}\""
-    )
-    try:
-        async def _call() -> str | None:
-            resp = await _genai_client.aio.models.generate_content(
-                model=TITLE_MODEL,
-                contents=[types.Content(role="user", parts=[types.Part(text=prompt)])],
-            )
-            text = getattr(resp, "text", None)
-            if not text:
-                return None
-            # Strip common noise: quotes, markdown, leading numbering.
-            raw = text.strip()
-            raw = re.sub(r"^[\"'`]+|[\"'`]+$", "", raw)
-            raw = re.sub(r"[*#_`~>\-]", "", raw)
-            raw = re.sub(r"^\d+\.\s*", "", raw).strip()
-            words = raw.split()
-            if not words or len(words) > 8:
-                return None
-            return " ".join(words[:4])
-
-        result = await asyncio.wait_for(_call(), timeout=TITLE_TIMEOUT_S)
-        return result or _fallback_title(query_text)
-    except Exception:  # noqa: BLE001
-        log.warning("title generation failed, using deterministic fallback", exc_info=True)
-        return _fallback_title(query_text)
-
-
-# ── Timeline notes + summary ───────────────────────────────────────────────
-
-
-def _notes_llm_disabled() -> bool:
-    return os.environ.get("DISABLE_NOTE_LLM", "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _deterministic_note(milestone: str) -> str:
-    return {
-        "context_start": "I'm checking the venue and likely peer set before drafting the answer.",
-        "plan_ready": "I'm narrowing the research path before validating the strongest signals.",
-        "research_placeholder": "I'm validating the strongest signals across source and review coverage.",
-        "research_result": "I'm comparing the strongest evidence across sources before drafting the answer.",
-    }[milestone]
-
-
-def _clean_note_text(text: str | None) -> str | None:
-    if not text:
-        return None
-    cleaned = " ".join(text.strip().split())
-    cleaned = re.sub(r"^[\"'`]+|[\"'`]+$", "", cleaned)
-    cleaned = re.sub(r"^\d+\.\s*", "", cleaned).strip()
-    if not cleaned:
-        return None
-    if len(cleaned.split()) > 28:
-        return None
-    if "\n" in cleaned:
-        return None
-    return cleaned
-
-
-async def _generate_timeline_note(*, milestone: str, query_text: str, input_text: str) -> str:
-    if _notes_llm_disabled():
-        return _deterministic_note(milestone)
-    assert _genai_client is not None
-    prompt = (
-        "Write one short first-person research-progress update for a timeline.\n"
-        "Rules:\n"
-        "- One sentence only\n"
-        "- Maximum 28 words\n"
-        "- Use the SAME LANGUAGE as the user message\n"
-        "- No markdown, no bullets, no quotes\n"
-        "- No raw tool names or internal agent names\n"
-        "- Do not promise work that has not started\n"
-        "- Sound calm and concrete\n\n"
-        f"User message:\n{_strip_query_prefixes(query_text)}\n\n"
-        f"Milestone: {milestone}\n\n"
-        f"Material to summarize:\n{input_text}"
-    )
-    try:
-        async def _call() -> str:
-            resp = await _genai_client.aio.models.generate_content(
-                model=NOTE_MODEL,
-                contents=[types.Content(role="user", parts=[types.Part(text=prompt)])],
-                config=types.GenerateContentConfig(
-                    temperature=0,
-                    candidate_count=1,
-                ),
-            )
-            return _clean_note_text(getattr(resp, "text", None)) or _deterministic_note(milestone)
-
-        return await asyncio.wait_for(_call(), timeout=NOTE_TIMEOUT_S)
-    except Exception:  # noqa: BLE001
-        log.warning("timeline note generation failed; using deterministic fallback", exc_info=True)
-        return _deterministic_note(milestone)
-
-
-def _iter_parts(event: Any) -> list[Any]:
-    content = getattr(event, "content", None)
-    return list(getattr(content, "parts", None) or [])
-
-
-def _iter_function_calls(event: Any) -> list[tuple[str, dict[str, Any]]]:
-    out: list[tuple[str, dict[str, Any]]] = []
-    for part in _iter_parts(event):
-        fc = getattr(part, "function_call", None)
-        if not fc or not getattr(fc, "name", None):
-            continue
-        args = getattr(fc, "args", None) or {}
-        out.append((fc.name, args if isinstance(args, dict) else {}))
-    return out
-
-
-def _iter_function_responses(event: Any) -> list[tuple[str, dict[str, Any]]]:
-    out: list[tuple[str, dict[str, Any]]] = []
-    for part in _iter_parts(event):
-        fr = getattr(part, "function_response", None)
-        if not fr or not getattr(fr, "name", None):
-            continue
-        response = getattr(fr, "response", None) or {}
-        out.append((fr.name, response if isinstance(response, dict) else {}))
-    return out
-
-
-def _normalize_query(query: str) -> str:
-    return " ".join(query.strip().lower().split())
-
-
-def _normalize_url(url: str) -> str:
-    return url.strip()
-
-
-class TurnSummaryBuilder:
-    def __init__(self, *, started_at_ms: int):
-        self.started_at_ms = started_at_ms
-        self.web_queries: set[str] = set()
-        self.sources: set[str] = set()
-        self.venues: set[str] = set()
-        self.platforms: set[str] = set()
-        self.detail_dedupe: set[tuple[str, str, str]] = set()
-        self.notes: list[dict[str, Any]] = []
-        self.pending_plan_fallback: dict[str, Any] | None = None
-        self.pending_research_fallback: dict[str, Any] | None = None
-        self.context_note_emitted = False
-        self.plan_note_emitted = False
-        self.research_placeholder_emitted = False
-        self.research_note_emitted = False
-        self.drafting_emitted = False
-
-    def observe_event(self, event: Any, state: dict[str, Any]) -> None:
-        for name, args in _iter_function_calls(event):
-            if name == "google_search":
-                query = args.get("query")
-                if isinstance(query, str) and query.strip():
-                    self.web_queries.add(_normalize_query(query))
-            elif name == "fetch_web_content":
-                url = args.get("url")
-                if isinstance(url, str) and url.strip():
-                    self.sources.add(_normalize_url(url))
-            elif name == "get_google_reviews":
-                place_id = args.get("place_id")
-                if isinstance(place_id, str) and place_id.strip():
-                    self.venues.add(place_id.strip())
-                    self.sources.add(_normalize_url(f"https://www.google.com/maps/place/?q=place_id:{place_id.strip()}"))
-            elif name == "get_restaurant_details":
-                place_id = args.get("place_id")
-                if isinstance(place_id, str) and place_id.strip():
-                    self.venues.add(place_id.strip())
-            elif name == "get_batch_restaurant_details":
-                place_ids = args.get("place_ids")
-                if isinstance(place_ids, list):
-                    for place_id in place_ids:
-                        if isinstance(place_id, str) and place_id.strip():
-                            self.venues.add(place_id.strip())
-
-        for source in extract_sources_from_grounding(event):
-            url = source.get("url")
-            if isinstance(url, str) and url.strip():
-                self.sources.add(_normalize_url(url))
-
-        sd = (event.actions.state_delta if getattr(event, "actions", None) else None) or {}
-        if isinstance(sd, dict):
-            for key, value in sd.items():
-                if key.startswith("_place_name_") and isinstance(value, str) and value.strip():
-                    self.venues.add(value.strip().lower())
-
-        for name, response in _iter_function_responses(event):
-            status = str(response.get("status") or "").strip().lower()
-            if name in ("search_restaurants", "find_nearby_restaurants") and status == "success":
-                results = response.get("results")
-                if isinstance(results, list):
-                    for result in results:
-                        if not isinstance(result, dict):
-                            continue
-                        rid = result.get("id")
-                        if isinstance(rid, str) and rid.strip():
-                            self.venues.add(rid.strip())
-                        display_name = ((result.get("displayName") or {}) if isinstance(result.get("displayName"), dict) else {})
-                        text = display_name.get("text")
-                        if isinstance(text, str) and text.strip():
-                            self.venues.add(text.strip().lower())
-            elif name == "find_tripadvisor_restaurant" and status == "success":
-                # Only accumulate on a verified match. Unverified/error responses
-                # now strip these fields, but gate explicitly in case the tool
-                # ever returns a partial payload on a non-success path.
-                trip_link = response.get("tripadvisor_link")
-                if isinstance(trip_link, str) and trip_link.strip():
-                    self.sources.add(_normalize_url(trip_link))
-                venue_name = response.get("name")
-                if isinstance(venue_name, str) and venue_name.strip():
-                    self.venues.add(venue_name.strip().lower())
-            elif name == "get_restaurant_details" and status == "success":
-                place = response.get("place")
-                if isinstance(place, dict):
-                    display_name = place.get("displayName")
-                    if isinstance(display_name, dict):
-                        text = display_name.get("text")
-                        if isinstance(text, str) and text.strip():
-                            self.venues.add(text.strip().lower())
-
-    def accept_detail(self, event: dict[str, Any]) -> bool:
-        key = (
-            str(event.get("group") or ""),
-            str(event.get("family") or ""),
-            str(event.get("text") or ""),
-        )
-        if key in self.detail_dedupe:
-            return False
-        self.detail_dedupe.add(key)
-        family = event.get("family")
-        if isinstance(family, str) and family and family != "Warnings":
-            self.platforms.add(family)
-        return True
-
-    def counts_snapshot(self) -> dict[str, int]:
-        return {
-            "webQueries": len(self.web_queries),
-            "sources": len(self.sources),
-            "venues": len(self.venues),
-            "platforms": len(self.platforms),
-        }
-
-    def add_note(
-        self,
-        *,
-        milestone: str,
-        text: str,
-        note_source: str,
-        counts: dict[str, int] | None = None,
-        live_only: bool = False,
-    ) -> dict[str, Any] | None:
-        if milestone == "context_start" and self.context_note_emitted:
-            return None
-        if milestone == "plan_ready" and self.plan_note_emitted:
-            return None
-        if milestone == "research_placeholder" and self.research_placeholder_emitted:
-            return None
-        if milestone == "research_result" and self.research_note_emitted:
-            return None
-
-        snapshot = counts or self.counts_snapshot()
-        note = {
-            "milestone": milestone,
-            "text": text,
-            "noteSource": note_source,
-            "counts": snapshot,
-            "liveOnly": live_only,
-        }
-        self.notes.append(note)
-        if milestone == "context_start":
-            self.context_note_emitted = True
-        elif milestone == "plan_ready":
-            self.plan_note_emitted = True
-            self.pending_plan_fallback = None
-        elif milestone == "research_placeholder":
-            self.research_placeholder_emitted = True
-        elif milestone == "research_result":
-            self.research_note_emitted = True
-            self.pending_research_fallback = None
-        return {
-            "kind": "note",
-            "id": f"note:{milestone}:{len(self.notes)}",
-            "text": text,
-            "noteSource": note_source,
-            "counts": snapshot,
-        }
-
-    def mark_drafting(self) -> bool:
-        if self.drafting_emitted:
-            return False
-        self.drafting_emitted = True
-        return True
-
-    def finalize_notes(self) -> list[dict[str, Any]]:
-        if self.pending_plan_fallback and not self.plan_note_emitted:
-            fallback = self.pending_plan_fallback
-            self.notes.append(
-                {
-                    "milestone": "plan_ready",
-                    "text": fallback["text"],
-                    "noteSource": "deterministic",
-                    "counts": fallback["counts"],
-                    "liveOnly": False,
-                }
-            )
-            self.plan_note_emitted = True
-        if self.pending_research_fallback and not self.research_note_emitted and not self.research_placeholder_emitted:
-            fallback = self.pending_research_fallback
-            self.notes.append(
-                {
-                    "milestone": "research_result",
-                    "text": fallback["text"],
-                    "noteSource": "deterministic",
-                    "counts": fallback["counts"],
-                    "liveOnly": False,
-                }
-            )
-            self.research_note_emitted = True
-
-        notes = list(self.notes)
-        if self.research_note_emitted:
-            notes = [n for n in notes if n["milestone"] != "research_placeholder" or not n.get("liveOnly")]
-        kept = []
-        for note in notes:
-            kept.append(
-                {
-                    "text": note["text"],
-                    "noteSource": note["noteSource"],
-                    "counts": note["counts"],
-                }
-            )
-        return kept[:4]
-
-    def build_summary(self) -> dict[str, Any]:
-        finished_at_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-        return {
-            "startedAtMs": self.started_at_ms,
-            "finishedAtMs": finished_at_ms,
-            "elapsedMs": max(0, finished_at_ms - self.started_at_ms),
-            "notes": self.finalize_notes(),
-            "finalCounts": self.counts_snapshot(),
-        }
-
-
-class TimelineWriter:
-    def __init__(
-        self,
-        *,
-        fs: firestore.Client,
-        sid: str,
-        user_id: str,
-        run_id: str,
-        attempt: int,
-    ):
-        self._fs = fs
-        self._sid = sid
-        self._user_id = user_id
-        self._run_id = run_id
-        self._attempt = attempt
-        self._seq_in_attempt = 0
-        self._lock = asyncio.Lock()
-        self.closed = False
-
-    async def write_timeline(self, data: dict[str, Any]) -> dict[str, Any] | None:
-        async with self._lock:
-            if self.closed:
-                return None
-            self._seq_in_attempt += 1
-            return await write_event_doc(
-                fs=self._fs,
-                sid=self._sid,
-                user_id=self._user_id,
-                run_id=self._run_id,
-                attempt=self._attempt,
-                seq_in_attempt=self._seq_in_attempt,
-                event_type="timeline",
-                data=data,
-            )
-
-    async def close(self) -> None:
-        async with self._lock:
-            self.closed = True
-
-    @property
-    def seq_in_attempt(self) -> int:
-        return self._seq_in_attempt
-
-
-async def _emit_note_task(
-    *,
-    writer: TimelineWriter,
-    builder: TurnSummaryBuilder,
-    milestone: str,
-    query_text: str,
-    input_text: str,
-    counts_snapshot: dict[str, int],
-    live_only: bool = False,
-) -> None:
-    if writer.closed:
-        return
-    text = await _generate_timeline_note(
-        milestone=milestone,
-        query_text=query_text,
-        input_text=input_text,
-    )
-    note = builder.add_note(
-        milestone=milestone,
-        text=text,
-        note_source="llm" if not _notes_llm_disabled() and text != _deterministic_note(milestone) else "deterministic",
-        counts=counts_snapshot,
-        live_only=live_only,
-    )
-    if note is not None:
-        await writer.write_timeline(note)
 
 
 async def _cancel_background_tasks(tasks: list[asyncio.Task[Any]]) -> None:

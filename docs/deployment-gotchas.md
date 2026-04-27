@@ -195,3 +195,21 @@ deletes it via `agentDelete`; use sparingly, not as a CI gate.
 For backend-only reproduction (UI is innocent, want to isolate the worker),
 `agent/tests/e2e_worker_live.py` drives the pipeline in-process against the
 real stack without involving Chrome or the dev server.
+
+## ADC quota project (required for `firebase deploy` from the VM)
+
+`firebase deploy` and other Google APIs called from the VM use Application
+Default Credentials. ADC needs a quota project pinned to `superextra-site`
+or you'll see `403 PERMISSION_DENIED` errors against APIs that bill per
+project (Firebase Hosting, Cloud Functions, Cloud Build).
+
+Two ways, either works:
+
+- Edit `~/.config/gcloud/legacy_credentials/<email>/adc.json` and set
+  `"quota_project_id": "superextra-site"`.
+- Or export `GOOGLE_CLOUD_QUOTA_PROJECT=superextra-site` in your shell
+  before running `firebase deploy`.
+
+Discovered during R3 setup of the GEAR migration probe work
+(`docs/gear-probe-results-round3-2026-04-26.md`). Once set, ADC stays
+sticky across sessions.

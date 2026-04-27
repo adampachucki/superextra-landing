@@ -1248,7 +1248,12 @@ async def test_note_tasks_are_cancelled_before_turn_summary_is_serialized(monkey
         order.append(f"write:{merged.get('status', 'progress')}")
         fenced_writes.append(merged)
 
-    monkeypatch.setattr(wm, "_generate_timeline_note", _slow_note)
+    # `_generate_timeline_note` lives in `superextra_agent.notes` after the
+    # GEAR phase-4 timeline/notes extraction. `_emit_note_task` in notes.py
+    # resolves it as a bare name at call time, so patching the module
+    # attribute is enough to mock the LLM call.
+    from superextra_agent import notes as _notes_mod
+    monkeypatch.setattr(_notes_mod, "_generate_timeline_note", _slow_note)
     monkeypatch.setattr(wm, "_cancel_background_tasks", _record_cancel)
     monkeypatch.setattr(wm, "_fenced_update", _record_fenced_update)
     monkeypatch.setattr(
