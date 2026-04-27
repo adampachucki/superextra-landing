@@ -1,0 +1,4 @@
+google-cloud-aiplatform[agent_engines,adk]==1.147.0
+google-adk==1.28.0
+google-cloud-firestore==2.22.0
+typing-extensions>=4.12
