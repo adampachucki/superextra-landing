@@ -29,7 +29,7 @@ The Vite dev server is managed by a **systemd user service** — it runs automat
 - `npm run lint` — Prettier check + ESLint
 - `npm run format` — auto-format all files
 - `npm run test` — run Vitest unit tests (Firestore stream client, chat state)
-- `cd functions && npm test` — run Cloud Function tests (agentStream, agentCheck, watchdog, utils)
+- `cd functions && npm test` — run Cloud Function tests (agentStream, gearHandoff, watchdog, utils)
 - `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — run agent Python tests
 - `npm run test:rules` — Firestore rules emulator tests (needs Java + Firestore emulator)
 - Deploy: push to `main` → GitHub Actions → Firebase (project: superextra-site)
@@ -47,7 +47,7 @@ The Vite dev server is managed by a **systemd user service** — it runs automat
 Four test suites — **run all before pushing changes to chat transport, Cloud Functions, worker, or agent code**:
 
 - `npm run test` — Vitest: Firestore stream client, chat state machine, chat-recovery, plus any `.spec.ts`/`.test.ts` files
-- `cd functions && npm test` — Node test runner: agentStream, agentCheck, watchdog, utils
+- `cd functions && npm test` — Node test runner: agentStream, gearHandoff, watchdog, utils
 - `npm run test:rules` — Firestore rules emulator (sessions + events collection-group reads/writes)
 - `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — pytest: worker, Firestore-event mapper, source extraction, Places tools, instruction providers
 - `npm run test:evals` — live Gemini eval calls for router instructions (not in CI)
@@ -128,7 +128,7 @@ Routing decision in `functions/index.js:agentStream`:
 - New session → `chooseInitialTransport(uid, GEAR_ALLOWLIST, GEAR_DEFAULT)`. `GEAR_DEFAULT='gear'` (Stage B), `GEAR_ALLOWLIST` is an explicit-route override.
 - Rollback = flip `GEAR_DEFAULT` back to `'cloudrun'` and redeploy `agentStream`. Sticky-per-session means in-flight chats don't change transport mid-conversation.
 
-Read path is shared: browser reads state via two `onSnapshot` observers (`sessions/{sid}` for terminal; `collectionGroup('events')` for progress). REST fallback via `agentCheck` when Firestore is blocked.
+Read path is shared: browser reads state via two `onSnapshot` observers (`sessions/{sid}` for terminal; `collectionGroup('events')` for progress).
 
 Watchdog (`watchdog.js`, scheduled every 2 min) flips stuck sessions to `status=error` inside a fenced transaction — covers both transports identically.
 

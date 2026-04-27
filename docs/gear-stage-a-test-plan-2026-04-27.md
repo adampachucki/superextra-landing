@@ -215,7 +215,7 @@ Before opening the PR (only after Phase 2 is clean):
    - Phase 3 v3.9 P2 screenshot reference
    - Link to this test plan
 
-After PR merges to main, plan §"Stage B default flip" (`GEAR_DEFAULT='gear'` + redeploy) becomes the next operational step. Phase 9 cutover follows the 30-day rollback window per the implementation plan.
+> **Historical (2026-04-27):** the original sequencing here said Stage B (`GEAR_DEFAULT='gear'`) would flip _after_ PR merge. In practice Stage B shipped the same day as Stage A (commit `f4ff1bf`), before PR #10 was opened, because all Stage A smokes ran clean and Adam waived the soak window. PR merge to main now happens with Stage B already live; the only step still gated on the rollback window is Phase 9 cutover (worker decommission + field migration + `agent/probe/` archival).
 
 ---
 
