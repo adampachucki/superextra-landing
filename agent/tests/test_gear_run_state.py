@@ -364,6 +364,33 @@ async def test_finalize_uses_returned_title():
     assert session_update.get("title") == "Short Title"
 
 
+@pytest.mark.asyncio
+async def test_finalize_propagates_cancellation():
+    """plan §Commit-3 + F2 P3 — the title-task except clause was tightened
+    from `(TimeoutError, CancelledError, Exception)` to
+    `(TimeoutError, Exception)`. `Exception` does NOT subclass
+    `CancelledError`, so cancellation now propagates out of finalize()
+    rather than being swallowed by the title-task wrapper.
+
+    Recipe (F2's simpler form): cancel the title_task directly and
+    assert finalize() re-raises CancelledError. No timing-sensitive
+    outer-task race.
+    """
+    state = _make_state()
+    state.final_reply = "answer"
+    state.timeline_writer.write_timeline = AsyncMock(return_value=None)
+
+    async def _hangs():
+        await asyncio.sleep(60)
+
+    title_task = asyncio.create_task(_hangs())
+    state.title_task = title_task
+    title_task.cancel()  # force CancelledError when finalize awaits it
+
+    with pytest.raises(asyncio.CancelledError):
+        await state.finalize()
+
+
 # ── _maybe_emit_notes spawns LLM-backed tasks for 'plan_ready' / 'research_result' ──
 
 

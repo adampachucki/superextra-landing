@@ -78,8 +78,10 @@ class GearRunState:
     fs: firestore.Client | None = None
 
     def __post_init__(self) -> None:
-        if self.fs is None:
-            raise RuntimeError("GearRunState requires fs (Firestore client)")
+        # `fs` is required in practice (the plugin always passes it). Earlier
+        # versions had a defensive `raise RuntimeError(...)` here; dropped per
+        # the lean covenant — no verified failure mode, and a downstream
+        # AttributeError from a Firestore call surfaces the bug just as well.
         started_at_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         self.timeline_builder = TurnSummaryBuilder(started_at_ms=started_at_ms)
         # `attempt=1` here mirrors agentStream's :appendEvent stateDelta —
@@ -298,7 +300,11 @@ class GearRunState:
         if self.title_task is not None:
             try:
                 title = await asyncio.wait_for(self.title_task, timeout=TITLE_TIMEOUT_S)
-            except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+            except (asyncio.TimeoutError, Exception):
+                # `Exception` does NOT catch `CancelledError` (BaseException
+                # subclass); explicitly NOT catching it here lets outer
+                # cancellation propagate through finalize() instead of
+                # being swallowed by the title-task wrapper.
                 title = None
 
         # All background mutators of timeline_builder are now done or

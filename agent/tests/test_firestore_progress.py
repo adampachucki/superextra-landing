@@ -568,6 +568,66 @@ async def test_plugin_after_run_swallows_ownership_lost(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_plugin_after_run_writes_finalize_failed_terminal_on_finalize_crash(monkeypatch):
+    """plan §"finalize_failed" + F2 P2 — when GearRunState.finalize raises,
+    after_run must still issue a fenced terminal-error write so the user
+    sees an error within ~1s instead of waiting for watchdog (5min). The
+    write is wrapped in `_retry_critical` to match terminal-write retry
+    semantics (a transient Firestore blip during the error write should
+    retry the same way the happy-path terminal write does)."""
+    plugin = FirestoreProgressPlugin(project="superextra-site")
+    plugin._fs = MagicMock()
+
+    async def _claim(_fs, _state):
+        return None
+
+    async def _no_title(_q):
+        return None
+
+    async def _no_hb(_fs, _state):
+        await asyncio.sleep(60)
+
+    # Fenced write fails twice with a transient error, succeeds on the third
+    # attempt — proves `_retry_critical` is wired up. Without it, a single
+    # transient blip would skip the terminal write and leave the user
+    # waiting for watchdog.
+    fenced_calls = 0
+
+    async def _fenced(_fs, _state, _su, _tu):
+        nonlocal fenced_calls
+        fenced_calls += 1
+        if fenced_calls < 3:
+            from google.api_core.exceptions import DeadlineExceeded
+            raise DeadlineExceeded("transient")
+        # Third attempt succeeds.
+
+    monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
+    monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
+    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "fenced_session_and_turn_update", _fenced)
+
+    ctx = _mock_invocation_context(
+        sid="abc", run_id="r-1", turn_idx=1, invocation_id="inv-1"
+    )
+    await plugin.before_run_callback(invocation_context=ctx)
+    state = plugin._states["inv-1"]
+
+    # Force finalize to raise.
+    async def _crashing_finalize() -> tuple:
+        raise RuntimeError("synthesizer barfed")
+
+    state.finalize = _crashing_finalize
+
+    # Must not raise. The fenced write must be called 3 times (transient
+    # × 2 + success), proving _retry_critical wraps it.
+    await plugin.after_run_callback(invocation_context=ctx)
+    assert fenced_calls == 3, (
+        "expected _retry_critical to retry 3× (transient × 2 → success); "
+        f"saw {fenced_calls} calls — terminal-error write isn't retry-wrapped"
+    )
+
+
+@pytest.mark.asyncio
 async def test_plugin_on_event_writes_timeline_events(monkeypatch):
     """on_event_callback feeds events through observe_event and writes
     each returned timeline event."""

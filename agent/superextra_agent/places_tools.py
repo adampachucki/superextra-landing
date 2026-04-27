@@ -54,10 +54,6 @@ DETAIL_FIELDS = ",".join([
     "outdoorSeating",
 ])
 
-# Warn early if API key is missing (actual RuntimeError raised on first call)
-if not os.environ.get("GOOGLE_PLACES_API_KEY"):
-    logger.warning("GOOGLE_PLACES_API_KEY not set — Places API calls will fail")
-
 # Lazy-initialized client and API key
 _client: httpx.AsyncClient | None = None
 

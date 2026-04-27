@@ -438,6 +438,34 @@ class FirestoreProgressPlugin(BasePlugin):
                 per.sid,
                 per.run_id,
             )
+            # Best-effort terminal error write so the user sees an error
+            # within ~1 s instead of waiting for watchdog (5 min) to flip
+            # `pipeline_wedged`. Wraps `_retry_critical` to match the same
+            # transient-Firestore retry semantics every other terminal
+            # write enjoys (F2 P2 from the post-review plan).
+            try:
+                await _retry_critical(
+                    lambda: fenced_session_and_turn_update(
+                        self._client(),
+                        per,
+                        {
+                            "status": "error",
+                            "error": "finalize_failed",
+                            "updatedAt": firestore.SERVER_TIMESTAMP,
+                        },
+                        {"status": "error", "error": "finalize_failed"},
+                    )
+                )
+            except OwnershipLost:
+                # Run was already flipped (watchdog or cleanup). Don't
+                # resurrect.
+                pass
+            except Exception:  # noqa: BLE001
+                log.exception(
+                    "finalize_failed terminal write also failed sid=%s runId=%s",
+                    per.sid,
+                    per.run_id,
+                )
             return None
 
         try:

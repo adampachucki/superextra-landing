@@ -125,7 +125,12 @@ async function _doHandoff({
 		});
 		if (!r.ok) {
 			const body = await r.text().catch(() => '');
-			if (!body.includes('ALREADY_EXISTS')) {
+			// Narrow to status === 409 + body match — pre-fix any 4xx whose
+			// body happened to contain the substring "ALREADY_EXISTS" was
+			// silently treated as success (theoretical: a 429 quota error
+			// mentioning the phrase). Now only the actual conflict response
+			// is the success path.
+			if (r.status !== 409 || !body.includes('ALREADY_EXISTS')) {
 				throw new Error(`createSession_failed:${r.status}:${body.slice(0, 200)}`);
 			}
 		}

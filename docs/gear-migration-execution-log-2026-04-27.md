@@ -134,7 +134,9 @@ Branch is ready for staging deploy.
 
 ## Decisions / changes / learnings
 
-(none yet)
+- **Plan §"Cross-cutting" 3s POST-rollback timer was implemented as 10s (existing `LOAD_TIMEOUT_MS`).** The plan called for a ~3s rollback timer to deselect a session whose POST never resolved. The existing `LOAD_TIMEOUT_MS = 10_000` in `chat-state.svelte.ts:101` already provides this mechanism via `loadState='loadTimedOut'` after 10s. 3s is too aggressive given gearHandoff's 75s first-NDJSON-line deadline — a normal-but-slow first turn would trip a 3s timer well before the doc materializes. 10s catches network-blackhole cases without false-positiving on legitimate slowness. Documented per plan §"Honesty and pushback": empirical reasoning (verified gearHandoff timing) trumps unverified plan numbers.
+- **gearHandoff deadline collapsed from two timers to one (post-review F2 P1).** Pre-fix had `setTimeout(() => controller.abort(), ms)` and a separate `_deadlineReject` promise with its own timer. The two fired in parallel; the abort-timer's effect (in-flight fetch rejecting `_doHandoff` with AbortError on a microtask) settled the `Promise.race` BEFORE the rejection-timer fired. Caller saw `AbortError` instead of `gearHandoff_deadline_exceeded`. Verified via Node simulation in the F2 review. Now: one timer that synchronously aborts AND rejects, making the rejection message deterministic.
+- **Chat-state spec coverage gap on the post-Firestore-failure branch is real.** vitest's `vi.mock('firebase/firestore', ...)` does NOT propagate to chat-state's dynamic `await import('firebase/firestore')`. Both the post-Firestore-failure path (POST 502 + getDoc returns exists=true → no rollback) and the v3.9 P2 regression (getFirebase throws → rollback) were attempted as unit tests — the dynamic import resolves to the real Firebase module which throws on the empty `db: {}` mock. The pre-Firestore rollback test exercises the rollback machinery via the same dynamic-import-throws path; the missing branches are deferred to the Chrome DevTools MCP smoke (force-offline mid-POST recipe).
 
 ---
 
