@@ -9,17 +9,29 @@
 
 ## Phase status
 
-| Phase | Title                                      | Status        | Started | Finished | Notes                                                      |
-| ----- | ------------------------------------------ | ------------- | ------- | -------- | ---------------------------------------------------------- |
-| 1     | Local prereqs + secret provisioning        | not started   | —       | —        | Requires user action on `gcloud` IAM grant + secret values |
-| 2     | Lazy-init Gemini subclass                  | not started   | —       | —        |                                                            |
-| 3     | Secret Manager runtime fetch               | not started   | —       | —        |                                                            |
-| 4     | `FirestoreProgressPlugin` + `GearRunState` | not started   | —       | —        |                                                            |
-| 5     | `agentStream` rewrite + `gearHandoff`      | not started   | —       | —        |                                                            |
-| 6     | Frontend optimistic submission             | not started   | —       | —        |                                                            |
-| 7     | A/B cutover infrastructure                 | not started   | —       | —        |                                                            |
-| 8     | Production deploy + soak + flip            | calendar time | —       | —        | ~2–3 weeks; user-driven                                    |
-| 9     | Cutover + cleanup                          | post-rollback | —       | —        | After 30-day window                                        |
+| Phase | Title                                      | Status        | Commit(s)             | Notes                                                                                             |
+| ----- | ------------------------------------------ | ------------- | --------------------- | ------------------------------------------------------------------------------------------------- |
+| 0     | Branch + onboarding reading                | ✅ done       | `91a2188` + `6dbeff4` | Baseline: probe artifacts + plan + R3.2 probe handoff CFs                                         |
+| 1     | Local prereqs + secret provisioning        | ⏸ partial     | `d514a40` (code-side) | Cloud-side (IAM grant + 3 secrets) blocked on Adam — command set in this log                      |
+| 2     | Lazy-init Gemini subclass                  | ✅ done       | `0f9cba3`             | `cloudpickle.dumps` round-trips; full agent pytest green                                          |
+| 3     | Secret Manager runtime fetch               | ✅ done       | `0a7ac9e`             | env-first fallback + 5 new unit tests; 3 existing tests updated to block SM in CI                 |
+| 4     | `FirestoreProgressPlugin` + `GearRunState` | ✅ done       | `1cdfcd6` + `dc99d08` | Extract refactor + plugin/run-state/45 tests/cloudpickle round-trip                               |
+| 5+7   | `agentStream` rewrite + A/B cutover        | ✅ done       | `9038932`             | gear-handoff.js + 16 new tests; transport field + chooseInitialTransport allowlist + default flip |
+| 6     | Frontend optimistic submission             | ✅ done       | `f3cd9e6`             | optimisticPendingSid guard + pre-Firestore rollback + 2 new vitest cases                          |
+| 8     | Production deploy + soak + flip            | calendar time | —                     | ~2–3 weeks; Adam-driven                                                                           |
+| 9     | Cutover + cleanup                          | post-rollback | —                     | After 30-day window                                                                               |
+
+## Final regression — all four test suites + svelte-check + lint (2026-04-27)
+
+- `cd agent && PYTHONPATH=. .venv/bin/pytest tests/` — **224 passed, 17 skipped** (45 new in test_gear_run_state + test_firestore_progress; 5 new in test_secrets; 3 existing updated to block SM in CI).
+- `cd functions && npm test` — **64 passed** in <500 ms (16 new in gear-handoff.test.js).
+- `npm run test` (Vitest) — **59 passed** (2 new in chat-state.spec.ts: pre-Firestore rollback + listener race).
+- `npm run test:rules` (Firestore rules emulator) — **22 passed** in 5 s.
+- `npm run check` (svelte-check) — 0 errors, 9 pre-existing a11y warnings (not introduced by this work).
+- `npm run lint` (prettier + eslint) — clean for all GEAR-scope files. Five non-GEAR files (parallel research-depth + tripadvisor work) still flagged for prettier formatting; left alone per global rule.
+- `cloudpickle.dumps(superextra_agent.agent.app)` — **67 KB** clean round-trip with both ChatLoggerPlugin + FirestoreProgressPlugin registered.
+
+Branch is ready for staging deploy.
 
 ---
 
@@ -73,7 +85,50 @@
 
 ## Blockers
 
-(none yet)
+- **Phase 1 cloud-side** (IAM + 3 secrets) — drafted command set ready, Adam to run.
+- **Phase 8 staging deploy** — Adam-driven; needs `GEAR_REASONING_ENGINE_RESOURCE` env var on the deployed agentStream Cloud Function once `agent_engines.create(...)` returns the staging resource ID.
+- **Phase 8 allowlist toggle** — Adam adds his UID to `GEAR_ALLOWLIST` in `functions/index.js` for Stage A soak; flips `GEAR_DEFAULT='gear'` for Stage B.
+
+## Phase 8 handoff — operator notes for Adam-driven rollout
+
+1. **Deploy** the agent code to the staging Vertex AI Agent Engine via:
+
+   ```bash
+   cd agent && PYTHONPATH=. .venv/bin/python -c "
+   import vertexai
+   from vertexai import agent_engines
+   from superextra_agent.agent import app
+   vertexai.init(
+       project='superextra-site',
+       location='us-central1',
+       staging_bucket='gs://superextra-site-agent-engine-staging',
+   )
+   remote = agent_engines.create(
+       agent_engine=agent_engines.AdkApp(app=app),
+       gcs_dir_name='agent_engine_staging',
+       requirements=open('requirements.txt').read().splitlines(),
+       extra_packages=['./superextra_agent'],
+   )
+   print(remote.resource_name)
+   "
+   ```
+
+   Expected: ~3–4 minutes wait. Output is `projects/907466498524/locations/us-central1/reasoningEngines/{ID}`.
+
+2. **Configure agentStream**: set `GEAR_REASONING_ENGINE_RESOURCE` env var on the deployed Cloud Function via the deploy workflow (or `gcloud functions deploy ... --update-env-vars=GEAR_REASONING_ENGINE_RESOURCE=...`). Without it, the gear branch fast-fails with `GEAR_REASONING_ENGINE_RESOURCE env var not set`.
+
+3. **Stage A — allowlist soak** (~1 week): add 1–2 developer UIDs to `GEAR_ALLOWLIST` in `functions/index.js` (currently empty), commit + deploy. Watch:
+   - `gcloud logging read 'resource.type="cloud_function" AND severity>=WARNING'` for handoff failures.
+   - Firestore `sessions/*` for `transport: 'gear'` docs reaching `status: 'complete'`.
+   - Watchdog for stuck `status: 'running'` sessions (none expected).
+
+4. **Stage B — default flip** (~1 week): change `GEAR_DEFAULT` from `'cloudrun'` to `'gear'` in `functions/index.js`, commit + deploy. New sessions route to GEAR by default; existing `'cloudrun'` sessions stay sticky and keep working.
+
+5. **Soak + drain** (~1 week): legacy worker handles remaining `'cloudrun'` sessions. Cloud Run scales to zero pods once it has no traffic.
+
+6. **Phase 9 cutover** (after 30-day rollback window): decommission Cloud Tasks + Cloud Run, delete worker_main.py / Dockerfile / enqueueRunTask, remove `adkSessionId`/`currentAttempt`/`currentWorkerId` fields via Firestore migration script, archive `agent/probe/` + `functions/probe-stream-query.js` to `docs/archived/`, delete `probeHandoffAbort` + `probeHandoffLeaveOpen`.
+
+**Rollback at any stage:** remove UIDs from `GEAR_ALLOWLIST` or flip `GEAR_DEFAULT` back to `'cloudrun'`; sticky-per-session means in-flight chats are never rerouted.
 
 ---
 
