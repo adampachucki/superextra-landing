@@ -233,4 +233,11 @@ gcloud projects get-iam-policy superextra-site \
 
 ## Verification artifacts
 
-(none yet — log green test runs, screenshots, deploy IDs here as phases finish)
+- **Phase 6 Chrome DevTools MCP smoke (2026-04-27).** Recipe per the post-review fixes plan: `new_page` → `http://localhost:5199/agent/chat` → fill input → pick a venue → press Enter. Result: URL flipped to `?sid=f23a7e46-...` immediately, chat panel rendered with the user message + "Working for 5s" + "Starting research…" placeholder, sidebar showed the new "Untitled chat" entry. **No "Couldn't load this chat" flash** anywhere through the optimistic window — listener-race-suppression confirmed. Screenshot: [`gear-phase6-smoke-2026-04-27.png`](./gear-phase6-smoke-2026-04-27.png). Smoke ran against the live cloudrun path (Phase 5/7 changes not yet deployed); end-to-end gear smoke deferred to Stage A allowlist soak per plan §6.
+
+- **Final-regression run (2026-04-27).** All four test suites green:
+  - `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -q` → **226 passed, 17 skipped** (was 224; +1 finalize_failed retry, +1 cancellation propagation).
+  - `cd functions && npm test` → **70 passed** in <500 ms (was 64; +5 agentStream gear branch + 1 deadline-fires-abort).
+  - `npm run test` (Vitest) → **59 passed** (unchanged after Tests 7+8 deferred to Chrome MCP smoke).
+  - `npm run test:rules` → **22 passed** in 5 s.
+  - `npm run check` → 0 errors, 9 pre-existing a11y warnings.
