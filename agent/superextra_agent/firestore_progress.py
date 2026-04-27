@@ -383,7 +383,19 @@ class FirestoreProgressPlugin(BasePlugin):
             # before_run must have short-circuited. Ignore.
             return None
 
-        timeline_events = per.observe_event(event)
+        # observe_event maps an ADK event into 0+ timeline rows and mutates
+        # accumulator state. A mapper bug must not kill the run — receiving
+        # an event already proves the pipeline is alive, so we still bump
+        # lastEventAt below even when mapping fails.
+        try:
+            timeline_events = per.observe_event(event)
+        except Exception:  # noqa: BLE001
+            log.exception(
+                "observe_event failed sid=%s runId=%s; continuing without timeline write",
+                per.sid,
+                per.run_id,
+            )
+            timeline_events = []
 
         # Best-effort timeline writes. TimelineWriter has its own internal
         # lock so concurrent writers don't interleave.

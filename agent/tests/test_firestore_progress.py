@@ -719,3 +719,55 @@ async def test_plugin_on_event_swallows_lastEventAt_ownership_lost(monkeypatch):
     # Cleanup
     state.heartbeat_task.cancel()
     await asyncio.gather(state.heartbeat_task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_plugin_on_event_observe_event_failure_still_bumps_heartbeat(monkeypatch):
+    """A mapper bug in observe_event must not kill the run. Receiving the
+    event already proves the pipeline is alive, so lastEventAt still bumps;
+    timeline writes simply get skipped for that event."""
+    plugin = FirestoreProgressPlugin(project="superextra-site")
+    plugin._fs = MagicMock()
+
+    async def _claim(_fs, _state):
+        return None
+
+    async def _no_title(_q):
+        return None
+
+    async def _no_hb(_fs, _state):
+        await asyncio.sleep(60)
+
+    fenced_calls = 0
+
+    async def _fenced(_fs, _state, _updates):
+        nonlocal fenced_calls
+        fenced_calls += 1
+        return None
+
+    monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
+    monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
+    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
+
+    ctx = _mock_invocation_context(
+        sid="abc", run_id="r-1", turn_idx=1, invocation_id="inv-1"
+    )
+    await plugin.before_run_callback(invocation_context=ctx)
+    state = plugin._states["inv-1"]
+    state.timeline_writer.write_timeline = AsyncMock(return_value=None)
+
+    # observe_event raises — simulating a mapper bug on a malformed event.
+    state.observe_event = MagicMock(side_effect=RuntimeError("mapper boom"))
+
+    # Must not raise.
+    await plugin.on_event_callback(invocation_context=ctx, event=SimpleNamespace())
+
+    # No timeline rows should have been written (mapper failed before any).
+    assert state.timeline_writer.write_timeline.await_count == 0
+    # lastEventAt still bumped — receiving an event = pipeline alive.
+    assert fenced_calls == 1
+
+    # Cleanup
+    state.heartbeat_task.cancel()
+    await asyncio.gather(state.heartbeat_task, return_exceptions=True)

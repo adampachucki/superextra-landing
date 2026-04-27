@@ -851,6 +851,58 @@ describe('agentStream', () => {
 		);
 	});
 
+	it('gear follow-up arg shape: isFirstMessage=false, turnIdx increments, userId stays creator, no [Context: ...] re-injection', async () => {
+		// Existing gear session created by a different UID (the "creator"),
+		// with prior turns. Submitter is a shared-URL participant (different
+		// UID) submitting the second turn. The handoff must carry:
+		//  - the creator's UID (not the submitter's) for Agent Engine session ownership
+		//  - turnIdx = lastTurnIndex + 1
+		//  - isFirstMessage = false
+		//  - message = `[Date: ...] {raw}` only — no `[Context: asking about ...]` prefix
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				userId: 'creator-uid',
+				participants: ['creator-uid'],
+				status: 'complete',
+				transport: 'gear',
+				adkSessionId: 'adk-existing',
+				lastTurnIndex: 3,
+				placeContext: { name: 'Umami', secondary: 'Berlin', placeId: 'ChIJ-place' },
+				title: 'Prior chat'
+			})
+		}));
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({ body: { message: 'and the wine list?', sessionId: 'sess-1' } }),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		assert.equal(tasksClient.createTask.mock.callCount(), 0);
+
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.equal(handoffArg.sid, 'sess-1');
+		assert.equal(handoffArg.isFirstMessage, false);
+		assert.equal(handoffArg.turnIdx, 4, 'turnIdx must be lastTurnIndex + 1');
+		assert.equal(
+			handoffArg.userId,
+			'creator-uid',
+			'follow-up must carry the creator UID, not the submitter UID'
+		);
+		assert.match(handoffArg.runId, /^[0-9a-f-]{36}$/);
+		// `[Date: ...]` prefix is added every turn; `[Context: asking about ...]`
+		// is ONLY injected on the first message — after that the ADK session
+		// holds the place context in state.
+		assert.match(handoffArg.message, /^\[Date: [^\]]+\] and the wine list\?$/);
+		assert.ok(
+			!handoffArg.message.includes('[Context:'),
+			'follow-up message must not re-inject [Context: asking about ...] (lives in ADK session state)'
+		);
+	});
+
 	it('v3.9 P1 regression: legacy session with no transport field stays cloudrun', async () => {
 		// Submitter IS in allowlist (would pick 'gear' on a NEW session) but
 		// the existing session has no `transport` field at all (legacy data
