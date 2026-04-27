@@ -1,13 +1,10 @@
 import atexit
 import asyncio
-import logging
 import os
 import uuid
 import httpx
 
 from .secrets import get_secret
-
-logger = logging.getLogger(__name__)
 
 BASE_URL = "https://places.googleapis.com/v1"
 

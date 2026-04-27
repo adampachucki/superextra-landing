@@ -167,10 +167,6 @@ export function chooseInitialTransport(
 	return defaultTransport;
 }
 
-export function resetGearAllowlist() {
-	GEAR_ALLOWLIST.clear();
-}
-
 let _tasksClient;
 function getTasksClient() {
 	if (!_tasksClient) _tasksClient = new CloudTasksClient();

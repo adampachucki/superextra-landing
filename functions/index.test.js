@@ -122,16 +122,8 @@ mock.module('./gear-handoff.js', {
 // Set WORKER_URL before importing so the Cloud Task target resolves.
 process.env.WORKER_URL = 'https://worker-test.run.app';
 
-const {
-	intake,
-	agentStream,
-	agentDelete,
-	sttToken,
-	tts,
-	chooseInitialTransport,
-	GEAR_ALLOWLIST,
-	resetGearAllowlist
-} = await import('./index.js');
+const { intake, agentStream, agentDelete, sttToken, tts, chooseInitialTransport, GEAR_ALLOWLIST } =
+	await import('./index.js');
 
 // ── Test helpers ──
 
@@ -204,7 +196,7 @@ beforeEach(() => {
 	// `mockImplementationOnce` from a prior test could otherwise leak.
 	gearHandoffMock.mock.mockImplementation(async () => ({ ok: true }));
 	gearHandoffCleanupMock.mock.mockImplementation(async () => {});
-	resetGearAllowlist();
+	GEAR_ALLOWLIST.clear();
 });
 
 afterEach(() => {

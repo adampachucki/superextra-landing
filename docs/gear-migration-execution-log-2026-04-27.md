@@ -85,9 +85,37 @@ Branch is ready for staging deploy.
 
 ## Blockers
 
-- **Phase 1 cloud-side** (IAM + 3 secrets) — drafted command set ready, Adam to run.
-- **Phase 8 staging deploy** — Adam-driven; needs `GEAR_REASONING_ENGINE_RESOURCE` env var on the deployed agentStream Cloud Function once `agent_engines.create(...)` returns the staging resource ID.
-- **Phase 8 allowlist toggle** — Adam adds his UID to `GEAR_ALLOWLIST` in `functions/index.js` for Stage A soak; flips `GEAR_DEFAULT='gear'` for Stage B.
+(none — Stage A is live as of 2026-04-27; see "Stage A live" entry under "Verification artifacts" for the deployed state)
+
+## Stage A operator state (current as of 2026-04-27)
+
+- **Staging Reasoning Engine:** `projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288` (display name `superextra-agent-staging`, deployed from gear-migration HEAD).
+- **`agentStream` Cloud Function:** deployed from gear-migration; env var `GEAR_REASONING_ENGINE_RESOURCE` set to the resource above; six functions on the live URLs (agentStream, agentDelete, intake, sttToken, tts, watchdog).
+- **`GEAR_ALLOWLIST`:** two entries in `functions/index.js`:
+  - `feadLLD5IuUrJNeQTPPu9QIg3wg1` — adam@finebite.co prod (`agent.superextra.ai`)
+  - `UqQvmOsaBifkwzzLBugbnYj8kUt2` — adam@finebite.co dev (`http://34.38.81.215:5199`)
+- **`GEAR_DEFAULT`:** `'cloudrun'` — only allowlisted UIDs route to GEAR; everyone else stays on the existing Cloud Run worker.
+
+## Stage A rollback procedure
+
+Both rollback paths require a code change + redeploy — `GEAR_ALLOWLIST` and `GEAR_DEFAULT` are JS module constants, not Cloud Function env vars (env vars wouldn't survive cold starts the same way module state does, and the immutability is intentional for code-review traceability).
+
+Two scoped revert flows:
+
+```bash
+# Flow A — disable Stage A entirely (drop both UIDs):
+cd /home/adam/src/superextra-landing && git checkout gear-migration
+# edit functions/index.js → empty out GEAR_ALLOWLIST
+GOOGLE_APPLICATION_CREDENTIALS=/home/adam/.config/gcloud/legacy_credentials/adam@finebite.co/adc.json \
+GOOGLE_CLOUD_QUOTA_PROJECT=superextra-site \
+firebase deploy --only functions:agentStream --project=superextra-site
+
+# Flow B — undo a Stage B default flip (set GEAR_DEFAULT back to 'cloudrun'):
+# edit functions/index.js → const GEAR_DEFAULT = 'cloudrun';
+# same firebase deploy command as above
+```
+
+Sticky-per-session means in-flight chats are never rerouted by either flow; the change only affects new chats from the un-allowlisted UIDs (or, after Stage B, all UIDs).
 
 ## Phase 8 handoff — operator notes for Adam-driven rollout
 
@@ -117,7 +145,7 @@ Branch is ready for staging deploy.
 
 2. **Configure agentStream**: set `GEAR_REASONING_ENGINE_RESOURCE` env var on the deployed Cloud Function via the deploy workflow (or `gcloud functions deploy ... --update-env-vars=GEAR_REASONING_ENGINE_RESOURCE=...`). Without it, the gear branch fast-fails with `GEAR_REASONING_ENGINE_RESOURCE env var not set`.
 
-3. **Stage A — allowlist soak** (~1 week): add 1–2 developer UIDs to `GEAR_ALLOWLIST` in `functions/index.js` (currently empty), commit + deploy. Watch:
+3. **Stage A — allowlist soak** (~1 week, **CURRENTLY LIVE**): two developer UIDs are in `GEAR_ALLOWLIST` (Adam's prod + dev origins — see the "Stage A operator state" section above). Watch:
    - `gcloud logging read 'resource.type="cloud_function" AND severity>=WARNING'` for handoff failures.
    - Firestore `sessions/*` for `transport: 'gear'` docs reaching `status: 'complete'`.
    - Watchdog for stuck `status: 'running'` sessions (none expected).
@@ -128,7 +156,7 @@ Branch is ready for staging deploy.
 
 6. **Phase 9 cutover** (after 30-day rollback window): decommission Cloud Tasks + Cloud Run, delete worker_main.py / Dockerfile / enqueueRunTask, remove `adkSessionId`/`currentAttempt`/`currentWorkerId` fields via Firestore migration script, archive `agent/probe/` + `functions/probe-stream-query.js` to `docs/archived/`, delete `probeHandoffAbort` + `probeHandoffLeaveOpen`.
 
-**Rollback at any stage:** remove UIDs from `GEAR_ALLOWLIST` or flip `GEAR_DEFAULT` back to `'cloudrun'`; sticky-per-session means in-flight chats are never rerouted.
+**Rollback at any stage:** see the "Stage A rollback procedure" section above. Both `GEAR_ALLOWLIST` and `GEAR_DEFAULT` are JS module constants (not Cloud Function env vars), so rollback always requires a code change + `firebase deploy --only functions:agentStream`. Sticky-per-session means in-flight chats are never rerouted.
 
 ---
 
