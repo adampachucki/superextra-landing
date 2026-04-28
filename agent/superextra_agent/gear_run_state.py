@@ -311,7 +311,11 @@ class GearRunState:
                     "error": "empty_or_malformed_reply",
                     "updatedAt": firestore.SERVER_TIMESTAMP,
                 },
-                {"status": "error", "error": "empty_or_malformed_reply"},
+                {
+                    "status": "error",
+                    "error": "empty_or_malformed_reply",
+                    "completedAt": firestore.SERVER_TIMESTAMP,
+                },
                 "error",
             )
 

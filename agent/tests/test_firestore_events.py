@@ -201,6 +201,27 @@ def test_synth_complete_uses_grounding_sources():
     }
 
 
+def test_followup_complete_reads_final_report_followup_key():
+    """The follow-up agent writes to `final_report_followup`, not `final_report`.
+    Mapper must pick up the follow-up reply without falling back to
+    `final_report` (which still holds the original synthesizer report)."""
+    ev = _event(
+        author="follow_up",
+        is_final=True,
+        state_delta={
+            "final_report_followup": "Short follow-up answer.",
+            # `final_report` is untouched — still holds the prior research.
+            # Mapper must NOT pick this up for the follow-up event.
+            "final_report": "# Original full research report",
+        },
+    )
+    mapped = map_event(ev, {})
+    assert mapped["complete"] == {
+        "reply": "Short follow-up answer.",
+        "sources": [],
+    }
+
+
 def test_extract_sources_from_grounding_dedupes_urls():
     ev = _event(
         grounding_chunks=[

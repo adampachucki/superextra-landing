@@ -228,7 +228,12 @@ follow_up = LlmAgent(
     model=_FAST_MODEL,
     instruction=_follow_up_instruction,
     description="Answers simple follow-up questions using existing research data. No tools.",
-    output_key="final_report",
+    # Distinct from `final_report` so a follow-up reply doesn't overwrite
+    # the original synthesizer report in session state — the next follow-up
+    # would otherwise read its own (typically shorter, sourceless) prior
+    # answer as "the research", causing quality decay turn-over-turn.
+    # Mapper at firestore_events.py:_map_synth_complete reads either key.
+    output_key="final_report_followup",
 )
 
 # --- Router instruction provider ---

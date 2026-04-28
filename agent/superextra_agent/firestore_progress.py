@@ -470,7 +470,11 @@ class FirestoreProgressPlugin(BasePlugin):
                             "error": "finalize_failed",
                             "updatedAt": firestore.SERVER_TIMESTAMP,
                         },
-                        {"status": "error", "error": "finalize_failed"},
+                        {
+                            "status": "error",
+                            "error": "finalize_failed",
+                            "completedAt": firestore.SERVER_TIMESTAMP,
+                        },
                     )
                 )
             except OwnershipLost:
