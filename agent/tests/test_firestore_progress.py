@@ -354,11 +354,11 @@ def _mock_invocation_context(*, sid: str, run_id: str, turn_idx: int, invocation
 @pytest.mark.asyncio
 async def test_plugin_before_run_noops_when_state_missing(monkeypatch):
     """If session.state has no runId, before_run returns None so the
-    runner proceeds normally. The legacy Cloud Run worker shares the
-    same `App` and runs without populating runId into ADK state — the
-    plugin must let that run through, not halt it. (Halting was the
-    2026-04-27 cloudrun-broken-by-plugin regression.)"""
+    runner proceeds normally. (Halting was the 2026-04-27 cloudrun-
+    broken-by-plugin regression that this guard prevents from
+    recurring after Phase 9.)"""
     plugin = FirestoreProgressPlugin(project="superextra-site")
+    plugin._fs = MagicMock()  # short-circuit lazy ADC init in CI
 
     bad_session = SimpleNamespace(id="se-x", state={})
     ctx = SimpleNamespace(
@@ -370,7 +370,7 @@ async def test_plugin_before_run_noops_when_state_missing(monkeypatch):
     out = await plugin.before_run_callback(invocation_context=ctx)
     assert out is None, (
         "plugin must no-op (return None) when runId is missing — halting "
-        "kills the legacy worker pipeline that shares the same App"
+        "would kill any caller that doesn't populate ADK state.runId"
     )
 
 
