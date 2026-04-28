@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
-import { CloudTasksClient } from '@google-cloud/tasks';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
@@ -22,8 +21,6 @@ const db = getFirestore();
 const relayKey = defineSecret('RELAY_KEY');
 const elevenlabsKey = defineSecret('ELEVENLABS_API_KEY');
 const DEST = 'hello@superextra.ai';
-
-const PROJECT = 'superextra-site';
 
 export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req, res) => {
 	const RELAY_KEY = relayKey.value();
@@ -121,87 +118,6 @@ const UID_RATE_LIMIT_MAX = 20; // per-UID pipeline runs per hour (plan default)
 // Plan §5 / §6 — shared 10-turn cap per chat, counted across all contributors.
 const MAX_TURNS_PER_SESSION = 10;
 
-// Cloud Tasks config. WORKER_URL is canonically set at deploy time: the
-// workflow describes the deployed `superextra-worker` Cloud Run service and
-// writes the URL into `functions/.env.superextra-site`, which
-// firebase-functions v2 loads into `process.env`. The fallback default uses
-// this project's observed Cloud Run URL pattern
-// (`<service>-<project-hash>-<region-short>.a.run.app`) as defense-in-depth
-// against a deploy that forgot to set the env var. The older project-number
-// URL pattern is NOT used by this project's Cloud Run services.
-const TASKS_LOCATION = 'us-central1';
-const TASKS_QUEUE = 'agent-dispatch';
-const WORKER_SA = 'superextra-worker@superextra-site.iam.gserviceaccount.com';
-const DISPATCH_DEADLINE_S = 1800; // plan-mandated — overrides 10-min default
-const DEFAULT_WORKER_URL = 'https://superextra-worker-22b3fxahka-uc.a.run.app';
-const WORKER_URL = () => process.env.WORKER_URL || DEFAULT_WORKER_URL;
-
-// ── GEAR transport selection ────────────────────────────────────────────────
-//
-// **Stage B is live (2026-04-27): `GEAR_DEFAULT = 'gear'`.** All NEW sessions
-// route to the GEAR Reasoning Engine. Existing `transport: 'cloudrun'`
-// sessions stay sticky per-session and drain naturally on the legacy worker.
-// Legacy sessions written BEFORE the `transport` field existed (no field at
-// all) are caught by the `existing` branch in the agentStream txn and stay
-// on 'cloudrun' forever — this is the v3.9 P1 invariant.
-//
-// `GEAR_ALLOWLIST` is now redundant for routing (everything routes to gear
-// regardless), but the mechanism is kept in case we need a partial revert
-// (flip default back to 'cloudrun' but keep specific UIDs on gear, or vice
-// versa). Allowlist entries are harmless with default='gear'.
-//
-// Rollback to Stage A: change `GEAR_DEFAULT` back to 'cloudrun' and redeploy.
-// Sticky-per-session means in-flight gear sessions are never rerouted; only
-// new sessions get cloudrun once again.
-//
-// Exported so unit tests can verify allowlist hit/miss + default-flipped
-// scenarios via parameters (no module-state mutation).
-export const GEAR_ALLOWLIST = new Set([
-	'feadLLD5IuUrJNeQTPPu9QIg3wg1', // adam@finebite.co prod (agent.superextra.ai)
-	'UqQvmOsaBifkwzzLBugbnYj8kUt2' // adam@finebite.co dev (34.38.81.215:5199)
-]);
-export const GEAR_DEFAULT = 'gear'; // Stage B — flip back to 'cloudrun' to revert
-
-export function chooseInitialTransport(
-	submitterUid,
-	allowlist = GEAR_ALLOWLIST,
-	defaultTransport = GEAR_DEFAULT
-) {
-	if (allowlist.has(submitterUid)) return 'gear';
-	return defaultTransport;
-}
-
-let _tasksClient;
-function getTasksClient() {
-	if (!_tasksClient) _tasksClient = new CloudTasksClient();
-	return _tasksClient;
-}
-
-async function enqueueRunTask({ runId, body }) {
-	const workerUrl = WORKER_URL();
-	const client = getTasksClient();
-	const parent = client.queuePath(PROJECT, TASKS_LOCATION, TASKS_QUEUE);
-	await client.createTask({
-		parent,
-		task: {
-			// Name must be unique per runId so retries don't get new tasks and
-			// we get 24h dedup on accidental double-enqueues of the same turn.
-			name: `${parent}/tasks/${runId}`,
-			dispatchDeadline: { seconds: DISPATCH_DEADLINE_S, nanos: 0 },
-			httpRequest: {
-				httpMethod: 'POST',
-				url: `${workerUrl}/run`,
-				headers: { 'Content-Type': 'application/json' },
-				body: Buffer.from(JSON.stringify(body)).toString('base64'),
-				oidcToken: {
-					serviceAccountEmail: WORKER_SA,
-					audience: workerUrl
-				}
-			}
-		}
-	});
-}
-
 class AgentStreamError extends Error {
 	constructor(status, code) {
 		super(code);
@@ -277,20 +193,13 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 	//     rate limiting.
 	//   - `creatorUid` — the session's stored `userId`, allocated on the first
 	//     turn. Preserved across follow-ups (even from a different submitter)
-	//     because the worker continues the shared Vertex Agent Engine session
-	//     under the original creator UID.
+	//     because gearHandoff resumes the shared Reasoning Engine session under
+	//     the original creator UID.
 	// Transactions can re-run on contention, so we capture decision signals
-	// into outer-scope vars on every attempt; the last successful attempt
-	// wins and those are the values we use for the Cloud Task body.
-	let existingAdkSessionId = null;
+	// into outer-scope vars on every attempt.
 	let isFirstMessage = false;
 	let creatorUid = submitterUid;
 	let newTurnIdx = 1;
-	// Captured inside the txn callback on every attempt (re-runs on
-	// contention re-pick `existing` from the latest snapshot). The
-	// post-commit branch reads this to decide between the legacy Cloud
-	// Run path and the GEAR direct-handoff path.
-	let transport = 'cloudrun';
 	try {
 		await db.runTransaction(async (t) => {
 			const snap = await t.get(sessionRef);
@@ -309,22 +218,11 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 			}
 
 			isFirstMessage = !existing;
-			existingAdkSessionId = existing?.adkSessionId || null;
 			creatorUid = existing?.userId || submitterUid;
 			newTurnIdx = lastTurnIndex + 1;
-			// plan §v3.9 — branch on `existing` (not on the field). Legacy
-			// sessions written before the `transport` field existed have
-			// no field at all; treating absence as 'cloudrun' keeps them
-			// on their original codepath. Only first-turn-of-a-new-session
-			// picks the initial transport.
-			transport = existing
-				? (existing.transport ?? 'cloudrun')
-				: chooseInitialTransport(submitterUid);
 
 			const perTurn = {
 				currentRunId: runId,
-				currentAttempt: 0,
-				currentWorkerId: null,
 				status: 'queued',
 				queuedAt: FieldValue.serverTimestamp(),
 				lastHeartbeat: null,
@@ -339,18 +237,14 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 					userId: submitterUid,
 					participants: [submitterUid],
 					createdAt: FieldValue.serverTimestamp(),
-					adkSessionId: null, // worker creates on first turn
 					placeContext: placeContext || null,
 					title: null,
-					transport, // sticky for the lifetime of this session
 					...perTurn
 				});
 			} else {
-				// Preserve userId / createdAt / adkSessionId / placeContext / title.
+				// Preserve userId / createdAt / placeContext / title.
 				// `participants` arrays-union'd so shared-URL contributors pin
 				// the chat to their sidebar without overwriting prior UIDs.
-				// IMPORTANT: do NOT include `transport` here — the existing
-				// value is preserved across follow-ups (sticky-per-session).
 				t.update(sessionRef, {
 					...perTurn,
 					participants: FieldValue.arrayUnion(submitterUid)
@@ -384,10 +278,9 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 		return;
 	}
 
-	// 6. Build the query text the worker feeds to the pipeline. Matches the
-	// shape the current pipeline expects; worker doesn't do any further
-	// mutation. [Context: ...] is only injected on the first message — after
-	// that the ADK session holds the context in state.
+	// 6. Build the query text the pipeline receives. `[Context: ...]` is only
+	// injected on the first message — after that the Reasoning Engine session
+	// holds the place context in state.
 	const today = new Date(now).toLocaleDateString('en-US', {
 		year: 'numeric',
 		month: 'long',
@@ -398,50 +291,9 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 		queryText = `[Context: asking about ${placeContext.name}, ${placeContext.secondary || ''} (Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
 	}
 
-	// 7. Dispatch the run. Two transports coexist through the GEAR rollback
-	// window (plan §"Coexistence rule"): legacy sessions and explicit-cloudrun
-	// new sessions go via Cloud Tasks → Cloud Run worker; gear sessions go
-	// direct to Vertex AI Agent Engine via gearHandoff.
-	if (transport === 'cloudrun') {
-		// Cloud Tasks body carries the creator UID (not the submitter UID)
-		// because the worker uses it for Vertex Agent Engine session
-		// ownership. `turnIdx` is sent as an integer; the worker formats
-		// to a zero-padded doc key on its side.
-		try {
-			await enqueueRunTask({
-				runId,
-				body: {
-					sessionId,
-					runId,
-					turnIdx: newTurnIdx,
-					adkSessionId: existingAdkSessionId,
-					userId: creatorUid,
-					queryText,
-					isFirstMessage,
-					placeContext: placeContext || null
-				}
-			});
-		} catch (err) {
-			console.error('Cloud Tasks enqueue failed:', err.message || err);
-			try {
-				await sessionRef.update({
-					status: 'error',
-					error: 'enqueue_failed'
-				});
-			} catch (e2) {
-				console.error('Post-enqueue status=error write failed:', e2.message || e2);
-			}
-			res.status(502).json({ ok: false, error: 'enqueue_failed' });
-			return;
-		}
-
-		res.status(202).json({ ok: true, sessionId, runId });
-		return;
-	}
-
-	// transport === 'gear' — direct handoff to Vertex AI Agent Engine.
-	// Cleanup on failure mirrors `watchdog.js:172-186`: session+turn flip
-	// to status='error' atomically inside a `currentRunId`-fenced txn.
+	// 7. Direct handoff to Vertex AI Agent Engine. Cleanup on failure flips
+	// session + turn to status='error' atomically inside a `currentRunId`-
+	// fenced txn (mirrors watchdog.js).
 	try {
 		await gearHandoff({
 			sid: sessionId,

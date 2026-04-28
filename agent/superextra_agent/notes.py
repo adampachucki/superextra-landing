@@ -1,20 +1,15 @@
-"""Title + timeline-note generation, extracted from `worker_main.py`.
+"""Title + timeline-note generation for `FirestoreProgressPlugin`.
 
-Both the legacy worker (during the rollback window) and the new
-`FirestoreProgressPlugin` need to:
   1. Generate a short Gemini-Flash title for the first turn of a session.
   2. Generate one short Gemini-Flash progress note per timeline milestone.
 
-Either generation is **best-effort** — every path through has a
-deterministic fallback. The shared call-site is `_emit_note_task`, which
-the plugin spawns from its `on_event_callback` and `worker_main.py`
-spawns from its main event loop. Both schedule the resulting coroutine
-as an `asyncio.Task` so the LLM call can overlap with the next event.
+Both are **best-effort** — every path through has a deterministic
+fallback. The shared call-site is ``_emit_note_task``, which the plugin
+spawns from ``on_event_callback`` as an ``asyncio.Task`` so the LLM
+call can overlap with the next event.
 
-`_genai_client` is constructed lazily on first use — the worker's
-lifespan no longer pre-initialises it (and the plugin has no equivalent
-hook). The lazy init is process-local; cross-process state isn't a
-concern in either container.
+``_genai_client`` is constructed lazily on first use; the lazy init is
+process-local.
 """
 
 from __future__ import annotations

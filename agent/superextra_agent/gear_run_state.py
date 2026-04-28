@@ -1,19 +1,18 @@
-"""Per-invocation accumulator for the GEAR `FirestoreProgressPlugin`.
+"""Per-invocation accumulator for `FirestoreProgressPlugin`.
 
-Replaces the nine local variables that today's `worker_main.py` keeps in
-its event loop scope (`final_reply`, `final_sources`, `specialist_sources`,
-`specialist_sources_seen`, `mapping_state`, `timeline_builder`,
-`timeline_writer`, `note_tasks`, `title_task`) — plus the heartbeat task —
-with a single object owned by the plugin's per-invocation map.
+A single object owned by the plugin's per-invocation map holds all the
+mutable state for one run: ``final_reply``, ``final_sources``,
+``specialist_sources``, ``specialist_sources_seen``, ``mapping_state``,
+``timeline_builder``, ``timeline_writer``, ``note_tasks``, ``title_task``,
+and the heartbeat task.
 
-Concurrency discipline (load-bearing — plan §"No per-run lock"): every
-mutation method on `GearRunState` and on `TurnSummaryBuilder` is
-synchronous and `await`-free. Once a mutation starts there are no
-suspension points until it returns, so concurrent coroutines (e.g.
-overlapping note tasks) cannot interleave a partial mutation.
-`TimelineWriter` owns its own internal lock for its Firestore writes.
-**Any future mutator added here must stay sync and await-free**, or this
-safety property breaks.
+Concurrency discipline (load-bearing): every mutation method on
+``GearRunState`` and on ``TurnSummaryBuilder`` is synchronous and
+``await``-free. Once a mutation starts there are no suspension points
+until it returns, so concurrent coroutines (e.g. overlapping note tasks)
+cannot interleave a partial mutation. ``TimelineWriter`` owns its own
+internal lock for its Firestore writes. **Any future mutator added here
+must stay sync and await-free**, or this safety property breaks.
 """
 
 from __future__ import annotations
@@ -60,7 +59,7 @@ class GearRunState:
     timeline_builder: TurnSummaryBuilder = field(init=False)
     timeline_writer: TimelineWriter = field(init=False)
 
-    # Mutable accumulators (mirror worker_main.py:646-661)
+    # Mutable accumulators
     final_reply: str | None = None
     final_sources: list[dict[str, Any]] = field(default_factory=list)
     specialist_sources: list[dict[str, Any]] = field(default_factory=list)
@@ -100,12 +99,11 @@ class GearRunState:
     def observe_event(self, event: Any) -> list[dict[str, Any]]:
         """Mutate accumulator from one ADK event. Returns the list of
         timeline-event dicts the caller should feed to
-        ``timeline_writer.write_timeline(...)``. Mirrors
-        ``worker_main.py:670-771``.
+        ``timeline_writer.write_timeline(...)``.
 
-        Sync + await-free by design (plan §"No per-run lock"): the caller
-        can run this from `on_event_callback` without worrying about
-        another coroutine interleaving partial mutations.
+        Sync + await-free by design: the caller can run this from
+        ``on_event_callback`` without worrying about another coroutine
+        interleaving partial mutations.
         """
         mapped = map_event(event, self.mapping_state)
         self.timeline_builder.observe_event(event, self.mapping_state)
@@ -127,7 +125,7 @@ class GearRunState:
 
         # Drain `_tool_src_*` keys from the event state_delta. Each tool
         # call writes a UNIQUE state key so parallel tool calls all survive
-        # in one event's stateDelta. Mirrors worker_main.py:693-696.
+        # in one event's stateDelta.
         sd = (event.actions.state_delta if getattr(event, "actions", None) else None) or {}
         if isinstance(sd, dict):
             for key, value in sd.items():
@@ -154,10 +152,9 @@ class GearRunState:
         self.specialist_sources.append(entry)
 
     def _maybe_emit_notes(self, milestones: dict[str, Any]) -> list[dict[str, Any]]:
-        """Mirrors worker_main.py:698-754. Returns deterministic notes the
-        caller must write to the timeline. LLM-backed notes are spawned
-        as ``asyncio.Task`` and tracked on ``self.note_tasks`` for drain
-        in ``finalize()``.
+        """Returns deterministic notes the caller must write to the timeline.
+        LLM-backed notes are spawned as ``asyncio.Task`` and tracked on
+        ``self.note_tasks`` for drain in ``finalize()``.
         """
         extras: list[dict[str, Any]] = []
 
@@ -249,9 +246,8 @@ class GearRunState:
 
     async def stop_heartbeat(self) -> None:
         """Cancel the heartbeat task with a 1s timeout. Called FIRST in
-        `after_run` so a late tick can't clobber the terminal write with
-        a fresh ``lastHeartbeat``. Mirrors ``worker_main.py:454``
-        ``_cancel_heartbeat``.
+        ``after_run`` so a late tick can't clobber the terminal write with
+        a fresh ``lastHeartbeat``.
         """
         if self.heartbeat_task and not self.heartbeat_task.done():
             self.heartbeat_task.cancel()
@@ -281,8 +277,7 @@ class GearRunState:
           3. Await ``title_task`` with bounded ``TITLE_TIMEOUT_S``. (Note:
              ``asyncio.wait_for`` cancels-on-timeout so no straggler
              concern there.)
-          4. Empty-reply sanity check (mirrors
-             ``worker_main.py:1292``). Whitespace-only ``final_reply``
+          4. Empty-reply sanity check. Whitespace-only ``final_reply``
              returns the error payload, NOT a complete payload.
           5. Build the two payloads from now-stable state.
         """

@@ -1,23 +1,17 @@
-"""TurnSummaryBuilder + TimelineWriter, extracted from `worker_main.py`.
+"""TurnSummaryBuilder + TimelineWriter for `FirestoreProgressPlugin`.
 
-These two classes own the per-turn UI-progress accumulator (which `notes`
-to surface, which `sources` were touched, which `venues` were resolved)
-and the Firestore writer that lands live timeline events
+These two classes own the per-turn UI-progress accumulator (which
+``notes`` to surface, which ``sources`` were touched, which ``venues``
+were resolved) and the Firestore writer that lands live timeline events
 (``sessions/{sid}/events`` subcollection).
 
-Shared between the legacy Cloud Run worker (`worker_main.py`, kept alive
-through the GEAR rollback window) and the new `FirestoreProgressPlugin`
-that runs inside Vertex AI Agent Engine. Both call the same Builder /
-Writer pair so the live timeline shape and `turnSummary` payload stay
-identical across the cutover.
-
-Mutation discipline (load-bearing for the plugin path): every method on
-`TurnSummaryBuilder` is **synchronous and `await`-free**. Concurrent
+Mutation discipline (load-bearing): every method on
+``TurnSummaryBuilder`` is **synchronous and ``await``-free**. Concurrent
 note-task coroutines call only these synchronous methods between their
 own awaits, so a control-yield can never interleave a partial mutation.
-`TimelineWriter` owns its own `asyncio.Lock` to serialise its Firestore
-writes. Together this gives the plugin its no-extra-lock concurrency
-guarantee (plan §"No per-run lock").
+``TimelineWriter`` owns its own ``asyncio.Lock`` to serialise its
+Firestore writes. Together this gives the plugin its no-extra-lock
+concurrency guarantee.
 """
 
 from __future__ import annotations

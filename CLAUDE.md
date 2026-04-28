@@ -117,33 +117,24 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 
 ## Transport architecture
 
-Two coexisting transports, picked per-session at first turn and sticky for the rest of that session's life:
+Browser POSTs to `agentStream` (Cloud Function) → `agentStream` hands off directly to a deployed Vertex AI Agent Engine Reasoning Engine (`GEAR_REASONING_ENGINE_RESOURCE`) via `gearHandoff()`. The agent runs inside Agent Engine; `FirestoreProgressPlugin` (in `agent/superextra_agent/firestore_progress.py`) writes progress + terminal state to Firestore from inside the engine. Runs survive client disconnect for ≥240s.
 
-- **gear** (Vertex AI Agent Engine — current default): Browser POSTs to `agentStream` → it directly handoffs to a deployed Reasoning Engine (`GEAR_REASONING_ENGINE_RESOURCE`) via `gearHandoff()`. The agent runs inside Agent Engine; `FirestoreProgressPlugin` (in `agent/superextra_agent/firestore_progress.py`) writes progress + terminal state to Firestore from inside the engine. Survives client disconnect for ≥240s.
-- **cloudrun** (legacy): Browser POSTs to `agentStream` → enqueues a Cloud Task to the private Cloud Run worker (`superextra-worker`, Python + ADK in-process) → worker writes progress + terminal state to Firestore. Kept warm during the GEAR rollback window for sticky sessions and rollback.
+Browser reads state via two `onSnapshot` observers (`sessions/{sid}` for terminal; `collectionGroup('events')` for progress).
 
-Routing decision in `functions/index.js:agentStream`:
+Watchdog (`watchdog.js`, scheduled every 2 min) flips stuck sessions to `status=error` inside a fenced transaction.
 
-- Existing session → reuse `existing.transport` (legacy sessions with no field default to `'cloudrun'`).
-- New session → `chooseInitialTransport(uid, GEAR_ALLOWLIST, GEAR_DEFAULT)`. `GEAR_DEFAULT='gear'` (Stage B), `GEAR_ALLOWLIST` is an explicit-route override.
-- Rollback = flip `GEAR_DEFAULT` back to `'cloudrun'` and redeploy `agentStream`. Sticky-per-session means in-flight chats don't change transport mid-conversation.
-
-Read path is shared: browser reads state via two `onSnapshot` observers (`sessions/{sid}` for terminal; `collectionGroup('events')` for progress).
-
-Watchdog (`watchdog.js`, scheduled every 2 min) flips stuck sessions to `status=error` inside a fenced transaction — covers both transports identically.
-
-Plans: `docs/gear-migration-implementation-plan-2026-04-26.md` (current), `docs/pipeline-decoupling-plan.md` (legacy cloudrun design), `docs/pipeline-decoupling-fixes-plan.md` (cloudrun fixes).
+Plans: `docs/gear-migration-implementation-plan-2026-04-26.md`, `docs/gear-phase9-decommission-plan-2026-04-27.md`.
 
 ## Deployment
 
 Push to `main` → `.github/workflows/deploy.yml`:
 
-1. **detect-changes** — `dorny/paths-filter` checks if agent code changed
-2. **test** — lint, format check, svelte-check, Vitest, functions tests, rules emulator, agent tests
-3. **deploy-worker** — `gcloud run deploy superextra-worker --source=agent` (skipped if agent code unchanged)
-4. **deploy-hosting** — Firebase Hosting + Cloud Functions + Firestore rules/indexes. Waits for `deploy-worker` when the worker deploys; proceeds otherwise.
+1. **test** — lint, format check, svelte-check, Vitest, functions tests, rules emulator, agent tests
+2. **deploy-hosting** — Firebase Hosting + Cloud Functions + Firestore rules/indexes.
 
-For deployment gotchas and the live E2E playbook (Cloud Run worker, Cloud Tasks IAM, Firestore indexes, watchdog, rerun policy, Chrome MCP E2E flow): read `docs/deployment-gotchas.md` when working on those areas.
+The agent app itself is hosted as a Vertex AI Agent Engine Reasoning Engine; redeploy via `agent_engines.update(...)` from the agent venv when the agent code changes.
+
+For deployment gotchas (Firebase env-var replace behavior, Firestore indexes, watchdog, rerun policy, Chrome MCP E2E flow): read `docs/deployment-gotchas.md` when working on those areas.
 
 ## Assume nothing — verify
 

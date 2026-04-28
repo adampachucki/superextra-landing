@@ -157,8 +157,7 @@ describe('findStuckSessions', () => {
 			'sessions|status|lastHeartbeat|limit': mockSnap([
 				mockDoc('sid-hb', {
 					status: 'running',
-					lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
-					currentAttempt: 2
+					lastHeartbeat: millisTs(NOW - 12 * 60 * 1000)
 				})
 			])
 		};
@@ -166,7 +165,6 @@ describe('findStuckSessions', () => {
 		const out = await findStuckSessions(db, NOW);
 		assert.equal(out.length, 1);
 		assert.equal(out[0].reason, 'worker_lost');
-		assert.equal(out[0].errorDetails.currentAttempt, 2);
 	});
 
 	it('classifies wedged pipeline (fresh heartbeat, stale lastEventAt) as pipeline_wedged', async () => {
@@ -174,8 +172,7 @@ describe('findStuckSessions', () => {
 			'sessions|status|lastEventAt|limit': mockSnap([
 				mockDoc('sid-wedge', {
 					status: 'running',
-					lastEventAt: millisTs(NOW - 7 * 60 * 1000),
-					currentAttempt: 1
+					lastEventAt: millisTs(NOW - 7 * 60 * 1000)
 				})
 			])
 		};
@@ -183,7 +180,6 @@ describe('findStuckSessions', () => {
 		const out = await findStuckSessions(db, NOW);
 		assert.equal(out.length, 1);
 		assert.equal(out[0].reason, 'pipeline_wedged');
-		assert.equal(out[0].errorDetails.currentAttempt, 1);
 	});
 
 	it('dedupes by sid — queued classifier wins over heartbeat for same sid', async () => {
@@ -268,7 +264,6 @@ describe('runWatchdog', () => {
 		assert.equal(q1.data.updatedAt, '__server_timestamp__');
 		assert.equal(hb1.data.status, 'error');
 		assert.equal(hb1.data.error, 'worker_lost');
-		assert.equal(hb1.data.errorDetails.currentAttempt, 3);
 		assert.equal(hb1.data.updatedAt, '__server_timestamp__');
 
 		// Turn doc propagation — status + error reason match the session.
