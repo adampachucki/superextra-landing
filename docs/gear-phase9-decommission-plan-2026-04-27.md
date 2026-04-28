@@ -1,21 +1,32 @@
 # GEAR migration — Phase 9 decommission plan
 
 **Date drafted:** 2026-04-27
-**Earliest execution:** 2026-05-27 (Stage B + 30-day rollback window)
+**Execution:** 2026-04-28 (compressed — see "Compression rationale" below)
 **Owner:** Adam (with agent-side help on the source-side cleanup + migration)
 
-## Pre-flight checklist
+## Compression rationale
 
-Phase 9 only proceeds when ALL of these hold for ≥7 consecutive days. Each item is a single grep / gcloud / Firestore query — no inference.
+The original plan called for a 30-day rollback window before Phase 9, with a 7-day pre-flight checklist on top. That gate was waived on 2026-04-28 with explicit user direction ("there are no users — all testing is on us"). The proof points the calendar would have given us — watchdog firing on a real stuck session, cost trajectory diverging, subjective quality regression — only have value when there's organic traffic to generate them. There isn't.
 
-- [ ] **No new cloudrun sessions.** `transport='cloudrun'` count among `sessions/*` written in the last 7 days = 0. Query: Firestore filter `where('transport', '==', 'cloudrun').where('createdAt', '>=', sevenDaysAgo)`.
-- [ ] **No active sticky-cloudrun chats.** Sessions with `transport='cloudrun'` AND `status` in `('queued','running')` = 0. (If there are any, wait for them to drain or watchdog-flip.)
-- [ ] **Worker traffic at zero.** `gcloud run services describe superextra-worker` shows zero requests in the last 7 days via Cloud Logging: `resource.type="cloud_run_revision" AND resource.labels.service_name="superextra-worker" AND httpRequest.requestMethod="POST"` returns 0 hits.
-- [ ] **No GEAR-side incidents.** `gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="agentstream" AND severity>=WARNING'` for the same 7 days shows no `gear_handoff_failed` errors > baseline noise.
-- [ ] **Cost trajectory acceptable.** GCP Console → Billing → Reports filtered to project=superextra-site shows weekly spend within ±20 % of pre-migration cloudrun baseline. (Baseline: 2026-04-20 to 2026-04-26 worker week.) If the gear week is materially higher, treat as a Stage 2 conversation, not a Phase 9 blocker — Phase 9 is a code-cleanup phase, not a cost gate.
-- [ ] **Firestore backup.** `gcloud firestore export gs://superextra-site-firestore-backups/phase9-pre-migration-$(date +%Y%m%d)` returned success. (One-time creation of the bucket: `gsutil mb -l us-central1 gs://superextra-site-firestore-backups`.) Required because the field-deletion is non-reversible without the export.
+What we did instead, all on 2026-04-27:
 
-If any item fails, do not proceed. Fix or wait, then re-check.
+- Rollback drill in both directions (gear→cloudrun→gear), fresh anon UIDs, verified `transport` field flipping correctly each direction.
+- Side-by-side quality drill on a substantive prompt (`Le Vintage Brussels` brasserie comparison): gear `6058 chars / 32 sources / structured analysis with chart`, cloudrun `6393 chars / 13 sources / parallel structure`. Quality parity confirmed.
+- Watchdog verified end-to-end with an injected stuck Firestore session (`worker_lost` flip in 76s).
+- Two production regressions caught + fixed during the same drills (env-var stripping, plugin halting cloudrun) — exactly the kind of issues a real soak would have found.
+- Cost baseline script in place (`agent/probe/cost_baseline.py`) with documented project-level visibility limits for the gear side.
+
+Without users, additional calendar time gives us nothing the active drills haven't already given us. Phase 9 executes today.
+
+## Pre-flight sanity checks (single-pass, all run today)
+
+Each item is a single query. If any fails, fix or skip the offending stage; do not proceed past Stage 2 with unresolved failures.
+
+- [ ] **No active sticky-cloudrun chats.** Firestore query: `where('transport', '==', 'cloudrun').where('status', 'in', ['queued','running'])` returns zero docs. (If there are any, wait briefly for them to drain or watchdog-flip — usually <5 min.)
+- [ ] **Worker recent traffic visible.** `gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="superextra-worker" AND httpRequest.requestMethod="POST"' --freshness=1h` — note the count. Non-zero means there's still cloudrun traffic from sticky sessions; wait or accept that those sessions will fail mid-Stage-2.
+- [ ] **No GEAR-side incidents in last 24h.** `gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="agentstream" AND severity>=WARNING' --freshness=24h` shows no `gear_handoff_failed` errors above baseline noise (the cold-start `DEFAULT_RESOURCE` warning is benign and doesn't count).
+- [ ] **agentStream env vars healthy.** `gcloud run services describe agentstream --region=us-central1 --format='value(spec.template.spec.containers[0].env)'` shows `GEAR_REASONING_ENGINE_RESOURCE` set. (PR #11 fix verification.)
+- [ ] **Firestore backup bucket exists.** `gsutil ls gs://superextra-site-firestore-backups/` returns ok. If the bucket doesn't exist, one-shot create: `gsutil mb -l us-central1 gs://superextra-site-firestore-backups`. Backup is non-negotiable: Stage 3 field deletions are non-reversible without it.
 
 ## Execution sequence
 
@@ -56,8 +67,13 @@ Single PR titled `chore(gear): phase 9 — decommission worker codepath`. Branch
 - `.github/workflows/deploy.yml`
   - Drop the `deploy-worker` job entirely.
   - Drop `detect-changes` if it only feeds `deploy-worker`.
-  - Drop the `GEAR_REASONING_ENGINE_RESOURCE` line from the .env-write step IF the gear-handoff `DEFAULT_RESOURCE` constant is judged sufficient (or keep both; cheap belt-and-suspenders).
-- `agent/superextra_agent/firestore_progress.py` and `gear_run_state.py` — keep, these ARE the new runtime.
+  - Keep the `GEAR_REASONING_ENGINE_RESOURCE` line in the .env-write step. Belt-and-suspenders with `gear-handoff.js`'s `DEFAULT_RESOURCE` is cheap; future engine recreation only needs the workflow line updated.
+- `agent/superextra_agent/firestore_progress.py` and `gear_run_state.py` — keep, these ARE the new runtime. Also keep the `runId`-missing no-op branch + its log warning (case 2 — malformed gear handoff — is still a real failure mode worth surfacing, even with the legacy worker gone).
+- `docs/deployment-gotchas.md` — add a short entry capturing the `firebase deploy REPLACES env vars (does not merge)` finding from PR #11. ~5 lines. Future agent sessions otherwise rediscover this the hard way.
+- `docs/gear-stage-a-test-plan-2026-04-27.md` — append a one-paragraph retrospective: "any 'X is contained' smoke must verify the contained X actually works end-to-end (`status='complete'`), not just that routing landed (`status='running'`)." Smoke 5 demonstrated the cost of skipping that — the cloudrun-broken-by-plugin regression sat undetected for hours because the smoke only checked routing.
+- `agent/probe/` — `git tag gear-migration-probes-archive HEAD` AND `git push origin gear-migration-probes-archive` BEFORE this PR's `agent/probe/` delete commit. The probe scripts proved R3.x's post-disconnect contract during the migration; tag preserves the audit trail at zero cost.
+
+**Doc files NOT to touch in this PR:** `docs/gear-migration-implementation-plan-2026-04-26.md`, `docs/gear-migration-execution-log-2026-04-27.md`, `docs/gear-stage-a-test-plan-2026-04-27.md` (except the retrospective paragraph), and `docs/gear-post-review-fixes-plan-2026-04-27.md`. They are historical record and should stay as-is.
 
 **Verification gates:**
 
@@ -120,38 +136,57 @@ GOOGLE_APPLICATION_CREDENTIALS=... GOOGLE_CLOUD_PROJECT=superextra-site \
 
 The script strips `adkSessionId`, `currentAttempt`, `currentWorkerId`, and `transport` from every `sessions/*` doc. Idempotent — re-run if interrupted. Latest dry-run (2026-04-28) reports 33 sessions need cleanup. Note: `transport` is a deviation from plan §9 (which only listed `adkSessionId`/`currentAttempt`/`currentWorkerId`); included here because the field becomes vestigial once the cloudrun branch is gone, and leaving it would just confuse future readers.
 
-### Stage 4 — agent/probe/ archival (optional)
+### Stage 4 — Post-flight smoke
 
-The probe scripts under `agent/probe/` proved the platform's post-disconnect contract during the migration (R3.x rounds). They have audit value but no operational role. Two options:
+After Stage 3 completes:
 
-- **Archive on a tag.** Before deleting in Stage 1, `git tag gear-migration-probes-archive HEAD` and push the tag. Restoration via `git checkout gear-migration-probes-archive -- agent/probe/`.
-- **Just delete.** The probe results docs (`docs/gear-probe-results-*.md`) capture the findings; the scripts are reproducible from those + the implementation plan.
+1. Submit one Chrome MCP query against the live agentStream from a fresh anon UID. Use a substantive prompt (e.g. the Le Vintage Brussels brasserie comparison) so the run exercises the full pipeline, not just routing.
+2. Verify `sessions/{sid}` reaches `status='complete'`, no `error`, reply length and source count in the same ballpark as previous gear runs.
+3. Spot-check the session doc: confirm `adkSessionId`, `currentAttempt`, `currentWorkerId`, `transport` are absent (Stage 3 cleaned them; Stage 1 source no longer writes them).
+4. `gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="agentstream" AND severity>=WARNING' --freshness=10m` — confirm no new warnings.
 
-Recommend the tag — costs nothing and preserves the audit trail.
+If any check fails, freeze cleanup and investigate. The Firestore export from Stage 2 step 1 is the safety net.
 
 ## Rollback (if something goes sideways)
 
-- **Stage 1 / Stage 2 mid-execution:** revert the Stage 1 PR, redeploy the worker via `gcloud run deploy superextra-worker --source=agent` if it was already deleted (~10 min from a fresh container build). Sticky-cloudrun was already drained by the pre-flight gate, so any in-flight work is on gear and unaffected.
+- **Stage 1 mid-execution:** revert the Stage 1 PR. No cloud-side state changed yet.
+- **Stage 2 mid-execution:** Stage 1 is already deployed (gear-only source), so a re-deployed worker would have no caller. Restore via `git checkout gear-migration-probes-archive~1 -- agent/worker_main.py agent/Dockerfile` then `gcloud run deploy superextra-worker --source=agent` (~10 min build). Then revert the relevant `functions/index.js` deletes to restore the cloudrun branch + redeploy. About 30 min total to a working cloudrun fallback.
 - **Stage 3 mid-execution:** the script is dry-run-by-default and idempotent; re-running picks up where it left off.
-- **Post-Stage 3:** field deletions are non-reversible without the Firestore export from the pre-flight checklist. Restore via `gcloud firestore import gs://superextra-site-firestore-backups/phase9-pre-migration-...`.
+- **Post-Stage 3:** field deletions are non-reversible without the Firestore export from Stage 2 step 1. Restore via `gcloud firestore import gs://superextra-site-firestore-backups/phase9-pre-migration-...`.
 
 ## Estimated effort
 
-- Stage 1 (source PR): 2-3 hours including test updates.
+- Stage 1 (source PR + bundled doc cleanups): 2-3 hours including test updates.
 - Stage 2 (gcloud + service-account cleanup): 30 min wall clock.
-- Stage 3 (Firestore migration): 5 min wall clock (dry-run + apply on 29 sessions today).
-- Stage 4 (archival): 5 min if tag; <1 min if just delete.
+- Stage 3 (Firestore migration): 5 min wall clock (dry-run + apply on 33 sessions today).
+- Stage 4 (post-flight smoke): 10 min wall clock.
 
-**Total:** ~half a day, plus the 30-day rollback wait before any of it starts.
+**Total:** ~half a day end-to-end on 2026-04-28.
 
 ## What stays
 
 After Phase 9 the codebase carries:
 
 - `agent/superextra_agent/` — the agent app (instructions, plugins, tools)
-- `agent/superextra_agent/firestore_progress.py` + `gear_run_state.py` — Stage B runtime
+- `agent/superextra_agent/firestore_progress.py` + `gear_run_state.py` — the runtime
 - `functions/index.js` (slimmer), `functions/gear-handoff.js`, `functions/watchdog.js`
 - `agent/tests/` (without `test_worker_main.py`) — plugin + agent tests
-- `agent/probe/` may or may not be present per Stage 4 choice
+- `agent/probe/` is GONE from main but preserved at the `gear-migration-probes-archive` git tag
+- `scripts/phase9_field_migration.py` stays in tree as a re-runnable safety net (idempotent, dry-run by default)
 
-Nothing about gear/cloudrun coexistence remains. The mental model becomes: browser → agentStream → Reasoning Engine. Sticky transport, the allowlist, and `chooseInitialTransport` all evaporate.
+Nothing about gear/cloudrun coexistence remains. The mental model becomes: **browser → agentStream → Reasoning Engine → Firestore progress/terminal state**. Sticky transport, the allowlist, `chooseInitialTransport`, and the four legacy session fields all evaporate.
+
+## Done means
+
+Quoting the reviewer's framing — "Done means: no cloudrun branch, no transport field dependency, no Cloud Tasks queue, no worker deployment job, no stale docs. The architecture should read simply: browser → agentStream → GEAR → Firestore progress/terminal state."
+
+Verification at end-of-Phase-9:
+
+- `grep -rn 'cloudrun\|enqueueRunTask\|chooseInitialTransport\|GEAR_DEFAULT\|GEAR_ALLOWLIST' functions/` returns no matches in source.
+- `grep -rn 'transport\|adkSessionId\|currentAttempt\|currentWorkerId' functions/` returns no matches in source.
+- `gcloud run services list --project=superextra-site` does not list `superextra-worker`.
+- `gcloud tasks queues list --location=us-central1 --project=superextra-site` does not list `agent-runs`.
+- `gcloud iam service-accounts list --project=superextra-site` does not list `superextra-worker@...`.
+- `cat .github/workflows/deploy.yml` has no `deploy-worker` job.
+- `grep -rn 'Cloud Tasks\|Cloud Run worker\|cloudrun' CLAUDE.md AGENTS.md` returns no match (except possibly in historic-context callouts).
+- Firestore: a fresh-anon submission produces a `sessions/{sid}` doc whose only fence-related field is `currentRunId`.
