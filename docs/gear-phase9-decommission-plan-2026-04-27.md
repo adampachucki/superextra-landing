@@ -37,6 +37,8 @@ Single PR titled `chore(gear): phase 9 — decommission worker codepath`. Branch
 
 - `functions/index.js`
   - Drop `currentAttempt: 0` and `currentWorkerId: null` from the `perTurn` object.
+  - Drop `adkSessionId: null` from the first-message `t.set` payload (line 342) — Reasoning Engine owns session identity.
+  - Drop `existingAdkSessionId` capture (line 312) and the `adkSessionId: existingAdkSessionId` field in the cloudrun task body (line 417). Both go away when the cloudrun branch goes away.
   - Drop the entire `if (transport === 'cloudrun') { ... enqueueRunTask ... }` branch in `agentStream`.
   - Drop the `enqueueRunTask` function and the `CloudTasksClient` import.
   - Drop `chooseInitialTransport`, `GEAR_DEFAULT`, `GEAR_ALLOWLIST` (always-gear after Phase 9).
@@ -50,10 +52,11 @@ Single PR titled `chore(gear): phase 9 — decommission worker codepath`. Branch
 - `functions/utils.js` and `functions/utils.test.js`
   - Drop `enqueueRunTask` and its tests. Drop the Cloud Tasks queue / location constants.
 - `firestore.indexes.json` — drop any indexes that exist solely for the worker (audit per index).
-- `CLAUDE.md` § "Transport architecture" — collapse to a single-transport description: "Browser POSTs to `agentStream` → handoff to Reasoning Engine via `gearHandoff()`. `FirestoreProgressPlugin` writes progress + terminal state from inside the engine."
+- `CLAUDE.md` AND `AGENTS.md` § "Transport architecture" — collapse to a single-transport description: "Browser POSTs to `agentStream` → handoff to Reasoning Engine via `gearHandoff()`. `FirestoreProgressPlugin` writes progress + terminal state from inside the engine."
 - `.github/workflows/deploy.yml`
   - Drop the `deploy-worker` job entirely.
   - Drop `detect-changes` if it only feeds `deploy-worker`.
+  - Drop the `GEAR_REASONING_ENGINE_RESOURCE` line from the .env-write step IF the gear-handoff `DEFAULT_RESOURCE` constant is judged sufficient (or keep both; cheap belt-and-suspenders).
 - `agent/superextra_agent/firestore_progress.py` and `gear_run_state.py` — keep, these ARE the new runtime.
 
 **Verification gates:**
@@ -63,11 +66,11 @@ Single PR titled `chore(gear): phase 9 — decommission worker codepath`. Branch
 - `npm run test:rules` — unchanged (rules don't reference fields).
 - `npm run check` — 0 errors.
 
-Merge this PR ONLY after Stage 2 below has been planned (do not delete worker source while a deployed worker still exists).
+**Merge order (CRITICAL):** Stage 1 PR must merge AND deploy successfully BEFORE Stage 2's `gcloud run services delete` runs. The deployed agentStream still routes sticky `transport='cloudrun'` follow-ups via `enqueueRunTask` until the Stage 1 source ships; deleting the worker first would 404 those Cloud Tasks. The pre-flight gate ("zero new cloudrun sessions in last 7 days") gives strong protection but isn't atomic — the strict ordering closes the gap.
 
 ### Stage 2 — Cloud-side deletes (Adam runs gcloud)
 
-After Stage 1 PR is approved but BEFORE merging:
+After Stage 1 PR has merged AND the Cloud Functions deploy completes successfully (verify `gcloud run services describe agentstream --region=us-central1` shows the new revision serving 100% traffic), AND `gcloud logging read` shows zero `enqueueRunTask` calls for ≥30 min:
 
 ```bash
 # 1. Snapshot Firestore (required for the rollback story)
@@ -99,11 +102,11 @@ gcloud iam service-accounts delete \
   --quiet
 ```
 
-Once step 2 succeeds and zero errors fire from agentStream for ≥30 min, merge the Stage 1 PR.
+After Stage 2 step 2, the only path that could attempt to route to the deleted worker is a sticky-cloudrun follow-up — but the Stage 1 source no longer has the `transport === 'cloudrun'` branch, so even a sticky follow-up routes via `gearHandoff` to the Reasoning Engine. The pre-flight gate ("no active sticky-cloudrun sessions") + the source-side branch removal gives belt-and-suspenders containment.
 
 ### Stage 3 — Firestore field migration
 
-Run `scripts/phase9_field_migration.py` AFTER the Stage 1 PR is deployed (so no new docs get the legacy fields written back).
+Run `scripts/phase9_field_migration.py` AFTER Stage 2 completes (worker gone, no chance of new legacy-field writes).
 
 ```bash
 # Dry-run first — confirm count + sample looks right
@@ -115,7 +118,7 @@ GOOGLE_APPLICATION_CREDENTIALS=... GOOGLE_CLOUD_PROJECT=superextra-site \
   .venv/bin/python scripts/phase9_field_migration.py --apply
 ```
 
-The script strips `currentAttempt`, `currentWorkerId`, and `transport` from every `sessions/*` doc. Idempotent — re-run if interrupted. Today's dry-run reports 29 sessions need cleanup (all complete state, no in-flight risk).
+The script strips `adkSessionId`, `currentAttempt`, `currentWorkerId`, and `transport` from every `sessions/*` doc. Idempotent — re-run if interrupted. Latest dry-run (2026-04-28) reports 33 sessions need cleanup. Note: `transport` is a deviation from plan §9 (which only listed `adkSessionId`/`currentAttempt`/`currentWorkerId`); included here because the field becomes vestigial once the cloudrun branch is gone, and leaving it would just confuse future readers.
 
 ### Stage 4 — agent/probe/ archival (optional)
 

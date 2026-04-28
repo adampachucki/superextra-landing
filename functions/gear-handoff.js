@@ -50,8 +50,23 @@ export const HANDOFF_DEADLINE_MS = 75_000;
  */
 const DEFAULT_RESOURCE =
 	'projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288';
+
+// Cold-start guard: warn once per container when the env var is missing
+// and the default fires. If the GHA env-var plumbing breaks again (the
+// 2026-04-27 incident), this surfaces in Cloud Logging at deploy-then-
+// first-request time instead of staying silent.
+let _warnedAboutDefault = false;
 function getResource() {
-	return process.env.GEAR_REASONING_ENGINE_RESOURCE || DEFAULT_RESOURCE;
+	const fromEnv = process.env.GEAR_REASONING_ENGINE_RESOURCE;
+	if (!fromEnv && !_warnedAboutDefault) {
+		_warnedAboutDefault = true;
+		console.warn(
+			'GEAR_REASONING_ENGINE_RESOURCE env var is unset — falling back to ' +
+				'hardcoded DEFAULT_RESOURCE. Check .github/workflows/deploy.yml writes ' +
+				'this var to functions/.env.superextra-site.'
+		);
+	}
+	return fromEnv || DEFAULT_RESOURCE;
 }
 
 let _auth = null;

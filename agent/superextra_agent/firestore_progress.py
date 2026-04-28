@@ -353,6 +353,17 @@ class FirestoreProgressPlugin(BasePlugin):
             #      catch any stuck state at the 5-min lastEventAt fence.
             # Halting here was the wrong choice — it killed the legacy
             # cloudrun path the moment the plugin landed globally on App.
+            #
+            # The warning is the only signal that distinguishes case 1
+            # (expected, every legacy cloudrun run) from case 2 (a real
+            # gear-handoff bug). Cloud Logging filter to find case 2:
+            # `text:"plugin no-op" AND resource.labels.service_name="superextra-worker" -- nope, that'd be case 1`
+            # use Reasoning Engine logs instead — the warning fires from
+            # inside the engine when the handoff is malformed.
+            log.warning(
+                "plugin no-op: session.state has no runId — legacy worker "
+                "invocation (expected) OR malformed gear handoff (bug)"
+            )
             return None
 
         try:

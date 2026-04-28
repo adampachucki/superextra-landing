@@ -1,12 +1,20 @@
-"""Phase 9 Firestore field migration — drop legacy fence fields.
+"""Phase 9 Firestore field migration — drop legacy fence + cloudrun-only fields.
 
 Run AFTER the legacy Cloud Run worker is decommissioned. Strips the
 following fields from every `sessions/*` doc:
 
+  - adkSessionId — Vertex Agent Engine session id; legacy worker
+    creates/persists it on cloudrun runs. Gear uses the ADK session
+    object directly via the Reasoning Engine `:createSession` /
+    `:appendEvent` API, so the Firestore-side mirror becomes vestigial.
+    Plan §9 explicitly listed this field for cleanup.
   - currentAttempt — Cloud-Tasks-takeover counter, never read by gear
   - currentWorkerId — worker identity for the legacy fence, never used by gear
   - transport — sticky-per-session selector; collapses to gear-only after
-    Phase 9, so the field becomes vestigial
+    Phase 9, so the field becomes vestigial. (Plan §9 deviation: the
+    original plan didn't list `transport` here because the field was
+    introduced later in the migration; including it now keeps the
+    schema clean.)
 
 The script is idempotent: deleting a missing field is a no-op. Safe to
 re-run if interrupted.
@@ -42,7 +50,7 @@ from google.cloud import firestore
 
 
 PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "superextra-site")
-LEGACY_FIELDS = ("currentAttempt", "currentWorkerId", "transport")
+LEGACY_FIELDS = ("adkSessionId", "currentAttempt", "currentWorkerId", "transport")
 BATCH_LIMIT = 400  # Firestore batched writes cap at 500; leave headroom.
 
 
