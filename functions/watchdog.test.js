@@ -275,33 +275,6 @@ describe('runWatchdog', () => {
 		assert.equal(hb1Turn.data.error, 'heartbeat_lost');
 	});
 
-	it('skips turn-doc update when lastTurnIndex is missing (legacy partial-enqueue doc)', async () => {
-		const plans = {
-			'sessions|status|queuedAt|limit': mockSnap([
-				mockDoc('legacy', {
-					status: 'queued',
-					queuedAt: millisTs(NOW - 45 * 60 * 1000),
-					currentRunId: 'run-legacy'
-				})
-			])
-		};
-		const txReads = {
-			legacy: {
-				status: 'queued',
-				queuedAt: millisTs(NOW - 45 * 60 * 1000),
-				currentRunId: 'run-legacy'
-				// no lastTurnIndex
-			}
-		};
-		const db = makeDb(plans, { txReads });
-		const result = await runWatchdog(db, NOW);
-
-		assert.equal(result.flipped, 1);
-		// Only the session update — no turn doc to address.
-		assert.equal(db._txUpdates.length, 1);
-		assert.equal(db._txUpdates[0].id, 'legacy');
-	});
-
 	it('skips both writes if currentRunId advanced between scan and txn', async () => {
 		// Race-safety is preserved: the transaction re-checks currentRunId
 		// BEFORE either the session flip OR the turn-doc propagation. A

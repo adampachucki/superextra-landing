@@ -202,7 +202,6 @@ async def _emit_note_task(
     query_text: str,
     input_text: str,
     counts_snapshot: dict[str, int],
-    live_only: bool = False,
 ) -> None:
     if writer.closed:
         return
@@ -218,7 +217,6 @@ async def _emit_note_task(
         if not _notes_llm_disabled() and text != _deterministic_note(milestone)
         else "deterministic",
         counts=counts_snapshot,
-        live_only=live_only,
     )
     if note is not None:
         await writer.write_timeline(note)
