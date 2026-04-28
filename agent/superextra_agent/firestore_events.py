@@ -230,10 +230,17 @@ def _map_synth_complete(event: Any) -> dict[str, Any] | None:
         return None
 
     reply: str | None = None
-    if _has_state_delta(event, "final_report"):
-        candidate = _state_delta(event).get("final_report")
-        if isinstance(candidate, str) and candidate.strip():
-            reply = candidate
+    # `final_report_followup` is the follow-up agent's output_key (kept
+    # distinct so a follow-up reply doesn't clobber the original report
+    # in session state). `final_report` is the synthesizer's. Each event
+    # carries at most one of them in its state delta — same turn, same
+    # author — so checking both is collision-free.
+    for key in ("final_report_followup", "final_report"):
+        if _has_state_delta(event, key):
+            candidate = _state_delta(event).get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                reply = candidate
+                break
 
     if reply is None:
         text = _collect_text(event).strip()

@@ -4,16 +4,22 @@
 // in code. (Deployed as `watchdog` Cloud Run function + Cloud Scheduler job
 // via firebase-functions v2 `onSchedule`.)
 //
-// Thresholds (plan §Phase 7.5):
-//   - queued > 30 min   → queue_dispatch_timeout
-//   - running, heartbeat silent > 10 min → worker_lost
-//   - running, lastEventAt > 5 min → pipeline_wedged (heartbeat fresh but no
-//     ADK events — specialist stuck on a hung tool call, etc.)
+// Thresholds (gear-only post-Phase-9):
+//   - queued > 5 min → handoff_start_timeout. agentStream's gearHandoff
+//     normally claims the run within seconds (the plugin's
+//     `claim_invocation` flips queued → running). 5 min is generous —
+//     anything stuck queued past that means the plugin never claimed
+//     (malformed handoff, agentStream crashed mid-dispatch, etc.).
+//   - running, heartbeat silent > 10 min → heartbeat_lost. The plugin
+//     ticks `lastHeartbeat` every 30 s; 10 min of silence means the
+//     Reasoning Engine container crashed or got descheduled.
+//   - running, lastEventAt > 5 min → pipeline_wedged. Heartbeat fresh
+//     but no ADK events — specialist stuck on a hung tool call, etc.
 
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-const QUEUED_MAX_AGE_MS = 30 * 60 * 1000;
+const QUEUED_MAX_AGE_MS = 5 * 60 * 1000;
 const HEARTBEAT_MAX_AGE_MS = 10 * 60 * 1000;
 const LAST_EVENT_MAX_AGE_MS = 5 * 60 * 1000;
 const BATCH_LIMIT = 100;
@@ -82,7 +88,7 @@ export async function findStuckSessions(db, nowMs = Date.now()) {
 		const d = doc.data();
 		const ageMs = nowMs - (toMillis(d.queuedAt) ?? nowMs);
 		classify(doc.id, {
-			reason: 'queue_dispatch_timeout',
+			reason: 'handoff_start_timeout',
 			errorDetails: { queuedAtAgeMs: ageMs },
 			expectedStatus: 'queued',
 			expectedRunId: d.currentRunId ?? null,
@@ -94,7 +100,7 @@ export async function findStuckSessions(db, nowMs = Date.now()) {
 		const d = doc.data();
 		const ageMs = nowMs - (toMillis(d.lastHeartbeat) ?? nowMs);
 		classify(doc.id, {
-			reason: 'worker_lost',
+			reason: 'heartbeat_lost',
 			errorDetails: { lastHeartbeatAgeMs: ageMs },
 			expectedStatus: 'running',
 			expectedRunId: d.currentRunId ?? null,

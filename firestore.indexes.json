@@ -1,16 +1,6 @@
 {
 	"indexes": [
 		{
-			"collectionGroup": "events",
-			"queryScope": "COLLECTION_GROUP",
-			"fields": [
-				{ "fieldPath": "userId", "order": "ASCENDING" },
-				{ "fieldPath": "runId", "order": "ASCENDING" },
-				{ "fieldPath": "attempt", "order": "ASCENDING" },
-				{ "fieldPath": "seqInAttempt", "order": "ASCENDING" }
-			]
-		},
-		{
 			"collectionGroup": "sessions",
 			"queryScope": "COLLECTION",
 			"fields": [

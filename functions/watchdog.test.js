@@ -135,7 +135,7 @@ function makeDb(plans, { txReads = {} } = {}) {
 const NOW = 1_000_000_000_000;
 
 describe('findStuckSessions', () => {
-	it('classifies queued-too-long as queue_dispatch_timeout', async () => {
+	it('classifies queued-too-long as handoff_start_timeout', async () => {
 		const plans = {
 			'sessions|status|queuedAt|limit': mockSnap([
 				mockDoc('sid-1', {
@@ -148,11 +148,11 @@ describe('findStuckSessions', () => {
 		const out = await findStuckSessions(db, NOW);
 		assert.equal(out.length, 1);
 		assert.equal(out[0].sid, 'sid-1');
-		assert.equal(out[0].reason, 'queue_dispatch_timeout');
+		assert.equal(out[0].reason, 'handoff_start_timeout');
 		assert.equal(out[0].errorDetails.queuedAtAgeMs, 45 * 60 * 1000);
 	});
 
-	it('classifies stale-heartbeat running session as worker_lost', async () => {
+	it('classifies stale-heartbeat running session as heartbeat_lost', async () => {
 		const plans = {
 			'sessions|status|lastHeartbeat|limit': mockSnap([
 				mockDoc('sid-hb', {
@@ -164,7 +164,7 @@ describe('findStuckSessions', () => {
 		const db = makeDb(plans);
 		const out = await findStuckSessions(db, NOW);
 		assert.equal(out.length, 1);
-		assert.equal(out[0].reason, 'worker_lost');
+		assert.equal(out[0].reason, 'heartbeat_lost');
 	});
 
 	it('classifies wedged pipeline (fresh heartbeat, stale lastEventAt) as pipeline_wedged', async () => {
@@ -196,7 +196,7 @@ describe('findStuckSessions', () => {
 		const db = makeDb(plans);
 		const out = await findStuckSessions(db, NOW);
 		assert.equal(out.length, 1);
-		assert.equal(out[0].reason, 'queue_dispatch_timeout');
+		assert.equal(out[0].reason, 'handoff_start_timeout');
 	});
 
 	it('returns empty list when nothing is stuck', async () => {
@@ -259,11 +259,11 @@ describe('runWatchdog', () => {
 		const q1 = sessionUpdates.find((u) => u.id === 'q1');
 		const hb1 = sessionUpdates.find((u) => u.id === 'hb1');
 		assert.equal(q1.data.status, 'error');
-		assert.equal(q1.data.error, 'queue_dispatch_timeout');
+		assert.equal(q1.data.error, 'handoff_start_timeout');
 		// Session bump carries updatedAt sentinel so the sidebar reorders.
 		assert.equal(q1.data.updatedAt, '__server_timestamp__');
 		assert.equal(hb1.data.status, 'error');
-		assert.equal(hb1.data.error, 'worker_lost');
+		assert.equal(hb1.data.error, 'heartbeat_lost');
 		assert.equal(hb1.data.updatedAt, '__server_timestamp__');
 
 		// Turn doc propagation — status + error reason match the session.
@@ -272,9 +272,9 @@ describe('runWatchdog', () => {
 		assert.ok(q1Turn, 'expected q1 turn doc update at turnIdx=1');
 		assert.ok(hb1Turn, 'expected hb1 turn doc update at turnIdx=2');
 		assert.equal(q1Turn.data.status, 'error');
-		assert.equal(q1Turn.data.error, 'queue_dispatch_timeout');
+		assert.equal(q1Turn.data.error, 'handoff_start_timeout');
 		assert.equal(hb1Turn.data.status, 'error');
-		assert.equal(hb1Turn.data.error, 'worker_lost');
+		assert.equal(hb1Turn.data.error, 'heartbeat_lost');
 	});
 
 	it('skips turn-doc update when lastTurnIndex is missing (legacy partial-enqueue doc)', async () => {
