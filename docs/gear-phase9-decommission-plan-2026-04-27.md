@@ -14,7 +14,7 @@ What we did instead, all on 2026-04-27:
 - Side-by-side quality drill on a substantive prompt (`Le Vintage Brussels` brasserie comparison): gear `6058 chars / 32 sources / structured analysis with chart`, cloudrun `6393 chars / 13 sources / parallel structure`. Quality parity confirmed.
 - Watchdog verified end-to-end with an injected stuck Firestore session (`worker_lost` flip in 76s).
 - Two production regressions caught + fixed during the same drills (env-var stripping, plugin halting cloudrun) — exactly the kind of issues a real soak would have found.
-- Cost baseline script in place (`agent/probe/cost_baseline.py`) with documented project-level visibility limits for the gear side.
+- Cost baseline script in place at `scripts/cost_baseline.py` (already moved out of `agent/probe/` in PR #16) with documented project-level visibility limits for the gear side.
 
 Without users, additional calendar time gives us nothing the active drills haven't already given us. Phase 9 executes today.
 
@@ -40,7 +40,7 @@ Single PR titled `chore(gear): phase 9 — decommission worker codepath`. Branch
 - `agent/worker_main.py` (~921 lines) — the legacy ADK pipeline runner
 - `agent/tests/test_worker_main.py` (~1773 lines) — its tests
 - `agent/tests/e2e_worker_live.py` — also imports `worker_main`; becomes dead after the worker source is gone
-- `agent/probe/` directory entirely (~1721 lines) — R3 probe scripts that shipped with the migration. **Move `agent/probe/cost_baseline.py` → `scripts/cost_baseline.py` BEFORE the directory delete** so the post-Phase-9 cost-monitoring tool survives. Update its docstring to reference its new path.
+- `agent/probe/` directory entirely (~1600 lines remaining; `cost_baseline.py` was already moved to `scripts/cost_baseline.py` in PR #16, so it survives the delete).
 - `agent/Dockerfile` — only purpose is to build the worker image; if `cloudbuild.yaml` exists for the worker, also delete
 - `spikes/skeletons/worker_main.py` — historic spike, leftover
 
@@ -66,10 +66,13 @@ Single PR titled `chore(gear): phase 9 — decommission worker codepath`. Branch
 - `CLAUDE.md` AND `AGENTS.md` § "Transport architecture" — collapse to a single-transport description: "Browser POSTs to `agentStream` → handoff to Reasoning Engine via `gearHandoff()`. `FirestoreProgressPlugin` writes progress + terminal state from inside the engine."
 - `.github/workflows/deploy.yml`
   - Drop the `deploy-worker` job entirely.
-  - Update `deploy-hosting.needs` from `[test, deploy-worker]` to `[test]` (verified: `.github/workflows/deploy.yml:102`). Forgetting this line will keep `deploy-hosting` blocked on a non-existent job.
+  - Update `deploy-hosting.needs` from `[test, deploy-worker]` to `[test]` (verified: `.github/workflows/deploy.yml:102`). Forgetting this leaves `deploy-hosting` blocked on a non-existent job.
+  - **Strip the `if:` guard at lines 103-106.** It currently reads `always() && needs.test.result == 'success' && (needs.deploy-worker.result == 'success' || needs.deploy-worker.result == 'skipped')`. After `deploy-worker` is gone, `needs.deploy-worker.result` evaluates to null; both equality checks return false; the whole guard becomes false; **deploy-hosting silently never runs**. Replace with a minimal guard like `if: needs.test.result == 'success'` or drop the conditional entirely (the implicit job-success-required behavior covers it). This is the load-bearing fix — without it, the next push to main quietly stops deploying. Stage 1 CI would still pass (CI runs tests, doesn't deploy), so the failure surfaces only after merge.
+  - Strip the cosmetic `deploy-worker` references in the explanatory comments at lines 98-100 and ~129. They confuse future readers AND would trip the "Done means" `cat` check.
   - Drop `detect-changes` if it only feeds `deploy-worker`.
   - Keep the `GEAR_REASONING_ENGINE_RESOURCE` line in the .env-write step. Belt-and-suspenders with `gear-handoff.js`'s `DEFAULT_RESOURCE` is cheap; future engine recreation only needs the workflow line updated.
 - `agent/superextra_agent/firestore_progress.py` and `gear_run_state.py` — keep, these ARE the new runtime. Also keep the `runId`-missing no-op branch + its log warning (case 2 — malformed gear handoff — is still a real failure mode worth surfacing, even with the legacy worker gone).
+- **Strip `worker_main.py` mirror-comments from kept gear runtime files.** The migration era left "Mirrors `worker_main.py:NNN`" line-number cross-references in `firestore_progress.py`, `gear_run_state.py`, `notes.py`, and `timeline.py` (verified by `grep -n worker_main agent/superextra_agent/*.py`). They were useful while both implementations coexisted; after Phase 9 they're broken pointers that only confuse readers. Same edit incidentally cleans the "Done means" greps so they don't false-positive on educational text. (Root-cause simplification, not pattern-tweaking.)
 - `docs/deployment-gotchas.md` — two changes here, not just one. (a) **Strip** the now-stale "Cloud Run worker (`superextra-worker`)" section (lines 11-39) and the "Cloud Tasks + OIDC" section (lines 40-64) — both describe a service that no longer exists. (b) **Add** a short entry capturing the `firebase deploy REPLACES env vars (does not merge)` finding from PR #11. ~5 lines. Future agent sessions otherwise rediscover both the missing-context AND the env-var trap the hard way.
 - `docs/gear-stage-a-test-plan-2026-04-27.md` — append a one-paragraph retrospective: "any 'X is contained' smoke must verify the contained X actually works end-to-end (`status='complete'`), not just that routing landed (`status='running'`)." Smoke 5 demonstrated the cost of skipping that — the cloudrun-broken-by-plugin regression sat undetected for hours because the smoke only checked routing.
 - `agent/probe/` — `git tag gear-migration-probes-archive HEAD` AND `git push origin gear-migration-probes-archive` BEFORE this PR's `agent/probe/` delete commit. The probe scripts proved R3.x's post-disconnect contract during the migration; tag preserves the audit trail at zero cost.
@@ -83,7 +86,7 @@ Single PR titled `chore(gear): phase 9 — decommission worker codepath`. Branch
 - `npm run test:rules` — unchanged (rules don't reference fields).
 - `npm run check` — 0 errors.
 
-**Merge order (CRITICAL):** Stage 1 PR must merge AND deploy successfully BEFORE Stage 2's `gcloud run services delete` runs. The deployed agentStream still routes sticky `transport='cloudrun'` follow-ups via `enqueueRunTask` until the Stage 1 source ships; deleting the worker first would 404 those Cloud Tasks. The pre-flight gate ("zero new cloudrun sessions in last 7 days") gives strong protection but isn't atomic — the strict ordering closes the gap.
+**Merge order (CRITICAL):** Stage 1 PR must merge AND deploy successfully BEFORE Stage 2's `gcloud run services delete` runs. The deployed agentStream still routes sticky `transport='cloudrun'` follow-ups via `enqueueRunTask` until the Stage 1 source ships; deleting the worker first would 404 those Cloud Tasks. The pre-flight worker-idle gate ("no worker POSTs in last 30 min") gives strong protection but isn't atomic — the strict ordering closes the gap.
 
 ### Stage 2 — Cloud-side deletes (Adam runs gcloud)
 
@@ -183,8 +186,8 @@ Quoting the reviewer's framing — "Done means: no cloudrun branch, no transport
 
 Verification at end-of-Phase-9:
 
-- `grep -rn 'cloudrun\|enqueueRunTask\|chooseInitialTransport\|GEAR_DEFAULT\|GEAR_ALLOWLIST' functions/ agent/superextra_agent/` returns no matches in source. (Comments are fine; active code references would be a bug. Scope expanded from `functions/` because gear-side code in `agent/superextra_agent/` would otherwise pass the check falsely.)
-- `grep -rn 'transport\|adkSessionId\|currentAttempt\|currentWorkerId' functions/ agent/superextra_agent/` returns no matches in source.
+- `grep -rn 'enqueueRunTask\|chooseInitialTransport\|GEAR_DEFAULT\|GEAR_ALLOWLIST\|adkSessionId\|currentAttempt\|currentWorkerId\|worker_main' functions/ agent/superextra_agent/` returns no matches. (Distinct identifier names with no benign collisions. The previously-included `cloudrun` and `transport` are dropped because they collide with legitimate generic vocabulary — `transport` appears in `tripadvisor_tools.py` for SerpAPI transport errors, etc. The Stage 1 comment-stripping step removes the only false-positive we cared about: `worker_main.py:NNN` cross-references in kept runtime files.)
+- `grep -c '^  deploy-worker:' .github/workflows/deploy.yml` returns 0. (Concrete pattern — top-level YAML key with two-space indent. Cosmetic comment matches are fine; the comment-stripping step in Stage 1 already cleans those.)
 - `gcloud run services list --project=superextra-site` does not list `superextra-worker`.
 - `gcloud tasks queues list --location=us-central1 --project=superextra-site` does not list `agent-dispatch`.
 - `gcloud iam service-accounts list --project=superextra-site` does not list `superextra-worker@...`.
