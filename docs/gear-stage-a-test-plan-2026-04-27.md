@@ -242,3 +242,15 @@ Documented for clarity; revisit at Phase 9 cleanup or a future iteration:
 - **Watchdog manual trigger** — assumed working; observable through Phase 2 if any stuck sessions appear.
 - **End-to-end gear path under high concurrency** — Stage A is single-user (allowlisted operator); concurrency surface is exercised at Stage B default flip, not here.
 - **Memory Bank integration** — explicitly deferred per the implementation plan.
+
+---
+
+## Retrospective (2026-04-28)
+
+One process scar from this plan worth recording:
+
+**Any "X is contained" smoke must verify the contained X actually works end-to-end (`status='complete'`), not just that routing landed (`status='running'`).**
+
+Smoke 5 ("non-allowlisted control") asserted only that a non-allowlisted submission landed at `transport='cloudrun'` and reached `status='running'` on the legacy worker. It did NOT wait for `status='complete'`. Result: when the global plugin registration in `agent/superextra_agent/agent.py` started shorting the worker pipeline (the `runId`-missing halt-content path), the regression sat undetected for hours. Smoke 5 passed; cloudrun was actually broken.
+
+Going forward, any "containment" smoke gets the same finish criteria as the happy path: terminal state with the expected reply shape. The cost (a few extra minutes per smoke) is small relative to discovering a silently-broken rollback path mid-incident.

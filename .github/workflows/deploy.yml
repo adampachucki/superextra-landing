@@ -6,33 +6,14 @@ on:
 
 # Opt JavaScript actions into Node 24 ahead of the 2026-06-02 forced switch.
 # Without this, GitHub emits deprecation warnings for every step that still
-# uses a Node-20-compiled action (checkout, paths-filter, setup-*, auth,
-# download/upload-artifact). The actions themselves run the same — only the
-# Node runtime invoking them changes.
+# uses a Node-20-compiled action (checkout, setup-*, auth, download/upload-
+# artifact). The actions themselves run the same — only the Node runtime
+# invoking them changes.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      agent: ${{ steps.filter.outputs.agent }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            agent:
-              - 'agent/superextra_agent/**'
-              - 'agent/worker_main.py'
-              - 'agent/Dockerfile'
-              - 'agent/requirements.txt'
-              - '.github/workflows/deploy.yml'
-
   test:
-    needs: detect-changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -74,36 +55,20 @@ jobs:
       - run: cd functions && npm ci
       - run: cd functions && npm test
 
-      - name: Authenticate to Google Cloud (for agent tests)
-        if: needs.detect-changes.outputs.agent == 'true'
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SUPEREXTRA_SITE }}
-
       - uses: actions/setup-python@v5
-        if: needs.detect-changes.outputs.agent == 'true'
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: agent/requirements-dev.txt
 
       - name: Run agent tests
-        if: needs.detect-changes.outputs.agent == 'true'
         run: |
           cd agent
           pip install -r requirements-dev.txt
           PYTHONPATH=. pytest tests/ -v
 
   deploy-hosting:
-    # Waits for deploy-worker when it runs (agent changed) so agentStream
-    # can't enqueue to a Cloud Run service that doesn't exist yet. When
-    # deploy-worker is skipped (agent unchanged), hosting proceeds normally.
-    # See docs/pipeline-decoupling-fixes-plan.md §Tier 1.5.
-    needs: [test, deploy-worker]
-    if: |
-      always()
-      && needs.test.result == 'success'
-      && (needs.deploy-worker.result == 'success' || needs.deploy-worker.result == 'skipped')
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -126,216 +91,28 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SUPEREXTRA_SITE }}
 
-      # Guards against infra drift: deploy-worker may have been skipped
-      # (agent unchanged), but the worker service could still be missing
-      # (manually deleted, region mismatch, etc.). A cheap read-only
-      # describe fails the job fast before we ship hosting + functions
-      # that would enqueue to a phantom URL.
-      - uses: google-github-actions/setup-gcloud@v2
-
-      # Guards against infra drift AND captures the authoritative worker URL
-      # to hand to Cloud Functions at deploy time. Cloud Run URL format is
-      # `<service>-<project-hash>-<region-short>.a.run.app` in this project;
-      # the hash is project-stable but not documented as guaranteed, so we
-      # read the real URL from the service resource rather than hardcoding.
-      - name: Verify worker service exists and capture URL
-        id: worker_url
-        run: |
-          set -euo pipefail
-          URL=$(gcloud run services describe superextra-worker \
-            --region=us-central1 \
-            --project=superextra-site \
-            --format='value(status.url)' 2>/dev/null || true)
-          if [ -z "$URL" ]; then
-            echo "::error::superextra-worker Cloud Run service is missing. Deploy it first (see docs/deployment-gotchas.md)."
-            exit 1
-          fi
-          echo "✓ worker service exists at $URL"
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-
       - run: cd functions && npm ci
 
       # firebase-functions v2 loads `.env.<projectId>` into process.env at
       # deploy time AND `firebase deploy` REPLACES the deployed function's
       # env vars with whatever the .env file declares. So every var the
       # function needs at runtime must be in this file at deploy time —
-      # anything missing gets stripped on each deploy. WORKER_URL depends on
-      # the live Cloud Run hash so we read it dynamically; the rest are
-      # static project-level constants.
-      - name: Write functions .env (WORKER_URL + GEAR resource)
+      # anything missing gets stripped on each deploy.
+      - name: Write functions .env (GEAR resource)
         run: |
-          {
-            echo "WORKER_URL=${{ steps.worker_url.outputs.url }}"
-            echo "GEAR_REASONING_ENGINE_RESOURCE=projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288"
-          } > functions/.env.superextra-site
+          echo "GEAR_REASONING_ENGINE_RESOURCE=projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288" \
+            > functions/.env.superextra-site
           echo "✓ wrote functions/.env.superextra-site:"
           cat functions/.env.superextra-site | sed 's/=.*/=***/'
 
       # Single firebase-tools deploy for hosting + functions + firestore
       # rules + indexes. Separate `--only hosting` then `--only functions`
       # calls create a cutover window where the new frontend JS is live but
-      # the old agentStream (SSE) is still running. The new client expects
-      # JSON { sessionId, runId } from agentStream (firestore-stream.ts
-      # `postAgentStream`) and throws `malformed_response` on an SSE body.
-      # Deploying all four targets in one invocation minimises that window.
-      # `--only` accepts comma-separated targets per firebase-tools docs.
+      # the old agentStream is still running. Deploying all four targets
+      # in one invocation minimises that window.
       - name: Deploy Firebase Hosting + Functions + Firestore rules + indexes
         run: |
           npx firebase-tools deploy \
             --only hosting,functions,firestore:rules,firestore:indexes \
             --project superextra-site \
             --force
-
-  deploy-worker:
-    needs: [detect-changes, test]
-    if: needs.detect-changes.outputs.agent == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SUPEREXTRA_SITE }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-
-      - name: Snapshot current revision
-        id: snapshot
-        run: |
-          BEFORE=$(gcloud run revisions list \
-            --service=superextra-worker \
-            --region=us-central1 \
-            --project=superextra-site \
-            --limit=1 \
-            --format="value(metadata.name)" 2>/dev/null || echo "none")
-          echo "before=$BEFORE" >> "$GITHUB_OUTPUT"
-
-      # Deploy the worker from source using our hand-rolled Dockerfile.
-      # Replaces the old `adk deploy cloud_run` flow (which silently swallowed
-      # gcloud failures — see docs/deployment-gotchas.md).
-      #
-      # Cloud Run config pinned to plan §Phase 3:
-      #   --timeout=1790         : Cloud Run cancels at 1790 s; Cloud Tasks
-      #                            dispatch-deadline is 1800 s, so the worker
-      #                            always exits before Cloud Tasks gives up
-      #                            on the dispatch (spike H verdict).
-      #   --concurrency=1        : single request per instance. The worker
-      #                            tracks per-request state (heartbeat task,
-      #                            current sid/attempt/workerId) in module
-      #                            globals that are NOT safe under parallel
-      #                            requests on one instance. Cloud Run docs
-      #                            explicitly call this out: "If your code
-      #                            cannot handle parallel requests, set the
-      #                            maximum concurrency to 1." Scaling out via
-      #                            max-instances=10 is unaffected.
-      #   --no-cpu-throttling    : CPU available outside active requests too,
-      #                            which the heartbeat task depends on.
-      #   --no-allow-unauthenticated : Cloud Run IAM gates all traffic; only
-      #                            Cloud Tasks (with OIDC) should reach /run.
-      - name: Deploy superextra-worker to Cloud Run
-        run: |
-          set -euo pipefail
-          gcloud run deploy superextra-worker \
-            --source=agent \
-            --region=us-central1 \
-            --project=superextra-site \
-            --service-account=superextra-worker@superextra-site.iam.gserviceaccount.com \
-            --no-cpu-throttling \
-            --timeout=1790 \
-            --memory=2Gi \
-            --min-instances=0 \
-            --max-instances=10 \
-            --concurrency=1 \
-            --no-allow-unauthenticated \
-            --update-env-vars="GOOGLE_CLOUD_PROJECT=superextra-site,GOOGLE_CLOUD_LOCATION=us-central1,GOOGLE_GENAI_USE_VERTEXAI=TRUE,AGENT_ENGINE_ID=2746721333428617216,GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }},SERPAPI_API_KEY=${{ secrets.SERPAPI_API_KEY }},APIFY_TOKEN=${{ secrets.APIFY_TOKEN }}"
-
-      # Verify a new revision actually shipped. gcloud's exit code is usually
-      # honest with `--source=` (unlike `adk deploy`), but keep the guard.
-      - name: Verify new revision deployed
-        run: |
-          set -euo pipefail
-          AFTER=$(gcloud run revisions list \
-            --service=superextra-worker \
-            --region=us-central1 \
-            --project=superextra-site \
-            --limit=1 \
-            --format="value(metadata.name)")
-          BEFORE="${{ steps.snapshot.outputs.before }}"
-          if [ "$BEFORE" = "$AFTER" ]; then
-            echo "::error::No new revision after deploy (stuck on $BEFORE)"
-            exit 1
-          fi
-          echo "✓ New revision: $AFTER (was $BEFORE)"
-
-      # Two run.invoker bindings on the private worker service:
-      #
-      #  1. The worker SA itself — so Cloud Tasks' OIDC tokens (minted as
-      #     the worker SA, audience = worker URL) are accepted by Cloud Run
-      #     at request time.
-      #  2. The currently-active GitHub Actions SA — so the smoke-test
-      #     step below can call `/healthz` with its own identity token.
-      #     Without this, Cloud Run returns 404 (obscured 403) on the
-      #     smoke request. Resolving the active SA at runtime keeps the
-      #     workflow robust if the auth SA changes.
-      #
-      # Both bindings are idempotent.
-      - name: Grant run.invoker on the worker service
-        run: |
-          set -euo pipefail
-          ACTIVE_SA=$(gcloud auth list --filter='status:ACTIVE' --format='value(account)' | head -1)
-          if [ -z "$ACTIVE_SA" ]; then
-            echo "::error::Could not determine active service account"
-            exit 1
-          fi
-          echo "Active SA: $ACTIVE_SA"
-          gcloud run services add-iam-policy-binding superextra-worker \
-            --region=us-central1 \
-            --project=superextra-site \
-            --member="serviceAccount:superextra-worker@superextra-site.iam.gserviceaccount.com" \
-            --role=roles/run.invoker
-          gcloud run services add-iam-policy-binding superextra-worker \
-            --region=us-central1 \
-            --project=superextra-site \
-            --member="serviceAccount:$ACTIVE_SA" \
-            --role=roles/run.invoker
-
-      # Smoke test: verify the service is Ready at the Cloud Run control
-      # plane. The earlier approach of `curl /healthz` with an identity token
-      # was brittle — a private Cloud Run service can return 404 at the
-      # frontend even with valid IAM + audience, for reasons that aren't
-      # observable from the caller (we saw this with the Firebase admin SA
-      # despite a verified run.invoker binding). The `Ready: True` condition
-      # already proves the container started and passed its startup probes,
-      # which is what a smoke check needs. Real end-to-end verification
-      # happens via the Cloud Tasks → /run path, which has its own IAM
-      # pathway (Cloud Tasks service agent mints tokens as the worker SA).
-      - name: Smoke test worker readiness
-        run: |
-          set -euo pipefail
-          sleep 5
-          # Cloud Run's `Ready` condition sits at conditions[0] — the gcloud
-          # projection language supports positional indexing reliably; the
-          # JMESPath filter form `conditions[?type=="Ready"]` was silently
-          # rejected by `--format=value(...)` and produced an empty string.
-          READ_LINE=$(gcloud run services describe superextra-worker \
-            --region=us-central1 \
-            --project=superextra-site \
-            --format='value(status.conditions[0].type,status.conditions[0].status)')
-          TYPE=$(echo "$READ_LINE" | cut -f1)
-          READY=$(echo "$READ_LINE" | cut -f2)
-          if [ "$TYPE" != "Ready" ] || [ "$READY" != "True" ]; then
-            echo "::error::Worker service conditions[0]=${TYPE}:${READY} (expected Ready:True)"
-            exit 1
-          fi
-          URL=$(gcloud run services describe superextra-worker \
-            --region=us-central1 \
-            --project=superextra-site \
-            --format='value(status.url)')
-          echo "✓ Worker Ready at $URL"
-
-  # The old `superextra-agent` Cloud Run service (from `adk deploy cloud_run`)
-  # is no longer deployed to. It can be manually deleted once all traffic has
-  # drained off the pre-migration code. Intentionally not automated here —
-  # the deletion is a one-time, destructive action that the operator should
-  # confirm by hand.

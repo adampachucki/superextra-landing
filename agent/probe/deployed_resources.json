@@ -1,7 +1,0 @@
-{
-  "lifecycle": "projects/907466498524/locations/us-central1/reasoningEngines/329317476414259200",
-  "event_shape": "projects/907466498524/locations/us-central1/reasoningEngines/8725153081739706368",
-  "kitchen": "projects/907466498524/locations/us-central1/reasoningEngines/3851695334971408384",
-  "gemini3": "projects/907466498524/locations/us-central1/reasoningEngines/886074980347936768",
-  "prod_shape": "projects/907466498524/locations/us-central1/reasoningEngines/7256416653263503360"
-}

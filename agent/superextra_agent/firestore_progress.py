@@ -1,7 +1,6 @@
 """`FirestoreProgressPlugin` — runs inside Vertex AI Agent Engine.
 
-Replaces the legacy Cloud Run worker (`worker_main.py`). For each
-root-runner invocation:
+For each root-runner invocation:
 
   - **before_run**: builds a ``GearRunState``, claims the run via fenced
     Firestore transaction (``status='queued' → 'running'``), spawns a
@@ -15,8 +14,7 @@ Three classes of write, three error semantics (plan §"Write-class taxonomy"):
 
   - **Critical** (claim, terminal): retried on transient Firestore errors;
     OwnershipLost surfaces immediately.
-  - **Heartbeat**: no inner retry — the 30 s tick interval IS the retry,
-    matching ``worker_main.py:438-449``.
+  - **Heartbeat**: no inner retry — the 30 s tick interval IS the retry.
   - **Best-effort** (timeline events, lastEventAt bumps): swallowed,
     logged; never halt the run.
 
@@ -67,8 +65,7 @@ def _claim_logic(
     """Predicates: session ``currentRunId == expected_run_id`` AND
     session ``status == 'queued'`` AND turn ``status == 'pending'``.
     On match: write session ``status='running'`` + heartbeat timestamps,
-    turn ``status='running'``. Mirrors ``worker_main.py:355-363`` with
-    GEAR's simpler fence keys."""
+    turn ``status='running'``."""
     snap = session_ref.get(transaction=txn)
     data = snap.to_dict() or {}
     if data.get("currentRunId") != expected_run_id:
@@ -121,7 +118,7 @@ def _fenced_logic(
     """Predicates: ``currentRunId == expected_run_id`` AND
     ``status == 'running'``. The status predicate prevents resurrecting a
     run that the watchdog or pre-handoff cleanup already flipped to
-    'error'. Mirrors ``worker_main.py:341`` no-op-on-terminal pattern.
+    'error'.
     """
     snap = session_ref.get(transaction=txn)
     data = snap.to_dict() or {}
@@ -217,9 +214,9 @@ HEARTBEAT_INTERVAL_S = 30
 
 
 async def _heartbeat_loop(fs: firestore.Client, state: GearRunState) -> None:
-    """30 s tick → fenced heartbeat write. Mirrors ``worker_main.py:434-451``.
-    Transient blips logged + continued; ``OwnershipLost`` exits cleanly.
-    Cancellation is silent (caller awaits with timeout in ``stop_heartbeat``).
+    """30 s tick → fenced heartbeat write. Transient blips logged + continued;
+    ``OwnershipLost`` exits cleanly. Cancellation is silent (caller awaits
+    with timeout in ``stop_heartbeat``).
     """
     try:
         while True:
@@ -341,28 +338,13 @@ class FirestoreProgressPlugin(BasePlugin):
         fs = self._client()
         state = _build_state(fs, invocation_context)
         if state is None:
-            # No gear-context runId in session.state. Two cases:
-            #   1. Legacy Cloud Run worker is running the same App — it
-            #      doesn't set runId into ADK session.state, so the plugin
-            #      simply has nothing to mirror. Returning None lets the
-            #      runner proceed normally; the worker writes progress
-            #      itself via its own Firestore writes.
-            #   2. A genuinely malformed gear handoff arrived without
-            #      runId. The agentStream txn upsert already wrote the
-            #      session doc with currentRunId, so the watchdog will
-            #      catch any stuck state at the 5-min lastEventAt fence.
-            # Halting here was the wrong choice — it killed the legacy
-            # cloudrun path the moment the plugin landed globally on App.
-            #
-            # The warning is the only signal that distinguishes case 1
-            # (expected, every legacy cloudrun run) from case 2 (a real
-            # gear-handoff bug). Cloud Logging filter to find case 2:
-            # `text:"plugin no-op" AND resource.labels.service_name="superextra-worker" -- nope, that'd be case 1`
-            # use Reasoning Engine logs instead — the warning fires from
-            # inside the engine when the handoff is malformed.
+            # Malformed handoff — agentStream's :appendEvent didn't put runId
+            # into session.state. The agentStream txn already wrote the
+            # session doc with currentRunId, so the watchdog will catch any
+            # stuck state at the 5-min lastEventAt fence. Warn so this surfaces
+            # in Reasoning Engine logs rather than being silent.
             log.warning(
-                "plugin no-op: session.state has no runId — legacy worker "
-                "invocation (expected) OR malformed gear handoff (bug)"
+                "plugin no-op: session.state has no runId — malformed gear handoff"
             )
             return None
 
@@ -457,7 +439,7 @@ class FirestoreProgressPlugin(BasePlugin):
         if per is None:
             return None
 
-        # Order matters and matches worker_main.py:1283 / :1328-1357:
+        # Order matters:
         #   1. stop_heartbeat — late ticks can't clobber the terminal write
         #   2. finalize — drains notes (with cancel-stragglers + gather),
         #      closes writer, awaits title with timeout, builds payload

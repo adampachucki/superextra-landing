@@ -95,10 +95,7 @@ export async function findStuckSessions(db, nowMs = Date.now()) {
 		const ageMs = nowMs - (toMillis(d.lastHeartbeat) ?? nowMs);
 		classify(doc.id, {
 			reason: 'worker_lost',
-			errorDetails: {
-				lastHeartbeatAgeMs: ageMs,
-				currentAttempt: d.currentAttempt ?? null
-			},
+			errorDetails: { lastHeartbeatAgeMs: ageMs },
 			expectedStatus: 'running',
 			expectedRunId: d.currentRunId ?? null,
 			thresholdField: 'lastHeartbeat',
@@ -110,10 +107,7 @@ export async function findStuckSessions(db, nowMs = Date.now()) {
 		const ageMs = nowMs - (toMillis(d.lastEventAt) ?? nowMs);
 		classify(doc.id, {
 			reason: 'pipeline_wedged',
-			errorDetails: {
-				lastEventAgeMs: ageMs,
-				currentAttempt: d.currentAttempt ?? null
-			},
+			errorDetails: { lastEventAgeMs: ageMs },
 			expectedStatus: 'running',
 			expectedRunId: d.currentRunId ?? null,
 			thresholdField: 'lastEventAt',
