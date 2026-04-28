@@ -60,6 +60,11 @@
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
 		<a
 			href="/"
+			onclick={(e) => {
+				if (!minimal) return;
+				e.preventDefault();
+				window.scrollTo({ top: 0, behavior: 'smooth' });
+			}}
 			class="group flex items-center gap-0 transition-colors md:gap-0.5 {over
 				? 'text-white'
 				: 'text-black dark:text-white'}"
