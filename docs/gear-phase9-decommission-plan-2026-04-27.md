@@ -1,5 +1,7 @@
 # GEAR migration — Phase 9 decommission plan
 
+> **Status: EXECUTED 2026-04-28.** All four stages shipped. See `docs/gear-migration-execution-log-2026-04-27.md` § "2026-04-28 closeout" for the actual outcome (Stage 1 in PR #18, Stage 2 cloud deletes, Stage 3 field migration on 33 sessions, Stage 4 post-flight smoke at sid `4acf92e3-...`). This plan is preserved as historical record of the executed runbook.
+
 **Date drafted:** 2026-04-27
 **Execution:** 2026-04-28 (compressed — see "Compression rationale" below)
 **Owner:** Adam (with agent-side help on the source-side cleanup + migration)
