@@ -4,7 +4,7 @@ rules_version = '2';
 // - `get` on session/turn/event paths: open to any signed-in visitor.
 // - `list` on /sessions: constrained to participants (query must include
 //   `where('participants', 'array-contains', uid)`).
-// - All writes server-only via Admin SDK (Cloud Functions + worker).
+// - All writes server-only via Admin SDK (Cloud Functions + Reasoning Engine plugin).
 service cloud.firestore {
   match /databases/{database}/documents {
     match /sessions/{sid} {

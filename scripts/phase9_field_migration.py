@@ -1,5 +1,12 @@
 """Phase 9 Firestore field migration — drop legacy fence + cloudrun-only fields.
 
+**Status: applied 2026-04-28.** All session docs in production were
+cleaned in Stage 3 of the Phase 9 decommission. The script remains
+in tree as an idempotent re-runnable safety net (re-running on a clean
+schema is a no-op: 0 sessions need cleanup). Don't delete it during
+post-Phase-9 sweeps — if a future Cloud Functions revision somehow
+writes one of these fields back, the script is the recovery tool.
+
 Run AFTER the legacy Cloud Run worker is decommissioned. Strips the
 following fields from every `sessions/*` doc:
 

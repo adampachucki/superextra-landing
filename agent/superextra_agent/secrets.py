@@ -1,19 +1,14 @@
 """Runtime secret resolution: env first, Secret Manager fallback.
 
-Two runtimes coexist through the GEAR rollback window:
+Vertex AI Agent Engine reserves env-var space, so the agent can't get
+secrets through env vars at runtime. The Reasoning Engine SA
+(`service-907466498524@gcp-sa-aiplatform-re...`) has
+`secretmanager.secretAccessor` granted, so this module reads
+`APIFY_TOKEN`, `GOOGLE_PLACES_API_KEY`, `SERPAPI_API_KEY` from Secret
+Manager when the env var is missing.
 
-- **Cloud Run worker** has secrets injected as Cloud Run env vars by
-  `.github/workflows/deploy.yml` (`APIFY_TOKEN`, `GOOGLE_PLACES_API_KEY`,
-  `SERPAPI_API_KEY`). The worker's service account has no
-  `secretmanager.secretAccessor` grant — env-first is the only path.
-- **Agent Runtime (gear)** has no way to inject secrets as env vars; the
-  platform reserves env-var space. The runtime SA
-  (`service-907466498524@gcp-sa-aiplatform-re...`) has
-  `secretmanager.secretAccessor` granted in Phase 1 and reads secrets
-  from Secret Manager at runtime.
-
-Local dev and CI also use env vars (from `agent/.env` or GHA secrets).
-Env-first means zero IAM changes to the rollback path.
+Local dev and CI use env vars (from `agent/.env` or GHA secrets); the
+env-first ordering means dev iterates without touching Secret Manager.
 """
 
 from __future__ import annotations

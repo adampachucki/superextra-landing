@@ -108,7 +108,7 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 
 // row, esc, confirmationHtml imported from ./utils.js
 
-// --- Agent chat endpoint (enqueues work to Cloud Tasks → superextra-worker) ---
+// --- Agent chat endpoint (hands off directly to Vertex AI Agent Engine) ---
 
 const rateLimitMap = new Map();
 const uidRateLimitMap = new Map();
@@ -252,7 +252,8 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 			}
 
 			// Create the turn doc in the same transaction so sidebar readers
-			// and the worker see a consistent lastTurnIndex → turn-doc pairing.
+			// and the Reasoning Engine plugin see a consistent
+			// lastTurnIndex → turn-doc pairing.
 			const turnKey = String(newTurnIdx).padStart(4, '0');
 			const turnRef = sessionRef.collection('turns').doc(turnKey);
 			t.set(turnRef, {
@@ -431,10 +432,10 @@ export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (re
 // `db.recursiveDelete(...)` to reap the session doc plus both subcollections
 // (`turns/*`, `events/*`) in one server call.
 //
-// No soft-delete, no undo, no mid-run drain protocol. If the worker is still
-// writing when the delete lands, its next fenced write will hit OwnershipLost
-// and bail; any event docs it writes before that are bounded by the 3-day
-// events TTL.
+// No soft-delete, no undo, no mid-run drain protocol. If the Reasoning Engine
+// plugin is still writing when the delete lands, its next fenced write will
+// hit OwnershipLost and bail; any event docs it writes before that are bounded
+// by the 3-day events TTL.
 export const agentDelete = onRequest(
 	{ cors: true, timeoutSeconds: 120, memory: '256MiB' },
 	async (req, res) => {

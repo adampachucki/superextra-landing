@@ -41,11 +41,10 @@ export const HANDOFF_DEADLINE_MS = 75_000;
 
 /**
  * Production Reasoning Engine resource. The default below mirrors the
- * value the deploy workflow writes into functions/.env.superextra-site,
- * matching the WORKER_URL pattern (DEFAULT_WORKER_URL + env override at
- * index.js:136). Tests can override by setting GEAR_REASONING_ENGINE_RESOURCE
- * before importing. Belt-and-suspenders against a deploy that ships with
- * an empty .env (which is exactly how Stage B broke transiently on
+ * value the deploy workflow writes into functions/.env.superextra-site.
+ * Tests can override by setting GEAR_REASONING_ENGINE_RESOURCE before
+ * importing. Belt-and-suspenders against a deploy that ships with an
+ * empty .env (which is exactly how Stage B broke transiently on
  * 2026-04-27 — see commit history).
  */
 const DEFAULT_RESOURCE =
@@ -260,8 +259,8 @@ export async function gearHandoff({
 /**
  * Flip session+turn to status='error' atomically inside a transaction
  * that fences on `currentRunId`. No-ops if the run has moved on or the
- * terminal state has already been written (race-safe). Mirrors
- * `watchdog.js:172-186` and `worker_main.py:1349`.
+ * terminal state has already been written (race-safe). Same fenced-write
+ * pattern as the watchdog's transactional flip.
  */
 export async function gearHandoffCleanup(db, sid, runId, turnIdx, errorReason) {
 	const sessionRef = db.collection('sessions').doc(sid);

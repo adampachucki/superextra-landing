@@ -220,7 +220,6 @@ describe('runWatchdog', () => {
 				mockDoc('hb1', {
 					status: 'running',
 					lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
-					currentAttempt: 3,
 					currentRunId: 'run-hb1'
 				})
 			])
@@ -238,7 +237,6 @@ describe('runWatchdog', () => {
 			hb1: {
 				status: 'running',
 				lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
-				currentAttempt: 3,
 				currentRunId: 'run-hb1',
 				lastTurnIndex: 2
 			}
@@ -357,7 +355,6 @@ describe('runWatchdog', () => {
 				mockDoc('hb1', {
 					status: 'running',
 					lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
-					currentAttempt: 1,
 					currentRunId: 'run-hb1'
 				})
 			])
@@ -393,7 +390,6 @@ describe('runWatchdog', () => {
 				mockDoc('hb1', {
 					status: 'running',
 					lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
-					currentAttempt: 2,
 					currentRunId: 'run-hb1'
 				})
 			])
@@ -421,7 +417,6 @@ describe('runWatchdog', () => {
 				mockDoc('hb1', {
 					status: 'running',
 					lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
-					currentAttempt: 1,
 					currentRunId: 'run-hb1'
 				})
 			])
@@ -431,7 +426,6 @@ describe('runWatchdog', () => {
 			hb1: {
 				status: 'running',
 				lastHeartbeat: millisTs(NOW - 10 * 1000), // 10 s old — well within threshold
-				currentAttempt: 1,
 				currentRunId: 'run-hb1'
 			}
 		};
@@ -484,7 +478,6 @@ describe('runWatchdog', () => {
 				mockDoc('hb1', {
 					status: 'running',
 					lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
-					currentAttempt: 1,
 					currentRunId: 'run-hb1'
 				})
 			])
@@ -493,7 +486,6 @@ describe('runWatchdog', () => {
 			hb1: {
 				status: 'running',
 				lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
-				currentAttempt: 1,
 				currentRunId: 'run-hb1'
 			}
 		};
