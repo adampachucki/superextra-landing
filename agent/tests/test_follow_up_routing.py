@@ -36,43 +36,50 @@ INSTRUCTIONS_DIR = (
     Path(__file__).resolve().parent.parent / "superextra_agent" / "instructions"
 )
 
-_RETRY = types.HttpRetryOptions(attempts=3, initial_delay=1.0, max_delay=30.0)
+# Build router + stub agents only when live evals are actually requested.
+# `Client(vertexai=True, ...)` calls google.auth.default() at construction
+# time, which raises DefaultCredentialsError in CI (no ADC). Guarding here
+# keeps module collection clean even when the skipif above would have
+# skipped each test individually.
+_test_router = None
+if os.environ.get("RUN_LIVE_EVALS"):
+    _RETRY = types.HttpRetryOptions(attempts=3, initial_delay=1.0, max_delay=30.0)
 
-_flash = Gemini(model="gemini-2.5-flash", retry_options=_RETRY)
-_flash.api_client = Client(
-    vertexai=True,
-    location="global",
-    http_options=types.HttpOptions(retry_options=_RETRY),
-)
+    _flash = Gemini(model="gemini-2.5-flash", retry_options=_RETRY)
+    _flash.api_client = Client(
+        vertexai=True,
+        location="global",
+        http_options=types.HttpOptions(retry_options=_RETRY),
+    )
 
-_stub_pipeline = LlmAgent(
-    name="research_pipeline",
-    model=_flash,
-    instruction="Reply with exactly: 'Pipeline activated.' Nothing else.",
-    description="Stub pipeline for routing tests.",
-    output_key="final_report",
-    disallow_transfer_to_parent=True,
-    disallow_transfer_to_peers=True,
-)
+    _stub_pipeline = LlmAgent(
+        name="research_pipeline",
+        model=_flash,
+        instruction="Reply with exactly: 'Pipeline activated.' Nothing else.",
+        description="Stub pipeline for routing tests.",
+        output_key="final_report",
+        disallow_transfer_to_parent=True,
+        disallow_transfer_to_peers=True,
+    )
 
-_stub_follow_up = LlmAgent(
-    name="follow_up",
-    model=_flash,
-    instruction="Reply with exactly: 'Follow-up activated.' Nothing else.",
-    description="Stub follow-up agent for routing tests.",
-    output_key="final_report",
-    disallow_transfer_to_parent=True,
-    disallow_transfer_to_peers=True,
-)
+    _stub_follow_up = LlmAgent(
+        name="follow_up",
+        model=_flash,
+        instruction="Reply with exactly: 'Follow-up activated.' Nothing else.",
+        description="Stub follow-up agent for routing tests.",
+        output_key="final_report",
+        disallow_transfer_to_parent=True,
+        disallow_transfer_to_peers=True,
+    )
 
-_test_router = LlmAgent(
-    name="router",
-    model=_flash,
-    instruction=_router_instruction,
-    description="Routes user questions to research, follow-up, or asks for clarification.",
-    sub_agents=[_stub_pipeline, _stub_follow_up],
-    output_key="router_response",
-)
+    _test_router = LlmAgent(
+        name="router",
+        model=_flash,
+        instruction=_router_instruction,
+        description="Routes user questions to research, follow-up, or asks for clarification.",
+        sub_agents=[_stub_pipeline, _stub_follow_up],
+        output_key="router_response",
+    )
 
 
 async def _run_conversation(messages: list[str], pre_state: dict | None = None) -> list[dict]:

@@ -36,48 +36,55 @@ INSTRUCTIONS_DIR = (
 )
 
 # --- Test router setup (stub pipeline avoids running real research) ---
+#
+# Built lazily — `Client(vertexai=True, ...)` calls google.auth.default()
+# at construction time, which raises DefaultCredentialsError in CI (no ADC).
+# Module-level eager init would break collection even though skipif would
+# have skipped the tests themselves.
 
-_RETRY = types.HttpRetryOptions(attempts=3, initial_delay=1.0, max_delay=30.0)
+_test_router = None
+if os.environ.get("RUN_LIVE_EVALS"):
+    _RETRY = types.HttpRetryOptions(attempts=3, initial_delay=1.0, max_delay=30.0)
 
-_flash = Gemini(model="gemini-2.5-flash", retry_options=_RETRY)
-_flash.api_client = Client(
-    vertexai=True,
-    location="global",
-    http_options=types.HttpOptions(retry_options=_RETRY),
-)
+    _flash = Gemini(model="gemini-2.5-flash", retry_options=_RETRY)
+    _flash.api_client = Client(
+        vertexai=True,
+        location="global",
+        http_options=types.HttpOptions(retry_options=_RETRY),
+    )
 
-_stub_pipeline = LlmAgent(
-    name="research_pipeline",
-    model=_flash,
-    instruction="Reply with exactly: 'Pipeline activated.' Nothing else.",
-    description="Stub pipeline for routing tests.",
-    output_key="final_report",
-    disallow_transfer_to_parent=True,
-    disallow_transfer_to_peers=True,
-)
+    _stub_pipeline = LlmAgent(
+        name="research_pipeline",
+        model=_flash,
+        instruction="Reply with exactly: 'Pipeline activated.' Nothing else.",
+        description="Stub pipeline for routing tests.",
+        output_key="final_report",
+        disallow_transfer_to_parent=True,
+        disallow_transfer_to_peers=True,
+    )
 
-# The production router also routes to `follow_up` when a prior report exists.
-# This test suite runs only first-turn prompts (no `final_report` in state), so
-# the model shouldn't transfer there, but a mis-route to `follow_up` without
-# this stub would raise "agent not found" and mask the real assertion failure.
-_stub_follow_up = LlmAgent(
-    name="follow_up",
-    model=_flash,
-    instruction="Reply with exactly: 'Follow-up activated.' Nothing else.",
-    description="Stub follow-up agent for routing tests.",
-    output_key="final_report",
-    disallow_transfer_to_parent=True,
-    disallow_transfer_to_peers=True,
-)
+    # The production router also routes to `follow_up` when a prior report
+    # exists. This suite runs only first-turn prompts, so the model
+    # shouldn't transfer there — but a mis-route without this stub would
+    # raise "agent not found" and mask the real assertion failure.
+    _stub_follow_up = LlmAgent(
+        name="follow_up",
+        model=_flash,
+        instruction="Reply with exactly: 'Follow-up activated.' Nothing else.",
+        description="Stub follow-up agent for routing tests.",
+        output_key="final_report",
+        disallow_transfer_to_parent=True,
+        disallow_transfer_to_peers=True,
+    )
 
-_test_router = LlmAgent(
-    name="router",
-    model=_flash,
-    instruction=(INSTRUCTIONS_DIR / "router.md").read_text(),
-    description="Routes user questions to research, follow-up, or asks for clarification.",
-    sub_agents=[_stub_pipeline, _stub_follow_up],
-    output_key="router_response",
-)
+    _test_router = LlmAgent(
+        name="router",
+        model=_flash,
+        instruction=(INSTRUCTIONS_DIR / "router.md").read_text(),
+        description="Routes user questions to research, follow-up, or asks for clarification.",
+        sub_agents=[_stub_pipeline, _stub_follow_up],
+        output_key="router_response",
+    )
 
 
 async def _check_routing(message: str) -> dict:
