@@ -352,11 +352,15 @@ def _mock_invocation_context(*, sid: str, run_id: str, turn_idx: int, invocation
 
 
 @pytest.mark.asyncio
-async def test_plugin_before_run_noops_when_state_missing(monkeypatch):
-    """If session.state has no runId, before_run returns None so the
-    runner proceeds normally. (Halting was the 2026-04-27 cloudrun-
-    broken-by-plugin regression that this guard prevents from
-    recurring after Phase 9.)"""
+async def test_plugin_before_run_halts_when_state_missing(monkeypatch):
+    """If session.state has no runId, before_run returns a `types.Content`
+    so the ADK runner short-circuits cleanly at runners.py:819, before
+    any LLM compute is spent. Returning None would let the run proceed
+    with no Firestore observability — burning 7-15 min of model time
+    until the watchdog catches the still-queued session.
+
+    The halt content carries `gear_handoff_state_missing` as the typed
+    reason so it's identifiable in Reasoning Engine logs."""
     plugin = FirestoreProgressPlugin(project="superextra-site")
     plugin._fs = MagicMock()  # short-circuit lazy ADC init in CI
 
@@ -368,10 +372,11 @@ async def test_plugin_before_run_noops_when_state_missing(monkeypatch):
         user_content=None,
     )
     out = await plugin.before_run_callback(invocation_context=ctx)
-    assert out is None, (
-        "plugin must no-op (return None) when runId is missing — halting "
-        "would kill any caller that doesn't populate ADK state.runId"
+    assert isinstance(out, types.Content), (
+        "plugin must halt (return types.Content) when runId is missing — "
+        "returning None lets the runner proceed and burn LLM compute"
     )
+    assert "gear_handoff_state_missing" in out.parts[0].text
 
 
 @pytest.mark.asyncio
