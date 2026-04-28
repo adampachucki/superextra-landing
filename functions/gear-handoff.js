@@ -40,32 +40,21 @@ const VERTEX_BASE = 'https://us-central1-aiplatform.googleapis.com';
 export const HANDOFF_DEADLINE_MS = 75_000;
 
 /**
- * Production Reasoning Engine resource. The default below mirrors the
- * value the deploy workflow writes into functions/.env.superextra-site.
- * Tests can override by setting GEAR_REASONING_ENGINE_RESOURCE before
- * importing. Belt-and-suspenders against a deploy that ships with an
- * empty .env (which is exactly how Stage B broke transiently on
- * 2026-04-27 — see commit history).
+ * The deploy workflow writes GEAR_REASONING_ENGINE_RESOURCE into
+ * functions/.env.superextra-site; firebase-functions v2 loads it at
+ * deploy time. No fallback — if the env var is missing we'd rather
+ * fail loudly than silently route to a hardcoded ID that could go
+ * stale on engine recreation.
  */
-const DEFAULT_RESOURCE =
-	'projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288';
-
-// Cold-start guard: warn once per container when the env var is missing
-// and the default fires. If the GHA env-var plumbing breaks again (the
-// 2026-04-27 incident), this surfaces in Cloud Logging at deploy-then-
-// first-request time instead of staying silent.
-let _warnedAboutDefault = false;
 function getResource() {
 	const fromEnv = process.env.GEAR_REASONING_ENGINE_RESOURCE;
-	if (!fromEnv && !_warnedAboutDefault) {
-		_warnedAboutDefault = true;
-		console.warn(
-			'GEAR_REASONING_ENGINE_RESOURCE env var is unset — falling back to ' +
-				'hardcoded DEFAULT_RESOURCE. Check .github/workflows/deploy.yml writes ' +
-				'this var to functions/.env.superextra-site.'
+	if (!fromEnv) {
+		throw new Error(
+			'GEAR_REASONING_ENGINE_RESOURCE env var is unset — ' +
+				'check .github/workflows/deploy.yml writes it to functions/.env.superextra-site'
 		);
 	}
-	return fromEnv || DEFAULT_RESOURCE;
+	return fromEnv;
 }
 
 let _auth = null;
@@ -133,7 +122,7 @@ async function _doHandoff({
 			headers,
 			body: JSON.stringify({
 				userId,
-				sessionState: { runId, turnIdx, attempt: 1 }
+				sessionState: { runId, turnIdx }
 			})
 		});
 		if (!r.ok) {
@@ -158,7 +147,7 @@ async function _doHandoff({
 			author: 'system',
 			invocationId: `agentstream-${runId}`,
 			timestamp: new Date().toISOString(),
-			actions: { stateDelta: { runId, turnIdx, attempt: 1 } }
+			actions: { stateDelta: { runId, turnIdx } }
 		})
 	});
 	if (!ar.ok) {

@@ -161,29 +161,24 @@ export async function runWatchdog(db, nowMs = Date.now()) {
 				if (fieldMillis !== null && fieldMillis > thresholdMillis) {
 					return 'field_freshened';
 				}
-				// Server-stored sessions (plan §8): propagate the error to the
-				// in-flight turn doc in the same transaction. agentStream
-				// enforces that `turns/{lastTurnIndex}` is the doc for
-				// `currentRunId`, so the predicates already validated above
-				// keep that invariant intact. If `lastTurnIndex` is missing
-				// (e.g., a partial-enqueue legacy doc), skip the turn write
-				// rather than fail the flip — the session update is still the
-				// meaningful signal.
+				// Propagate the error to the in-flight turn doc atomically.
+				// agentStream's txn writes lastTurnIndex unconditionally, so
+				// any session that has currentRunId also has lastTurnIndex.
+				// If a future bug ever produces a session without it, the
+				// turn-doc update fails and rolls back the whole txn — that
+				// loud signal is preferable to a silent partial-flip.
 				tx.update(ref, {
 					status: 'error',
 					error: reason,
 					errorDetails,
 					updatedAt: FieldValue.serverTimestamp()
 				});
-				const lastTurnIndex = data.lastTurnIndex;
-				if (typeof lastTurnIndex === 'number' && lastTurnIndex > 0) {
-					const turnKey = String(lastTurnIndex).padStart(4, '0');
-					const turnRef = ref.collection('turns').doc(turnKey);
-					tx.update(turnRef, {
-						status: 'error',
-						error: reason
-					});
-				}
+				const turnKey = String(data.lastTurnIndex).padStart(4, '0');
+				const turnRef = ref.collection('turns').doc(turnKey);
+				tx.update(turnRef, {
+					status: 'error',
+					error: reason
+				});
 				return 'flipped';
 			});
 			if (result === 'flipped') {

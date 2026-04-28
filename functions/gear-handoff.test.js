@@ -378,24 +378,14 @@ describe('gearHandoff', () => {
 		assert.equal(captured[0].aborted, true);
 	});
 
-	it('falls back to the hardcoded prod resource when GEAR_REASONING_ENGINE_RESOURCE is unset', async () => {
-		// Belt-and-suspenders against a deploy that ships with an empty
-		// .env (the 2026-04-27 GHA-strip incident). Without this default,
-		// agentStream would 502 every gear request whenever the workflow
-		// dropped the env var.
+	it('throws clearly when GEAR_REASONING_ENGINE_RESOURCE is unset', async () => {
+		// We removed the hardcoded DEFAULT_RESOURCE fallback (it papered
+		// over deploy bugs and would route silently to a stale engine ID
+		// if the engine was ever recreated). Missing env var must fail
+		// loudly so deploy/config errors surface immediately.
 		const saved = process.env.GEAR_REASONING_ENGINE_RESOURCE;
 		delete process.env.GEAR_REASONING_ENGINE_RESOURCE;
-		const captured = [];
-		const fetchMock = mock.fn(async (url) => {
-			captured.push(url);
-			return new Response('{}', { status: 401 });
-		});
-		globalThis.fetch = fetchMock;
 		try {
-			// Resource resolved from default → handoff reaches `:createSession`
-			// using the default URL → mock returns 401 → throws createSession_failed.
-			// The throw means we got past `getResource()` (no env var thrown);
-			// the captured URL proves the default resource was used.
 			await assert.rejects(
 				gearHandoff({
 					sid: 'sid1',
@@ -405,11 +395,7 @@ describe('gearHandoff', () => {
 					message: 'hi',
 					isFirstMessage: true
 				}),
-				/createSession_failed/
-			);
-			assert.ok(
-				captured.length > 0 && String(captured[0]).includes('reasoningEngines/1179666575196684288'),
-				`expected fetch URL to include the default resource ID; got ${JSON.stringify(captured)}`
+				/GEAR_REASONING_ENGINE_RESOURCE env var is unset/
 			);
 		} finally {
 			process.env.GEAR_REASONING_ENGINE_RESOURCE = saved;
