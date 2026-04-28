@@ -339,14 +339,21 @@ class FirestoreProgressPlugin(BasePlugin):
         state = _build_state(fs, invocation_context)
         if state is None:
             # Malformed handoff — agentStream's :appendEvent didn't put runId
-            # into session.state. The agentStream txn already wrote the
-            # session doc with currentRunId, so the watchdog will catch any
-            # stuck state at the 5-min lastEventAt fence. Warn so this surfaces
-            # in Reasoning Engine logs rather than being silent.
+            # into session.state. Halt the run before any LLM compute is
+            # spent (returning types.Content triggers ADK's early-exit
+            # branch at runners.py:819). The session was just written by
+            # agentStream with status='queued'; the watchdog flips it
+            # within 5 min via the handoff_start_timeout threshold.
+            #
+            # We deliberately do NOT write Firestore from this branch:
+            # without our own runId we can't fence the write safely
+            # (an unfenced flip could clobber a newer turn that took
+            # over after agentStream's "previous-turn-in-flight" check
+            # passed because watchdog already flipped this turn to error).
             log.warning(
-                "plugin no-op: session.state has no runId — malformed gear handoff"
+                "halting run: session.state has no runId — malformed gear handoff"
             )
-            return None
+            return _halt_content("gear_handoff_state_missing")
 
         try:
             await _retry_critical(lambda: claim_invocation(fs, state))
