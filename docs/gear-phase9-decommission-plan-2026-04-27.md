@@ -22,8 +22,7 @@ Without users, additional calendar time gives us nothing the active drills haven
 
 Each item is a single query. If any fails, fix or skip the offending stage; do not proceed past Stage 2 with unresolved failures.
 
-- [ ] **No active sticky-cloudrun chats.** Firestore query: `where('transport', '==', 'cloudrun').where('status', 'in', ['queued','running'])` returns zero docs. (If there are any, wait briefly for them to drain or watchdog-flip — usually <5 min.)
-- [ ] **Worker recent traffic visible.** `gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="superextra-worker" AND httpRequest.requestMethod="POST"' --freshness=1h` — note the count. Non-zero means there's still cloudrun traffic from sticky sessions; wait or accept that those sessions will fail mid-Stage-2.
+- [ ] **Worker idle.** `gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="superextra-worker" AND httpRequest.requestMethod="POST"' --freshness=30m` returns zero hits. Sticky-cloudrun follow-ups manifest as worker POSTs; if the count is zero for the last 30 minutes, no active sticky-cloudrun work is in flight. (Collapsed from two gates that asked the same question different ways — Firestore query for sticky sessions would have needed a composite index; the worker log is observable directly.)
 - [ ] **No GEAR-side incidents in last 24h.** `gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="agentstream" AND severity>=WARNING' --freshness=24h` shows no `gear_handoff_failed` errors above baseline noise (the cold-start `DEFAULT_RESOURCE` warning is benign and doesn't count).
 - [ ] **agentStream env vars healthy.** `gcloud run services describe agentstream --region=us-central1 --format='value(spec.template.spec.containers[0].env)'` shows `GEAR_REASONING_ENGINE_RESOURCE` set. (PR #11 fix verification.)
 - [ ] **Firestore backup bucket exists.** `gsutil ls gs://superextra-site-firestore-backups/` returns ok. If the bucket doesn't exist, one-shot create: `gsutil mb -l us-central1 gs://superextra-site-firestore-backups`. Backup is non-negotiable: Stage 3 field deletions are non-reversible without it.
@@ -40,7 +39,8 @@ Single PR titled `chore(gear): phase 9 — decommission worker codepath`. Branch
 
 - `agent/worker_main.py` (~921 lines) — the legacy ADK pipeline runner
 - `agent/tests/test_worker_main.py` (~1773 lines) — its tests
-- `agent/probe/` directory entirely (~1721 lines) — R3 probe scripts that shipped with the migration
+- `agent/tests/e2e_worker_live.py` — also imports `worker_main`; becomes dead after the worker source is gone
+- `agent/probe/` directory entirely (~1721 lines) — R3 probe scripts that shipped with the migration. **Move `agent/probe/cost_baseline.py` → `scripts/cost_baseline.py` BEFORE the directory delete** so the post-Phase-9 cost-monitoring tool survives. Update its docstring to reference its new path.
 - `agent/Dockerfile` — only purpose is to build the worker image; if `cloudbuild.yaml` exists for the worker, also delete
 - `spikes/skeletons/worker_main.py` — historic spike, leftover
 
@@ -66,10 +66,11 @@ Single PR titled `chore(gear): phase 9 — decommission worker codepath`. Branch
 - `CLAUDE.md` AND `AGENTS.md` § "Transport architecture" — collapse to a single-transport description: "Browser POSTs to `agentStream` → handoff to Reasoning Engine via `gearHandoff()`. `FirestoreProgressPlugin` writes progress + terminal state from inside the engine."
 - `.github/workflows/deploy.yml`
   - Drop the `deploy-worker` job entirely.
+  - Update `deploy-hosting.needs` from `[test, deploy-worker]` to `[test]` (verified: `.github/workflows/deploy.yml:102`). Forgetting this line will keep `deploy-hosting` blocked on a non-existent job.
   - Drop `detect-changes` if it only feeds `deploy-worker`.
   - Keep the `GEAR_REASONING_ENGINE_RESOURCE` line in the .env-write step. Belt-and-suspenders with `gear-handoff.js`'s `DEFAULT_RESOURCE` is cheap; future engine recreation only needs the workflow line updated.
 - `agent/superextra_agent/firestore_progress.py` and `gear_run_state.py` — keep, these ARE the new runtime. Also keep the `runId`-missing no-op branch + its log warning (case 2 — malformed gear handoff — is still a real failure mode worth surfacing, even with the legacy worker gone).
-- `docs/deployment-gotchas.md` — add a short entry capturing the `firebase deploy REPLACES env vars (does not merge)` finding from PR #11. ~5 lines. Future agent sessions otherwise rediscover this the hard way.
+- `docs/deployment-gotchas.md` — two changes here, not just one. (a) **Strip** the now-stale "Cloud Run worker (`superextra-worker`)" section (lines 11-39) and the "Cloud Tasks + OIDC" section (lines 40-64) — both describe a service that no longer exists. (b) **Add** a short entry capturing the `firebase deploy REPLACES env vars (does not merge)` finding from PR #11. ~5 lines. Future agent sessions otherwise rediscover both the missing-context AND the env-var trap the hard way.
 - `docs/gear-stage-a-test-plan-2026-04-27.md` — append a one-paragraph retrospective: "any 'X is contained' smoke must verify the contained X actually works end-to-end (`status='complete'`), not just that routing landed (`status='running'`)." Smoke 5 demonstrated the cost of skipping that — the cloudrun-broken-by-plugin regression sat undetected for hours because the smoke only checked routing.
 - `agent/probe/` — `git tag gear-migration-probes-archive HEAD` AND `git push origin gear-migration-probes-archive` BEFORE this PR's `agent/probe/` delete commit. The probe scripts proved R3.x's post-disconnect contract during the migration; tag preserves the audit trail at zero cost.
 
@@ -86,7 +87,7 @@ Single PR titled `chore(gear): phase 9 — decommission worker codepath`. Branch
 
 ### Stage 2 — Cloud-side deletes (Adam runs gcloud)
 
-After Stage 1 PR has merged AND the Cloud Functions deploy completes successfully (verify `gcloud run services describe agentstream --region=us-central1` shows the new revision serving 100% traffic), AND `gcloud logging read` shows zero `enqueueRunTask` calls for ≥30 min:
+After Stage 1 PR has merged AND the Cloud Functions deploy completes successfully (verify `gcloud run services describe agentstream --region=us-central1` shows the new revision serving 100% traffic), AND the gear-only source has been live for ≥30 min with the worker observably idle: re-run the pre-flight "Worker idle" check (`gcloud logging read ...freshness=30m` returns 0 worker POSTs). agentStream itself does not log successful `enqueueRunTask` calls (only failures at `functions/index.js:425`), so the worker-side log is the load-bearing observable, not an agentStream-side one.
 
 ```bash
 # 1. Snapshot Firestore (required for the rollback story)
@@ -99,8 +100,8 @@ gcloud run services delete superextra-worker \
   --project=superextra-site \
   --quiet
 
-# 3. (If exclusive to worker) delete the Cloud Tasks queue
-gcloud tasks queues delete agent-runs \
+# 3. Delete the Cloud Tasks queue (verified live name: agent-dispatch, NOT agent-runs)
+gcloud tasks queues delete agent-dispatch \
   --location=us-central1 \
   --project=superextra-site \
   --quiet
@@ -150,7 +151,7 @@ If any check fails, freeze cleanup and investigate. The Firestore export from St
 ## Rollback (if something goes sideways)
 
 - **Stage 1 mid-execution:** revert the Stage 1 PR. No cloud-side state changed yet.
-- **Stage 2 mid-execution:** Stage 1 is already deployed (gear-only source), so a re-deployed worker would have no caller. Restore via `git checkout gear-migration-probes-archive~1 -- agent/worker_main.py agent/Dockerfile` then `gcloud run deploy superextra-worker --source=agent` (~10 min build). Then revert the relevant `functions/index.js` deletes to restore the cloudrun branch + redeploy. About 30 min total to a working cloudrun fallback.
+- **Stage 2 mid-execution:** Stage 1 is already deployed (gear-only source), so a re-deployed worker would have no caller. Restore via `git checkout gear-migration-probes-archive -- agent/worker_main.py agent/Dockerfile` (the tag is placed at HEAD BEFORE the Stage 1 delete commits, so the tagged tree CONTAINS the worker source — no `~1` parent traversal needed) then `gcloud run deploy superextra-worker --source=agent` (~10 min build). Then revert the relevant `functions/index.js` deletes to restore the cloudrun branch + redeploy. About 30 min total to a working cloudrun fallback.
 - **Stage 3 mid-execution:** the script is dry-run-by-default and idempotent; re-running picks up where it left off.
 - **Post-Stage 3:** field deletions are non-reversible without the Firestore export from Stage 2 step 1. Restore via `gcloud firestore import gs://superextra-site-firestore-backups/phase9-pre-migration-...`.
 
@@ -182,10 +183,10 @@ Quoting the reviewer's framing — "Done means: no cloudrun branch, no transport
 
 Verification at end-of-Phase-9:
 
-- `grep -rn 'cloudrun\|enqueueRunTask\|chooseInitialTransport\|GEAR_DEFAULT\|GEAR_ALLOWLIST' functions/` returns no matches in source.
-- `grep -rn 'transport\|adkSessionId\|currentAttempt\|currentWorkerId' functions/` returns no matches in source.
+- `grep -rn 'cloudrun\|enqueueRunTask\|chooseInitialTransport\|GEAR_DEFAULT\|GEAR_ALLOWLIST' functions/ agent/superextra_agent/` returns no matches in source. (Comments are fine; active code references would be a bug. Scope expanded from `functions/` because gear-side code in `agent/superextra_agent/` would otherwise pass the check falsely.)
+- `grep -rn 'transport\|adkSessionId\|currentAttempt\|currentWorkerId' functions/ agent/superextra_agent/` returns no matches in source.
 - `gcloud run services list --project=superextra-site` does not list `superextra-worker`.
-- `gcloud tasks queues list --location=us-central1 --project=superextra-site` does not list `agent-runs`.
+- `gcloud tasks queues list --location=us-central1 --project=superextra-site` does not list `agent-dispatch`.
 - `gcloud iam service-accounts list --project=superextra-site` does not list `superextra-worker@...`.
 - `cat .github/workflows/deploy.yml` has no `deploy-worker` job.
 - `grep -rn 'Cloud Tasks\|Cloud Run worker\|cloudrun' CLAUDE.md AGENTS.md` returns no match (except possibly in historic-context callouts).

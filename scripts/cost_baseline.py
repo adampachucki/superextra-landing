@@ -30,7 +30,11 @@ gear's effective cost is wildly different from cloudrun's.
 
 Run with:
     GOOGLE_APPLICATION_CREDENTIALS=... GOOGLE_CLOUD_PROJECT=superextra-site \
-      .venv/bin/python agent/probe/cost_baseline.py [--days 7]
+      agent/.venv/bin/python scripts/cost_baseline.py [--days 7]
+
+Moved from `agent/probe/` to `scripts/` during Phase 9 because the
+probe directory was deleted with the rest of the R3 scripts. Reuses
+the agent venv since `google-cloud-monitoring` already ships there.
 """
 
 from __future__ import annotations

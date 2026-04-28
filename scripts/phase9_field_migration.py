@@ -24,15 +24,16 @@ pass first to confirm the count + sample.
 
 Pre-flight checklist (verify before --apply):
 
-  - [ ] Cloud Run service `superextra-worker` deleted (or maxScale=0
-        for >=24h with no traffic)
-  - [ ] No new sessions written with `transport='cloudrun'` in the last
-        7 days (sticky cloudrun sessions all drained)
+  - [ ] Cloud Run service `superextra-worker` deleted (Stage 2 complete)
   - [ ] `functions/index.js` source already updated to drop the fields
         from `perTurn` AND deployed (otherwise the next agentStream
         write puts them back)
   - [ ] Firestore backup exists: `gcloud firestore export
-        gs://superextra-site-firestore-backups/phase9-pre-migration`
+        gs://superextra-site-firestore-backups/phase9-pre-migration-$(date +%Y%m%d)`
+
+See docs/gear-phase9-decommission-plan-2026-04-27.md for the full
+runbook. The plan was compressed to same-day execution on 2026-04-28
+once the soak gate was waived (no real users).
 
 Usage:
     GOOGLE_APPLICATION_CREDENTIALS=... GOOGLE_CLOUD_PROJECT=superextra-site \\
