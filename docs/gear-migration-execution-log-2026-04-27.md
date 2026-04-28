@@ -338,3 +338,36 @@ gcloud projects get-iam-policy superextra-site \
   - `npm run test` (Vitest) → **59 passed** (unchanged after Tests 7+8 deferred to Chrome MCP smoke).
   - `npm run test:rules` → **22 passed** in 5 s.
   - `npm run check` → 0 errors, 9 pre-existing a11y warnings.
+
+---
+
+## 2026-04-28 closeout — Phase 9 + post-merge sweeps
+
+The 30-day rollback window was waived (no real users; active drills covered the discovery the calendar would have given). Phase 9 executed end-to-end on 2026-04-28, followed by a four-PR sweep addressing post-merge review findings + a deliberate hardening-accretion lean pass.
+
+### Phase 9 execution (2026-04-28 morning)
+
+- **PRs #15-17** — compressed the Phase 9 plan from the 30-day-soak draft to same-day execution; folded reviewer findings (Cloud Tasks queue name `agent-dispatch` not `agent-runs`, missing `e2e_worker_live.py` + `phase0_measure.py` from delete list, load-bearing `deploy-hosting.needs.deploy-worker.result` if-guard removal, etc.).
+- **PR #18 — Stage 1 source PR.** Single commit: deleted `agent/worker_main.py` (921 LOC), `agent/tests/test_worker_main.py` (1773 LOC), `agent/tests/e2e_worker_live.py`, `agent/probe/` entirely (preserved at `gear-migration-probes-archive` tag), `agent/Dockerfile`, `spikes/skeletons/worker_main.py`. Edited `functions/index.js` (dropped CloudTasksClient + entire cloudrun branch + GEAR_DEFAULT/GEAR_ALLOWLIST/chooseInitialTransport + adkSessionId/transport writes), `functions/watchdog.js` (dropped currentAttempt error-detail), `functions/utils.js` clean, `functions/package.json` (dropped @google-cloud/tasks dep), `.github/workflows/deploy.yml` (rewrote end-to-end: dropped detect-changes + entire deploy-worker job + the deploy-hosting if-guard referencing `needs.deploy-worker.result`), `CLAUDE.md`/`AGENTS.md` to single-path narrative, `docs/deployment-gotchas.md` (stripped worker + Cloud Tasks sections, added firebase-deploy env-var-replace gotcha), and stripped migration-era `Mirrors worker_main.py:NNN` cross-references from kept runtime files.
+- **PRs #19, #20 hotfixes** — eval tests (`test_router_evals.py`, `test_follow_up_routing.py`) called `Client(vertexai=True)` at module top level, raising `DefaultCredentialsError` at pytest collection time when CI lacked ADC. Lazy-init under `if os.environ.get("RUN_LIVE_EVALS")`. Plus the plugin no-op test triggered ADC via `_client()`; assigned `plugin._fs = MagicMock()` to short-circuit.
+- **Stage 2 cloud deletes** (~5 min): `gcloud firestore export gs://superextra-site-firestore-backups/phase9-pre-migration-20260428` (rollback safety net). Then deleted Cloud Run service `superextra-worker`, Cloud Tasks queue `agent-dispatch`, removed `roles/aiplatform.user` + `roles/datastore.user` IAM bindings, deleted SA `superextra-worker@superextra-site.iam.gserviceaccount.com`.
+- **Stage 3 field migration**: `scripts/phase9_field_migration.py --apply` stripped `adkSessionId`/`currentAttempt`/`currentWorkerId`/`transport` from all 33 session docs in 1.2 s. Verified post-run: 0/33 sessions retain any of the four fields.
+- **Stage 4 post-flight smoke**: Chrome MCP submission to `agent.superextra.ai/chat` — Le Vintage Brussels brasserie comparison prompt. Session `4acf92e3-aa00-44e4-acd8-852e8368f56e` reached `status='complete'` in 258 s with 6823-char reply, 24 sources, title generated. Zero `agentStream` Cloud Logging warnings during the run. Session doc carried no legacy fields.
+
+### Post-merge review fixes + lean pass (2026-04-28 afternoon)
+
+- **PR #21 — four production fixes.** (a) Follow-up reply quality bug: changed `follow_up` agent's `output_key` from `"final_report"` to `"final_report_followup"` so a follow-up reply doesn't overwrite the synthesizer's original report in session state — symptom was a 490K-char restated table on turn 0002 of the post-flight session. Mapper at `firestore_events.py:_map_synth_complete` now reads either key. `follow_up.md` rewritten with explicit "answer the latest question only, default to prose, no full-report restatement, no tables unless asked." (b) Both terminal error paths (`empty_or_malformed_reply` in `gear_run_state.py`, `finalize_failed` in `firestore_progress.py`) now write `completedAt: SERVER_TIMESTAMP` on the turn doc. (c) Watchdog rename + retune: `queue_dispatch_timeout`→`handoff_start_timeout` (5 min instead of 30), `worker_lost`→`heartbeat_lost`. (d) Dropped the unused `events COLLECTION_GROUP` index from `firestore.indexes.json`.
+- **PR #22 — doc rot sweep + scaffolding deletes.** Tagged `phase9-scaffolding-archive` BEFORE delete (audit trail). Deleted `functions/probe-stream-query.js` (120-LOC orphan shipping in deploy bundle), `agent/tests/phase0_measure.py`, entire `spikes/` directory. Updated 8 stale architecture comments across `CLAUDE.md`, `AGENTS.md`, `functions/index.js`, `functions/gear-handoff.js`, `agent/superextra_agent/secrets.py`, `firestore.rules`. Dropped 8 `currentAttempt` lines from `watchdog.test.js` fixtures. Updated `cost_baseline.py` + `phase9_field_migration.py` docstrings.
+- **PR #23 — lean-pass removals.** Four pure-win dead-code removals: dropped `DEFAULT_RESOURCE` + `_warnedAboutDefault` cold-start guard from `gear-handoff.js` (paper over a fixed bug; would silently route to stale engine if engine ever recreated); dropped dead `lastTurnIndex` skip predicate from `watchdog.js` (legacy partial-enqueue scenario can't happen post-Phase-9); dropped `attempt: 1` from BOTH `:appendEvent` stateDelta AND `createSession` sessionState (vestigial wire field from v3 multi-attempt scheme); dropped `live_only` parameter from `_emit_note_task` (always defaulted to False; no caller passed True).
+- **PR #24 — fail-fast on missing handoff state.** Plugin's missing-`runId`-in-state branch changed from `return None` (let the run proceed for 7-15 min producing nothing, watchdog catches as `pipeline_wedged`) to `return _halt_content("gear_handoff_state_missing")` (ADK runner short-circuits before any LLM compute, watchdog catches via the new `handoff_start_timeout` 5-min threshold). Reviewer surfaced the race that ruled out a Firestore write from this branch: without our own runId we can't fence safely, and a stalled cold-start invocation could clobber a newer turn that took over after watchdog flipped the original.
+
+### End state (2026-04-28 evening)
+
+- One architecture: browser → `agentStream` → Vertex AI Reasoning Engine → Firestore.
+- No rollback infrastructure, no transport selection, no allowlist, no Cloud Tasks queue, no Cloud Run worker, no legacy Firestore fields.
+- ~700 LOC removed across PRs #21-24 in addition to the ~4,400 LOC removed by Phase 9 Stage 1.
+- Test suites green at session end: **174 pytest** + 17 skipped, **63 functions**, **59 vitest**, **22 rules**.
+- Tags preserve audit trail: `gear-migration-probes-archive` (R3 probe scripts at the pre-Stage-1 commit), `phase9-scaffolding-archive` (`spikes/` + `phase0_measure.py` + `probe-stream-query.js` at the pre-PR-22 commit). Restoration via `git checkout <tag> -- <path>`.
+- Live verifications: rev 60+ of `agentstream` deployed; `GEAR_REASONING_ENGINE_RESOURCE` env var set; watchdog flipped a synthetic stuck session in 91 s with the new `heartbeat_lost` reason; sidebar listener cold-loads correctly post-field-migration; follow-up turn arg shape verified live.
+
+Migration is closed.
