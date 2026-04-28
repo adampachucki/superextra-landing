@@ -44,12 +44,12 @@ The Vite dev server is managed by a **systemd user service** — it runs automat
 
 ## Testing
 
-Four test suites — **run all before pushing changes to chat transport, Cloud Functions, worker, or agent code**:
+Four test suites — **run all before pushing changes to Cloud Functions, the agent app, or chat-state code**:
 
 - `npm run test` — Vitest: Firestore stream client, chat state machine, chat-recovery, plus any `.spec.ts`/`.test.ts` files
 - `cd functions && npm test` — Node test runner: agentStream, gearHandoff, watchdog, utils
-- `npm run test:rules` — Firestore rules emulator (sessions + events collection-group reads/writes)
-- `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — pytest: worker, Firestore-event mapper, source extraction, Places tools, instruction providers
+- `npm run test:rules` — Firestore rules emulator (sessions + per-session events reads/writes)
+- `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — pytest: plugin runtime, Firestore-event mapper, source extraction, Places tools, instruction providers
 - `npm run test:evals` — live Gemini eval calls for router instructions (not in CI)
 
 ## Branding
@@ -115,7 +115,7 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 
 Browser POSTs to `agentStream` (Cloud Function) → `agentStream` hands off directly to a deployed Vertex AI Agent Engine Reasoning Engine (`GEAR_REASONING_ENGINE_RESOURCE`) via `gearHandoff()`. The agent runs inside Agent Engine; `FirestoreProgressPlugin` (in `agent/superextra_agent/firestore_progress.py`) writes progress + terminal state to Firestore from inside the engine. Runs survive client disconnect for ≥240s.
 
-Browser reads state via two `onSnapshot` observers (`sessions/{sid}` for terminal; `collectionGroup('events')` for progress).
+Browser reads state via two `onSnapshot` observers (`sessions/{sid}` for terminal; the per-session subcollection `sessions/{sid}/events` for progress).
 
 Watchdog (`watchdog.js`, scheduled every 2 min) flips stuck sessions to `status=error` inside a fenced transaction.
 
@@ -130,7 +130,7 @@ Push to `main` → `.github/workflows/deploy.yml`:
 
 The agent app is hosted as a Vertex AI Agent Engine Reasoning Engine; redeploy via `agent_engines.update(...)` from the agent venv when the agent code changes.
 
-For deployment gotchas (Cloud Run worker, Cloud Tasks IAM, Firestore indexes, watchdog, rerun policy): @docs/deployment-gotchas.md
+For deployment gotchas (Firebase env-var replace behavior, Firestore indexes, watchdog, Reasoning Engine deploys): @docs/deployment-gotchas.md
 
 ## Assume nothing — verify
 

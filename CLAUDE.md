@@ -119,7 +119,7 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 
 Browser POSTs to `agentStream` (Cloud Function) → `agentStream` hands off directly to a deployed Vertex AI Agent Engine Reasoning Engine (`GEAR_REASONING_ENGINE_RESOURCE`) via `gearHandoff()`. The agent runs inside Agent Engine; `FirestoreProgressPlugin` (in `agent/superextra_agent/firestore_progress.py`) writes progress + terminal state to Firestore from inside the engine. Runs survive client disconnect for ≥240s.
 
-Browser reads state via two `onSnapshot` observers (`sessions/{sid}` for terminal; `collectionGroup('events')` for progress).
+Browser reads state via two `onSnapshot` observers (`sessions/{sid}` for terminal; the per-session subcollection `sessions/{sid}/events` for progress).
 
 Watchdog (`watchdog.js`, scheduled every 2 min) flips stuck sessions to `status=error` inside a fenced transaction.
 

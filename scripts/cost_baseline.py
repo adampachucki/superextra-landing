@@ -1,27 +1,26 @@
-"""Weekly transport-cost baseline for the GEAR migration window.
+"""Weekly cost-baseline harness.
 
-Pulls the last N days of usage proxies for both transports so we can spot
-a meaningful spend delta between the legacy Cloud Run worker baseline
-and the live Reasoning Engine. NOT a $ figure — Reasoning Engine spend
-is opaque from Cloud Monitoring; Vertex AI SKUs only resolve in BigQuery
-billing export (not enabled for this project) or the GCP Console
-billing UI.
+Pulls the last N days of usage proxies for the gear runtime + the
+agentStream entry point so we can compare against the Vertex AI line
+items in the GCP Console Billing UI. NOT a $ figure — Reasoning Engine
+spend is opaque from Cloud Monitoring; Vertex AI SKUs only resolve in
+BigQuery billing export (not enabled for this project) or the Console.
 
-Usage proxies that ARE here:
+Usage proxies queried:
 
 - gear (Reasoning Engine path): `aiplatform.googleapis.com/generate_content_requests_per_minute_per_project_per_base_model`
   + `aiplatform.googleapis.com/generate_content_input_tokens_per_minute_per_base_model`
   These ARE intended to count Gemini calls made FROM INSIDE the engine.
   **Important caveat (verified 2026-04-27):** at our project level these
   metrics return 0 even when gear runs are happening — Reasoning Engine
-  appears to bill Gemini calls against the engine's tenant project,
-  not the customer project. The script keeps querying them in case
-  Google changes the attribution; until then, dollar-figure comparison
-  has to come from the GCP Console Billing UI (last paragraph of the
-  output) which DOES surface the spend correctly.
-- cloudrun (legacy worker): `run.googleapis.com/request_count` +
-  `run.googleapis.com/container/billable_instance_time` for service
-  `superextra-worker`. These ARE billed.
+  bills Gemini calls against the engine's tenant project, not the
+  customer project. The script keeps querying in case Google changes
+  attribution; until then, dollar comparison comes from the GCP Console
+  Billing UI (last paragraph of the output).
+- cloudrun (legacy worker): vestigial — `superextra-worker` was deleted
+  in Phase 9 Stage 2 (2026-04-28). Queries left in place because they
+  return 0 cleanly and document the historical comparison; remove the
+  block in any future refactor of this script.
 
 Re-run this weekly. After Stage B was flipped on 2026-04-27 19:22 UTC,
 worker traffic should taper to sticky cloudrun sessions only and gear
