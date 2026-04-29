@@ -4,7 +4,7 @@ The agent runtime is hosted as a Vertex AI Agent Engine Reasoning Engine. Browse
 
 ## Vertex AI Agent Engine
 
-- **Redeploy via `agent_engines.update(...)`.** No Cloud Run build, no Dockerfile. The agent venv (`agent/.venv/`) carries the deploy tooling; pickle the agent app + redeploy in-place. Engine resource ID stays stable across redeploys.
+- **Redeploy via `agent/scripts/redeploy_engine.py`.** No Cloud Run build, no Dockerfile. The agent venv (`agent/.venv/`) carries the deploy tooling; the script wraps `agent_engines.update(...)`, applies the local ADC credential workaround, pickle-checks the app, and redeploys in-place when run with `--yes`. Engine resource ID stays stable across redeploys.
 - **`GEAR_REASONING_ENGINE_RESOURCE` is read by `agentStream` at request time.** Set in `functions/.env.superextra-site` (which the GHA workflow writes at deploy time) and as a fallback constant in `functions/gear-handoff.js:DEFAULT_RESOURCE`. Belt-and-suspenders: the env-var path is the override, the constant is the floor.
 - **Calls FROM INSIDE the engine to Gemini are billed against the engine's tenant project**, not `superextra-site`. Cloud Monitoring metrics for `aiplatform.googleapis.com/generate_content_*` therefore return 0 at our project level even when gear runs are happening. Use the GCP Console → Billing UI for actual spend; see `scripts/cost_baseline.py` for the proxy queries.
 - **Filesystem inside the engine is read-only** except `/tmp`.
