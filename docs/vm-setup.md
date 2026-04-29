@@ -139,6 +139,31 @@ Host superextra-vm
 
 Key optimizations: `ObscureKeystrokeTiming no` (disables 20 ms delay), `Ciphers aes128-gcm` (hardware AES), `ControlMaster` (connection reuse).
 
+## IPv6-only network fallback
+
+The VM's public IP `34.38.81.215` is IPv4-only. Some networks (notably some EU mobile/home ISPs) put the Mac on IPv6-only with no v4 default route — direct ET/SSH to the VM fails with "no route to host".
+
+**The mechanism**: when v4 is unreachable, add `34.38.81.215` as a `/32` alias on `lo0` and bind a single `gcloud compute start-iap-tunnel` to that exact `IP:port`. The kernel routes traffic to the VM IP via lo0 → local gcloud listener → IAP → VM. Existing ET clients in already-open VS Code terminals reconnect transparently because their destination address didn't change.
+
+**SSH bootstrap (for ET's spawned `ssh adam@34.38.81.215`)**: a `Match host superextra-vm,34.38.81.215 exec "ifconfig lo0 | grep 34.38.81.215"` block in `~/.ssh/config` activates only when the alias is present and overrides with `ProxyCommand gcloud compute start-iap-tunnel ai-workstation %p --listen-on-stdin --zone=europe-west1-b --quiet`. No long-lived SSH tunnel needed.
+
+### Mac commands
+
+- `x` / `xl` / `xj` / `xk` / `xK` — same session API as in v4-direct mode; `_x_route` auto-engages IAP fallback when needed.
+- `x iap status` / `x iap up` / `x iap down` — manage the lo0 alias + tunnel manually. `up` prompts for admin auth (TouchID-capable via osascript when there's no TTY). State files: `/tmp/x-iap.{pid,log}`.
+- `vp up` — opens a SOCKS5 (`localhost:1080`) and HTTP CONNECT (`localhost:1081`) proxy through the VM, for tools that need to reach IPv4-only services like Azure cognitive services from an IPv6-only network. The HTTP CONNECT side runs a stdlib Python proxy at `~/bin/codex-connect-proxy.py` on the VM.
+- `codex-az` — auto-engages `HTTPS_PROXY=http://localhost:1081` when on IPv6-only (codex's reqwest honors HTTPS_PROXY for HTTP CONNECT but ignores SOCKS).
+
+### Auto-transition (launchd watcher)
+
+`~/bin/x-netchange.sh`, registered as a user agent at `~/Library/LaunchAgents/co.pachucki.x-netchange.plist`, fires on macOS `com.apple.system.config.network_change` notifications. On each fire:
+
+- Acts only when `v4_default` route presence flips, OR when a state mismatch is detected (alias present while v4 default route is also present — likely an orphan from a failed `iap_up`).
+- On `iap → v4_direct` transition: tears down `vp` (SOCKS+HTTP CONNECT) before dropping the SSH ControlMaster, so `ssh -O cancel` can reach it. Then bounces the `superextra-vm-sync` mutagen session.
+- On `iap_up` failure (e.g. gcloud auth blip, cold-start timeout): rolls back the half-set alias rather than stranding traffic at a dead lo0 socket.
+
+`/etc/sudoers.d/x-iap-lo0` whitelists `ifconfig lo0 alias 34.38.81.215/32` and `ifconfig lo0 -alias 34.38.81.215` NOPASSWD so the watcher can flip routing without prompting.
+
 ## Performance tuning
 
 ### VM TCP (`/etc/sysctl.conf`)
