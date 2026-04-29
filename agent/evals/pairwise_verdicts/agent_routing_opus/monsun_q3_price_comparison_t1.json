@@ -1,0 +1,20 @@
+{
+  "winner": "A",
+  "dimensions": {
+    "coverage": "A",
+    "specificity": "A",
+    "source_diversity": "TIE",
+    "actionability": "B",
+    "specialist_set_correctness": "A"
+  },
+  "supporting_urls": ["https://wolt.com", "https://pyszne.pl"],
+  "judge_model": "claude-opus-4-7",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "venue_key": "monsun",
+  "query_id": "q3_price_comparison",
+  "trial": 1,
+  "input_a_path": "agent/evals/results/V_baseline/monsun__q3_price_comparison_t1.json",
+  "input_b_path": "agent/evals/results/V_agenttool/monsun__q3_price_comparison_t1.json",
+  "justification": "As the operator, A is more useful. It hits the exact specialist set the question demands (menu_pricing, review_analyst, marketing_digital), and that shows up in the substance: a sourced platform-channel read (Wolt vs Pyszne.pl, HAOS's 11-13% delivery markup, MIWO's direct-order play) plus a 6% response-rate finding I can act on Monday. Pricing claims are concrete and quote real reviews verbatim, tying value perception to execution inconsistency rather than absolute price. B trades marketing_digital for revenue_sales, and it shows: estimated avg-check chart contradicts its own menu data (Restauracja Moon ranked highest spend at 105 PLN despite mains cheaper than Monsun's). B does land one sharper actionable insight - the Mon/Tue closed, 1 PM open, 8 PM close hours gap vs HAOS - but the internal inconsistency and softer sourcing don't outweigh A's tighter, better-cited operator brief."
+}

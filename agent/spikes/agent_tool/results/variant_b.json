@@ -1,0 +1,91 @@
+{
+  "label": "variant_b",
+  "started_at": "2026-04-29T09:10:16.753503+00:00",
+  "elapsed_s": 130.06,
+  "timed_out": false,
+  "error": null,
+  "events": [
+    {
+      "ts": 2118363.520424563,
+      "author": "research_orchestrator_b",
+      "invocation_id": "e-7ebb699b-cbb7-416a-a7f3-4a46d37eabd6",
+      "branch": null,
+      "id": "b855ea51-7ff2-4d4a-946a-7b3ba57e4b88",
+      "parts_count": 2,
+      "function_calls": [
+        {
+          "name": "menu_pricing",
+          "args_excerpt": "{\"request\": \"Analyze competitive menu and pricing for Monsun (\\u015awi\\u0119toja\\u0144ska 49, Gdynia) against its local competitive set: Bar Mleczny\\u2026\"}"
+        },
+        {
+          "name": "marketing_digital",
+          "args_excerpt": "{\"request\": \"Analyze the digital marketing and platform positioning for Monsun (\\u015awi\\u0119toja\\u0144ska 49, Gdynia) and its competitors: Bar Mle\\u2026\"}"
+        }
+      ],
+      "turn_complete": null,
+      "elapsed_s": 13.46
+    },
+    {
+      "ts": 2118468.504899753,
+      "author": "research_orchestrator_b",
+      "invocation_id": "e-7ebb699b-cbb7-416a-a7f3-4a46d37eabd6",
+      "branch": null,
+      "id": "863c2962-e69d-4673-a915-040c309ee078",
+      "parts_count": 2,
+      "function_responses": [
+        {
+          "name": "menu_pricing",
+          "response_len": 5908,
+          "response_excerpt": "{\"result\": \"Based on a deep-dive analysis of live delivery platforms (Wolt, Pyszne.pl, Glovo, Uber Eats) and restaurant menus as of April 2026, here is the competitive menu and pricing analysis for **…"
+        },
+        {
+          "name": "marketing_digital",
+          "response_len": 14,
+          "response_excerpt": "{\"result\": \"\"}"
+        }
+      ],
+      "state_delta_keys": [
+        "pricing_result"
+      ],
+      "turn_complete": null,
+      "elapsed_s": 118.45
+    },
+    {
+      "ts": 2118480.114231951,
+      "author": "research_orchestrator_b",
+      "invocation_id": "e-7ebb699b-cbb7-416a-a7f3-4a46d37eabd6",
+      "branch": null,
+      "id": "d4622b73-3798-4a1a-b2a8-00d8c394dd55",
+      "parts_count": 1,
+      "text_len": 721,
+      "text_excerpt": "I have dispatched the specialists, and the pricing data reveals that Monsun sits solidly in the upper-mid-tier ($$) bracket, with main dishes priced competitively alongside Pueblo and just below Tłusta Kaczka's premium offerings. While local venues typically apply a 15–30% delivery markup to offset …",
+      "state_delta_keys": [
+        "research_plan"
+      ],
+      "turn_complete": null,
+      "elapsed_s": 130.06
+    }
+  ],
+  "final_state_summary": {
+    "places_context": {
+      "type": "str",
+      "len": 936,
+      "excerpt": "TARGET RESTAURANT\n- Name: Monsun\n- Address: Świętojańska 49, 81-368 Gdynia, Poland\n- Place ID: ChIJ48HwEQCn_UYRmVqYQULc9pM\n- Rating: 4.6 (≈420 reviews)\n- Price level: $$\n- Cuisine: modern Polish, brunch-leaning\n- Service modes: dine-in, takeaway\n- Hours: Mon-Sun 09:00-22:00\n\nCOMPETITIVE SET (within "
+    },
+    "_target_place_id": {
+      "type": "str",
+      "len": 27,
+      "excerpt": "ChIJ48HwEQCn_UYRmVqYQULc9pM"
+    },
+    "pricing_result": {
+      "type": "str",
+      "len": 5678,
+      "excerpt": "Based on a deep-dive analysis of live delivery platforms (Wolt, Pyszne.pl, Glovo, Uber Eats) and restaurant menus as of April 2026, here is the competitive menu and pricing analysis for **Monsun** and its competitive set in Gdynia.\n\n*Note on Data Baseline: Live delivery data and actual menus diverge"
+    },
+    "research_plan": {
+      "type": "str",
+      "len": 721,
+      "excerpt": "I have dispatched the specialists, and the pricing data reveals that Monsun sits solidly in the upper-mid-tier ($$) bracket, with main dishes priced competitively alongside Pueblo and just below Tłusta Kaczka's premium offerings. While local venues typically apply a 15–30% delivery markup to offset "
+    }
+  }
+}

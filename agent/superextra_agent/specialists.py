@@ -12,10 +12,9 @@ from google.genai import Client, types
 
 from .apify_tools import get_google_reviews
 from .specialist_catalog import (
-    BRIEFABLE_SPECIALISTS,
+    ORCHESTRATOR_SPECIALISTS,
     ROLE_TITLES,
     SPECIALIST_OUTPUT_KEYS,
-    VALID_BRIEF_KEYS,
 )
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
 from .web_tools import fetch_web_content
@@ -116,8 +115,12 @@ _SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
 _NO_BASE = {"gap_researcher"}
 
 
-def _make_instruction(name: str, brief_key: str | None = None):
-    """Create an InstructionProvider that injects places_context and brief into the template."""
+def _make_instruction(name: str):
+    """Create an InstructionProvider that injects shared state into the template.
+
+    Specialist-specific briefs arrive as the AgentTool `request` user message,
+    so the instruction provider only supplies durable context.
+    """
     body = (INSTRUCTIONS_DIR / f"{name}.md").read_text()
     if name in _NO_BASE:
         template = body
@@ -125,7 +128,6 @@ def _make_instruction(name: str, brief_key: str | None = None):
         template = (_SPECIALIST_BASE
                     .replace("{specialist_body}", body)
                     .replace("{role_title}", ROLE_TITLES.get(name, name)))
-    _brief_key = brief_key or name
 
     def provider(ctx):
         places_context = ctx.state.get("places_context", "No Google Places data available.")
@@ -139,10 +141,6 @@ def _make_instruction(name: str, brief_key: str | None = None):
             target_place_id=target_place_id,
         )
         instruction += _SOURCE_GUIDANCE
-        briefs = ctx.state.get("specialist_briefs", {})
-        brief = briefs.get(_brief_key, "")
-        if brief:
-            instruction += f"\n\n## Your research brief\n\n{brief}"
         return instruction
 
     return provider
@@ -162,16 +160,6 @@ def _inject_geo_bias(*, callback_context, llm_request):
     return None
 
 
-def _make_skip_callback(name: str):
-    """Skip the specialist if the orchestrator didn't assign it a brief."""
-    def callback(*, callback_context):
-        briefs = callback_context.state.get("specialist_briefs", {})
-        if name not in briefs:
-            return types.Content(role="model", parts=[types.Part(text="NOT_RELEVANT")])
-        return None
-    return callback
-
-
 def _on_model_error(*, callback_context, llm_request, error):
     """Return a graceful fallback when the LLM call fails."""
     return LlmResponse(
@@ -187,50 +175,22 @@ def _on_tool_error(*, tool, args, tool_context, error):
     return {"error": f"Tool {tool.name} failed: {type(error).__name__}"}
 
 
-async def set_specialist_briefs(briefs: dict, tool_context) -> str:
-    """Assign research briefs to specialist agents.
-
-    Args:
-        briefs: Dict mapping specialist name to brief text.
-               Valid names: market_landscape, menu_pricing, revenue_sales,
-               guest_intelligence, location_traffic, operations,
-               marketing_digital, review_analyst,
-               dynamic_researcher_1
-
-    Note: review_analyst has structured review API tools (TripAdvisor).
-    Include the restaurant name and area in its brief so it can look up
-    the profile. guest_intelligence uses only google_search for independent
-    cross-platform research — do not assign both to the same platform.
-    """
-    invalid = set(briefs.keys()) - VALID_BRIEF_KEYS
-    if invalid:
-        logger.warning("Unknown specialist brief keys ignored: %s", invalid)
-    valid_briefs = {k: v for k, v in briefs.items() if k in VALID_BRIEF_KEYS}
-    tool_context.state["specialist_briefs"] = valid_briefs
-    return f"Briefs set for: {', '.join(valid_briefs.keys())}"
-
-
 def _make_specialist(name, description, output_key, tools=None, instruction_name=None, thinking_config=None):
-    """Create a specialist agent with standard callbacks and config.
+    """Create an AgentTool-compatible specialist.
 
-    `include_contents='none'` isolates the model call to its own instruction +
-    brief. The instruction provider (`_make_instruction`) already resolves
-    every piece of required context from `ctx.state` at runtime (places_context,
-    briefs), so the model doesn't need prior ADK conversation history — and
-    the history it would otherwise inherit (enricher output, orchestrator
-    reasoning, sibling specialist outputs with their own source blocks) was
-    pure prompt bloat.
+    `include_contents='default'` is intentional: AgentTool passes the
+    orchestrator's brief as the user message (`request`), while the instruction
+    provider injects shared state such as Places context.
     """
     return LlmAgent(
         name=name,
         model=SPECIALIST_GEMINI,
         description=description,
-        instruction=_make_instruction(instruction_name or name, brief_key=name),
+        instruction=_make_instruction(instruction_name or name),
         tools=tools or [google_search, fetch_web_content],
         output_key=output_key,
-        include_contents="none",
+        include_contents="default",
         generate_content_config=thinking_config if thinking_config is not None else THINKING_CONFIG,
-        before_agent_callback=_make_skip_callback(name),
         before_model_callback=_inject_geo_bias,
         on_model_error_callback=_on_model_error,
         on_tool_error_callback=_on_tool_error,
@@ -257,18 +217,18 @@ ALL_SPECIALISTS = [
         instruction_name=s.instruction_name,
         thinking_config=_THINKING_CONFIGS[s.thinking],
     )
-    for s in BRIEFABLE_SPECIALISTS
+    for s in ORCHESTRATOR_SPECIALISTS
 ]
 
 # --- Gap researcher (Phase 2 of two-phase research) ---
 
 _GAP_RESEARCHER_TEMPLATE = (INSTRUCTIONS_DIR / "gap_researcher.md").read_text()
 
-# Context pairs at the top, then every briefable specialist's output_key.
+# Context pairs at the top, then every orchestrator-callable specialist's output_key.
 # Derived so new specialists flow automatically.
 _GAP_RESEARCHER_KEYS = [
     "places_context", "research_plan",
-    *[s.output_key for s in BRIEFABLE_SPECIALISTS],
+    *[s.output_key for s in ORCHESTRATOR_SPECIALISTS],
 ]
 
 
@@ -283,39 +243,34 @@ def _gap_researcher_instruction(ctx):
 def _should_run_gap_researcher(callback_context):
     """Decide whether to invoke the gap researcher.
 
-    Gap research is a Gemini Pro + MEDIUM-thinking + 3-search call (~30–50K
-    tokens). The prior gate only skipped when no specialist produced any
-    output at all, so the step ran on almost every turn. This tightens the
-    decision to: inspect only orchestrator-assigned specialists, and run
-    when any of them either has no state entry or returned the model-error
-    fallback `"Research unavailable: …"` (see `_on_model_error`).
-
-    Unassigned specialists aren't iterated at all (they never appear in
-    `specialist_briefs`), so their `NOT_RELEVANT` outputs are irrelevant.
-    An orchestrator run with zero assigned specialists skips at the top.
+    The AgentTool architecture has no separate dispatch registry. That is
+    deliberate: the orchestrator calls only the specialists it needs, and
+    successful calls write their output keys into state. The gap step only
+    runs when a called specialist produced an explicit error fallback; silent
+    missing outputs are left to the orchestrator/synthesizer rather than
+    reintroducing a second tracking path.
     """
-    briefs = callback_context.state.get("specialist_briefs", {}) or {}
-    assigned = [n for n in briefs.keys() if n in SPECIALIST_OUTPUT_KEYS]
+    produced = {
+        name: callback_context.state.get(output_key)
+        for name, output_key in SPECIALIST_OUTPUT_KEYS.items()
+        if callback_context.state.get(output_key)
+    }
 
-    if not assigned:
-        # Orchestrator dispatched nothing — preserves the previous
-        # "no specialist outputs to analyze" skip behavior.
-        logger.info("gap gate: skip — no assigned specialists")
+    if not produced:
+        logger.info("gap gate: skip — no specialist outputs")
         return types.Content(role="model", parts=[types.Part(text="No specialist outputs to analyze.")])
 
     failures: list[str] = []
-    for spec_name in assigned:
-        value = callback_context.state.get(SPECIALIST_OUTPUT_KEYS[spec_name])
+    for spec_name, value in produced.items():
         if not isinstance(value, str) or value.startswith("Research unavailable: "):
             failures.append(spec_name)
 
     if not failures:
-        logger.info("gap gate: skip — %d/%d assigned specialists succeeded",
-                    len(assigned), len(assigned))
-        return types.Content(role="model", parts=[types.Part(text="All assigned specialists succeeded; no gaps to research.")])
+        logger.info("gap gate: skip — %d specialists succeeded", len(produced))
+        return types.Content(role="model", parts=[types.Part(text="All called specialists succeeded; no gaps to research.")])
 
-    logger.info("gap gate: run — %d/%d assigned specialists failed: %s",
-                len(failures), len(assigned), failures)
+    logger.info("gap gate: run — %d/%d specialists failed: %s",
+                len(failures), len(produced), failures)
     return None
 
 

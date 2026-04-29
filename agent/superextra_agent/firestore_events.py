@@ -428,8 +428,6 @@ def _has_state_delta(event: Any, key: str) -> bool:
     value = sd[key]
     if not value:
         return False
-    if isinstance(value, str) and value.strip() == "NOT_RELEVANT":
-        return False
     return True
 
 

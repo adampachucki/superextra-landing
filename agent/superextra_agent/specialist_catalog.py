@@ -9,8 +9,7 @@ table; every consumer derives its view.
 
 The catalog is intentionally **data-only** — no helper classes, no
 registries, no indirection. A future add-specialist step is: append one
-line here, update the orchestrator instruction's "Available specialists"
-list, and you're done.
+line here and add its instruction/body template.
 """
 from __future__ import annotations
 
@@ -23,8 +22,7 @@ class Specialist:
 
     Fields:
         name: Agent name — also the key used by the orchestrator in
-            `specialist_briefs` to dispatch work. Equal to `author` on
-            emitted events.
+            AgentTool dispatch. Equal to `author` on emitted events.
         output_key: State key the specialist writes its final report into.
         label: Human-readable title used in UI activity rows and prompts.
         description: One-sentence summary used by the orchestrator prompt
@@ -37,9 +35,9 @@ class Specialist:
         instruction_name: Optional override for which `.md` template to
             load. Defaults to `name`. `dynamic_researcher_1` reuses the
             generic `dynamic_researcher` template.
-        supports_brief: Whether the orchestrator can dispatch a brief to
-            this specialist. The gap researcher is excluded — it runs as
-            a distinct step, not part of the briefed pool.
+        dispatchable: Whether the orchestrator can call this specialist
+            directly as a tool. The gap researcher is excluded — it runs as
+            a distinct step after specialist dispatch.
     """
     name: str
     output_key: str
@@ -48,10 +46,10 @@ class Specialist:
     role_title: str
     thinking: str  # "high" | "medium"
     instruction_name: str | None = None
-    supports_brief: bool = True
+    dispatchable: bool = True
 
 
-# Orchestrator-assignable specialists + the gap researcher. Order matters
+# Orchestrator-callable specialists + the gap researcher. Order matters
 # for the fallback report stitch (see `_build_fallback_report` in agent.py)
 # — it's the canonical top-to-bottom structure of a report.
 SPECIALISTS: tuple[Specialist, ...] = (
@@ -59,7 +57,13 @@ SPECIALISTS: tuple[Specialist, ...] = (
         name="market_landscape",
         output_key="market_result",
         label="Market Landscape",
-        description="Analyzes restaurant market dynamics: openings, closings, competitor activity, cuisine trends, saturation, white space.",
+        description=(
+            "Restaurant openings, closings, competitor mapping, cuisine trends, "
+            "saturation, and white space — sourced from press, forums "
+            "(Trojmiasto.pl, Reddit), local food blogs, and government "
+            "registries. Best for 'who's new, who's gone, what's missing' "
+            "questions and trade-area scans."
+        ),
         role_title="Market Landscape research agent",
         thinking="high",
     ),
@@ -67,7 +71,16 @@ SPECIALISTS: tuple[Specialist, ...] = (
         name="menu_pricing",
         output_key="pricing_result",
         label="Menu & Pricing",
-        description="Analyzes menus, pricing, delivery markups, promotions, trending dishes.",
+        description=(
+            "Competitive menu and price analysis for the target restaurant and "
+            "competitive set. Pulls live data from delivery platforms "
+            "(Pyszne.pl, Wolt, Glovo, Uber Eats, Bolt Food), making this also "
+            "the strongest live signal of who is currently operating and on "
+            "which platforms. Compares delivery markup vs dine-in pricing, "
+            "surfaces promotions, lunch deals, trending dishes, and "
+            "dietary-trend adoption. Does NOT cover review sentiment about "
+            "price, marketing positioning, or revenue."
+        ),
         role_title="Menu & Pricing research agent",
         thinking="high",
     ),
@@ -75,7 +88,12 @@ SPECIALISTS: tuple[Specialist, ...] = (
         name="revenue_sales",
         output_key="revenue_result",
         label="Revenue & Sales",
-        description="Estimates revenue, check size, seasonality, channel splits, platform share.",
+        description=(
+            "Revenue estimates, check-size ranges, seasonality, channel splits "
+            "between dine-in/takeaway/delivery, and platform market share. "
+            "Pulls from industry reports, Eurostat, NielsenIQ-style "
+            "aggregators, and triangulates with platform listing density."
+        ),
         role_title="Revenue & Sales research agent",
         thinking="high",
     ),
@@ -83,7 +101,14 @@ SPECIALISTS: tuple[Specialist, ...] = (
         name="guest_intelligence",
         output_key="guest_result",
         label="Guest Intelligence",
-        description="Analyzes review sentiment, complaint/praise patterns, rating trends.",
+        description=(
+            "Cross-platform qualitative review sentiment via web search — "
+            "TheFork, delivery-platform reviews (Wolt/Pyszne/Glovo), food "
+            "blogs, Reddit, local forums, press coverage. Distinct from "
+            "review_analyst's structured-API analysis: this is the 'what are "
+            "people actually saying' lens. Does NOT touch Google Reviews or "
+            "TripAdvisor structured API (review_analyst's domain)."
+        ),
         role_title="Guest Intelligence research agent",
         thinking="medium",
     ),
@@ -91,7 +116,12 @@ SPECIALISTS: tuple[Specialist, ...] = (
         name="location_traffic",
         output_key="location_result",
         label="Location & Traffic",
-        description="Analyzes foot traffic, demographics, purchasing power, rent, trade areas.",
+        description=(
+            "Foot traffic, demographic catchment, purchasing power index, rent "
+            "as a market signal (vs operations which treats rent as a cost "
+            "ratio), and trade-area shape. Pulls from Eurostat, OpenStreetMap "
+            "density, mobility data, real-estate listings."
+        ),
         role_title="Location & Traffic research agent",
         thinking="medium",
     ),
@@ -99,7 +129,14 @@ SPECIALISTS: tuple[Specialist, ...] = (
         name="operations",
         output_key="ops_result",
         label="Operations",
-        description="Analyzes labor market, salary benchmarks, rent, supplier pricing.",
+        description=(
+            "Cost-side benchmarks for running a restaurant: salary ranges by "
+            "role from job boards, hiring difficulty signals, supplier and "
+            "ingredient pricing trends, and rent as a cost ratio (vs "
+            "location_traffic which treats rent as a market signal). Use for "
+            "any wage/labor question, hiring feasibility, or unit-economics "
+            "framing."
+        ),
         role_title="Operations research agent",
         thinking="high",
     ),
@@ -107,7 +144,17 @@ SPECIALISTS: tuple[Specialist, ...] = (
         name="marketing_digital",
         output_key="marketing_result",
         label="Marketing & Digital",
-        description="Analyzes social media, ads, delivery platform presence, web presence.",
+        description=(
+            "Live Instagram, TikTok, Facebook activity (follower count, "
+            "posting cadence, engagement, Reels) and Meta Ad Library data "
+            "(active ads, creative, launch dates) for the target restaurant "
+            "and competitive set. Canonical signal for new venues launching "
+            "(announced on social before press), brand momentum, and "
+            "competitor advertising spend. Also covers delivery-platform "
+            "positioning (rankings, photo quality, menu completeness) and "
+            "Google SERP/Business Profile presence. Does NOT analyze menus or "
+            "prices, review sentiment, or revenue."
+        ),
         role_title="Marketing & Digital research agent",
         thinking="medium",
     ),
@@ -115,7 +162,13 @@ SPECIALISTS: tuple[Specialist, ...] = (
         name="review_analyst",
         output_key="review_result",
         label="Review Analysis",
-        description="Quantitative review analysis from structured API sources: tourist/local breakdown, rating trends, owner engagement, rankings.",
+        description=(
+            "Quantitative review analysis from structured API sources: Google "
+            "Reviews + TripAdvisor (tourist/local breakdown, rating trends, "
+            "owner-engagement, ranking position). Apify-backed, includes "
+            "demographics. Best for hard numbers on review patterns; pair "
+            "with guest_intelligence for cross-platform qualitative."
+        ),
         role_title="Review Analyst",
         thinking="high",
     ),
@@ -123,7 +176,13 @@ SPECIALISTS: tuple[Specialist, ...] = (
         name="dynamic_researcher_1",
         output_key="dynamic_result_1",
         label="Dynamic Research",
-        description="Flexible research agent for investigating specific angles that don't fit the 7 specialist domains.",
+        description=(
+            "Flexible research agent for angles outside the 8 specialist "
+            "domains. Use for niche regulatory questions, one-off competitor "
+            "news, sector-specific events, or any topic where no other "
+            "specialist's data sources apply. Brief should name the exact "
+            "question and where to search."
+        ),
         role_title="flexible research agent",
         thinking="high",
         instruction_name="dynamic_researcher",
@@ -135,7 +194,7 @@ SPECIALISTS: tuple[Specialist, ...] = (
         description="Analyzes Phase 1 specialist outputs for gaps, contradictions, and underexplored angles.",
         role_title="Gap Researcher",
         thinking="medium",
-        supports_brief=False,
+        dispatchable=False,
     ),
 )
 
@@ -143,9 +202,9 @@ SPECIALISTS: tuple[Specialist, ...] = (
 # ── Derived views (never edit by hand) ──────────────────────────────────────
 
 
-#: Specialists the orchestrator can dispatch a brief to (everything minus gap).
-BRIEFABLE_SPECIALISTS: tuple[Specialist, ...] = tuple(
-    s for s in SPECIALISTS if s.supports_brief
+#: Specialists the orchestrator can call as tools (everything minus gap).
+ORCHESTRATOR_SPECIALISTS: tuple[Specialist, ...] = tuple(
+    s for s in SPECIALISTS if s.dispatchable
 )
 
 #: author → state output_key. Used by `firestore_events.AUTHOR_TO_OUTPUT_KEY`
@@ -155,27 +214,23 @@ AUTHOR_TO_OUTPUT_KEY: dict[str, str] = {s.name: s.output_key for s in SPECIALIST
 #: state output_key → UI label.
 OUTPUT_KEY_TO_LABEL: dict[str, str] = {s.output_key: s.label for s in SPECIALISTS}
 
-#: Brief-assignable specialist name → output_key. Used by the gap-gate to
-#: check which brief-assigned specialists succeeded or failed.
+#: Orchestrator-callable specialist name → output_key.
 SPECIALIST_OUTPUT_KEYS: dict[str, str] = {
-    s.name: s.output_key for s in BRIEFABLE_SPECIALISTS
+    s.name: s.output_key for s in ORCHESTRATOR_SPECIALISTS
 }
 
-#: Brief-assignable specialist name → role_title for `specialist_base.md`.
+#: Orchestrator-callable specialist name → role_title for `specialist_base.md`.
 ROLE_TITLES: dict[str, str] = {
-    (s.instruction_name or s.name): s.role_title for s in BRIEFABLE_SPECIALISTS
+    (s.instruction_name or s.name): s.role_title for s in ORCHESTRATOR_SPECIALISTS
 }
 
 #: Orchestrator-prompt lookup: output_key → label for "prior results" detection.
 #: Excludes gap research (it's a phase 2 output, not a phase 1 signal).
 SPECIALIST_RESULT_KEYS: dict[str, str] = {
-    s.output_key: s.label for s in BRIEFABLE_SPECIALISTS
+    s.output_key: s.label for s in ORCHESTRATOR_SPECIALISTS
 }
 
 #: Top-to-bottom structure of the fallback report stitched from specialist
 #: state when the synth callback needs to substitute a report. Order is the
 #: catalog order; includes the gap research section.
 FALLBACK_SECTIONS: list[tuple[str, str]] = [(s.output_key, s.label) for s in SPECIALISTS]
-
-#: Valid brief keys the orchestrator's `set_specialist_briefs` tool accepts.
-VALID_BRIEF_KEYS: frozenset[str] = frozenset(s.name for s in BRIEFABLE_SPECIALISTS)

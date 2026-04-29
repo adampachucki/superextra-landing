@@ -18,11 +18,12 @@ Three classes of write, three error semantics (plan §"Write-class taxonomy"):
   - **Best-effort** (timeline events, lastEventAt bumps): swallowed,
     logged; never halt the run.
 
-Plugin granularity (plan §4.2.2): production agents use
-``SequentialAgent``/``ParallelAgent`` composition, NOT ``AgentTool``. ADK
-fires plugin run-level callbacks once per root-runner invocation, so
-``claim_invocation`` runs ONCE per turn and the heartbeat lives for the
-full 7–15 min pipeline.
+Plugin granularity: production uses a top-level ``SequentialAgent`` with
+specialists called through ``AgentTool``. ADK fires run-level callbacks for
+each AgentTool child runner, so nested ``before_run``/``after_run`` callbacks
+are lifecycle no-ops. Per-event callbacks from child runners are routed back
+to the parent ``GearRunState`` by ``runId`` so live activity still reflects
+specialist work without a second progress path.
 """
 
 from __future__ import annotations
@@ -247,6 +248,24 @@ async def _heartbeat_loop(fs: firestore.Client, state: GearRunState) -> None:
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
+def _is_nested_invocation(invocation_context: InvocationContext) -> bool:
+    """True iff this invocation runs inside an `AgentTool`-spawned child
+    Runner.
+
+    `InvocationContext` has no first-class parent pointer (verified
+    against `agent/.venv/lib/python3.12/site-packages/google/adk/agents/invocation_context.py`),
+    so we discriminate by the session_service type. AgentTool's
+    `run_async` constructs the child Runner with a fresh
+    `InMemorySessionService` (`agent_tool.py:233`); top-level production
+    invocations come from agentStream which wires a Vertex AI session
+    service. Anything in-memory at run time is a nested AgentTool call.
+    """
+    from google.adk.sessions.in_memory_session_service import InMemorySessionService
+
+    svc = getattr(invocation_context, "session_service", None)
+    return isinstance(svc, InMemorySessionService)
+
+
 def _halt_content(reason: str) -> types.Content:
     """`before_run_callback` returning a ``types.Content`` triggers ADK's
     early-exit branch at ``runners.py:819``. Returning anything else
@@ -333,8 +352,35 @@ class FirestoreProgressPlugin(BasePlugin):
             self._fs = firestore.Client(project=self._project)
         return self._fs
 
+    def _state_for_event(
+        self, invocation_context: InvocationContext
+    ) -> GearRunState | None:
+        per = self._states.get(invocation_context.invocation_id)
+        if per is not None:
+            return per
+        if not _is_nested_invocation(invocation_context):
+            return None
+
+        session = getattr(invocation_context, "session", None)
+        state_dict = (getattr(session, "state", None) or {}) if session else {}
+        run_id = state_dict.get("runId")
+        if not isinstance(run_id, str) or not run_id:
+            return None
+
+        for state in self._states.values():
+            if state.run_id == run_id:
+                return state
+        return None
+
     @override
     async def before_run_callback(self, *, invocation_context: InvocationContext):
+        if _is_nested_invocation(invocation_context):
+            # AgentTool spawns a child Runner with its own InMemorySessionService
+            # for each tool call. The parent invocation already owns the
+            # Firestore session lifecycle (claim, heartbeat, terminal write);
+            # nested invocations must be no-ops here to avoid duplicate
+            # ownership claims and conflicting heartbeats.
+            return None
         fs = self._client()
         state = _build_state(fs, invocation_context)
         if state is None:
@@ -389,10 +435,12 @@ class FirestoreProgressPlugin(BasePlugin):
     async def on_event_callback(
         self, *, invocation_context: InvocationContext, event: Event
     ):
-        per = self._states.get(invocation_context.invocation_id)
+        per = self._state_for_event(invocation_context)
         if per is None:
             # Plugin saw an event for an invocation that wasn't claimed —
-            # before_run must have short-circuited. Ignore.
+            # before_run must have short-circuited, or an AgentTool child
+            # event arrived after the parent run had already finalized.
+            # Ignore.
             return None
 
         # observe_event maps an ADK event into 0+ timeline rows and mutates
@@ -442,6 +490,9 @@ class FirestoreProgressPlugin(BasePlugin):
 
     @override
     async def after_run_callback(self, *, invocation_context: InvocationContext):
+        if _is_nested_invocation(invocation_context):
+            # Nested invocation (AgentTool child) — parent owns lifecycle.
+            return None
         per = self._states.pop(invocation_context.invocation_id, None)
         if per is None:
             return None

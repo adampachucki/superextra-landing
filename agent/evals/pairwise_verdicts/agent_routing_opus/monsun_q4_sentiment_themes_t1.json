@@ -1,0 +1,14 @@
+{
+  "winner": "A",
+  "dimensions": {"coverage": "B", "specificity": "B", "source_diversity": "A", "actionability": "TIE", "specialist_set_correctness": "TIE"},
+  "supporting_urls": ["https://www.google.com/maps/place/Monsun+Gdynia", "https://www.trojmiasto.pl/"],
+  "judge_model": "claude-opus-4-7",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "venue_key": "monsun",
+  "query_id": "q4_sentiment_themes",
+  "trial": 1,
+  "input_a_path": "agent/evals/results/V_baseline/monsun__q4_sentiment_themes_t1.json",
+  "input_b_path": "agent/evals/results/V_agenttool/monsun__q4_sentiment_themes_t1.json",
+  "justification": "B writes the more sophisticated narrative — it adds Restauracja Chinska Shanghai as a declining-legacy reference, traces Monsun's lineage to Alga Street Food, quantifies review velocity (27/mo), and frames the Local-Guide share as a neighborhood-vs-transient proxy. Coverage and specificity tilt to B. But B's drawer shows only google.com (2 domains) while the prose name-drops Pyszne.pl 4.8/5, Uber Eats Gong Bao satisfaction, Wanderlog, and local food vlogs — sourcing claims the report cannot back. A actually pulls from six domains (eatzon, kukbuk, trojmiasto, wanderlog, wolt, google) and delivers equally concrete sentiment numbers (4.30 recent average, 16% Biang Biang mention rate, 34% Local Guides, 74/26 PL/EN split, 22% negative-response rate) without inventing citations. As the operator, A is the trustable read; B's hallucinated multi-platform sourcing is disqualifying on a sentiment-themes question. Specialist set is identical."
+}

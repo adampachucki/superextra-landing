@@ -1,11 +1,11 @@
 import logging
 
 from google.adk.agents.sequential_agent import SequentialAgent
-from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents import LlmAgent
 from google.adk.models.llm_response import LlmResponse
 from google.adk.apps import App
 from google.adk.tools import google_search
+from google.adk.tools.agent_tool import AgentTool
 from google.genai import types
 
 from .log_ctx import worker_sid
@@ -20,7 +20,7 @@ from .specialist_catalog import (
 from .specialists import (
     MODEL_GEMINI, SPECIALIST_GEMINI, THINKING_CONFIG, MEDIUM_THINKING_CONFIG,
     ORCHESTRATOR_THINKING_CONFIG,
-    ALL_SPECIALISTS, set_specialist_briefs, RETRY,
+    ALL_SPECIALISTS,
     _inject_geo_bias, _make_gemini, make_gap_researcher,
 )
 from .places_tools import get_restaurant_details, get_batch_restaurant_details, find_nearby_restaurants, search_restaurants
@@ -55,7 +55,7 @@ def _orchestrator_instruction(ctx):
             f"\n\n## Existing research from prior turn\n\n"
             f"Specialists with existing results: {', '.join(existing)}.\n\n"
             f"Prior research plan:\n{prior_plan}\n\n"
-            f"Only assign specialists for angles NOT already covered, "
+            f"Only call specialists for angles NOT already covered, "
             f"unless the follow-up explicitly needs to update or deepen an existing area."
         )
     return _ORCHESTRATOR_TEMPLATE.format(places_context=places_context) + follow_up_note
@@ -255,25 +255,23 @@ research_orchestrator = LlmAgent(
     name="research_orchestrator",
     model=MODEL_GEMINI,
     instruction=_orchestrator_instruction,
-    description="Plans research: reconnaissance, premise audit, and specialist brief assignment.",
-    tools=[google_search, set_specialist_briefs, fetch_web_content],
+    description="Plans research and calls specialist agents as tools.",
+    tools=[
+        google_search,
+        fetch_web_content,
+        *(AgentTool(agent=spec, include_plugins=True) for spec in ALL_SPECIALISTS),
+    ],
     output_key="research_plan",
     generate_content_config=ORCHESTRATOR_THINKING_CONFIG,
     before_model_callback=_inject_geo_bias,
-)
-
-specialist_pool = ParallelAgent(
-    name="specialist_pool",
-    sub_agents=ALL_SPECIALISTS,
-    description="Runs assigned specialists in parallel. Specialists without briefs skip instantly.",
 )
 
 # --- Pipeline ---
 
 research_pipeline = SequentialAgent(
     name="research_pipeline",
-    sub_agents=[_make_enricher(), research_orchestrator, specialist_pool, make_gap_researcher(), _make_synthesizer()],
-    description="Enriches context, plans research, runs specialists in parallel, then synthesizes findings.",
+    sub_agents=[_make_enricher(), research_orchestrator, make_gap_researcher(), _make_synthesizer()],
+    description="Enriches context, plans research, runs specialist tools, then synthesizes findings.",
 )
 
 # --- Router (root agent) ---

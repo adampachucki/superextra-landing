@@ -1,0 +1,14 @@
+{
+  "winner": "A",
+  "dimensions": {"coverage": "A", "specificity": "A", "source_diversity": "A", "actionability": "TIE", "specialist_set_correctness": "B"},
+  "supporting_urls": ["https://www.gdynia.pl", "https://wolt.com", "https://opener.pl", "https://trojmiasto.pl"],
+  "judge_model": "claude-opus-4-7",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "venue_key": "monsun",
+  "query_id": "qY_what_to_watch",
+  "trial": 1,
+  "input_a_path": "agent/evals/results/V_baseline/monsun__qY_what_to_watch_t1.json",
+  "input_b_path": "agent/evals/results/V_agenttool/monsun__qY_what_to_watch_t1.json",
+  "justification": "As the operator, A delivers more usable intelligence per page. Coverage favors A — it surfaces the failed beachfront food-truck tender (March 12, 66,000 PLN starting bid), legacy closures (Malika, Trafik, North Fish), competitor delivery promos, dietary tagging gaps, and a concrete Meta Ads white space, plus a priced delivery comparison across five competitors. B's edge is the hours-disconnect call-out (Monsun closing 8/9 PM during Open'er) and pedestrianization-permit angle, both genuinely operational, but B leans heavier on premise-restating prose. Specificity goes to A on dated events and named prices; source diversity also A (29 vs 20 domains, including delivery, municipal, press, festival sites). Specialist-set correctness clearly favors B: it dispatched exactly the expected market_landscape + marketing_digital + dynamic_researcher_1 trio, while A added location_traffic and menu_pricing. Actionability is roughly even — A's marketing tactics versus B's permit/hours moves. Holistically, A wins."
+}

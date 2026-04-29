@@ -1,0 +1,14 @@
+{
+  "winner": "A",
+  "dimensions": {"coverage": "A", "specificity": "TIE", "source_diversity": "B", "actionability": "A", "specialist_set_correctness": "TIE"},
+  "supporting_urls": ["https://trojmiasto.pl", "https://pracuj.pl"],
+  "judge_model": "claude-opus-4-7",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "venue_key": "monsun",
+  "query_id": "q8_wage_benchmarks",
+  "trial": 1,
+  "input_a_path": "agent/evals/results/V_baseline/monsun__q8_wage_benchmarks_t1.json",
+  "input_b_path": "agent/evals/results/V_agenttool/monsun__q8_wage_benchmarks_t1.json",
+  "justification": "As the Monsun operator, A is the more useful brief. A frames the 2026 hiring environment around concrete regulatory pressures an operator must manage this quarter — the EU Pay Transparency Directive forcing visible widelki, PIP's crackdown on misclassified umowa zlecenie, and the new seniority rules retroactively granting 26-day leave eligibility. Those are real compliance levers I can act on. A also flags the toxic 1.5%-of-sales tip-out mechanic specifically, which is a recruiting/retention issue I'd want to avoid replicating. B is broader on sourcing (36 domains vs 15, including TipTip's 17.88 PLN cashless-tip data and a PIE shadow-economy figure) and is internally consistent, but its core thesis leans on 'pod stolem' cash envelopes — not something a legitimate Swietojanska operator can build a hiring strategy around. B wins source_diversity; A wins coverage and actionability; specificity and specialist set are TIE. Overall A."
+}

@@ -1,0 +1,23 @@
+{
+  "winner": "B",
+  "dimensions": {
+    "coverage": "B",
+    "specificity": "B",
+    "source_diversity": "TIE",
+    "actionability": "B",
+    "specialist_set_correctness": "B"
+  },
+  "supporting_urls": [
+    "https://www.trojmiasto.pl/kulinaria/HAOS-o119938.html",
+    "https://www.trojmiasto.pl/raport/Rowerowy-rebus-na-Swietojanskiej-w-Gdyni-rt168009.html"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "input_a_path": "evals/results/V_baseline/monsun__qX_quietly_dying_t2.json",
+  "input_b_path": "evals/results/V_agenttool/monsun__qX_quietly_dying_t2.json",
+  "venue_key": "monsun",
+  "query_id": "qX_quietly_dying",
+  "raw_response": "Report B is substantially more useful for me as the operator of Monsun on Świętojańska. It wins decisively on **coverage** and **specificity** by providing a hyper-local analysis of my immediate street, correctly identifying a systemic infrastructure issue (the \"rowerowy rebus\") as the root cause of distress. This is a far more fundamental insight than Report A's more generic focus on the Asian dining scene across Gdynia. Report B's discovery of a \"shadow market\" of quietly failing businesses on real estate portals is exactly the kind of deep intelligence the query asked for. Furthermore, B is more **actionable**; its analysis of competitors *not* discounting but rather protecting margins and its identification of a price ceiling at a nearby cafe provide direct, nuanced guidance for my own pricing and channel strategy. While both reports are strong, B's granular, street-level focus and more sophisticated quantitative analysis (like review velocity) make it the superior strategic tool.\n\n```json\n{\"winner\": \"B\", \"dimensions\": {\"coverage\": \"B\", \"specificity\": \"B\", \"source_diversity\": \"TIE\", \"actionability\": \"B\", \"specialist_set_correctness\": \"B\"}, \"supporting_urls\": [\"https://www.trojmiasto.pl/kulinaria/HAOS-o119938.html\", \"https://www.trojmiasto.pl/raport/Rowerowy-rebus-na-Swietojanskiej-w-Gdyni-rt168009.html\"]}\n```",
+  "parse_error": null
+}

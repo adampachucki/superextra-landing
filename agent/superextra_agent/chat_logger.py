@@ -39,6 +39,18 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _is_nested_invocation(invocation_context: "InvocationContext") -> bool:
+    """True iff this invocation runs inside an `AgentTool`-spawned child
+    Runner. AgentTool constructs child runners with `InMemorySessionService`
+    (`agent_tool.py:233`); production parent invocations use a
+    Vertex/Firestore-backed session service.
+    """
+    from google.adk.sessions.in_memory_session_service import InMemorySessionService
+
+    svc = getattr(invocation_context, "session_service", None)
+    return isinstance(svc, InMemorySessionService)
+
+
 def _safe(obj: Any) -> Any:
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
@@ -111,6 +123,10 @@ class ChatLoggerPlugin(BasePlugin):
 
     @override
     async def before_run_callback(self, *, invocation_context: InvocationContext) -> types.Content | None:
+        if _is_nested_invocation(invocation_context):
+            # AgentTool child runner — parent invocation already logged
+            # invocation_start. Avoid duplicate lifecycle markers.
+            return None
         sid = self._session_id(invocation_context)
         self._write(sid, {
             "event": "invocation_start",
@@ -132,6 +148,8 @@ class ChatLoggerPlugin(BasePlugin):
 
     @override
     async def after_run_callback(self, *, invocation_context: InvocationContext) -> None:
+        if _is_nested_invocation(invocation_context):
+            return None
         sid = self._session_id(invocation_context)
         self._write(sid, {
             "event": "invocation_end",

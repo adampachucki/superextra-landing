@@ -1,0 +1,14 @@
+{
+  "winner": "A",
+  "dimensions": {"coverage": "A", "specificity": "A", "source_diversity": "A", "actionability": "A", "specialist_set_correctness": "A"},
+  "supporting_urls": ["https://pyszne.pl", "https://www.gdynia.pl", "https://radiogdansk.pl", "https://trojmiasto.pl"],
+  "judge_model": "claude-opus-4-7",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "venue_key": "monsun",
+  "query_id": "qX_quietly_dying",
+  "trial": 1,
+  "input_a_path": "agent/evals/results/V_baseline/monsun__qX_quietly_dying_t1.json",
+  "input_b_path": "agent/evals/results/V_agenttool/monsun__qX_quietly_dying_t1.json",
+  "justification": "As the operator of Monsun, A is materially more useful. It names four specific nearby competitors and dissects each with dated review quotes, response-rate percentages (0% vs 70%), exact menu/price evidence (Bistro u Misia rebranded to zupy-i-pierogi on Pyszne.pl, 24 PLN żurek; Polonia raw-pork-via-Glovo complaints), and a Meta Ad Library sweep confirming nobody is discounting — that is a clean opening to capture fleeing diners through service quality, not price. B reads like a macro think-piece: structurally sound on the Riviera-effect and rent-bailout narrative, but its drawer is two domains (google.com, tripadvisor.com), it admits TripAdvisor is dormant, and it flags API limitations rather than working around them. A's specialist set also better matches the expected market_landscape/menu_pricing/review_analyst trio (B drops menu_pricing). B's only edge is a slightly cleaner narrative thesis, which doesn't outweigh the evidence gap."
+}

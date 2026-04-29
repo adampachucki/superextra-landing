@@ -1,0 +1,23 @@
+{
+  "winner": "A",
+  "dimensions": {
+    "coverage": "A",
+    "specificity": "A",
+    "source_diversity": "A",
+    "actionability": "A",
+    "specialist_set_correctness": "A"
+  },
+  "supporting_urls": [
+    "https://trojmiasto.pl",
+    "https://www.gdynia.pl"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "input_a_path": "evals/results/V_baseline/monsun__qX_quietly_dying_t1.json",
+  "input_b_path": "evals/results/V_agenttool/monsun__qX_quietly_dying_t1.json",
+  "venue_key": "monsun",
+  "query_id": "qX_quietly_dying",
+  "raw_response": "As the owner of Monsun, my goal is to find weaknesses in my competitors that I can exploit. I need specific, tactical information, not just a high-level market summary. I'm looking for who is bleeding, why, and how I can attract their dissatisfied customers.\n\n**Overall Winner:** A\n\n**Dimensional Scores:**\n\n1.  **coverage** — `A`. Variant A provides a much more complete picture. It covers the macro environment (rent crisis), identifies specific struggling competitors with detailed reasons (Bistro u Misia, Polonia), names a thriving competitor to learn from (3 Burger), and analyzes the promotional landscape. Variant B focuses heavily on the macro story and already-closed venues, offering less insight into the currently operating, vulnerable businesses that I can actually compete against today.\n2.  **specificity** — `A`. Variant A is far more specific and granular. Its analysis of the \"last 30 reviews\" to calculate momentum is a killer feature, revealing recent declines that overall ratings mask. It cites specific menu changes on Pyszne.pl (\"zupy i pierogi\"), prices (24 PLN Żurek), and damning customer quotes. Variant B's chart of overall ratings is less insightful, and its analysis, while good, remains at a higher level.\n3.  **source_diversity** — `A`. Variant A demonstrates true multi-source analysis, pulling from local press, business registries, multiple delivery platforms (Pyszne, Wolt, Glovo), and the Meta Ad Library. Variant B's listed sources are only Google and TripAdvisor, making it appear like a mono-source report, even though it references press articles in its text. A's approach is more robust and verifiable.\n4.  **actionability** — `A`. This is the deciding factor. I can immediately form a plan based on Variant A. I know Bistro u Misia has service and menu problems, so I can target their former customers with ads emphasizing authentic Asian cuisine and excellent service. I know Restauracja Polonia has alleged food safety issues, so I can highlight my kitchen's hygiene standards. Variant B tells me to focus on delivery, which is good advice, but it doesn't give me the specific, tactical ammunition against my direct competitors that A does.\n5.  **specialist_set_correctness** — `A`. Variant A correctly included the `menu_pricing` specialist, which was essential for uncovering the \"menu hollowing\" at Bistro u Misia and the pricing vulnerability of the kebab shop—key signals of distress. Variant B missed this specialist, and its report is weaker for it, failing to identify these crucial operational changes.\n\n### Overall Justification\n\nVariant A is the decisive winner because it delivers precisely what an operator needs: specific, actionable intelligence on direct competitors. It moves beyond the high-level market analysis, which both reports cover well, to pinpoint the exact operational failures at specific venues like Bistro u Misia and Restauracja Polonia. By analyzing recent review momentum, menu changes on delivery platforms, and management response rates, it uncovers \"quiet\" signs of trouble that I can immediately exploit with targeted marketing and operational adjustments. Variant B provides good strategic context about the market's structural problems but fails to deliver the same tactical value. It tells me who has already died or who is thriving, whereas Variant A tells me who is currently wounded and vulnerable, which is infinitely more useful for winning market share this week.\n\n```json\n{\"winner\": \"A\", \"dimensions\": {\"coverage\": \"A\", \"specificity\": \"A\", \"source_diversity\": \"A\", \"actionability\": \"A\", \"specialist_set_correctness\": \"A\"}, \"supporting_urls\": [\"https://trojmiasto.pl\", \"https://www.gdynia.pl\"]}\n```",
+  "parse_error": null
+}

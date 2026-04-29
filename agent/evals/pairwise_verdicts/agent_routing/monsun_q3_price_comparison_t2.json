@@ -1,0 +1,24 @@
+{
+  "winner": "A",
+  "dimensions": {
+    "coverage": "A",
+    "specificity": "A",
+    "source_diversity": "TIE",
+    "actionability": "A",
+    "specialist_set_correctness": "A"
+  },
+  "supporting_urls": [
+    "https://wolt.com",
+    "https://trojmiasto.pl",
+    "https://www.pyszne.pl/"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "input_a_path": "evals/results/V_baseline/monsun__q3_price_comparison_t2.json",
+  "input_b_path": "evals/results/V_agenttool/monsun__q3_price_comparison_t2.json",
+  "venue_key": "monsun",
+  "query_id": "q3_price_comparison",
+  "raw_response": "Report A is substantially more useful and reliable for me as the operator of Monsun. It provides a more comprehensive and accurate picture of the competitive landscape, correctly identifying not only pricing tiers but also the nuanced promotional strategies of each competitor. Its key advantage is its specificity and correctness, particularly in distinguishing Monsun's strategy from that of its sister restaurant, ALGA—a critical detail that Report B completely missed, leading to a dangerously flawed conclusion about my own promotional activities. Report A's analysis of value perception, including the quantitative data on review keywords and the psychological benefit of my all-inclusive bowl pricing, offers directly actionable insights. While both reports correctly identified my premium positioning, Report A's superior specialist set (`marketing_digital`, `review_analyst`) resulted in a more granular, trustworthy, and ultimately actionable intelligence brief that I could use to confidently steer my business this week.\n\n```json\n{\"winner\": \"A\", \"dimensions\": {\"coverage\": \"A\", \"specificity\": \"A\", \"source_diversity\": \"TIE\", \"actionability\": \"A\", \"specialist_set_correctness\": \"A\"}, \"supporting_urls\": [\"https://wolt.com\", \"https://trojmiasto.pl\", \"https://www.pyszne.pl/\"]}\n```",
+  "parse_error": null
+}
