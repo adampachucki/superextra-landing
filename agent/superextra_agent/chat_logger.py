@@ -103,6 +103,8 @@ class ChatLoggerPlugin(BasePlugin):
         # track model/tool call start times for duration logging
         self._model_starts: dict[str, float] = {}  # invocation_id -> time
         self._tool_starts: dict[str, float] = {}  # function_call_id -> time
+        self._parent_session_by_run_id: dict[str, str] = {}
+        self._run_id_by_root_invocation: dict[str, str] = {}
 
     def _log_file(self, session_id: str) -> Path:
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -117,6 +119,24 @@ class ChatLoggerPlugin(BasePlugin):
             logger.exception("Failed to write chat log")
 
     def _session_id(self, ctx: InvocationContext) -> str:
+        return self._session_id_for_invocation(ctx)
+
+    def _run_id(self, ctx: InvocationContext) -> str | None:
+        state = getattr(getattr(ctx, "session", None), "state", None) or {}
+        run_id = state.get("runId") if isinstance(state, dict) else None
+        return run_id if isinstance(run_id, str) and run_id else None
+
+    def _session_id_for_invocation(self, ctx: InvocationContext) -> str:
+        if _is_nested_invocation(ctx):
+            run_id = self._run_id(ctx)
+            if run_id and run_id in self._parent_session_by_run_id:
+                return self._parent_session_by_run_id[run_id]
+        return ctx.session.id
+
+    def _session_id_for_context(self, ctx: CallbackContext | ToolContext) -> str:
+        invocation_context = getattr(ctx, "_invocation_context", None)
+        if invocation_context is not None:
+            return self._session_id_for_invocation(invocation_context)
         return ctx.session.id
 
     # ── lifecycle ──
@@ -128,6 +148,10 @@ class ChatLoggerPlugin(BasePlugin):
             # invocation_start. Avoid duplicate lifecycle markers.
             return None
         sid = self._session_id(invocation_context)
+        run_id = self._run_id(invocation_context)
+        if run_id:
+            self._parent_session_by_run_id[run_id] = sid
+            self._run_id_by_root_invocation[invocation_context.invocation_id] = run_id
         self._write(sid, {
             "event": "invocation_start",
             "invocation_id": invocation_context.invocation_id,
@@ -155,12 +179,17 @@ class ChatLoggerPlugin(BasePlugin):
             "event": "invocation_end",
             "invocation_id": invocation_context.invocation_id,
         })
+        run_id = self._run_id_by_root_invocation.pop(
+            invocation_context.invocation_id, None
+        )
+        if run_id:
+            self._parent_session_by_run_id.pop(run_id, None)
 
     # ── agent ──
 
     @override
     async def before_agent_callback(self, *, agent: BaseAgent, callback_context: CallbackContext) -> types.Content | None:
-        sid = callback_context.session.id
+        sid = self._session_id_for_context(callback_context)
         self._write(sid, {
             "event": "agent_start",
             "invocation_id": callback_context.invocation_id,
@@ -170,7 +199,7 @@ class ChatLoggerPlugin(BasePlugin):
 
     @override
     async def after_agent_callback(self, *, agent: BaseAgent, callback_context: CallbackContext) -> types.Content | None:
-        sid = callback_context.session.id
+        sid = self._session_id_for_context(callback_context)
         self._write(sid, {
             "event": "agent_end",
             "invocation_id": callback_context.invocation_id,
@@ -182,7 +211,7 @@ class ChatLoggerPlugin(BasePlugin):
 
     @override
     async def before_model_callback(self, *, callback_context: CallbackContext, llm_request: LlmRequest) -> LlmResponse | None:
-        sid = callback_context.session.id
+        sid = self._session_id_for_context(callback_context)
         inv = callback_context.invocation_id
         self._model_starts[inv] = time.monotonic()
         self._write(sid, {
@@ -197,7 +226,7 @@ class ChatLoggerPlugin(BasePlugin):
 
     @override
     async def after_model_callback(self, *, callback_context: CallbackContext, llm_response: LlmResponse) -> LlmResponse | None:
-        sid = callback_context.session.id
+        sid = self._session_id_for_context(callback_context)
         inv = callback_context.invocation_id
         duration = None
         if inv in self._model_starts:
@@ -234,7 +263,7 @@ class ChatLoggerPlugin(BasePlugin):
 
     @override
     async def on_model_error_callback(self, *, callback_context: CallbackContext, llm_request: LlmRequest, error: Exception) -> LlmResponse | None:
-        sid = callback_context.session.id
+        sid = self._session_id_for_context(callback_context)
         inv = callback_context.invocation_id
         duration = None
         if inv in self._model_starts:
@@ -258,7 +287,7 @@ class ChatLoggerPlugin(BasePlugin):
     async def before_tool_callback(self, *, tool: BaseTool, tool_args: dict[str, Any], tool_context: ToolContext) -> dict | None:
         call_id = tool_context.function_call_id or ""
         self._tool_starts[call_id] = time.monotonic()
-        sid = tool_context.session.id
+        sid = self._session_id_for_context(tool_context)
         self._write(sid, {
             "event": "tool_call",
             "invocation_id": tool_context.invocation_id,
@@ -276,7 +305,7 @@ class ChatLoggerPlugin(BasePlugin):
         if call_id in self._tool_starts:
             duration = round(time.monotonic() - self._tool_starts.pop(call_id), 2)
 
-        sid = tool_context.session.id
+        sid = self._session_id_for_context(tool_context)
         self._write(sid, {
             "event": "tool_result",
             "invocation_id": tool_context.invocation_id,
@@ -295,7 +324,7 @@ class ChatLoggerPlugin(BasePlugin):
         if call_id in self._tool_starts:
             duration = round(time.monotonic() - self._tool_starts.pop(call_id), 2)
 
-        sid = tool_context.session.id
+        sid = self._session_id_for_context(tool_context)
         self._write(sid, {
             "event": "tool_error",
             "invocation_id": tool_context.invocation_id,

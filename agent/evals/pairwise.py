@@ -41,7 +41,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -123,10 +122,7 @@ Give a 1-paragraph justification (~150 words) referencing the dimensional reason
 Now: which is the better answer for this operator on this question?"""
 
 
-# Find the trailing JSON object — must contain "winner" and may contain
-# "dimensions". We look for the last `{...}` block in the text that has
-# "winner" in it (allows multi-line JSON across `dimensions`).
-_JSON_BLOCK = re.compile(r"\{[\s\S]*\"winner\"[\s\S]*\}", re.DOTALL)
+_VALID_WINNERS = {"A", "B", "TIE"}
 
 
 def _build_prompt(a: dict, b: dict, a_label: str, b_label: str) -> str:
@@ -155,34 +151,53 @@ def _build_prompt(a: dict, b: dict, a_label: str, b_label: str) -> str:
 
 
 def _parse_response(text: str) -> dict:
-    """Pull the JSON winner block out of the response."""
-    # Search for the LAST JSON block — judges sometimes write a sketch
-    # earlier in their response.
-    matches = list(_JSON_BLOCK.finditer(text))
-    if not matches:
+    """Pull the final verdict JSON object out of the response."""
+    parsed = _find_verdict_json(text)
+    if parsed is None:
         return {
             "winner": None,
             "dimensions": {},
             "supporting_urls": [],
             "parse_error": "no_json",
         }
-    raw = matches[-1].group(0)
-    # Strip ``` fencing if the regex picked it up.
-    raw = raw.strip().strip("`")
-    try:
-        parsed = json.loads(raw)
-        return {
-            "winner": parsed.get("winner"),
-            "dimensions": parsed.get("dimensions") or {},
-            "supporting_urls": parsed.get("supporting_urls") or [],
-        }
-    except json.JSONDecodeError as e:
+
+    winner = parsed.get("winner")
+    if winner not in _VALID_WINNERS:
         return {
             "winner": None,
             "dimensions": {},
-            "supporting_urls": [],
-            "parse_error": f"json: {e}",
+            "supporting_urls": parsed.get("supporting_urls") or [],
+            "parse_error": f"invalid_winner:{winner!r}",
         }
+
+    return {
+        "winner": winner,
+        "dimensions": parsed.get("dimensions") or {},
+        "supporting_urls": parsed.get("supporting_urls") or [],
+    }
+
+
+def _find_verdict_json(text: str) -> dict | None:
+    """Return the last JSON object in `text` that contains a verdict winner.
+
+    Judges sometimes include examples or prose with braces before the final
+    answer. Regex is brittle for nested JSON, so scan object starts from the
+    end and let `json.JSONDecoder` handle the actual syntax.
+    """
+    decoder = json.JSONDecoder()
+    for idx in range(len(text) - 1, -1, -1):
+        if text[idx] != "{":
+            continue
+        candidate = text[idx:].lstrip()
+        try:
+            parsed, end = decoder.raw_decode(candidate)
+        except json.JSONDecodeError:
+            continue
+        if candidate[end:].lstrip()[:1] in {",", "}", "]"}:
+            continue
+        if isinstance(parsed, dict) and "winner" in parsed:
+            return parsed
+    return None
 
 
 def _judge_gemini(prompt: str, model: str) -> str:
@@ -284,6 +299,14 @@ def main() -> int:
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(out, indent=2, ensure_ascii=False))
+    if out["parse_error"] or out["winner"] not in _VALID_WINNERS:
+        print(
+            f"[pairwise] ERROR: could not parse valid verdict from judge response; "
+            f"parse_error={out['parse_error']}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
     print(
         f"[pairwise] {a_label} vs {b_label} on {a_data.get('venue_key')}/{a_data.get('query_id')}: "
         f"winner={parsed.get('winner')}, dims={parsed.get('dimensions')}, "
