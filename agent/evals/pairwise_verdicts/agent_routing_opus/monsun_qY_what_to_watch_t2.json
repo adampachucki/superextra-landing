@@ -1,0 +1,14 @@
+{
+  "winner": "A",
+  "dimensions": {"coverage": "A", "specificity": "A", "source_diversity": "A", "actionability": "TIE", "specialist_set_correctness": "B"},
+  "supporting_urls": ["https://www.trojmiasto.pl", "https://zdiz.gdynia.pl"],
+  "judge_model": "claude-opus-4-7",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "venue_key": "monsun",
+  "query_id": "qY_what_to_watch",
+  "trial": 2,
+  "input_a_path": "agent/evals/results/V_baseline/monsun__qY_what_to_watch_t2.json",
+  "input_b_path": "agent/evals/results/V_agenttool/monsun__qY_what_to_watch_t2.json",
+  "justification": "As Monsun's GM, A delivers the more complete operator brief. Coverage: A spans market churn, event traffic, internal review health, digital marketing, delivery economics, and direct-compset positioning; B drops the review/operational lens entirely and scans an Asian-cuisine peer set (HAOS, NARA, Chinese Wok) less relevant to a Świętojańska street-level operator than A's actual neighbors (Mąka i Kawa, FLOW, Wymówka, Santorini, Gdynianka). Specificity: A cites 4.36 recent rating, 16% kitchen-complaint rate, 6% owner-reply rate, 100 PLN/m² rent benchmark, plus the damning 41-minute-wait owner quote; B's logistics dates are sharp but its competitive numbers are thinner. Source diversity: A pulls 22 domains across delivery, real estate, press, community, government; B has 12. Actionability ties — B's dated delivery-blackout list is sharp, A's outdoor-stall and tone-correction calls cover more ground. B wins specialist correctness (exact expected set), but A's review_analyst add earned its keep by surfacing operational liabilities B never sees."
+}

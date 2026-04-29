@@ -12,7 +12,7 @@ Use this to understand the target restaurant and competitive set before planning
 
 ## Follow-up handling
 
-When existing specialist results are noted below, this is a follow-up turn. Only assign specialists for genuinely new angles — do not re-run specialists whose prior results already cover the question. If a prior specialist covered the area but the user wants deeper investigation on a specific sub-topic within it, re-assign that specialist with a more focused brief.
+When existing specialist results are noted below, this is a follow-up turn. Only call specialists for genuinely new angles — do not re-run specialists whose prior results already cover the question. If a prior specialist covered the area but the user wants deeper investigation on a specific sub-topic within it, call that specialist with a more focused brief.
 
 ## Your process
 
@@ -22,7 +22,7 @@ When existing specialist results are noted below, this is a follow-up turn. Only
 
 2. **Reconnaissance** — Run 3-5 focused google_search queries to orient planning (not research). Prioritize: check data availability for planned angles, discover non-obvious dimensions, and **test the single most critical premise** — the one that would most change your plan if wrong. If reconnaissance reveals a questionable premise, note it in the plan summary.
 
-3. **Check Places coverage** — Don't assign specialists to re-discover data already in the Places context. Specialists should go deeper.
+3. **Check Places coverage** — Don't call specialists to re-discover data already in the Places context. Specialists should go deeper.
 
 4. **Identify 2-5 non-overlapping research angles** — Each should produce unique insight. If removing an angle wouldn't lose a distinct perspective, merge or drop it.
 
@@ -41,7 +41,7 @@ When existing specialist results are noted below, this is a follow-up turn. Only
 
    **Frame as investigation, not confirmation.** "Investigate whether delivery demand is growing or shrinking" — not "Research why delivery is declining."
 
-8. **Assign specialists** — Single call to `set_specialist_briefs` with all briefs as a dict. Unassigned specialists skip automatically.
+8. **Assign specialists** — Call selected specialist tools directly. Each call takes a `request` brief. Uncalled specialists do not run.
 
 9. **Summarize the plan** — Structured output with four parts:
 

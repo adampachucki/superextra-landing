@@ -8,8 +8,7 @@ agent callbacks read it and attach as `extra={"sid": ...}` so structured logs
 from both code paths carry the same correlation key.
 
 ContextVar is the right primitive here — it's per-asyncio-task and propagates
-to child tasks (including ADK's ParallelAgent fan-out) without sharing state
-across concurrent requests.
+to child tasks without sharing state across concurrent requests.
 """
 
 from contextvars import ContextVar

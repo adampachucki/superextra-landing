@@ -1,0 +1,14 @@
+{
+  "winner": "A",
+  "dimensions": {"coverage": "A", "specificity": "A", "source_diversity": "TIE", "actionability": "A", "specialist_set_correctness": "TIE"},
+  "supporting_urls": ["https://www.trojmiasto.pl/", "https://www.kukbuk.pl/"],
+  "judge_model": "claude-opus-4-7",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "venue_key": "monsun",
+  "query_id": "q4_sentiment_themes",
+  "trial": 2,
+  "input_a_path": "agent/evals/results/V_baseline/monsun__q4_sentiment_themes_t2.json",
+  "input_b_path": "agent/evals/results/V_agenttool/monsun__q4_sentiment_themes_t2.json",
+  "justification": "As the operator, A is sharper and more useful. A delivers a structured 50-review sample with a rating-distribution chart, language split (66% PL / 34% EN), Local-Guide share (36%), and three named complaint patterns with concrete percentages — Biang Biang execution polarity (33% of negatives), return-visit quality drop (8%), and defensive management responses (6%). Each maps directly to a Monday-morning intervention. B reframes the authenticity critique as 'isolated' and rests its vulnerability case on a single stale-soup anecdote, which softens rather than sharpens the picture an owner actually needs. Both dispatched the right pair (review_analyst + guest_intelligence) and both pull from Trojmiasto, delivery apps, and Google, so source diversity and specialist correctness tie. A's rating-math (215/50 = 4.30 vs. stated 4.34) is a minor drift but its claims are internally cross-referenced; B is internally consistent but thinner. A wins overall on coverage, specificity, and actionability."
+}

@@ -351,6 +351,23 @@ def _mock_invocation_context(*, sid: str, run_id: str, turn_idx: int, invocation
     )
 
 
+def _mock_nested_invocation_context(*, run_id: str, turn_idx: int, invocation_id: str):
+    """Stand-in for an AgentTool child invocation."""
+    from google.adk.sessions.in_memory_session_service import InMemorySessionService
+
+    session = SimpleNamespace(
+        id=f"child-{invocation_id}",
+        state={"runId": run_id, "turnIdx": turn_idx, "attempt": 1},
+    )
+    return SimpleNamespace(
+        invocation_id=invocation_id,
+        session=session,
+        user_id="user-test",
+        user_content=None,
+        session_service=InMemorySessionService(),
+    )
+
+
 @pytest.mark.asyncio
 async def test_plugin_before_run_halts_when_state_missing(monkeypatch):
     """If session.state has no runId, before_run returns a `types.Content`
@@ -681,6 +698,51 @@ async def test_plugin_on_event_writes_timeline_events(monkeypatch):
     assert state.timeline_writer.write_timeline.await_count == 2
 
     # Cleanup
+    state.heartbeat_task.cancel()
+    await asyncio.gather(state.heartbeat_task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_plugin_on_event_routes_agenttool_child_events_to_parent_state(monkeypatch):
+    """AgentTool child runners have their own invocation ids. Their events
+    must still update the parent run's Firestore timeline via runId."""
+    plugin = FirestoreProgressPlugin(project="superextra-site")
+    plugin._fs = MagicMock()
+
+    async def _claim(_fs, _state):
+        return None
+
+    async def _no_title(_q):
+        return None
+
+    async def _no_hb(_fs, _state):
+        await asyncio.sleep(60)
+
+    async def _no_fenced(_fs, _state, _updates):
+        return None
+
+    monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
+    monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
+    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "fenced_session_update", _no_fenced)
+
+    parent_ctx = _mock_invocation_context(
+        sid="abc", run_id="r-1", turn_idx=1, invocation_id="inv-parent"
+    )
+    await plugin.before_run_callback(invocation_context=parent_ctx)
+    state = plugin._states["inv-parent"]
+    state.timeline_writer.write_timeline = AsyncMock(return_value=None)
+    state.observe_event = MagicMock(return_value=[{"kind": "detail", "text": "nested"}])
+
+    child_ctx = _mock_nested_invocation_context(
+        run_id="r-1", turn_idx=1, invocation_id="inv-child"
+    )
+    fake_event = SimpleNamespace()
+    await plugin.on_event_callback(invocation_context=child_ctx, event=fake_event)
+
+    state.observe_event.assert_called_once_with(fake_event)
+    assert state.timeline_writer.write_timeline.await_count == 1
+
     state.heartbeat_task.cancel()
     await asyncio.gather(state.heartbeat_task, return_exceptions=True)
 

@@ -1,0 +1,11 @@
+{
+  "venues": [
+    {
+      "key": "monsun",
+      "name": "Monsun",
+      "secondary": "Świętojańska, Gdynia, Poland",
+      "context_note": "high street retail context",
+      "place_id": "ChIJ48HwEQCn_UYRmVqYQULc9pM"
+    }
+  ]
+}

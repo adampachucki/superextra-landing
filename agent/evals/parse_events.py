@@ -24,6 +24,7 @@ from superextra_agent.firestore_events import (
 _GAP_SKIP_TEXTS = {
     "No specialist outputs to analyze.",
     "All assigned specialists succeeded; no gaps to research.",
+    "All called specialists succeeded; no gaps to research.",
 }
 
 # Sentinel text embedded by _build_fallback_report in agent.py. Presence
@@ -47,7 +48,7 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
         fetched_urls: list[str]              # unique URLs passed to fetch_web_content
         provider_pills: list[dict]           # _tool_src_* state_delta entries
         drawer_sources: list[dict]           # what sources[] would contain
-        specialists_dispatched: list[str]    # from specialist_briefs state_delta
+        specialists_dispatched: list[str]    # specialist tool calls observed
         gap_ran: bool
         synth_outcome: "ok" | "fallback" | "unknown"
         final_report: str                    # synthesizer/follow_up final text
@@ -98,7 +99,8 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                 if isinstance(url, str) and url:
                     fetched_urls.add(url)
 
-        # state_delta inspection: provider pills, specialists dispatched, outputs, synth fallback
+        # state_delta inspection: provider pills, historical dispatch keys,
+        # outputs, synth fallback.
         sd = _state_delta(event)
         for key, value in sd.items():
             if key.startswith("_tool_src_") and isinstance(value, dict):
@@ -126,6 +128,20 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                 v = _get(usage, field)
                 if isinstance(v, int):
                     token_totals[bucket] += v
+
+    # AgentTool-shaped pipelines have no `specialist_briefs` state_delta.
+    # Derive dispatch from specialist tool calls. The state_delta branch above
+    # remains only for historical eval captures produced before 2026-04-29.
+    if not specialists_dispatched:
+        try:
+            from superextra_agent.specialist_catalog import ORCHESTRATOR_SPECIALISTS
+
+            specialist_names = {s.name for s in ORCHESTRATOR_SPECIALISTS}
+            specialists_dispatched = sorted(
+                name for name in tool_call_counts.keys() if name in specialist_names
+            )
+        except Exception:
+            pass  # best-effort — if catalog import fails, leave empty
 
     # gap_ran: true iff the gap researcher produced non-sentinel output
     gap_ran = bool(gap_result_text) and gap_result_text not in _GAP_SKIP_TEXTS

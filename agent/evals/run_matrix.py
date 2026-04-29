@@ -92,17 +92,27 @@ async def _resolve_place_ids(venues: list[dict]) -> None:
 
 
 async def _run_single(
-    runner,
+    app,
     svc,
-    app_name: str,
+    base_plugins: list,
     venue: dict,
     query_spec: dict,
     user_id_prefix: str,
+    trial: int | None = None,
 ) -> dict:
-    """Run a single query × venue end-to-end and return the captured run record."""
+    """Run a single query × venue end-to-end and return the captured run record.
+
+    Builds a fresh Runner per call with a per-run `EventCapturePlugin` so
+    specialist events emitted inside `AgentTool` child runners are captured
+    too (they don't bubble up through the parent runner's iterator). Both
+    Variant A and Variant B runs use the same capture path — apples-to-apples.
+    """
+    from google.adk.runners import Runner
+    from google.adk.apps import App
     from google.genai import types
 
     from evals.parse_events import parse_run
+    from superextra_agent.event_capture_plugin import EventCapturePlugin
 
     today = datetime.date.today().isoformat()
     pid = venue.get("place_id") or "unknown"
@@ -112,21 +122,32 @@ async def _run_single(
     )
     full_query = f"[Date: {today}] {context} {query_spec['text']}"
 
-    user_id = f"{user_id_prefix}-{venue['key']}-{query_spec['id']}"
-    session = await svc.create_session(app_name=app_name, user_id=user_id)
+    trial_suffix = f"-t{trial}" if trial is not None else ""
+    user_id = f"{user_id_prefix}-{venue['key']}-{query_spec['id']}{trial_suffix}"
+    session = await svc.create_session(app_name=app.name, user_id=user_id)
     msg = types.Content(role="user", parts=[types.Part(text=full_query)])
 
-    events: list = []
+    capture = EventCapturePlugin()
+    eval_app = App(
+        name=app.name,
+        root_agent=app.root_agent,
+        plugins=[*base_plugins, capture],
+        events_compaction_config=app.events_compaction_config,
+        context_cache_config=app.context_cache_config,
+        resumability_config=app.resumability_config,
+    )
+    runner = Runner(app=eval_app, session_service=svc)
+
     t0 = time.monotonic()
     started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     error: str | None = None
     timed_out = False
 
     async def _consume() -> None:
-        async for evt in runner.run_async(
+        async for _evt in runner.run_async(
             user_id=user_id, session_id=session.id, new_message=msg
         ):
-            events.append(evt)
+            pass  # capture plugin records; we don't need the iterator's view
 
     try:
         # 20-min per-run cap — phase0 gate is 22 min p99, so this is a ceiling.
@@ -138,18 +159,22 @@ async def _run_single(
         error = f"{type(e).__name__}: {e}"
 
     elapsed = time.monotonic() - t0
-    parsed = parse_run(events)
+    # Use plugin-captured events — superset of the runner-iterated stream;
+    # required to see specialist events under AgentTool wrapping.
+    parsed = parse_run(capture.events)
 
     return {
         "query_id": query_spec["id"],
         "query_text": query_spec["text"],
         "query_pill_category": query_spec.get("pill_category"),
         "query_primary_probe": bool(query_spec.get("primary_probe")),
+        "expected_specialists": query_spec.get("expected_specialists"),
         "venue_key": venue["key"],
         "venue_name": venue["name"],
         "venue_secondary": venue.get("secondary"),
         "place_id": pid,
         "adk_session_id": session.id,
+        "trial": trial,
         "started_at": started_at,
         "elapsed_s": round(elapsed, 2),
         "timed_out": timed_out,
@@ -160,10 +185,11 @@ async def _run_single(
 
 async def _run_matrix_in_process(args: argparse.Namespace) -> int:
     """Child-process entry point: imports agent, runs matrix, writes JSONs."""
-    from google.adk.runners import Runner
     from google.adk.sessions.vertex_ai_session_service import VertexAiSessionService
 
     from superextra_agent.agent import app
+
+    print(f"[runner] using superextra_agent.agent:app", flush=True)
 
     queries = json.loads(Path(args.queries).read_text())["queries"]
     venues_data = json.loads(Path(args.venues).read_text())["venues"]
@@ -197,40 +223,89 @@ async def _run_matrix_in_process(args: argparse.Namespace) -> int:
         location="us-central1",
         agent_engine_id="2746721333428617216",
     )
-    runner = Runner(app=app, session_service=svc)
 
+    # The eval bypasses the agentStream → Vertex AI Reasoning Engine handoff,
+    # so `FirestoreProgressPlugin` would halt with `gear_handoff_state_missing`
+    # (missing runId) or `invocation_not_claimable` (no Firestore session
+    # document to claim). Strip Firestore-tied plugins; keep the others
+    # (chat logger, optional EventCapturePlugin) so the eval still records
+    # what we need.
+    from superextra_agent.firestore_progress import FirestoreProgressPlugin
+
+    eval_plugins = [
+        p for p in (app.plugins or []) if not isinstance(p, FirestoreProgressPlugin)
+    ]
+    print(
+        f"[runner] running with {len(eval_plugins)} of {len(app.plugins or [])} "
+        f"app plugins (FirestoreProgressPlugin stripped)",
+        flush=True,
+    )
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    combos = [(v, q) for v in venues_data for q in queries]
+    # Trials: --trials N means each (venue, query) pair runs N times with
+    # `_t1`, `_t2`, ... filename suffixes. Default 1 (no suffix).
+    n_trials = max(1, int(args.trials or 1))
+    trial_indices: list[int | None] = (
+        [None] if n_trials == 1 else list(range(1, n_trials + 1))
+    )
+
+    combos = [
+        (v, q, t) for v in venues_data for q in queries for t in trial_indices
+    ]
     print(
         f"[runner] variant={args.variant} combos={len(combos)} "
-        f"(venues={len(venues_data)}, queries={len(queries)})",
+        f"(venues={len(venues_data)}, queries={len(queries)}, trials={n_trials})",
         flush=True,
     )
 
-    for i, (venue, query) in enumerate(combos, 1):
-        out_path = out_dir / f"{venue['key']}__{query['id']}.json"
+    concurrency = max(1, int(args.concurrency or 4))
+    sem = asyncio.Semaphore(concurrency)
+    print(f"[runner] concurrency={concurrency}", flush=True)
+
+    async def _run_combo(idx: int, venue: dict, query: dict, trial: int | None):
+        suffix = f"_t{trial}" if trial is not None else ""
+        out_path = out_dir / f"{venue['key']}__{query['id']}{suffix}.json"
         if out_path.exists() and not args.force:
-            print(f"[runner] ({i}/{len(combos)}) skip existing {out_path.name}", flush=True)
-            continue
-        print(
-            f"[runner] ({i}/{len(combos)}) venue={venue['key']} query={query['id']}",
-            flush=True,
+            print(
+                f"[runner] ({idx}/{len(combos)}) skip existing {out_path.name}",
+                flush=True,
+            )
+            return
+        async with sem:
+            print(
+                f"[runner] ({idx}/{len(combos)}) START venue={venue['key']} "
+                f"query={query['id']}{suffix}",
+                flush=True,
+            )
+            rec = await _run_single(
+                app, svc, eval_plugins, venue, query, args.variant, trial=trial
+            )
+            rec["variant"] = args.variant
+            out_path.write_text(
+                json.dumps(rec, indent=2, ensure_ascii=False, default=str)
+            )
+            status = (
+                "TIMEOUT" if rec["timed_out"] else ("ERROR" if rec["error"] else "OK")
+            )
+            synth = rec.get("synth_outcome", "?")
+            n_drawer = len(rec.get("drawer_sources") or [])
+            n_fetched = len(rec.get("fetched_urls") or [])
+            print(
+                f"[runner] ({idx}/{len(combos)}) {status} "
+                f"elapsed={rec['elapsed_s']:.1f}s synth={synth} "
+                f"drawer={n_drawer} fetched={n_fetched} "
+                f"specialists={rec.get('specialists_dispatched')} "
+                f"err={rec['error']}",
+                flush=True,
+            )
+
+    await asyncio.gather(
+        *(
+            _run_combo(i, venue, query, trial)
+            for i, (venue, query, trial) in enumerate(combos, 1)
         )
-        rec = await _run_single(runner, svc, app.name, venue, query, args.variant)
-        rec["variant"] = args.variant
-        out_path.write_text(json.dumps(rec, indent=2, ensure_ascii=False, default=str))
-        status = "TIMEOUT" if rec["timed_out"] else ("ERROR" if rec["error"] else "OK")
-        synth = rec.get("synth_outcome", "?")
-        n_drawer = len(rec.get("drawer_sources") or [])
-        n_fetched = len(rec.get("fetched_urls") or [])
-        print(
-            f"[runner] ({i}/{len(combos)}) {status} elapsed={rec['elapsed_s']:.1f}s "
-            f"synth={synth} drawer={n_drawer} fetched={n_fetched} "
-            f"specialists={rec.get('specialists_dispatched')} err={rec['error']}",
-            flush=True,
-        )
+    )
 
     return 0
 
@@ -244,6 +319,18 @@ def _main() -> int:
     parser.add_argument("--force", action="store_true", help="overwrite existing run JSONs")
     parser.add_argument("--query-id", help="run only this query id")
     parser.add_argument("--venue-key", help="run only this venue key")
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=4,
+        help="max concurrent in-flight runs (default 4)",
+    )
+    parser.add_argument(
+        "--trials",
+        type=int,
+        default=1,
+        help="run each combo N times with _t{N} filename suffix (default 1)",
+    )
     parser.add_argument(
         "--child",
         action="store_true",
@@ -286,6 +373,10 @@ def _main() -> int:
             child_cmd += ["--query-id", args.query_id]
         if args.venue_key:
             child_cmd += ["--venue-key", args.venue_key]
+        if args.concurrency:
+            child_cmd += ["--concurrency", str(args.concurrency)]
+        if args.trials and args.trials != 1:
+            child_cmd += ["--trials", str(args.trials)]
         print(
             f"[runner] spawning child: variant={args.variant} "
             f"instructions={variant_dir}",

@@ -1,0 +1,24 @@
+{
+  "winner": "A",
+  "dimensions": {
+    "coverage": "A",
+    "specificity": "A",
+    "source_diversity": "A",
+    "actionability": "TIE",
+    "specialist_set_correctness": "A"
+  },
+  "supporting_urls": [
+    "https://trojmiasto.pl/",
+    "https://www.gdynia.pl/",
+    "https://gratka.pl/"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "a_label": "V_baseline",
+  "b_label": "V_agenttool",
+  "input_a_path": "evals/results/V_baseline/monsun__q1_openings_closings_t1.json",
+  "input_b_path": "evals/results/V_agenttool/monsun__q1_openings_closings_t1.json",
+  "venue_key": "monsun",
+  "query_id": "q1_openings_closings",
+  "raw_response": "As the owner of Monsun, I need intelligence that helps me understand not just my direct competitors, but the fundamental market forces shaping my street. Report A is significantly more useful for this purpose. While Report B provides an excellent and highly specific tactical analysis of a new, direct competitor (NEON), its focus is too narrow. Report A delivers a superior strategic overview by identifying the core reasons for recent business failures—namely, the \"Rowerowy Rebus\" traffic disruption and extreme real estate cost pressures. This insight, derived from a more diverse source set including real estate and government portals, explains the *why* behind the market volatility. It correctly frames my survival and success as being a \"destination-worthy\" concept that can overcome these environmental frictions. Report A’s analysis of the purely domestic customer base and their price sensitivity is also a critical piece of strategic information that B misses. Ultimately, A gives me a complete operating playbook for my specific location, while B only gives me a battle plan against a single opponent.\n\n```json\n{\"winner\": \"A\", \"dimensions\": {\"coverage\": \"A\", \"specificity\": \"A\", \"source_diversity\": \"A\", \"actionability\": \"TIE\", \"specialist_set_correctness\": \"A\"}, \"supporting_urls\": [\"https://trojmiasto.pl/\", \"https://www.gdynia.pl/\", \"https://gratka.pl/\"]}\n```",
+  "parse_error": null
+}

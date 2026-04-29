@@ -1,0 +1,75 @@
+{
+  "queries": [
+    {
+      "id": "q1_openings_closings",
+      "pill_category": "competitor_tracking",
+      "pill_color": "cyan",
+      "primary_probe": true,
+      "text": "What has opened or closed in my area recently?",
+      "expected_specialists": [
+        "market_landscape",
+        "menu_pricing",
+        "marketing_digital",
+        "review_analyst"
+      ]
+    },
+    {
+      "id": "q3_price_comparison",
+      "pill_category": "price_positioning",
+      "pill_color": "amber",
+      "primary_probe": true,
+      "text": "How does our menu pricing compare to competitors within 1 km?",
+      "expected_specialists": [
+        "menu_pricing",
+        "review_analyst",
+        "marketing_digital"
+      ]
+    },
+    {
+      "id": "q4_sentiment_themes",
+      "pill_category": "sentiment_trends",
+      "pill_color": "orange",
+      "primary_probe": false,
+      "text": "What are the real sentiment themes across our reviews and competitors?",
+      "expected_specialists": [
+        "review_analyst",
+        "guest_intelligence"
+      ]
+    },
+    {
+      "id": "q8_wage_benchmarks",
+      "pill_category": "wage_benchmarking",
+      "pill_color": "green",
+      "primary_probe": false,
+      "text": "What are restaurants near us actually paying for every role?",
+      "expected_specialists": [
+        "operations",
+        "dynamic_researcher_1"
+      ]
+    },
+    {
+      "id": "qX_quietly_dying",
+      "pill_category": "off_matrix",
+      "pill_color": "slate",
+      "primary_probe": false,
+      "text": "Which restaurants near us are quietly losing momentum or could be in trouble?",
+      "expected_specialists": [
+        "market_landscape",
+        "menu_pricing",
+        "review_analyst"
+      ]
+    },
+    {
+      "id": "qY_what_to_watch",
+      "pill_category": "off_matrix",
+      "pill_color": "slate",
+      "primary_probe": false,
+      "text": "What should I be watching in the local food and drink scene over the next 3 months?",
+      "expected_specialists": [
+        "market_landscape",
+        "marketing_digital",
+        "dynamic_researcher_1"
+      ]
+    }
+  ]
+}

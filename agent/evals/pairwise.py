@@ -1,27 +1,31 @@
 """Scripted pairwise judge for variant comparisons.
 
-Compares two run JSONs (typically V0 vs V2.1 on the same venue × query) and
-emits a structured verdict using Gemini 2.5 Pro as the judge model.
-
-This script is the **cheap unattended path** — fast, scriptable, and useful
-for catching obvious regressions across many comparisons. For high-stakes
-or close-call decisions, use **Claude subagents in-session as operator
-judges** instead (the pattern documented in
-`docs/research-depth-pairwise-verdicts-2026-04-25.md`). Subagents have
-WebFetch and produce richer verifiable verdicts; the scripted Gemini judge
-does not verify cited claims live, only reasons about internal consistency.
+Compares two run JSONs (typically Variant A vs Variant B on the same
+venue × query) and emits a structured verdict. Default judge is Claude
+Opus 4.7 (`claude-opus-4-7`), chosen because the system being judged
+runs on Gemini — same-family correlation bias would inflate scores for
+Gemini-shaped outputs. Falls back to Gemini 2.5 Pro if `--model` starts
+with `gemini`.
 
 Usage:
     .venv/bin/python evals/pairwise.py \\
-        --a evals/results/V0/monsun__q1_openings_closings.json \\
-        --b evals/results/V2_1/monsun__q1_openings_closings.json \\
-        --out evals/pairwise_verdicts/monsun_q1_V0_vs_V2_1.json
+        --a evals/results/V_baseline/monsun__q3_price_comparison_t1.json \\
+        --b evals/results/V_agenttool/monsun__q3_price_comparison_t1.json \\
+        --out evals/pairwise_verdicts/agenttool/monsun_q3_t1.json \\
+        --model claude-opus-4-7
 
-Output JSON:
+Output JSON (backwards-compatible: `winner` field always present):
     {
         "winner": "A" | "B" | "TIE",
+        "dimensions": {
+            "coverage": "A" | "B" | "TIE",
+            "specificity": "A" | "B" | "TIE",
+            "source_diversity": "A" | "B" | "TIE",
+            "actionability": "A" | "B" | "TIE",
+            "specialist_set_correctness": "A" | "B" | "TIE"
+        },
         "supporting_urls": [...],
-        "judge_model": "gemini-2.5-pro",
+        "judge_model": "claude-opus-4-7",
         "a_label": "<variant_a name>",
         "b_label": "<variant_b name>",
         "input_a_path": "...",
@@ -66,19 +70,28 @@ _load_dotenv(AGENT_DIR / ".env")
 
 _PROMPT_TEMPLATE = """You are roleplaying as the owner/GM of {venue_name} at {venue_secondary}. You asked an AI service: "{query}"
 
-Two AI-generated reports follow. Variant A is "{a_label}"; Variant B is "{b_label}". Both ran on the same query and venue. Your job is to decide which is more useful **as the operator would**.
+Two AI-generated reports follow. Variant A is "{a_label}"; Variant B is "{b_label}". Both ran on the same query and venue. Your job is to decide which is more useful **as the operator would**, scoring each named dimension.
 
-Compare along four axes:
-1. Actionability — what could you do this week based on each report?
-2. Specificity that verifies — do named figures, dates, and venues hold up?
-3. Coverage of what matters for this query type — relevant evidence surfaces (delivery platforms, social, press, municipal, registries, neighborhood context).
-4. Signal-to-noise — generic prose vs operator-relevant detail.
+## Dimensions to score
 
-Spot-check at least one specific claim in each report by reasoning about internal consistency and cross-references between the report's named entities, dates, prices, and the cited drawer domains. (Note: you do not have live web access in this judging call — that's reserved for higher-stakes Claude subagent judging when needed.)
+For each dimension below, pick a winner (`A`, `B`, or `TIE`):
 
-Pick a winner: A, B, or TIE. Give a 1-paragraph justification (~150 words). End your response with EXACTLY this JSON line and nothing after it:
+1. **coverage** — Did the report address all relevant angles for this question type? Look for missing perspectives a real operator would want.
+2. **specificity** — Does the report cite concrete numbers, named competitors, dated events, sourced claims? Or does it default to generic prose?
+3. **source_diversity** — Did the report draw from at least two source types (delivery platforms, social, community/forums, press, government, structured-API)? Mono-source reports are weaker even if internally rich.
+4. **actionability** — Could you, as the operator, do something this week based on this report? Or does it stop at observations without implications?
+5. **specialist_set_correctness** — Did the orchestrator dispatch the right specialists for this query? Expected set (where defined): {expected_specialists}. Penalize spurious adds and meaningful misses; routine variation is TIE.
+
+Spot-check at least one specific claim in each report by reasoning about internal consistency and cross-references between named entities, dates, prices, and the cited drawer domains. (Note: you do not have live web access in this judging call.)
+
+## Overall winner
+
+Pick `A`, `B`, or `TIE` for the **overall** verdict. The overall verdict is your holistic operator judgment, informed by but not strictly summed from the dimensions — a report that wins coverage and specificity but is unactionable can still lose overall.
+
+Give a 1-paragraph justification (~150 words) referencing the dimensional reasoning. End your response with EXACTLY this JSON line and nothing after it:
+
 ```json
-{{"winner": "A" | "B" | "TIE", "supporting_urls": ["url1", "url2"]}}
+{{"winner": "A" | "B" | "TIE", "dimensions": {{"coverage": "A|B|TIE", "specificity": "A|B|TIE", "source_diversity": "A|B|TIE", "actionability": "A|B|TIE", "specialist_set_correctness": "A|B|TIE"}}, "supporting_urls": ["url1", "url2"]}}
 ```
 
 ---
@@ -110,12 +123,18 @@ Pick a winner: A, B, or TIE. Give a 1-paragraph justification (~150 words). End 
 Now: which is the better answer for this operator on this question?"""
 
 
-_JSON_LINE = re.compile(r"\{[^{}]*\"winner\"[^{}]*\}", re.DOTALL)
+# Find the trailing JSON object — must contain "winner" and may contain
+# "dimensions". We look for the last `{...}` block in the text that has
+# "winner" in it (allows multi-line JSON across `dimensions`).
+_JSON_BLOCK = re.compile(r"\{[\s\S]*\"winner\"[\s\S]*\}", re.DOTALL)
 
 
 def _build_prompt(a: dict, b: dict, a_label: str, b_label: str) -> str:
     def domains(src):
         return sorted({s.get("domain") for s in src.get("drawer_sources") or [] if s.get("domain")})
+
+    expected = a.get("expected_specialists") or b.get("expected_specialists") or []
+    expected_str = ", ".join(expected) if expected else "(not specified — judge on routing reasonableness alone)"
 
     return _PROMPT_TEMPLATE.format(
         venue_name=a.get("venue_name", "?"),
@@ -131,22 +150,39 @@ def _build_prompt(a: dict, b: dict, a_label: str, b_label: str) -> str:
         b_n_drawer=len(b.get("drawer_sources") or []),
         b_drawer_domains=", ".join(domains(b)) or "(none)",
         b_report=b.get("final_report") or "(empty report)",
+        expected_specialists=expected_str,
     )
 
 
 def _parse_response(text: str) -> dict:
-    """Pull the JSON winner line out of the response."""
-    m = _JSON_LINE.search(text)
-    if not m:
-        return {"winner": None, "supporting_urls": [], "parse_error": "no_json"}
+    """Pull the JSON winner block out of the response."""
+    # Search for the LAST JSON block — judges sometimes write a sketch
+    # earlier in their response.
+    matches = list(_JSON_BLOCK.finditer(text))
+    if not matches:
+        return {
+            "winner": None,
+            "dimensions": {},
+            "supporting_urls": [],
+            "parse_error": "no_json",
+        }
+    raw = matches[-1].group(0)
+    # Strip ``` fencing if the regex picked it up.
+    raw = raw.strip().strip("`")
     try:
-        parsed = json.loads(m.group(0))
+        parsed = json.loads(raw)
         return {
             "winner": parsed.get("winner"),
+            "dimensions": parsed.get("dimensions") or {},
             "supporting_urls": parsed.get("supporting_urls") or [],
         }
     except json.JSONDecodeError as e:
-        return {"winner": None, "supporting_urls": [], "parse_error": f"json: {e}"}
+        return {
+            "winner": None,
+            "dimensions": {},
+            "supporting_urls": [],
+            "parse_error": f"json: {e}",
+        }
 
 
 def _judge_gemini(prompt: str, model: str) -> str:
@@ -161,9 +197,39 @@ def _judge_gemini(prompt: str, model: str) -> str:
     resp = client.models.generate_content(
         model=model,
         contents=prompt,
-        config=types.GenerateContentConfig(temperature=0.0, max_output_tokens=4000),
+        config=types.GenerateContentConfig(temperature=0.0, max_output_tokens=8000),
     )
     return resp.text or ""
+
+
+def _judge_claude(prompt: str, model: str) -> str:
+    """Claude judge path. Uses ANTHROPIC_API_KEY from env.
+
+    The Anthropic SDK shape mirrors the Gemini one: client → messages.create.
+    `max_tokens` is required by the SDK; 4000 matches the Gemini default.
+    """
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY env var not set. Set it in your shell before "
+            "running the Claude judge — agent/.env is not used for this key. "
+            "Example: `export ANTHROPIC_API_KEY=sk-ant-...`"
+        )
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=api_key)
+    resp = client.messages.create(
+        model=model,
+        max_tokens=4000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    # `content` is a list of content blocks; collect text from each.
+    parts = []
+    for block in resp.content or []:
+        text = getattr(block, "text", None)
+        if isinstance(text, str):
+            parts.append(text)
+    return "\n".join(parts)
 
 
 def main() -> int:
@@ -171,7 +237,11 @@ def main() -> int:
     parser.add_argument("--a", required=True, help="path to run JSON A")
     parser.add_argument("--b", required=True, help="path to run JSON B")
     parser.add_argument("--out", required=True, help="output verdict JSON")
-    parser.add_argument("--model", default="gemini-2.5-pro", help="Gemini model id")
+    parser.add_argument(
+        "--model",
+        default="claude-opus-4-7",
+        help="judge model id (claude-* dispatches to Anthropic, gemini-* to Vertex)",
+    )
     parser.add_argument("--a-label", help="label for variant A (defaults to file's variant field)")
     parser.add_argument("--b-label", help="label for variant B (defaults to file's variant field)")
     args = parser.parse_args()
@@ -191,11 +261,15 @@ def main() -> int:
         )
 
     prompt = _build_prompt(a_data, b_data, a_label, b_label)
-    text = _judge_gemini(prompt, args.model)
+    if args.model.startswith("claude"):
+        text = _judge_claude(prompt, args.model)
+    else:
+        text = _judge_gemini(prompt, args.model)
     parsed = _parse_response(text)
 
     out = {
         "winner": parsed.get("winner"),
+        "dimensions": parsed.get("dimensions") or {},
         "supporting_urls": parsed.get("supporting_urls") or [],
         "judge_model": args.model,
         "a_label": a_label,
@@ -212,7 +286,8 @@ def main() -> int:
     Path(args.out).write_text(json.dumps(out, indent=2, ensure_ascii=False))
     print(
         f"[pairwise] {a_label} vs {b_label} on {a_data.get('venue_key')}/{a_data.get('query_id')}: "
-        f"winner={parsed.get('winner')}, written to {args.out}",
+        f"winner={parsed.get('winner')}, dims={parsed.get('dimensions')}, "
+        f"written to {args.out}",
         flush=True,
     )
     return 0
