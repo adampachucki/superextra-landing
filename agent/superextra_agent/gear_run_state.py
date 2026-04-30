@@ -41,7 +41,7 @@ class GearRunState:
     run_id: str
     turn_idx: int
     user_id: str
-    query_text: str  # raw user message — needed for note-task LLM prompts
+    query_text: str  # raw user message — needed for title generation
 
     # Sub-objects (constructed in __post_init__ to keep dataclass init clean)
     timeline_builder: TurnSummaryBuilder = field(init=False)
@@ -54,7 +54,6 @@ class GearRunState:
     specialist_sources_seen: set[str] = field(default_factory=set)
     mapping_state: dict[str, Any] = field(default_factory=lambda: {"place_names": {}})
     title_task: asyncio.Task[Any] | None = None
-    seq: int = 0
 
     # Lifecycle
     heartbeat_task: asyncio.Task[Any] | None = None
@@ -93,7 +92,6 @@ class GearRunState:
         interleaving partial mutations.
         """
         mapped = map_event(event, self.mapping_state)
-        self.timeline_builder.observe_event(event, self.mapping_state)
 
         # Filter detail events through accept_detail for dedupe.
         events_to_write: list[dict[str, Any]] = []
@@ -121,7 +119,6 @@ class GearRunState:
         if mapped.get("complete") is not None and self.final_reply is None:
             self._capture_final(mapped["complete"])
 
-        self.seq += 1
         return events_to_write
 
     def _merge_source(self, entry: Any) -> None:
@@ -170,9 +167,8 @@ class GearRunState:
 
         Sequence:
 
-          1. Close ``timeline_writer``. There are no background note tasks
-             to drain anymore — narrate notes land synchronously inside
-             ``observe_event`` at event-mapping time.
+          1. Close ``timeline_writer``. Narrate notes land synchronously
+             inside ``observe_event`` at event-mapping time.
           2. Await ``title_task`` with bounded ``TITLE_TIMEOUT_S``.
              ``asyncio.wait_for`` cancels-on-timeout so no straggler
              concern.
@@ -193,8 +189,6 @@ class GearRunState:
                 # being swallowed by the title-task wrapper.
                 title = None
 
-        # All background mutators of timeline_builder are now done or
-        # cancelled. Safe to read.
         if not self.final_reply or not self.final_reply.strip():
             return (
                 {

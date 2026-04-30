@@ -7,8 +7,8 @@ For each root-runner invocation:
     30 s heartbeat, optionally spawns a title task on the first turn.
   - **on_event**: feeds each ADK event through ``GearRunState.observe_event``,
     writes resulting timeline events + bumps ``lastEventAt`` (best-effort).
-  - **after_run**: cancels heartbeat first, drains note tasks, builds the
-    terminal payload, writes session+turn atomically with a bounded retry.
+  - **after_run**: cancels heartbeat first, builds the terminal payload,
+    writes session+turn atomically with a bounded retry.
 
 Three classes of write, three error semantics (plan §"Write-class taxonomy"):
 

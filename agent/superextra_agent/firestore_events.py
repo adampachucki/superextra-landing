@@ -147,13 +147,6 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
                         "kind": "note",
                         "id": f"narrate:{_event_id(event)}:{idx}",
                         "text": text.strip(),
-                        "noteSource": "llm",
-                        "counts": {
-                            "webQueries": 0,
-                            "sources": 0,
-                            "venues": 0,
-                            "platforms": 0,
-                        },
                     }
                 )
             continue

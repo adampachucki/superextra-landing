@@ -5,6 +5,7 @@
 	import { splitChartSegments } from '$lib/chart-blocks';
 	import type { ChatSourceProvider } from '$lib/chat-types';
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
+	import TypewriterText from '$lib/components/agent/TypewriterText.svelte';
 	import ChartBlock from './ChartBlock.svelte';
 
 	marked.setOptions({ breaks: true, gfm: true });
@@ -67,13 +68,22 @@
 						<div
 							class="prose max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
 						>
-							{#each splitChartSegments(msg.text) as seg, segIdx (segIdx)}
-								{#if seg.kind === 'chart'}
-									<ChartBlock spec={seg.spec} />
-								{:else}
-									{@html renderMarkdown(seg.text)}
-								{/if}
-							{/each}
+							<TypewriterText
+								text={msg.text}
+								enabled={msg.animateText ?? false}
+								charsPerFrame={4}
+								onDone={() => chatState.markReplyTyped(msg.turnIndex)}
+							>
+								{#snippet children(text)}
+									{#each splitChartSegments(text) as seg, segIdx (segIdx)}
+										{#if seg.kind === 'chart'}
+											<ChartBlock spec={seg.spec} />
+										{:else}
+											{@html renderMarkdown(seg.text)}
+										{/if}
+									{/each}
+								{/snippet}
+							</TypewriterText>
 						</div>
 						<div class="mt-2 flex justify-end">
 							<button

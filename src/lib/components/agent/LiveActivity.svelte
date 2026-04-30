@@ -2,6 +2,7 @@
 	import type { TimelineEvent } from '$lib/chat-types';
 	import ProgressEventRow from './ProgressEventRow.svelte';
 	import ProgressWrapper from './ProgressWrapper.svelte';
+	import TypewriterText from './TypewriterText.svelte';
 
 	let {
 		events,
@@ -28,12 +29,6 @@
 		if (minutes > 0) return `${minutes}m ${seconds}s`;
 		return `${seconds}s`;
 	}
-
-	// Step count = detail rows only. Notes are narrative, not "steps".
-	let stepCount = $derived(events.filter((e) => e.kind === 'detail').length);
-	// Always streaming while LiveActivity is mounted — `chatState.loading`
-	// is the gate at the parent level.
-	let isStreaming = true;
 </script>
 
 <div class="flex flex-col gap-3">
@@ -41,19 +36,18 @@
 		Working for {formatDuration(startedAtMs ? now - startedAtMs : 0)}
 	</div>
 
-	<ProgressWrapper {stepCount} {isStreaming} shouldMinimize={false}>
+	<ProgressWrapper>
 		{#each events as ev (ev.id)}
 			{#if ev.kind === 'note'}
 				<p class="text-[15px] leading-relaxed text-black/82 dark:text-white/82">
-					{ev.text}
+					<TypewriterText text={ev.text} charsPerFrame={3}>
+						{#snippet children(text)}
+							{text}
+						{/snippet}
+					</TypewriterText>
 				</p>
 			{:else if ev.kind === 'detail'}
-				<ProgressEventRow
-					label={ev.family}
-					detail={ev.text}
-					status="done"
-					showConnector={false}
-				/>
+				<ProgressEventRow label={ev.family} detail={ev.text} />
 			{/if}
 		{/each}
 	</ProgressWrapper>

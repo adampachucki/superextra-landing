@@ -95,8 +95,6 @@ def test_narrate_function_call_emits_note_before_specialist_details():
         "kind": "note",
         "id": "narrate:evt-narrate:0",
         "text": "Pulling Google reviews for Maple & Ash and Bavette's now.",
-        "noteSource": "llm",
-        "counts": {"webQueries": 0, "sources": 0, "venues": 0, "platforms": 0},
     }
     # Specialist function-calls don't produce detail rows on their own (they
     # produce them via responses), so we only assert the note itself here.

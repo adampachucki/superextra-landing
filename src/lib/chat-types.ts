@@ -18,18 +18,10 @@ export interface ChatSource {
 	provider?: ChatSourceProvider;
 }
 
-export interface TurnCounts {
-	webQueries: number;
-	sources: number;
-	venues: number;
-	platforms: number;
-}
-
 export interface TurnSummary {
 	startedAtMs: number;
 	finishedAtMs: number;
 	elapsedMs: number;
-	finalCounts: TurnCounts;
 }
 
 export type TimelineEvent =
@@ -37,8 +29,6 @@ export type TimelineEvent =
 			kind: 'note';
 			id: string;
 			text: string;
-			noteSource: 'deterministic' | 'llm';
-			counts: TurnCounts;
 			ts?: number;
 	  }
 	| {

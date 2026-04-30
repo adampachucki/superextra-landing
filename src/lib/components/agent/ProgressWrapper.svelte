@@ -2,25 +2,12 @@
 	import type { Snippet } from 'svelte';
 
 	let {
-		stepCount,
-		isStreaming,
-		shouldMinimize,
 		children
 	}: {
-		stepCount: number;
-		isStreaming: boolean;
-		shouldMinimize: boolean;
 		children: Snippet;
 	} = $props();
 
-	let userOpenChoice = $state<boolean | null>(null);
-	let isOpen = $derived(userOpenChoice ?? !shouldMinimize);
-
-	let label = $derived(
-		isStreaming
-			? 'Working'
-			: `Completed in ${stepCount} step${stepCount === 1 ? '' : 's'}`
-	);
+	let isOpen = $state(true);
 </script>
 
 <div
@@ -28,18 +15,16 @@
 >
 	<button
 		type="button"
-		onclick={() => (userOpenChoice = !isOpen)}
+		onclick={() => (isOpen = !isOpen)}
 		class="flex w-full cursor-pointer items-center justify-between gap-2 text-[13px] text-black/55 transition-colors hover:text-black/80 dark:text-white/55 dark:hover:text-white/80"
 	>
 		<span class="flex items-baseline gap-1">
-			<span class="truncate">{label}</span>
-			{#if isStreaming}
-				<span class="ml-1 inline-flex shrink-0 items-baseline gap-[2px]">
-					<span class="dot dot-1"></span>
-					<span class="dot dot-2"></span>
-					<span class="dot dot-3"></span>
-				</span>
-			{/if}
+			<span class="truncate">Working</span>
+			<span class="ml-1 inline-flex shrink-0 items-baseline gap-[2px]">
+				<span class="dot dot-1"></span>
+				<span class="dot dot-2"></span>
+				<span class="dot dot-3"></span>
+			</span>
 		</span>
 		<svg
 			width="11"

@@ -119,8 +119,7 @@ describe('ChatThread', () => {
 						turnSummary: {
 							startedAtMs: 0,
 							finishedAtMs: 35_000,
-							elapsedMs: 35_000,
-							finalCounts: { webQueries: 0, sources: 1, venues: 0, platforms: 0 }
+							elapsedMs: 35_000
 						},
 						createdAt: { toMillis: () => 1000 },
 						completedAt: { toMillis: () => 36_000 }

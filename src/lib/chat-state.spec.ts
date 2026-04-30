@@ -450,6 +450,82 @@ describe('chatState (Firestore-driven)', () => {
 			expect(msgs[1].sources).toEqual([{ url: 'https://e.com', title: 'e' }]);
 		});
 
+		it('does not animate turns that arrive already complete', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.turns('sid-1'));
+
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'historical',
+							status: 'complete',
+							reply: 'already done',
+							createdAt: { toMillis: () => 1000 },
+							completedAt: { toMillis: () => 2000 }
+						}
+					}
+				])
+			);
+
+			expect(chatState.messages[1]).toMatchObject({
+				role: 'agent',
+				text: 'already done',
+				animateText: false
+			});
+		});
+
+		it('animates replies when a live turn moves from running to complete', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.turns('sid-1'));
+
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'live',
+							status: 'running',
+							reply: null,
+							createdAt: { toMillis: () => 1000 }
+						}
+					}
+				])
+			);
+			expect(chatState.messages).toHaveLength(1);
+
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'live',
+							status: 'complete',
+							reply: 'fresh reply',
+							createdAt: { toMillis: () => 1000 },
+							completedAt: { toMillis: () => 2000 }
+						}
+					}
+				])
+			);
+
+			const agent = chatState.messages[1];
+			expect(agent).toMatchObject({
+				role: 'agent',
+				text: 'fresh reply',
+				animateText: true
+			});
+
+			chatState.markReplyTyped(agent.turnIndex);
+			expect(chatState.messages[1].animateText).toBe(false);
+		});
+
 		it('skips incomplete agent messages — renders only the user message until the turn completes', async () => {
 			const obs = captureObservers();
 			chatState.selectSession('sid-1');

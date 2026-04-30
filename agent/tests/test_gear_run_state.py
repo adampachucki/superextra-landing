@@ -3,12 +3,9 @@
 Plan §4.6 verification matrix:
   - observe_event mutations don't interleave (no `await` inside; verified
     statically by walking the AST of all mutation methods).
-  - Note tasks pending after finalize() bounded wait are cancelled AND
-    gathered, so `timeline_builder.build_summary()` reads stable state.
   - Empty final_reply → finalize() returns ('error', ...) not
     ('complete', ...) — empty-reply sanity check at plan §4.1.
-  - Note-task and title-task cancellation doesn't leak when cancel()
-    is called.
+  - Title-task cancellation doesn't leak when cancel() is called.
 """
 
 from __future__ import annotations
@@ -99,10 +96,8 @@ _AWAIT_FREE_METHODS = (
 
 @pytest.mark.parametrize("method_name", _AWAIT_FREE_METHODS)
 def test_observe_event_methods_are_await_free(method_name):
-    """plan §"No per-run lock" — these methods MUST stay synchronous and
-    await-free, so concurrent coroutines (note tasks) cannot interleave a
-    partial mutation. Walk the AST of each and assert no Await/AsyncFor/
-    AsyncWith nodes."""
+    """These methods must stay synchronous and await-free. Walk the AST of
+    each and assert no Await/AsyncFor/AsyncWith nodes."""
     method = getattr(GearRunState, method_name)
     src = inspect.getsource(method)
     tree = ast.parse(src.lstrip())  # lstrip() handles indented def
@@ -224,11 +219,10 @@ def test_capture_final_dedupes_specialist_and_mapper_sources():
     assert titles["https://a"] == "A (mapper)"
 
 
-def test_observe_event_increments_seq_and_returns_list():
+def test_observe_event_returns_timeline_list():
     state = _make_state()
     out = state.observe_event(_fake_event())
     assert isinstance(out, list)
-    assert state.seq == 1
 
 
 def test_observe_event_capture_final_short_circuits_after_first():
@@ -248,7 +242,7 @@ def test_observe_event_capture_final_short_circuits_after_first():
     assert isinstance(out, list)
 
 
-# ── Note-task / title-task cancellation hygiene ─────────────────────────────
+# ── Title-task cancellation hygiene ─────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -309,4 +303,3 @@ async def test_finalize_propagates_cancellation():
 
     with pytest.raises(asyncio.CancelledError):
         await state.finalize()
-

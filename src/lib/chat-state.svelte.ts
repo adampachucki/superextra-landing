@@ -47,6 +47,8 @@ export interface ChatMessage {
 	role: 'user' | 'agent';
 	text: string;
 	timestamp: number;
+	turnIndex: number;
+	animateText?: boolean;
 	sources?: ChatSource[];
 	turnSummary?: TurnSummary;
 }
@@ -155,6 +157,12 @@ let currentEventsRunId: string | null = null;
 // seqInAttempt) to avoid duplicating timeline rows across resubscribes.
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
 const renderedEventKeys = new Set<string>();
+// Final-answer typewriter state is intentionally local to turns observed live
+// in this browser session. Historical complete turns render immediately.
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const previousTurnStatus = new Map<number, Turn['status']>();
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const replyTypewriterTurns = new Set<number>();
 
 // Sidebar listener state — attached lazily on first consumer access.
 let sidebarAttachStarted = false;
@@ -169,13 +177,16 @@ function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
 		msgs.push({
 			role: 'user',
 			text: turn.userMessage,
-			timestamp: turn.createdAtMs ?? Date.now()
+			timestamp: turn.createdAtMs ?? Date.now(),
+			turnIndex: turn.turnIndex
 		});
 		if (turn.status === 'complete' && turn.reply) {
 			msgs.push({
 				role: 'agent',
 				text: turn.reply,
 				timestamp: turn.completedAtMs ?? Date.now(),
+				turnIndex: turn.turnIndex,
+				animateText: replyTypewriterTurns.has(turn.turnIndex),
 				sources: turn.sources?.length ? turn.sources : undefined,
 				turnSummary: turn.turnSummary ?? undefined
 			});
@@ -264,6 +275,8 @@ function clearActiveState() {
 	loadState = 'idle';
 	placeContextState = null;
 	renderedEventKeys.clear();
+	previousTurnStatus.clear();
+	replyTypewriterTurns.clear();
 }
 
 async function attachActiveListeners(sid: string) {
@@ -376,6 +389,11 @@ async function attachActiveListeners(sid: string) {
 					error: (data.error as string | null | undefined) ?? null
 				};
 				next.push(turn);
+				const prev = previousTurnStatus.get(turnIndex);
+				if (prev && prev !== 'complete' && status === 'complete' && turn.reply) {
+					replyTypewriterTurns.add(turnIndex);
+				}
+				previousTurnStatus.set(turnIndex, status);
 			});
 			turns = next;
 			maybeAttachEventsListener();
@@ -623,6 +641,10 @@ function reset() {
 	clearActiveState();
 }
 
+function markReplyTyped(turnIndex: number) {
+	replyTypewriterTurns.delete(turnIndex);
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -678,9 +700,6 @@ export const chatState = {
 	get liveTimeline(): TimelineEvent[] {
 		return liveTimeline;
 	},
-	get isStreaming(): boolean {
-		return liveTimeline.length > 0;
-	},
 	get canDelete(): boolean {
 		if (!currentUid || !activeSession) return false;
 		return activeSession.userId === currentUid;
@@ -696,6 +715,7 @@ export const chatState = {
 	sendFollowUp,
 	selectSession,
 	deleteSession,
+	markReplyTyped,
 	reset
 };
 
