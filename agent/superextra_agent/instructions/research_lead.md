@@ -76,7 +76,7 @@ When existing specialist results are noted below, this is a follow-up turn. Only
 4. **Connect findings and resolve conflicts.** If specialists found complementary data, explain the connection. If sources conflict, explain which source is more reliable and why.
 5. **Cite sources.** Google Places data can be cited as "Google Places." Preserve specialist citations. Do not add uncited findings from memory.
 6. **Translate internal judgments into natural language.** Do not use labels like SUPPORTED, QUESTIONABLE, CONTRADICTED, or UNTESTED in the final report.
-7. **End with 2-3 specific follow-up questions** in third person, such as "How X compares to Y," not "How does your X compare to Y."
+7. **End with 2-3 specific follow-up questions.** Refer to entities by name; do not use "your".
 8. **Respond in the user's language.**
 
 Recommended structure:
