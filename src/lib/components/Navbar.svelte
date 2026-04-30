@@ -34,16 +34,20 @@
 	const iconBtnClass = $derived(
 		`relative cursor-pointer rounded-full border p-2 transition-all duration-200 ${over ? 'border-white/[0.12] text-white/55 hover:border-white/[0.30] hover:text-white/75' : 'border-black/[0.12] text-black/55 hover:border-black/[0.30] hover:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75'}`
 	);
+
+	const chatIconClass = $derived(
+		`relative mr-2 cursor-pointer p-1 transition-colors duration-200 ${over ? 'text-white/70 hover:text-white' : 'text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white'}`
+	);
 </script>
 
 {#snippet chatIcon()}
-	<a href="/agent/chat" class={iconBtnClass} aria-label="Chat history">
-		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+	<a href="/agent/chat" class={chatIconClass} aria-label="Chat history">
+		<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
 			<path d="M2 2h20v14H10l-2 4-2-4H2z" />
 		</svg>
 		{#if chatCount > 0}
 			<span
-				class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-black px-0.5 text-[10px] font-medium text-white dark:bg-white dark:text-black"
+				class="absolute top-0 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-black px-1 text-[10px] font-medium text-white dark:bg-white dark:text-black"
 				>{chatCount}</span
 			>
 		{/if}
