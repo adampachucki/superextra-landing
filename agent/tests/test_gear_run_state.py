@@ -225,6 +225,26 @@ def test_observe_event_returns_timeline_list():
     assert isinstance(out, list)
 
 
+@pytest.mark.asyncio
+async def test_observe_typed_pill_dedupes_detail_rows():
+    state = _make_state()
+    state.timeline_writer.write_timeline = AsyncMock(return_value={"ok": True})
+    pill = {
+        "kind": "detail",
+        "id": "a",
+        "group": "search",
+        "family": "Searching the web",
+        "text": "pizza",
+    }
+
+    first = await state.observe_typed_pill(pill)
+    second = await state.observe_typed_pill({**pill, "id": "b"})
+
+    assert first == {"ok": True}
+    assert second is None
+    state.timeline_writer.write_timeline.assert_awaited_once_with(pill)
+
+
 def test_observe_event_capture_final_short_circuits_after_first():
     state = _make_state()
     # Synthesize an event whose mapper produces a `complete` block — easier

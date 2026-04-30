@@ -5,11 +5,11 @@ Holds the mutable state for one run: ``final_reply``, ``final_sources``,
 ``timeline_builder``, ``timeline_writer``, ``title_task``, and the
 heartbeat task.
 
-Concurrency discipline (load-bearing): every mutation method on
-``GearRunState`` and on ``TurnSummaryBuilder`` is synchronous and
-``await``-free. ``TimelineWriter`` owns its own internal lock for its
-Firestore writes. **Any future mutator added here must stay sync and
-await-free**, or this safety property breaks.
+Concurrency discipline (load-bearing): accumulator mutations on
+``GearRunState`` and on ``TurnSummaryBuilder`` are synchronous and
+``await``-free. ``observe_typed_pill`` follows the same pattern for its dedupe
+decision, then awaits only the ``TimelineWriter`` write. ``TimelineWriter`` owns
+its own internal lock for Firestore writes.
 """
 
 from __future__ import annotations
@@ -120,6 +120,18 @@ class GearRunState:
             self._capture_final(mapped["complete"])
 
         return events_to_write
+
+    async def observe_typed_pill(self, event: dict[str, Any]) -> dict[str, Any] | None:
+        """Write one timeline event from a typed ADK hook.
+
+        The dedupe decision stays synchronous, matching ``observe_event``. Only
+        the Firestore timeline write awaits.
+        """
+        if event.get("kind") == "detail" and not self.timeline_builder.accept_detail(
+            event
+        ):
+            return None
+        return await self.timeline_writer.write_timeline(event)
 
     def _merge_source(self, entry: Any) -> None:
         if not isinstance(entry, dict):

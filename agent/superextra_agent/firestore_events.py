@@ -137,30 +137,6 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
             mapping["complete"] = complete
         return mapping
 
-    detail_events: list[dict[str, Any]] = []
-    for idx, name, args in _iter_function_calls(event):
-        if name == "narrate":
-            text = args.get("text")
-            if isinstance(text, str) and text.strip():
-                detail_events.append(
-                    {
-                        "kind": "note",
-                        "id": f"narrate:{_event_id(event)}:{idx}",
-                        "text": text.strip(),
-                    }
-                )
-            continue
-        detail = _map_function_call(author, name, args, state, _event_id(event), idx)
-        if detail is not None:
-            detail_events.append(detail)
-
-    for idx, name, response in _iter_function_responses(event):
-        detail_events.extend(
-            _map_function_response(author, name, response, state, _event_id(event), idx)
-        )
-
-    mapping["timeline_events"] = detail_events
-
     if author in SPECIALIST_AUTHORS:
         output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
         if output_key and _has_state_delta(event, output_key):
@@ -237,15 +213,26 @@ def _map_final_complete(event: Any) -> dict[str, Any] | None:
     return {"reply": reply, "sources": extract_sources_from_grounding(event)}
 
 
-def _map_function_call(
-    author: str | None,
+def _tool_row_id(*, call_id: str | None, phase: str, name: str) -> str:
+    return f"tool:{phase}:{call_id or 'unknown'}:{name}"
+
+
+def map_tool_call(
     name: str,
     args: dict[str, Any],
     state: dict[str, Any] | None,
-    event_id: str,
-    idx: int,
+    call_id: str | None,
 ) -> dict[str, Any] | None:
-    row_id = f"{event_id}:call:{idx}:{name}"
+    row_id = _tool_row_id(call_id=call_id, phase="call", name=name)
+    if name == "narrate":
+        text = args.get("text")
+        if isinstance(text, str) and text.strip():
+            return {
+                "kind": "note",
+                "id": row_id,
+                "text": text.strip(),
+            }
+        return None
     if name == "google_search":
         query = _normalize_space(str(args.get("query") or "")).strip()
         if query:
@@ -283,15 +270,13 @@ def _map_function_call(
     return None
 
 
-def _map_function_response(
-    author: str | None,
+def map_tool_result(
     name: str,
     response: dict[str, Any],
     state: dict[str, Any] | None,
-    event_id: str,
-    idx: int,
+    call_id: str | None,
 ) -> list[dict[str, Any]]:
-    row_id = f"{event_id}:response:{idx}:{name}"
+    row_id = _tool_row_id(call_id=call_id, phase="response", name=name)
     rows: list[dict[str, Any]] = []
     status = str(response.get("status") or "").strip().lower()
 
@@ -380,6 +365,17 @@ def _map_function_response(
     return rows
 
 
+def map_tool_error(
+    name: str,
+    args: dict[str, Any],
+    state: dict[str, Any] | None,
+    call_id: str | None,
+) -> list[dict[str, Any]]:
+    synthetic_response = dict(args)
+    synthetic_response["status"] = "error"
+    return map_tool_result(name, synthetic_response, state, call_id)
+
+
 def _ingest_place_names(event: Any, state: dict[str, Any] | None) -> None:
     if state is None:
         return
@@ -432,7 +428,3 @@ def _is_final(event: Any) -> bool:
         except Exception:
             return False
     return bool(_get(event, "is_final"))
-
-
-def _event_id(event: Any) -> str:
-    return str(_get(event, "id") or "evt")

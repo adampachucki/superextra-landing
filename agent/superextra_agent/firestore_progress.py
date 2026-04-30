@@ -5,8 +5,9 @@ For each root-runner invocation:
   - **before_run**: builds a ``GearRunState``, claims the run via fenced
     Firestore transaction (``status='queued' → 'running'``), spawns a
     30 s heartbeat, optionally spawns a title task on the first turn.
-  - **on_event**: feeds each ADK event through ``GearRunState.observe_event``,
-    writes resulting timeline events + bumps ``lastEventAt`` (best-effort).
+  - **tool hooks**: write typed tool-call/result pills through the accumulator.
+  - **on_event**: feeds non-tool ADK event concerns through
+    ``GearRunState.observe_event`` and bumps ``lastEventAt`` (best-effort).
   - **after_run**: cancels heartbeat first, builds the terminal payload,
     writes session+turn atomically with a bounded retry.
 
@@ -41,6 +42,7 @@ from google.cloud import firestore
 from google.genai import types
 from typing_extensions import override
 
+from .firestore_events import map_tool_call, map_tool_error, map_tool_result
 from .gear_run_state import GearRunState
 from .notes import _generate_title
 
@@ -352,25 +354,38 @@ class FirestoreProgressPlugin(BasePlugin):
             self._fs = firestore.Client(project=self._project)
         return self._fs
 
-    def _state_for_event(
-        self, invocation_context: InvocationContext
+    def _state_for_context(
+        self, context: Any, *, allow_run_id_fallback: bool
     ) -> GearRunState | None:
-        per = self._states.get(invocation_context.invocation_id)
+        invocation_id = getattr(context, "invocation_id", None)
+        per = self._states.get(invocation_id) if isinstance(invocation_id, str) else None
         if per is not None:
             return per
-        if not _is_nested_invocation(invocation_context):
+        if not allow_run_id_fallback:
             return None
 
-        session = getattr(invocation_context, "session", None)
+        session = getattr(context, "session", None)
         state_dict = (getattr(session, "state", None) or {}) if session else {}
         run_id = state_dict.get("runId")
         if not isinstance(run_id, str) or not run_id:
             return None
 
-        for state in self._states.values():
-            if state.run_id == run_id:
-                return state
-        return None
+        return next(
+            (state for state in self._states.values() if state.run_id == run_id),
+            None,
+        )
+
+    async def _observe_typed_pill(
+        self, per: GearRunState, pill: dict[str, Any]
+    ) -> None:
+        try:
+            await per.observe_typed_pill(pill)
+        except Exception:  # noqa: BLE001
+            log.exception(
+                "typed timeline write failed sid=%s runId=%s; continuing",
+                per.sid,
+                per.run_id,
+            )
 
     @override
     async def before_run_callback(self, *, invocation_context: InvocationContext):
@@ -432,10 +447,58 @@ class FirestoreProgressPlugin(BasePlugin):
         return None
 
     @override
+    async def before_tool_callback(self, *, tool, tool_args, tool_context):
+        per = self._state_for_context(tool_context, allow_run_id_fallback=True)
+        if per is None:
+            return None
+        pill = map_tool_call(
+            tool.name,
+            tool_args,
+            per.mapping_state,
+            getattr(tool_context, "function_call_id", None),
+        )
+        if pill is not None:
+            await self._observe_typed_pill(per, pill)
+        return None
+
+    @override
+    async def after_tool_callback(self, *, tool, tool_args, tool_context, result):
+        if isinstance(result, dict) and result.get("error"):
+            return None
+        per = self._state_for_context(tool_context, allow_run_id_fallback=True)
+        if per is None:
+            return None
+        for pill in map_tool_result(
+            tool.name,
+            result if isinstance(result, dict) else {},
+            per.mapping_state,
+            getattr(tool_context, "function_call_id", None),
+        ):
+            await self._observe_typed_pill(per, pill)
+        return None
+
+    @override
+    async def on_tool_error_callback(self, *, tool, tool_args, tool_context, error):
+        per = self._state_for_context(tool_context, allow_run_id_fallback=True)
+        if per is None:
+            return None
+        for pill in map_tool_error(
+            tool.name,
+            tool_args,
+            per.mapping_state,
+            getattr(tool_context, "function_call_id", None),
+        ):
+            await self._observe_typed_pill(per, pill)
+        return None
+
+    @override
     async def on_event_callback(
         self, *, invocation_context: InvocationContext, event: Event
     ):
-        per = self._state_for_event(invocation_context)
+        per = self._state_for_context(
+            invocation_context,
+            allow_run_id_fallback=_is_nested_invocation(invocation_context),
+        )
         if per is None:
             # Plugin saw an event for an invocation that wasn't claimed —
             # before_run must have short-circuited, or an AgentTool child

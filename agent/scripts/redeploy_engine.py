@@ -17,6 +17,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 
 PROJECT = "superextra-site"
@@ -28,6 +29,10 @@ RESOURCE_NAME = (
 )
 GCS_DIR_NAME = "agent_engine_staging"
 LEGACY_ADC_ACCOUNT = "adam@finebite.co"
+TRACE_ENV_VARS = {
+    "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
+    "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
+}
 
 
 def _agent_root() -> Path:
@@ -162,6 +167,22 @@ def _write_deployed_commit(
         blob.upload_from_string(sha + "\n", content_type="text/plain")
     except Exception as exc:  # noqa: BLE001
         print(f"  WARNING: could not record deployed sha: {exc}")
+
+
+def _deployment_env_vars(agent_engine: Any) -> dict[str, Any]:
+    """Return currently deployed env vars so update(env_vars=...) preserves them.
+
+    Agent Engine updates replace the whole deployment env list. Preserve existing
+    plain and secret env entries before adding telemetry flags.
+    """
+    deployment = agent_engine.gca_resource.spec.deployment_spec
+    return {
+        item.name: item.value for item in deployment.env if item.name
+    } | {
+        item.name: item.secret_ref
+        for item in deployment.secret_env
+        if item.name and item.secret_ref is not None
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -309,12 +330,18 @@ def main() -> int:
         location=args.location,
         staging_bucket=args.staging_bucket,
     )
-    remote = agent_engines.update(
-        args.resource_name,
+
+    existing = agent_engines.get(args.resource_name)
+    env_vars = _deployment_env_vars(existing)
+    env_vars.update(TRACE_ENV_VARS)
+    print(f"  env vars:       preserving/updating {', '.join(sorted(env_vars))}")
+
+    remote = existing.update(
         agent_engine=agent_engines.AdkApp(app=app),
         requirements=requirements,
         gcs_dir_name=args.gcs_dir_name,
         extra_packages=extra_packages,
+        env_vars=env_vars,
     )
     print(f"\nUpdated: {remote.resource_name}")
 

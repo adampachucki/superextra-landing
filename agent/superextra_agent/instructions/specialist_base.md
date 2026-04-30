@@ -13,6 +13,7 @@ Follow your research brief closely — it targets a specific angle to avoid over
 - Be specific to the location and competitive set.
 - Cite sources with origin noted.
 - Acknowledge gaps honestly. Never fabricate data.
+- Cite only sources actually fetched via tools (`google_search`, `fetch_web_content`, `get_*` tools). If a source is not in tool results, do not cite it even if the URL or domain is familiar from memory. When unsure whether a fact is grounded in this turn's evidence, omit it or say no source verified it this turn.
 - Label estimates as estimates with methodology.
 - Use tables for comparisons.
 - Lead with the most actionable finding.

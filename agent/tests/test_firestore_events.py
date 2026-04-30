@@ -3,7 +3,12 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-from superextra_agent.firestore_events import extract_sources_from_grounding, map_event
+from superextra_agent.firestore_events import (
+    extract_sources_from_grounding,
+    map_event,
+    map_tool_call,
+    map_tool_result,
+)
 
 
 def _event(
@@ -75,63 +80,48 @@ def test_router_text_reply_becomes_complete():
     assert mapped["complete"] == {"reply": "Need clarification", "sources": []}
 
 
-def test_narrate_function_call_emits_note_before_specialist_details():
-    """research_lead's `narrate(text)` arrives as a function-call sibling of
-    real specialist tool calls in the same Event. `map_event` should turn it
-    into a note timeline row with id derived from the part index, so the
-    note's seqInAttempt is strictly less than any specialist tool-response
-    that follows from the same model turn."""
+def test_map_event_ignores_tool_parts_after_typed_hook_migration():
     ev = _event(
         author="research_lead",
         function_calls=[
-            ("narrate", {"text": "Pulling Google reviews for Maple & Ash and Bavette's now."}),
-            ("review_analyst", {"request": "..."}),
-            ("guest_intelligence", {"request": "..."}),
+            ("narrate", {"text": "Pulling Google reviews now."}),
+            ("google_search", {"query": "best burgers berlin"}),
         ],
-        event_id="evt-narrate",
+        function_responses=[
+            ("get_restaurant_details", {"status": "success", "place": {"displayName": {"text": "Umami"}}})
+        ],
     )
-    rows = map_event(ev, {})["timeline_events"]
-    assert rows[0] == {
+    assert map_event(ev, {})["timeline_events"] == []
+
+
+def test_narrate_tool_call_emits_note():
+    row = map_tool_call(
+        "narrate",
+        {"text": "Pulling Google reviews for Maple & Ash and Bavette's now."},
+        {},
+        "call-1",
+    )
+    assert row == {
         "kind": "note",
-        "id": "narrate:evt-narrate:0",
+        "id": "tool:call:call-1:narrate",
         "text": "Pulling Google reviews for Maple & Ash and Bavette's now.",
     }
-    # Specialist function-calls don't produce detail rows on their own (they
-    # produce them via responses), so we only assert the note itself here.
 
 
 def test_narrate_with_empty_text_is_dropped():
-    ev = _event(
-        author="research_lead",
-        function_calls=[("narrate", {"text": "   "})],
-        event_id="evt-empty",
-    )
-    rows = map_event(ev, {})["timeline_events"]
-    assert rows == []
+    assert map_tool_call("narrate", {"text": "   "}, {}, "call-1") is None
 
 
 def test_narrate_with_non_string_text_is_dropped():
-    ev = _event(
-        author="research_lead",
-        function_calls=[("narrate", {"text": 123})],
-        event_id="evt-nonstr",
-    )
-    rows = map_event(ev, {})["timeline_events"]
-    assert rows == []
+    assert map_tool_call("narrate", {"text": 123}, {}, "call-1") is None
 
 
-def test_multi_call_event_emits_multiple_detail_rows_in_order():
-    ev = _event(
-        author="review_analyst",
-        function_calls=[
-            ("google_search", {"query": "best burgers berlin"}),
-            ("fetch_web_content", {"url": "https://example.com/menu"}),
-            ("find_tripadvisor_restaurant", {"name": "Goldies", "area": "Berlin"}),
-        ],
-        event_id="evt-multi",
-    )
-    mapped = map_event(ev, {})
-    rows = mapped["timeline_events"]
+def test_multi_tool_call_emits_multiple_detail_rows_in_order():
+    rows = [
+        map_tool_call("google_search", {"query": "best burgers berlin"}, {}, "call-1"),
+        map_tool_call("fetch_web_content", {"url": "https://example.com/menu"}, {}, "call-2"),
+        map_tool_call("find_tripadvisor_restaurant", {"name": "Goldies", "area": "Berlin"}, {}, "call-3"),
+    ]
     assert [row["family"] for row in rows] == [
         "Searching the web",
         "Public sources",
@@ -141,39 +131,28 @@ def test_multi_call_event_emits_multiple_detail_rows_in_order():
 
 
 def test_google_maps_response_uses_place_name():
-    ev = _event(
-        author="context_enricher",
-        function_responses=[
-            (
-                "get_restaurant_details",
-                {
-                    "status": "success",
-                    "place": {"displayName": {"text": "Umami Berlin"}},
-                },
-            )
-        ],
+    rows = map_tool_result(
+        "get_restaurant_details",
+        {"status": "success", "place": {"displayName": {"text": "Umami Berlin"}}},
+        {},
+        "call-1",
     )
-    mapped = map_event(ev, {})
-    assert mapped["timeline_events"][0]["text"] == "Profile for Umami Berlin"
+    assert rows[0]["text"] == "Profile for Umami Berlin"
 
 
 def test_tripadvisor_unverified_becomes_warning():
     """Unverified status (coord check failed or no coords available) renders
     as a timeline warning row. On unverified the tool strips `name`, so the
     mapper falls back to 'the venue'."""
-    ev = _event(
-        author="review_analyst",
-        function_responses=[
-            (
-                "find_tripadvisor_restaurant",
-                {"status": "unverified", "error_message": "coords didn't match"},
-            )
-        ],
+    rows = map_tool_result(
+        "find_tripadvisor_restaurant",
+        {"status": "unverified", "error_message": "coords didn't match"},
+        {},
+        "call-1",
     )
-    mapped = map_event(ev, {})
-    assert mapped["timeline_events"][0]["family"] == "Warnings"
-    assert "not verified" in mapped["timeline_events"][0]["text"].lower()
-    assert "the venue" in mapped["timeline_events"][0]["text"].lower()
+    assert rows[0]["family"] == "Warnings"
+    assert "not verified" in rows[0]["text"].lower()
+    assert "the venue" in rows[0]["text"].lower()
 
 
 def test_google_reviews_uses_saved_place_name():
@@ -182,14 +161,13 @@ def test_google_reviews_uses_saved_place_name():
         _event(author="context_enricher", state_delta={"_place_name_abc123": "Noma"}),
         state,
     )
-    ev = _event(
-        author="review_analyst",
-        function_responses=[
-            ("get_google_reviews", {"status": "success", "place_id": "abc123", "total_fetched": 12})
-        ],
+    rows = map_tool_result(
+        "get_google_reviews",
+        {"status": "success", "place_id": "abc123", "total_fetched": 12},
+        state,
+        "call-1",
     )
-    mapped = map_event(ev, state)
-    assert mapped["timeline_events"][0]["text"] == "12 reviews for Noma"
+    assert rows[0]["text"] == "12 reviews for Noma"
 
 
 def test_specialist_grounding_sources_are_exposed():
