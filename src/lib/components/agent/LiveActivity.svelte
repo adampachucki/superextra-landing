@@ -52,9 +52,11 @@
 			displayed[id] = '';
 			typer.setTarget(ev.text);
 		}
-		return () => {
-			for (const t of typers.values()) t.stop();
-		};
+		// Don't .stop() typewriters in cleanup — $effect cleanup runs on
+		// every events change, which would kill typewriters mid-drip and
+		// the sticky `typers.has(id)` check prevents restart. Typewriters
+		// self-terminate via the RAF loop when current.length === target.length.
+		// Component unmount drops the whole subtree anyway.
 	});
 
 	// Step count = detail rows only. Notes are narrative, not "steps".
