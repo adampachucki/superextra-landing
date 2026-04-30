@@ -295,10 +295,10 @@ The work splits cleanly into 5 steps:
    ~$25-50 — **this is required**). The existing
    `agent/evals/results/V_baseline/` results were captured against the
    _pre-AgentTool_ pipeline. They're not a fair baseline for a
-   floor-removal decision now: a V_targeted-vs-old-V_baseline
+   floor-removal decision now: a V*targeted-vs-old-V_baseline
    comparison would mix floor effects with architecture differences.
    Capture a current-architecture floored baseline by running the
-   harness against `main` _as-is_:
+   harness against `main` \_as-is*:
 
    ```
    .venv/bin/python evals/run_matrix.py --variant V_floored_2026 \

@@ -151,7 +151,7 @@ descriptions alone. They are replaced by **descriptions plus a
 structured pre-dispatch evidence-coverage check**. This keeps the
 lead in control, aligns with ADK's coordinator-plus-`AgentTool`
 pattern, and matches the cheap, high-signal step the current prompt
-already has at `research_orchestrator.md:48`.
+already has in the current research-lead prompt.
 
 **The check sharpens to a structured form:**
 
@@ -379,9 +379,8 @@ to four specialist descriptions per the floors-handoff doc:
 
 ### 2. Build the merged ResearchLead prompt (~1 hour)
 
-Create the merged prompt as the new
-`agent/superextra_agent/instructions/research_orchestrator.md`. (Same
-file path, fully overwrite.) Structure:
+Create the merged prompt as
+`agent/superextra_agent/instructions/research_lead.md`. Structure:
 
 1. Role line.
 2. Date prefix instruction.
