@@ -1,15 +1,7 @@
-"""Title generation for `FirestoreProgressPlugin`.
+"""Best-effort Gemini-Flash session title generation.
 
-Generates a short Gemini-Flash title for the first turn of a session.
-Best-effort — falls back to a deterministic prefix-stripped query if
-the LLM call fails or times out.
-
-``_genai_client`` is constructed lazily on first use; the lazy init is
-process-local.
-
-Timeline-note generation used to live here (see commit history before
-2026-04-30); it was removed when the agent gained the `narrate(text)`
-tool and the note plumbing moved into `firestore_events.map_event`.
+Falls back to the user query (prefix-stripped) on timeout or error.
+``_genai_client`` is lazy and process-local.
 """
 
 from __future__ import annotations

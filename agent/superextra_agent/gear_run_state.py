@@ -1,16 +1,13 @@
 """Per-invocation accumulator for `FirestoreProgressPlugin`.
 
-A single object owned by the plugin's per-invocation map holds all the
-mutable state for one run: ``final_reply``, ``final_sources``,
+Holds the mutable state for one run: ``final_reply``, ``final_sources``,
 ``specialist_sources``, ``specialist_sources_seen``, ``mapping_state``,
 ``timeline_builder``, ``timeline_writer``, ``title_task``, and the
 heartbeat task.
 
 Concurrency discipline (load-bearing): every mutation method on
 ``GearRunState`` and on ``TurnSummaryBuilder`` is synchronous and
-``await``-free. Once a mutation starts there are no suspension points
-until it returns, so concurrent coroutines cannot interleave a partial
-mutation. ``TimelineWriter`` owns its own internal lock for its
+``await``-free. ``TimelineWriter`` owns its own internal lock for its
 Firestore writes. **Any future mutator added here must stay sync and
 await-free**, or this safety property breaks.
 """

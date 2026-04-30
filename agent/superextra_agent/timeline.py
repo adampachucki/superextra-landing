@@ -75,10 +75,6 @@ class TurnSummaryBuilder:
         self.platforms: set[str] = set()
         self.detail_dedupe: set[tuple[str, str, str]] = set()
         self.notes: list[dict[str, Any]] = []
-        self.pending_research_fallback: dict[str, Any] | None = None
-        self.context_note_emitted = False
-        self.research_placeholder_emitted = False
-        self.research_note_emitted = False
 
     def observe_event(self, event: Any, state: dict[str, Any]) -> None:
         for name, args in _iter_function_calls(event):
@@ -181,89 +177,13 @@ class TurnSummaryBuilder:
             "platforms": len(self.platforms),
         }
 
-    def add_note(
-        self,
-        *,
-        milestone: str,
-        text: str,
-        note_source: str,
-        counts: dict[str, int] | None = None,
-        live_only: bool = False,
-    ) -> dict[str, Any] | None:
-        if milestone == "context_start" and self.context_note_emitted:
-            return None
-        if milestone == "research_placeholder" and self.research_placeholder_emitted:
-            return None
-        if milestone == "research_result" and self.research_note_emitted:
-            return None
-
-        snapshot = counts or self.counts_snapshot()
-        note = {
-            "milestone": milestone,
-            "text": text,
-            "noteSource": note_source,
-            "counts": snapshot,
-            "liveOnly": live_only,
-        }
-        self.notes.append(note)
-        if milestone == "context_start":
-            self.context_note_emitted = True
-        elif milestone == "research_placeholder":
-            self.research_placeholder_emitted = True
-        elif milestone == "research_result":
-            self.research_note_emitted = True
-            self.pending_research_fallback = None
-        return {
-            "kind": "note",
-            "id": f"note:{milestone}:{len(self.notes)}",
-            "text": text,
-            "noteSource": note_source,
-            "counts": snapshot,
-        }
-
-    def finalize_notes(self) -> list[dict[str, Any]]:
-        if (
-            self.pending_research_fallback
-            and not self.research_note_emitted
-            and not self.research_placeholder_emitted
-        ):
-            fallback = self.pending_research_fallback
-            self.notes.append(
-                {
-                    "milestone": "research_result",
-                    "text": fallback["text"],
-                    "noteSource": "deterministic",
-                    "counts": fallback["counts"],
-                    "liveOnly": False,
-                }
-            )
-            self.research_note_emitted = True
-
-        notes = list(self.notes)
-        if self.research_note_emitted:
-            notes = [
-                n
-                for n in notes
-                if n["milestone"] != "research_placeholder" or not n.get("liveOnly")
-            ]
-        kept = []
-        for note in notes:
-            kept.append(
-                {
-                    "text": note["text"],
-                    "noteSource": note["noteSource"],
-                    "counts": note["counts"],
-                }
-            )
-        return kept[:4]
-
     def build_summary(self) -> dict[str, Any]:
         finished_at_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         return {
             "startedAtMs": self.started_at_ms,
             "finishedAtMs": finished_at_ms,
             "elapsedMs": max(0, finished_at_ms - self.started_at_ms),
-            "notes": self.finalize_notes(),
+            "notes": self.notes[:4],
             "finalCounts": self.counts_snapshot(),
         }
 
