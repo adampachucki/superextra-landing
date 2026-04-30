@@ -63,6 +63,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    from google.api_core.exceptions import FailedPrecondition
     from google.cloud import firestore
     from google.cloud.firestore_v1 import FieldFilter
 
@@ -80,26 +81,33 @@ def main() -> int:
     query = fs.collection_group("turns").where(
         filter=FieldFilter("createdAt", ">=", cutoff)
     )
-    for t in query.stream():
-        d = t.to_dict()
-        started = d.get("startedAt") or d.get("createdAt")
-        if started and started > inflight_grace and d.get("status") != "complete":
-            in_flight_skipped += 1
-            continue
-        sid = t.reference.parent.parent.id
-        tid = t.id
-        reply = d.get("reply") or ""
-        status = d.get("status")
-        error = d.get("error")
-        threshold = _short_threshold_for(tid)
-        if error:
-            errored.append((sid, tid, str(error), len(reply)))
-        elif status != "complete":
-            not_complete.append((sid, tid, status, len(reply)))
-        elif len(reply) < threshold:
-            short.append((sid, tid, len(reply)))
-        else:
-            ok += 1
+    try:
+        for t in query.stream():
+            d = t.to_dict()
+            started = d.get("startedAt") or d.get("createdAt")
+            if started and started > inflight_grace and d.get("status") != "complete":
+                in_flight_skipped += 1
+                continue
+            sid = t.reference.parent.parent.id
+            tid = t.id
+            reply = d.get("reply") or ""
+            status = d.get("status")
+            error = d.get("error")
+            threshold = _short_threshold_for(tid)
+            if error:
+                errored.append((sid, tid, str(error), len(reply)))
+            elif status != "complete":
+                not_complete.append((sid, tid, status, len(reply)))
+            elif len(reply) < threshold:
+                short.append((sid, tid, len(reply)))
+            else:
+                ok += 1
+    except FailedPrecondition as exc:
+        if "index" in str(exc).lower():
+            print("audit unavailable: Firestore index for turns.createdAt is not ready")
+            print("  deployed index: collectionGroup=turns field=createdAt ASC")
+            return 2
+        raise
 
     flagged = errored or not_complete or short
     print(
