@@ -125,7 +125,6 @@ async def _run_conversation(messages: list[str], pre_state: dict | None = None) 
 REPORT_STATE = {
     "final_report": "## Market Analysis\n\nKey findings about Restaurant XYZ...\n\nPricing is competitive at PLN 35-45 range.",
     "places_context": "Target: Restaurant XYZ, Warsaw. Competitors: A, B, C.",
-    "research_plan": "Core question: competitive positioning of Restaurant XYZ.",
 }
 
 

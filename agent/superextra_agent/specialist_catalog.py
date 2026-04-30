@@ -35,9 +35,6 @@ class Specialist:
         instruction_name: Optional override for which `.md` template to
             load. Defaults to `name`. `dynamic_researcher_1` reuses the
             generic `dynamic_researcher` template.
-        dispatchable: Whether the orchestrator can call this specialist
-            directly as a tool. The gap researcher is excluded — it runs as
-            a distinct step after specialist dispatch.
     """
     name: str
     output_key: str
@@ -46,12 +43,10 @@ class Specialist:
     role_title: str
     thinking: str  # "high" | "medium"
     instruction_name: str | None = None
-    dispatchable: bool = True
 
 
-# Orchestrator-callable specialists + the gap researcher. Order matters
-# for the fallback report stitch (see `_build_fallback_report` in agent.py)
-# — it's the canonical top-to-bottom structure of a report.
+# ResearchLead-callable specialists. Order is the canonical top-to-bottom
+# structure used by prompts and UI labels.
 SPECIALISTS: tuple[Specialist, ...] = (
     Specialist(
         name="market_landscape",
@@ -77,9 +72,10 @@ SPECIALISTS: tuple[Specialist, ...] = (
             "(Pyszne.pl, Wolt, Glovo, Uber Eats, Bolt Food), making this also "
             "the strongest live signal of who is currently operating and on "
             "which platforms. Compares delivery markup vs dine-in pricing, "
-            "surfaces promotions, lunch deals, trending dishes, and "
-            "dietary-trend adoption. Does NOT cover review sentiment about "
-            "price, marketing positioning, or revenue."
+            "surfaces promotions, lunch deals, trending dishes, "
+            "dietary-trend adoption, and currently-operating signals from "
+            "delivery-platform availability. Does NOT cover review sentiment "
+            "about price, marketing positioning, or revenue."
         ),
         role_title="Menu & Pricing research agent",
         thinking="high",
@@ -150,10 +146,12 @@ SPECIALISTS: tuple[Specialist, ...] = (
             "(active ads, creative, launch dates) for the target restaurant "
             "and competitive set. Canonical signal for new venues launching "
             "(announced on social before press), brand momentum, and "
-            "competitor advertising spend. Also covers delivery-platform "
-            "positioning (rankings, photo quality, menu completeness) and "
-            "Google SERP/Business Profile presence. Does NOT analyze menus or "
-            "prices, review sentiment, or revenue."
+            "competitor advertising spend. Also covers price-positioning "
+            "signals such as promo frequency, value-proposition messaging, "
+            "discount framing, delivery-platform positioning (rankings, "
+            "photo quality, menu completeness), and Google SERP/Business "
+            "Profile presence. Does NOT analyze menu line-item prices, "
+            "review sentiment, or revenue."
         ),
         role_title="Marketing & Digital research agent",
         thinking="medium",
@@ -166,8 +164,10 @@ SPECIALISTS: tuple[Specialist, ...] = (
             "Quantitative review analysis from structured API sources: Google "
             "Reviews + TripAdvisor (tourist/local breakdown, rating trends, "
             "owner-engagement, ranking position). Apify-backed, includes "
-            "demographics. Best for hard numbers on review patterns; pair "
-            "with guest_intelligence for cross-platform qualitative."
+            "demographics. Best for hard numbers on review patterns, price/value "
+            "complaints, closure-risk signals such as review-velocity flatlines, "
+            "and defensive owner-response patterns; pair with guest_intelligence "
+            "for cross-platform qualitative."
         ),
         role_title="Review Analyst",
         thinking="high",
@@ -179,22 +179,16 @@ SPECIALISTS: tuple[Specialist, ...] = (
         description=(
             "Flexible research agent for angles outside the 8 specialist "
             "domains. Use for niche regulatory questions, one-off competitor "
-            "news, sector-specific events, or any topic where no other "
-            "specialist's data sources apply. Brief should name the exact "
-            "question and where to search."
+            "news, sector-specific events, job-board-specific labor checks, "
+            "salary benchmarks beyond operations' standard sources, or any "
+            "topic where no other specialist's data sources apply. For "
+            "wage/labor questions, pair with operations when the answer needs "
+            "current job postings or external benchmark validation. Brief "
+            "should name the exact question and where to search."
         ),
         role_title="flexible research agent",
         thinking="high",
         instruction_name="dynamic_researcher",
-    ),
-    Specialist(
-        name="gap_researcher",
-        output_key="gap_research_result",
-        label="Gap Research",
-        description="Analyzes Phase 1 specialist outputs for gaps, contradictions, and underexplored angles.",
-        role_title="Gap Researcher",
-        thinking="medium",
-        dispatchable=False,
     ),
 )
 
@@ -202,35 +196,20 @@ SPECIALISTS: tuple[Specialist, ...] = (
 # ── Derived views (never edit by hand) ──────────────────────────────────────
 
 
-#: Specialists the orchestrator can call as tools (everything minus gap).
-ORCHESTRATOR_SPECIALISTS: tuple[Specialist, ...] = tuple(
-    s for s in SPECIALISTS if s.dispatchable
-)
-
-#: author → state output_key. Used by `firestore_events.AUTHOR_TO_OUTPUT_KEY`
-#: (which also has a `follow_up → final_report` row the mapper adds).
+#: Specialist author -> state output_key. Used by `firestore_events`.
 AUTHOR_TO_OUTPUT_KEY: dict[str, str] = {s.name: s.output_key for s in SPECIALISTS}
 
 #: state output_key → UI label.
 OUTPUT_KEY_TO_LABEL: dict[str, str] = {s.output_key: s.label for s in SPECIALISTS}
 
-#: Orchestrator-callable specialist name → output_key.
-SPECIALIST_OUTPUT_KEYS: dict[str, str] = {
-    s.name: s.output_key for s in ORCHESTRATOR_SPECIALISTS
-}
+#: Specialist name → output_key.
+SPECIALIST_OUTPUT_KEYS: dict[str, str] = {s.name: s.output_key for s in SPECIALISTS}
 
-#: Orchestrator-callable specialist name → role_title for `specialist_base.md`.
+#: Specialist instruction name → role_title for `specialist_base.md`.
 ROLE_TITLES: dict[str, str] = {
-    (s.instruction_name or s.name): s.role_title for s in ORCHESTRATOR_SPECIALISTS
+    (s.instruction_name or s.name): s.role_title for s in SPECIALISTS
 }
 
 #: Orchestrator-prompt lookup: output_key → label for "prior results" detection.
-#: Excludes gap research (it's a phase 2 output, not a phase 1 signal).
-SPECIALIST_RESULT_KEYS: dict[str, str] = {
-    s.output_key: s.label for s in ORCHESTRATOR_SPECIALISTS
-}
-
-#: Top-to-bottom structure of the fallback report stitched from specialist
-#: state when the synth callback needs to substitute a report. Order is the
-#: catalog order; includes the gap research section.
-FALLBACK_SECTIONS: list[tuple[str, str]] = [(s.output_key, s.label) for s in SPECIALISTS]
+#: Includes every ResearchLead-callable specialist.
+SPECIALIST_RESULT_KEYS: dict[str, str] = {s.output_key: s.label for s in SPECIALISTS}

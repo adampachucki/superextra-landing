@@ -642,7 +642,7 @@ async def test_plugin_after_run_writes_finalize_failed_terminal_on_finalize_cras
 
     # Force finalize to raise.
     async def _crashing_finalize() -> tuple:
-        raise RuntimeError("synthesizer barfed")
+        raise RuntimeError("finalize failed")
 
     state.finalize = _crashing_finalize
 

@@ -160,9 +160,6 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
     if author == "context_enricher" and detail_events:
         mapping["milestones"]["context_started"] = True
 
-    if author == "research_orchestrator" and _has_state_delta(event, "research_plan"):
-        mapping["milestones"]["plan_ready_text"] = str(_state_delta(event)["research_plan"])
-
     if author in SPECIALIST_AUTHORS and detail_events:
         mapping["milestones"]["research_started"] = True
 
@@ -172,18 +169,8 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
             mapping["milestones"]["research_result_text"] = str(_state_delta(event)[output_key])
             mapping["grounding_sources"] = extract_sources_from_grounding(event)
 
-    if _has_state_delta(event, "_drafting_started"):
-        mapping["milestones"]["drafting_started"] = True
-        mapping["timeline_events"].append(
-            {
-                "kind": "drafting",
-                "id": f"{_event_id(event)}:drafting",
-                "text": "Drafting the answer…",
-            }
-        )
-
-    if author in ("synthesizer", "follow_up"):
-        complete = _map_synth_complete(event)
+    if author in ("research_lead", "follow_up"):
+        complete = _map_final_complete(event)
         if complete is not None:
             mapping["complete"] = complete
 
@@ -225,14 +212,14 @@ def _map_router_complete(event: Any) -> dict[str, Any] | None:
     return {"reply": text, "sources": []}
 
 
-def _map_synth_complete(event: Any) -> dict[str, Any] | None:
+def _map_final_complete(event: Any) -> dict[str, Any] | None:
     if not _is_final(event):
         return None
 
     reply: str | None = None
     # `final_report_followup` is the follow-up agent's output_key (kept
     # distinct so a follow-up reply doesn't clobber the original report
-    # in session state). `final_report` is the synthesizer's. Each event
+    # in session state). `final_report` is the research lead's. Each event
     # carries at most one of them in its state delta — same turn, same
     # author — so checking both is collision-free.
     for key in ("final_report_followup", "final_report"):

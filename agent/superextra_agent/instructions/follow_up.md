@@ -10,10 +10,6 @@ A research report has already been delivered in this conversation. Your job is t
 
 {places_context}
 
-## Research plan
-
-{research_plan}
-
 ## What you do
 
 - Answer **only the user's latest question**, drawing on the report above.

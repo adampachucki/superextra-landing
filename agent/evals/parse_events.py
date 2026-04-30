@@ -134,9 +134,9 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
     # remains only for historical eval captures produced before 2026-04-29.
     if not specialists_dispatched:
         try:
-            from superextra_agent.specialist_catalog import ORCHESTRATOR_SPECIALISTS
+            from superextra_agent.specialist_catalog import SPECIALISTS
 
-            specialist_names = {s.name for s in ORCHESTRATOR_SPECIALISTS}
+            specialist_names = {s.name for s in SPECIALISTS}
             specialists_dispatched = sorted(
                 name for name in tool_call_counts.keys() if name in specialist_names
             )

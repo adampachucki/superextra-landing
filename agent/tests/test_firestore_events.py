@@ -147,17 +147,7 @@ def test_google_reviews_uses_saved_place_name():
     assert mapped["timeline_events"][0]["text"] == "12 reviews for Noma"
 
 
-def test_plan_and_research_milestones_are_exposed():
-    plan = map_event(
-        _event(
-            author="research_orchestrator",
-            is_final=True,
-            state_delta={"research_plan": "Check menus, reviews, delivery coverage."},
-        ),
-        {},
-    )
-    assert plan["milestones"]["plan_ready_text"] == "Check menus, reviews, delivery coverage."
-
+def test_research_milestone_is_exposed():
     research = map_event(
         _event(
             author="guest_intelligence",
@@ -180,16 +170,9 @@ def test_research_started_fires_on_specialist_detail_rows():
     assert mapped["milestones"]["research_started"] is True
 
 
-def test_drafting_state_delta_emits_drafting_event():
-    ev = _event(author="synthesizer", state_delta={"_drafting_started": True}, event_id="evt-draft")
-    mapped = map_event(ev, {})
-    assert mapped["milestones"]["drafting_started"] is True
-    assert mapped["timeline_events"][-1]["kind"] == "drafting"
-
-
-def test_synth_complete_uses_grounding_sources():
+def test_research_lead_complete_uses_grounding_sources():
     ev = _event(
-        author="synthesizer",
+        author="research_lead",
         is_final=True,
         state_delta={"final_report": "# Report"},
         grounding_chunks=[{"uri": "https://a.example", "title": "A", "domain": "a.example"}],
@@ -201,10 +184,20 @@ def test_synth_complete_uses_grounding_sources():
     }
 
 
+def test_research_lead_empty_final_report_does_not_complete():
+    ev = _event(
+        author="research_lead",
+        is_final=True,
+        state_delta={"final_report": "   "},
+    )
+    mapped = map_event(ev, {})
+    assert mapped["complete"] is None
+
+
 def test_followup_complete_reads_final_report_followup_key():
     """The follow-up agent writes to `final_report_followup`, not `final_report`.
     Mapper must pick up the follow-up reply without falling back to
-    `final_report` (which still holds the original synthesizer report)."""
+    `final_report` (which still holds the original research report)."""
     ev = _event(
         author="follow_up",
         is_final=True,

@@ -1,4 +1,3 @@
-import logging
 import os
 from pathlib import Path
 
@@ -12,14 +11,11 @@ from google.genai import Client, types
 
 from .apify_tools import get_google_reviews
 from .specialist_catalog import (
-    ORCHESTRATOR_SPECIALISTS,
     ROLE_TITLES,
-    SPECIALIST_OUTPUT_KEYS,
+    SPECIALISTS,
 )
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
 from .web_tools import fetch_web_content
-
-logger = logging.getLogger(__name__)
 
 _dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
 INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
@@ -112,9 +108,6 @@ authoritative-but-generic. If a claim only appears in non-authoritative sources,
 
 _SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
 
-_NO_BASE = {"gap_researcher"}
-
-
 def _make_instruction(name: str):
     """Create an InstructionProvider that injects shared state into the template.
 
@@ -122,12 +115,9 @@ def _make_instruction(name: str):
     so the instruction provider only supplies durable context.
     """
     body = (INSTRUCTIONS_DIR / f"{name}.md").read_text()
-    if name in _NO_BASE:
-        template = body
-    else:
-        template = (_SPECIALIST_BASE
-                    .replace("{specialist_body}", body)
-                    .replace("{role_title}", ROLE_TITLES.get(name, name)))
+    template = (_SPECIALIST_BASE
+                .replace("{specialist_body}", body)
+                .replace("{role_title}", ROLE_TITLES.get(name, name)))
 
     def provider(ctx):
         places_context = ctx.state.get("places_context", "No Google Places data available.")
@@ -217,78 +207,5 @@ ALL_SPECIALISTS = [
         instruction_name=s.instruction_name,
         thinking_config=_THINKING_CONFIGS[s.thinking],
     )
-    for s in ORCHESTRATOR_SPECIALISTS
+    for s in SPECIALISTS
 ]
-
-# --- Gap researcher (Phase 2 of two-phase research) ---
-
-_GAP_RESEARCHER_TEMPLATE = (INSTRUCTIONS_DIR / "gap_researcher.md").read_text()
-
-# Context pairs at the top, then every orchestrator-callable specialist's output_key.
-# Derived so new specialists flow automatically.
-_GAP_RESEARCHER_KEYS = [
-    "places_context", "research_plan",
-    *[s.output_key for s in ORCHESTRATOR_SPECIALISTS],
-]
-
-
-def _gap_researcher_instruction(ctx):
-    """Uses `.format()` — it does NOT re-scan inserted values, so specialist
-    outputs containing literal `{` / `}` characters flow through verbatim.
-    The template itself has no literal braces that would need escaping."""
-    values = {k: ctx.state.get(k, "Agent did not produce output.") for k in _GAP_RESEARCHER_KEYS}
-    return _GAP_RESEARCHER_TEMPLATE.format(**values)
-
-
-def _should_run_gap_researcher(callback_context):
-    """Decide whether to invoke the gap researcher.
-
-    The AgentTool architecture has no separate dispatch registry. That is
-    deliberate: the orchestrator calls only the specialists it needs, and
-    successful calls write their output keys into state. The gap step only
-    runs when a called specialist produced an explicit error fallback; silent
-    missing outputs are left to the orchestrator/synthesizer rather than
-    reintroducing a second tracking path.
-    """
-    produced = {
-        name: callback_context.state.get(output_key)
-        for name, output_key in SPECIALIST_OUTPUT_KEYS.items()
-        if callback_context.state.get(output_key)
-    }
-
-    if not produced:
-        logger.info("gap gate: skip — no specialist outputs")
-        return types.Content(role="model", parts=[types.Part(text="No specialist outputs to analyze.")])
-
-    failures: list[str] = []
-    for spec_name, value in produced.items():
-        if not isinstance(value, str) or value.startswith("Research unavailable: "):
-            failures.append(spec_name)
-
-    if not failures:
-        logger.info("gap gate: skip — %d specialists succeeded", len(produced))
-        return types.Content(role="model", parts=[types.Part(text="All called specialists succeeded; no gaps to research.")])
-
-    logger.info("gap gate: run — %d/%d specialists failed: %s",
-                len(failures), len(produced), failures)
-    return None
-
-
-def make_gap_researcher():
-    # `include_contents='none'`: `_gap_researcher_instruction` injects every
-    # specialist output + places_context + research_plan from state at runtime,
-    # so the model doesn't need prior conversation history.
-    return LlmAgent(
-        name="gap_researcher",
-        model=SPECIALIST_GEMINI,
-        description="Analyzes Phase 1 specialist outputs for gaps, contradictions, and underexplored angles.",
-        instruction=_gap_researcher_instruction,
-        tools=[google_search, fetch_web_content],
-        output_key="gap_research_result",
-        include_contents="none",
-        generate_content_config=MEDIUM_THINKING_CONFIG,
-        before_agent_callback=_should_run_gap_researcher,
-        before_model_callback=_inject_geo_bias,
-        on_model_error_callback=_on_model_error,
-        on_tool_error_callback=_on_tool_error,
-    )
