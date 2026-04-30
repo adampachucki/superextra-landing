@@ -93,7 +93,6 @@ def _fake_event(
 _AWAIT_FREE_METHODS = (
     "observe_event",
     "_merge_source",
-    "_maybe_emit_notes",
     "_capture_final",
 )
 
@@ -161,86 +160,6 @@ async def test_finalize_real_reply_returns_complete_payload():
     assert turn_update["sources"] == state.final_sources
     assert "turnSummary" in turn_update
     assert "completedAt" in turn_update
-
-
-# ── finalize() — note-task drain order ───────────────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_finalize_cancels_pending_note_tasks_and_gathers():
-    """plan §v3.7 race fix — `asyncio.wait` with a timeout does NOT cancel
-    pending tasks; finalize() must explicitly cancel stragglers AND gather
-    all results so a raised note-task exception doesn't sit unretrieved.
-    """
-    state = _make_state()
-    state.final_reply = "answer"
-    state.timeline_writer.write_timeline = AsyncMock(return_value=None)
-
-    cancelled: list[str] = []
-
-    async def _fast() -> None:
-        return None
-
-    async def _slow() -> None:
-        try:
-            await asyncio.sleep(60)  # would outlast the drain
-        except asyncio.CancelledError:
-            cancelled.append("slow")
-            raise
-
-    async def _raises() -> None:
-        raise RuntimeError("note task crashed")
-
-    fast_task = asyncio.create_task(_fast())
-    slow_task = asyncio.create_task(_slow())
-    raises_task = asyncio.create_task(_raises())
-    state.note_tasks.extend([fast_task, slow_task, raises_task])
-
-    # Patch the drain timeout so the test runs quickly.
-    monkey_attr = "NOTE_TASK_DRAIN_TIMEOUT_S"
-    original = getattr(gear_run_state, monkey_attr)
-    try:
-        setattr(gear_run_state, monkey_attr, 0.1)
-        await state.finalize()
-    finally:
-        setattr(gear_run_state, monkey_attr, original)
-
-    assert fast_task.done()
-    assert slow_task.cancelled() or slow_task.done()
-    assert raises_task.done()
-    assert cancelled == ["slow"], "the long-running note task must have been cancelled"
-
-
-# ── finalize() — close timeline_writer AFTER notes drain ─────────────────────
-
-
-@pytest.mark.asyncio
-async def test_finalize_closes_timeline_writer_after_notes_drain():
-    """plan §v3.8 close-order swap — closing the writer first lets a
-    resuming note task mutate the builder while its write_timeline call
-    no-ops against the closed writer (turnSummary would contain a note
-    the live UI never saw). Verify drain happens before close."""
-    state = _make_state()
-    state.final_reply = "answer"
-    order: list[str] = []
-    real_close = state.timeline_writer.close
-
-    async def _close():
-        order.append("close")
-        await real_close()
-
-    state.timeline_writer.close = _close  # type: ignore[assignment]
-    state.timeline_writer.write_timeline = AsyncMock(return_value=None)
-
-    async def _note():
-        order.append("note")
-
-    state.note_tasks.append(asyncio.create_task(_note()))
-
-    await state.finalize()
-
-    # Note ran first (or at least started before close completed).
-    assert order.index("note") < order.index("close")
 
 
 # ── stop_heartbeat ───────────────────────────────────────────────────────────
@@ -391,51 +310,3 @@ async def test_finalize_propagates_cancellation():
         await state.finalize()
 
 
-# ── _maybe_emit_notes spawns LLM-backed tasks for 'research_result' ──
-
-
-@pytest.mark.asyncio
-async def test_maybe_emit_notes_spawns_task_for_research_result(monkeypatch):
-    """research_result milestones spawn an LLM-backed note task."""
-    state = _make_state()
-
-    spawned: list[str] = []
-
-    # Patch the LLM-backed function so we can observe scheduling without
-    # making a real call. _emit_note_task is what the GearRunState spawns.
-    async def _fake_emit_note_task(*, milestone, **_):
-        spawned.append(milestone)
-
-    monkeypatch.setattr(gear_run_state, "_emit_note_task", _fake_emit_note_task)
-
-    extras = state._maybe_emit_notes(
-        {
-            "research_result_text": "Research is done",
-        }
-    )
-    # No deterministic note is returned; the spawned task writes it via
-    # _emit_note_task.
-    assert extras == []
-    assert len(state.note_tasks) == 1
-    # Drain spawned tasks so they don't leak warnings
-    await asyncio.gather(*state.note_tasks)
-    assert spawned == ["research_result"]
-
-
-def test_maybe_emit_notes_returns_deterministic_for_context_start():
-    """context_start and research_placeholder are deterministic and must
-    be returned as timeline events to write inline."""
-    state = _make_state()
-    extras = state._maybe_emit_notes({"context_started": True})
-    assert len(extras) == 1
-    assert extras[0]["kind"] == "note"
-    assert "checking the venue" in extras[0]["text"]
-
-
-def test_maybe_emit_notes_idempotent_per_milestone():
-    """Each milestone's note can only fire once."""
-    state = _make_state()
-    a = state._maybe_emit_notes({"context_started": True})
-    b = state._maybe_emit_notes({"context_started": True})
-    assert len(a) == 1
-    assert b == []
