@@ -1,0 +1,43 @@
+name: Agent health check
+
+# Daily audit of recent turns for empty/short/errored final_report. The
+# collapse migration deleted the synth fallback callback (which used to
+# stitch a deterministic report from raw specialist outputs when the
+# model returned empty content). Without that net, an empty model
+# response now surfaces as an empty final_report. This audit catches
+# the failure mode early instead of waiting for a user to complain.
+#
+# Posts ::warning annotations to the workflow summary when anything is
+# flagged. Runs daily and can be triggered manually for ad-hoc checks.
+
+on:
+  schedule:
+    - cron: '15 7 * * *' # 07:15 UTC daily — after Europe morning queries roll in
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SUPEREXTRA_SITE }}
+
+      - name: Run turns audit
+        id: audit
+        continue-on-error: true
+        run: |
+          pip install google-cloud-firestore
+          python agent/scripts/audit_turns.py --hours 24
+
+      - name: Surface warning if audit flagged anything
+        if: steps.audit.outcome == 'failure'
+        run: |
+          echo "::warning::Agent health audit flagged at least one errored / incomplete / short final_report turn in the last 24h. See the previous step's output for sids and turn ids. Investigate via 'gcloud logging read severity>=WARNING --freshness=1d --project=superextra-site' or directly in Firestore."

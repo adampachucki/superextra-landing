@@ -6,6 +6,16 @@
 the AgentTool migration shipped on 2026-04-29 (commit `a313b50`); this doc
 is about the _next_ phase of that work, deliberately deferred.
 
+> **⚠️ Historical only.** This doc was a forward-looking handoff written before
+> the floors were dropped. The floor question played out: floors were removed
+> as part of the lead-as-synthesizer collapse on 2026-04-30 (commit `22d2540`),
+> replaced by a structured pre-dispatch evidence-surface coverage check.
+> Production has been running floors-free since the redeploy at op
+> `6143110664274575360`. Read this doc as background on _why_ floors were
+> contentious and the eval data that informed the decision; do not pick up
+> the "Option B execution plan" — it's been executed. See
+> `docs/agent-routing-collapse-deploy-log-2026-04-30.md` for what shipped.
+
 ## What this document is
 
 A self-contained brief for a separate team picking up the floor question.
