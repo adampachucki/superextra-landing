@@ -43,7 +43,7 @@
 - `cd agent && PYTHONPATH=. .venv/bin/pytest tests/test_firestore_events.py tests/test_gear_run_state.py -q` passed: 29 tests, 1 dependency deprecation warning.
 - `cd functions && npm test` passed: 63 tests.
 - `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` passed: 146 tests, 17 skipped live evals, 1 dependency deprecation warning.
-- `npm run test:rules` did not run locally because Java is missing: `Unable to locate a Java Runtime`. No Firestore rule assertion failed.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH" npm_config_cache=/tmp/superextra-npm-cache XDG_CONFIG_HOME=/tmp/superextra-firebase-config CI=true npm run test:rules` passed: 22 tests. The extra env vars avoid the macOS Java stub, npm cache permission issues, and Firebase CLI update-check writes to `~/.config`.
 - `npm run build` passed with the same pre-existing Svelte warnings as `npm run check`.
 
 ## LOC snapshot
