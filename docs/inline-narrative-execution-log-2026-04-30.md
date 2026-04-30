@@ -2,8 +2,8 @@
 
 **Started:** 2026-04-30
 **Plan reference:** `docs/inline-narrative-via-narrate-tool-2026-04-30.md`
-**Status:** Phase 0 (de-risking spike) — orientation complete; spike harness next.
-**Branch:** `main` (commit at start: `358a12e`).
+**Status:** **SHIPPED.** All phases done; Phase 8 fallback unused (compliance held in production).
+**Branch:** `main` (commit at start: `358a12e`; final commit: `3e733d6`).
 **Owner of this log:** Whoever is currently driving execution. Append; don't rewrite earlier entries.
 
 This is a living log of what we actually did, what changed in the code, what tripped us up, and any plan-level revisions discovered during execution. Insights and learnings live here too. Future readers should be able to pick up cold — read top-to-bottom for chronology, jump to the latest entry for current state.
@@ -12,18 +12,18 @@ This is a living log of what we actually did, what changed in the code, what tri
 
 ## Phase tracker
 
-| Phase                               | Status      | Commit          | Notes                                                      |
-| ----------------------------------- | ----------- | --------------- | ---------------------------------------------------------- |
-| 0 — De-risking spike                | **PASSED**  | n/a (throwaway) | 5/5 queries produced narrate, prose terse and personalized |
-| 1 — Tool definition                 | Not started |                 |                                                            |
-| 2 — Event mapping                   | Not started |                 |                                                            |
-| 3 — Instruction edits               | Not started |                 |                                                            |
-| 4 — Wire `narrate` into toolset     | Not started |                 |                                                            |
-| 5 — Delete old note machinery       | Not started |                 |                                                            |
-| 6 — Frontend rewire                 | Not started |                 |                                                            |
-| 7 — Deploy + live verification      | Not started |                 |                                                            |
-| 8 — Map-time fallback (conditional) | Not started |                 |                                                            |
-| 9 — Cleanup (delete preview route)  | Not started |                 |                                                            |
+| Phase                               | Status     | Commit                | Notes                                                                                                                               |
+| ----------------------------------- | ---------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 0 — De-risking spike                | **PASSED** | n/a (throwaway)       | 5/5 queries produced narrate, prose terse and personalized                                                                          |
+| 1 — Tool definition                 | **DONE**   | `08dd0df`             | Consolidated into one feature commit with 2–4                                                                                       |
+| 2 — Event mapping                   | **DONE**   | `08dd0df`             | `map_event` narrate branch + 3 unit tests                                                                                           |
+| 3 — Instruction edits               | **DONE**   | `08dd0df`             | research_lead + context_enricher; tightened to "exactly one narrate" + present-progressive                                          |
+| 4 — Wire `narrate` into toolset     | **DONE**   | `08dd0df`             | Added to research_lead.tools and \_ENRICHER_TOOLS                                                                                   |
+| 5 — Delete old note machinery       | **DONE**   | `4cf894f`             | −325 net LOC; TurnSummary.notes goes empty (acceptable)                                                                             |
+| 6 — Frontend rewire                 | **DONE**   | `23b90b6`             | `<LiveActivity>` replaces `<StreamingProgress>`; drip on notes                                                                      |
+| 7 — Deploy + live verification      | **DONE**   | `8861ec6` + `3e733d6` | Production verified; narrate notes interleave with activity rows correctly                                                          |
+| 8 — Map-time fallback (conditional) | Skipped    | —                     | Production compliance 2/2 on test query (context_enricher + research_lead both narrated). Plus prior 5/5 spike. No fallback needed. |
+| 9 — Cleanup (delete preview route)  | **DONE**   | `23b90b6`             | Folded into Phase 6 commit; `/dev/progress-preview` deleted                                                                         |
 
 ---
 
@@ -114,6 +114,53 @@ _(None yet.)_
 
 ---
 
+## Phase 7 — Deploy + live verification
+
+### Deploy
+
+- Push to `main` triggered Cloud Functions + Hosting deploy (3m).
+- `agent/scripts/redeploy_engine.py --yes` redeployed the Vertex AI Agent Engine (deployed sha = `23b90b6`).
+- Both deploys green.
+
+### First live test (sid `c08c5ac3-be7f-4731-9cbf-60f718b5a321`)
+
+Query: _"How does Maple & Ash position vs Bavette's?"_ with Maple & Ash place context.
+
+- **Backend**: Firestore query confirmed two narrate notes landed correctly.
+  - `seq=1` from context_enricher: _"Pulling Google Places data for Maple & Ash and its competitor Bavette's in Chicago."_
+  - `seq=6` from research_lead: _"Dispatching specialists to compare the menu pricing, digital presence, and guest sentiment of Maple & Ash and Bavette's."_
+- **Frontend**: notes rendered as **empty paragraphs**. The detail rows under each batch displayed correctly, but the narrate text never appeared.
+
+### Frontend bug + fix
+
+The `$effect` in `LiveActivity.svelte` set up a typewriter per note and called `typer.setTarget(ev.text)`. The cleanup function ran on every `events` change and called `.stop()` on every typewriter — killing the RAF loop mid-drip. The sticky `typers.has(ev.id)` check then prevented re-creation, so `displayed[ev.id]` stayed at `''` forever.
+
+Two attempted fixes:
+
+1. **Removed the `.stop()` cleanup** (`commit 8861ec6`) — typewriters self-terminate when current === target. Logically sound. Deployed. Did not fix the empty paragraphs in production.
+2. **Dropped the typewriter entirely** (`commit 3e733d6`) — replaced `{displayed[ev.id] ?? ''}` with `{ev.text}`. Removed `createTypewriter` import, `displayed` state, the `$effect`, and `SvelteMap`. Net −24 lines.
+
+After fix #2 + hard reload (Chrome's service worker had cached the old bundle, requiring `ignoreCache: true` to pick up the new one), the notes rendered correctly.
+
+### Second live test — verified (sid `014166e6-f124-4c62-aed5-9efda0819cc2`)
+
+Query: _"What's the audience profile for RPM Steak?"_ with RPM Steak place context.
+
+Visual confirmation (screenshot at `/tmp/live-narrate-WORKING.png`):
+
+- "Working for 1m 19s" header above the wrapper.
+- Collapsible "Working" wrapper with bouncing dots.
+- **Narrative 1**: _"Pulling Google Places data for RPM Steak and identifying its key competitors."_ rendered as a paragraph above the first activity batch.
+- Four Google Maps detail rows under it.
+- **Narrative 2**: _"Investigating review demographics, guest sentiment, and social media positioning to build an audience profile for RPM Steak in Chicago."_ rendered between the Google Maps batch and the TripAdvisor/Google reviews batch.
+- Six TripAdvisor + Google reviews detail rows under it.
+
+Order: narratives appear strictly above their corresponding details. Prose is terse (≤25 words each), personalized (entity name + city + intent), in present-progressive form. Both narrates passed.
+
+**Compliance on production: 2/2 narrates per turn (context_enricher + research_lead).** Phase 8 skipped — no fallback needed.
+
+---
+
 ## Insights / learnings
 
 - **Narrate-first compliance against `gemini-3.1-pro-preview` MEDIUM thinking is high.** 5/5 on the spike. The model treats a tool-call instruction as more binding than free-text narrate-before-tools instructions would be — exactly the hypothesis the plan was built on.
@@ -124,3 +171,6 @@ _(None yet.)_
 - **`InMemoryRunner(app=...)` works fine for plugin propagation under AgentTool.** Same pattern as `evals/run_matrix.py:97-180` but with `InMemorySessionService` instead of `VertexAiSessionService`. Keeps the spike Firestore-free.
 - **One transient 403 on a re-invocation** — running the agent twice back-to-back from the same Python process hit `PERMISSION_DENIED` on the second run's first Gemini call. Subsequent fresh-process spike runs all worked. Probably a token-cache hiccup; not a blocker.
 - **Pre-existing ADK warnings** — every run prints "Tools at indices [N] are not compatible with automatic function calling (AFC)" for `google_search` and `fetch_web_content`. These are pre-existing and unrelated to narrate. Ignore.
+- **Drip animation is dead, long live the narrative.** The typewriter $effect coupling between an external RAF callback and a `$state Record` either had a Svelte 5 reactivity gotcha or a deeper bug; either way, two debugging cycles (one local + autofixer-clean, one in production) didn't surface the root cause cheaply. Cutting the typewriter entirely shipped in 30 minutes and the narrative works fine without it. **Lesson:** if a "polish" feature blocks the core path, drop it on sight. Drip can come back as a separate iteration if real users miss it.
+- **Service-worker / browser cache bit us in production debugging.** After deploying fix #1, Chrome MCP hit the cached bundle and showed the old broken behavior. `ignoreCache: true` on `navigate_page` (or hard-reload via DevTools) is required to verify a fresh deploy. Worth remembering for any future production-verify session.
+- **Final aggregate diff vs `main` start (`358a12e`):** 6 commits, code is roughly net-flat (~+4 lines code, ~+170 LiveActivity-stack additions offset by ~−80 deletions in StreamingProgress + tests + the typewriter that we removed; backend −325 from notes/gear_run_state). Plan + log docs add ~600 lines, separately. The commit `06ac7e2` in the range was from a parallel session and not part of this work.
