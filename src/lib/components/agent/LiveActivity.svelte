@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { SvelteMap } from 'svelte/reactivity';
 	import type { TimelineEvent } from '$lib/chat-types';
-	import { createTypewriter, type Typewriter } from '$lib/typewriter';
 	import ProgressEventRow from './ProgressEventRow.svelte';
 	import ProgressWrapper from './ProgressWrapper.svelte';
 
@@ -31,34 +29,6 @@
 		return `${seconds}s`;
 	}
 
-	// Per-note drip state. The typewriter map lives outside $state because
-	// the instances are objects with internal RAF state we don't want
-	// Svelte to deep-track. The displayed text is reactive.
-	let displayed = $state<Record<string, string>>({});
-	const typers = new SvelteMap<string, Typewriter>();
-
-	$effect(() => {
-		for (const ev of events) {
-			if (ev.kind !== 'note') continue;
-			if (typers.has(ev.id)) continue;
-			const id = ev.id;
-			const typer = createTypewriter({
-				charsPerFrame: 4,
-				onUpdate: (current) => {
-					displayed[id] = current;
-				}
-			});
-			typers.set(id, typer);
-			displayed[id] = '';
-			typer.setTarget(ev.text);
-		}
-		// Don't .stop() typewriters in cleanup — $effect cleanup runs on
-		// every events change, which would kill typewriters mid-drip and
-		// the sticky `typers.has(id)` check prevents restart. Typewriters
-		// self-terminate via the RAF loop when current.length === target.length.
-		// Component unmount drops the whole subtree anyway.
-	});
-
 	// Step count = detail rows only. Notes are narrative, not "steps".
 	let stepCount = $derived(events.filter((e) => e.kind === 'detail').length);
 	// Always streaming while LiveActivity is mounted — `chatState.loading`
@@ -75,7 +45,7 @@
 		{#each events as ev (ev.id)}
 			{#if ev.kind === 'note'}
 				<p class="text-[15px] leading-relaxed text-black/82 dark:text-white/82">
-					{displayed[ev.id] ?? ''}
+					{ev.text}
 				</p>
 			{:else if ev.kind === 'detail'}
 				<ProgressEventRow
