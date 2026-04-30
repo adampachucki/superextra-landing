@@ -5,32 +5,21 @@
 		stepCount,
 		isStreaming,
 		shouldMinimize,
-		summaryLabel,
 		children
 	}: {
 		stepCount: number;
 		isStreaming: boolean;
 		shouldMinimize: boolean;
-		summaryLabel?: string;
 		children: Snippet;
 	} = $props();
 
-	let userToggled = $state(false);
-	let userOpenChoice = $state(true);
-	let everMinimized = $state(false);
-
-	$effect(() => {
-		if (shouldMinimize) everMinimized = true;
-	});
-
-	let isOpen = $derived(
-		userToggled ? userOpenChoice : !shouldMinimize && !everMinimized
-	);
+	let userOpenChoice = $state<boolean | null>(null);
+	let isOpen = $derived(userOpenChoice ?? !shouldMinimize);
 
 	let label = $derived(
 		isStreaming
 			? 'Working'
-			: (summaryLabel ?? `Completed in ${stepCount} step${stepCount === 1 ? '' : 's'}`)
+			: `Completed in ${stepCount} step${stepCount === 1 ? '' : 's'}`
 	);
 </script>
 
@@ -39,10 +28,7 @@
 >
 	<button
 		type="button"
-		onclick={() => {
-			userOpenChoice = !isOpen;
-			userToggled = true;
-		}}
+		onclick={() => (userOpenChoice = !isOpen)}
 		class="flex w-full cursor-pointer items-center justify-between gap-2 text-[13px] text-black/55 transition-colors hover:text-black/80 dark:text-white/55 dark:hover:text-white/80"
 	>
 		<span class="flex items-baseline gap-1">
