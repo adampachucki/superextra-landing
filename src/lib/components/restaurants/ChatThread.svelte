@@ -5,8 +5,8 @@
 	import { splitChartSegments } from '$lib/chart-blocks';
 	import { createTypewriter } from '$lib/typewriter';
 	import type { ChatSourceProvider, TurnCounts } from '$lib/chat-types';
+	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
 	import ChartBlock from './ChartBlock.svelte';
-	import StreamingProgress from './StreamingProgress.svelte';
 
 	marked.setOptions({ breaks: true, gfm: true });
 
@@ -277,7 +277,7 @@
 		{#if chatState.loading && chatState.liveTimeline.length > 0}
 			<div class="msg-appear flex justify-start">
 				<div class="max-w-[95%] px-1 py-1">
-					<StreamingProgress
+					<LiveActivity
 						events={chatState.liveTimeline}
 						startedAtMs={chatState.currentTurnStartedAtMs}
 					/>
