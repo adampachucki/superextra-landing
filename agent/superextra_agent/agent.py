@@ -10,6 +10,7 @@ from google.genai import types
 
 from .chat_logger import ChatLoggerPlugin
 from .firestore_progress import FirestoreProgressPlugin
+from .narrate_tool import narrate
 from .places_tools import (
     find_nearby_restaurants,
     get_batch_restaurant_details,
@@ -65,6 +66,7 @@ def _research_lead_instruction(ctx):
 
 _ENRICHER_INSTRUCTION = (INSTRUCTIONS_DIR / "context_enricher.md").read_text()
 _ENRICHER_TOOLS = [
+    narrate,
     get_restaurant_details,
     get_batch_restaurant_details,
     find_nearby_restaurants,
@@ -146,6 +148,7 @@ research_lead = LlmAgent(
     instruction=_research_lead_instruction,
     description="Plans research, calls specialist agents as tools, and writes the final report.",
     tools=[
+        narrate,
         google_search,
         fetch_web_content,
         *(AgentTool(agent=spec, include_plugins=True) for spec in ALL_SPECIALISTS),

@@ -144,6 +144,24 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
 
     detail_events: list[dict[str, Any]] = []
     for idx, name, args in _iter_function_calls(event):
+        if name == "narrate":
+            text = args.get("text")
+            if isinstance(text, str) and text.strip():
+                detail_events.append(
+                    {
+                        "kind": "note",
+                        "id": f"narrate:{_event_id(event)}:{idx}",
+                        "text": text.strip(),
+                        "noteSource": "llm",
+                        "counts": {
+                            "webQueries": 0,
+                            "sources": 0,
+                            "venues": 0,
+                            "platforms": 0,
+                        },
+                    }
+                )
+            continue
         detail = _map_function_call(author, name, args, state, _event_id(event), idx)
         if detail is not None:
             detail_events.append(detail)

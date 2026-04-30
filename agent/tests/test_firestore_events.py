@@ -75,6 +75,53 @@ def test_router_text_reply_becomes_complete():
     assert mapped["complete"] == {"reply": "Need clarification", "sources": []}
 
 
+def test_narrate_function_call_emits_note_before_specialist_details():
+    """research_lead's `narrate(text)` arrives as a function-call sibling of
+    real specialist tool calls in the same Event. `map_event` should turn it
+    into a note timeline row with id derived from the part index, so the
+    note's seqInAttempt is strictly less than any specialist tool-response
+    that follows from the same model turn."""
+    ev = _event(
+        author="research_lead",
+        function_calls=[
+            ("narrate", {"text": "Pulling Google reviews for Maple & Ash and Bavette's now."}),
+            ("review_analyst", {"request": "..."}),
+            ("guest_intelligence", {"request": "..."}),
+        ],
+        event_id="evt-narrate",
+    )
+    rows = map_event(ev, {})["timeline_events"]
+    assert rows[0] == {
+        "kind": "note",
+        "id": "narrate:evt-narrate:0",
+        "text": "Pulling Google reviews for Maple & Ash and Bavette's now.",
+        "noteSource": "llm",
+        "counts": {"webQueries": 0, "sources": 0, "venues": 0, "platforms": 0},
+    }
+    # Specialist function-calls don't produce detail rows on their own (they
+    # produce them via responses), so we only assert the note itself here.
+
+
+def test_narrate_with_empty_text_is_dropped():
+    ev = _event(
+        author="research_lead",
+        function_calls=[("narrate", {"text": "   "})],
+        event_id="evt-empty",
+    )
+    rows = map_event(ev, {})["timeline_events"]
+    assert rows == []
+
+
+def test_narrate_with_non_string_text_is_dropped():
+    ev = _event(
+        author="research_lead",
+        function_calls=[("narrate", {"text": 123})],
+        event_id="evt-nonstr",
+    )
+    rows = map_event(ev, {})["timeline_events"]
+    assert rows == []
+
+
 def test_multi_call_event_emits_multiple_detail_rows_in_order():
     ev = _event(
         author="review_analyst",
