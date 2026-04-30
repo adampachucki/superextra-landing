@@ -127,8 +127,8 @@ _(None yet.)_
 Query: _"How does Maple & Ash position vs Bavette's?"_ with Maple & Ash place context.
 
 - **Backend**: Firestore query confirmed two narrate notes landed correctly.
-  - `seq=1` from context_enricher: _"Pulling Google Places data for Maple & Ash and its competitor Bavette's in Chicago."_
-  - `seq=6` from research_lead: _"Dispatching specialists to compare the menu pricing, digital presence, and guest sentiment of Maple & Ash and Bavette's."_
+  - `seq=1` from context*enricher: *"Pulling Google Places data for Maple & Ash and its competitor Bavette's in Chicago."\_
+  - `seq=6` from research*lead: *"Dispatching specialists to compare the menu pricing, digital presence, and guest sentiment of Maple & Ash and Bavette's."\_
 - **Frontend**: notes rendered as **empty paragraphs**. The detail rows under each batch displayed correctly, but the narrate text never appeared.
 
 ### Frontend bug + fix
@@ -158,6 +158,38 @@ Visual confirmation (screenshot at `/tmp/live-narrate-WORKING.png`):
 Order: narratives appear strictly above their corresponding details. Prose is terse (≤25 words each), personalized (entity name + city + intent), in present-progressive form. Both narrates passed.
 
 **Compliance on production: 2/2 narrates per turn (context_enricher + research_lead).** Phase 8 skipped — no fallback needed.
+
+---
+
+## Post-ship slimming pass (same day)
+
+After production verification, an Explore subagent reviewed the shipped delta for dead code, over-engineering, and stale references. Three batches landed:
+
+### Backend — `9e2d25f` (−91 LOC)
+
+- **`agent/superextra_agent/timeline.py`** — deleted `TurnSummaryBuilder.add_note()` (38 lines) and the four state flags it mutates (`context_note_emitted`, `research_placeholder_emitted`, `research_note_emitted`, `pending_research_fallback`). Their only callers were `_emit_note_task` and `_maybe_emit_notes`, both deleted in Phase 5. Also collapsed `finalize_notes()` from 35 lines of unreachable fallback/placeholder-filter logic to a one-liner — `build_summary` reads `self.notes[:4]` directly. `self.notes` is empty in practice (narrate notes flow through `firestore_events.map_event`, not the builder), but the field stays for any future caller.
+- **`notes.py`** — trimmed the top docstring from 12 lines to 4. Dropped the "Timeline-note generation used to live here" reference; the file is title-only now.
+- **`gear_run_state.py`** — concurrency-discipline docstring no longer mentions `note_tasks` / "overlapping note tasks". The guarantee is unchanged; just the prose is current.
+
+### Frontend — `8528f66` (−38 LOC)
+
+- **`src/lib/components/agent/ProgressWrapper.svelte`** — dropped `summaryLabel` prop (only the deleted `/dev/progress-preview` route ever passed it). Collapsed `userToggled / userOpenChoice / everMinimized` triplet to a single nullable `userOpenChoice`: `null` means "no user preference, follow `shouldMinimize`"; explicit boolean overrides. The sticky-minimize latch is gone, which is fine — `LiveActivity` hard-codes `shouldMinimize={false}`, so the latch never fired in production.
+- **`agent/superextra_agent/narrate_tool.py`** — docstring went from 20 lines (with ADK internals references) to 3. The ordering-rationale prose belongs in `firestore_events.map_event` where the actual capture happens, not on a no-op tool.
+
+### Plan addendum — same commit as this log update
+
+Added a one-line note at the top of `docs/inline-narrative-via-narrate-tool-2026-04-30.md` flagging that Phase 6's drip animation was cut. The doc is now consistent with what shipped.
+
+### Deliberately kept
+
+- `src/lib/typewriter.ts` — reviewer flagged but `ChatThread.svelte:18-28` actively uses it for the assistant-reply typing effect. Not dead.
+- `chat-types.ts` `TurnSummary.notes` field + `ChatThread.svelte:185-213` rendering — both render empty in current production but are cheap to leave until we revisit the post-completion footer.
+- `ProgressEventRow.svelte` `dotClass` $derived — pure naming preference; inlining doesn't pay for itself.
+- `stepCount === 1 ? '' : 's'` pluralization in `ProgressWrapper` — branch is currently unreachable (`isStreaming = true` always) but harmless. Leaving in case `LiveActivity` ever flips `isStreaming` dynamically.
+
+### Aggregate cleanup diff
+
+3 commits, ~−129 net LOC, zero behavior change. 147 backend tests passing, 6/6 frontend test files passing, svelte-check 0 errors.
 
 ---
 

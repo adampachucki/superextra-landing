@@ -7,6 +7,8 @@
 
 This document captures the research, learnings, motivation, and concrete plan for replacing our current end-of-phase Gemini-Flash note generation with **inline LLM narrative driven by a model-callable `narrate(text)` no-op tool**, captured into the timeline at event-mapping time. The design pulls visual ideas from `willchen96/mike` (typed lifecycle events, collapsible "Working" wrapper, drip animation) and a structural idea from OpenAI's Codex chat surface (narrative-primary, activity-secondary). It produces personalized prose at the model's native turn cadence, eliminates the separate Gemini Flash note round-trip, and ships at roughly net-zero LOC against current `main` (further reduced if the preview route is deleted in Phase 9).
 
+**Post-ship addendum (2026-04-30):** Phase 6's typewriter-drip animation on note paragraphs was cut during Phase 7 verification — see the execution log. The shipped `LiveActivity.svelte` renders `{ev.text}` directly. Drip can come back as a separate iteration if real users miss it.
+
 **Revision note (same-day):** A first draft of this plan asserted that ADK serializes tool calls within a turn and that specialists run sequentially under `AgentTool`. Both are wrong against ADK 1.28 and our own orchestrator instructions:
 
 - `agent/.venv/lib/python3.12/site-packages/google/adk/flows/llm_flows/functions.py:387-404` runs every function call in a single LLM response in parallel via `asyncio.create_task` + `asyncio.gather`.
