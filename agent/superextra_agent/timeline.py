@@ -75,13 +75,10 @@ class TurnSummaryBuilder:
         self.platforms: set[str] = set()
         self.detail_dedupe: set[tuple[str, str, str]] = set()
         self.notes: list[dict[str, Any]] = []
-        self.pending_plan_fallback: dict[str, Any] | None = None
         self.pending_research_fallback: dict[str, Any] | None = None
         self.context_note_emitted = False
-        self.plan_note_emitted = False
         self.research_placeholder_emitted = False
         self.research_note_emitted = False
-        self.drafting_emitted = False
 
     def observe_event(self, event: Any, state: dict[str, Any]) -> None:
         for name, args in _iter_function_calls(event):
@@ -195,8 +192,6 @@ class TurnSummaryBuilder:
     ) -> dict[str, Any] | None:
         if milestone == "context_start" and self.context_note_emitted:
             return None
-        if milestone == "plan_ready" and self.plan_note_emitted:
-            return None
         if milestone == "research_placeholder" and self.research_placeholder_emitted:
             return None
         if milestone == "research_result" and self.research_note_emitted:
@@ -213,9 +208,6 @@ class TurnSummaryBuilder:
         self.notes.append(note)
         if milestone == "context_start":
             self.context_note_emitted = True
-        elif milestone == "plan_ready":
-            self.plan_note_emitted = True
-            self.pending_plan_fallback = None
         elif milestone == "research_placeholder":
             self.research_placeholder_emitted = True
         elif milestone == "research_result":
@@ -229,25 +221,7 @@ class TurnSummaryBuilder:
             "counts": snapshot,
         }
 
-    def mark_drafting(self) -> bool:
-        if self.drafting_emitted:
-            return False
-        self.drafting_emitted = True
-        return True
-
     def finalize_notes(self) -> list[dict[str, Any]]:
-        if self.pending_plan_fallback and not self.plan_note_emitted:
-            fallback = self.pending_plan_fallback
-            self.notes.append(
-                {
-                    "milestone": "plan_ready",
-                    "text": fallback["text"],
-                    "noteSource": "deterministic",
-                    "counts": fallback["counts"],
-                    "liveOnly": False,
-                }
-            )
-            self.plan_note_emitted = True
         if (
             self.pending_research_fallback
             and not self.research_note_emitted

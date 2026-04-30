@@ -43,7 +43,7 @@ These exist because we hit each problem at least once.
 
 2. **Agents don't coordinate.** If scopes overlap, they produce identical output. The research lead must call specialists with non-overlapping briefs and explicit boundaries. The lead also defines a shared competitive set so all specialists analyze the same restaurants.
 
-3. **LLMs default to summarizing.** The research lead writes the final report directly, so depth preservation must be explicit in `research_orchestrator.md`: preserve tables, quotes, numbers, and citations when they are central to the answer.
+3. **LLMs default to summarizing.** The research lead writes the final report directly, so depth preservation must be explicit in `research_lead.md`: preserve tables, quotes, numbers, and citations when they are central to the answer.
 
 4. **Specialists can't infer what they can't see.** Each specialist `request` must relay: response language, date, competitive set, what other specialists are covering, and what not to cover.
 
@@ -53,7 +53,7 @@ These exist because we hit each problem at least once.
 
 7. **Don't copy-paste across specialist body files without customizing.** Shared structure lives in `specialist_base.md`. Body files contain only domain-specific content.
 
-8. **Domain boundaries live in the research lead prompt.** When a topic could go to multiple specialists, add ownership rules to `research_orchestrator.md`.
+8. **Domain boundaries live in the research lead prompt.** When a topic could go to multiple specialists, add ownership rules to `research_lead.md`.
 
 9. **Agents are sycophantic by default.** Two structural checkpoints enforce objectivity:
    - **Research Lead:** Must audit assumptions, test the most important premise during reconnaissance, and translate findings into a final report that leads with data even when it contradicts the user's framing.
@@ -94,4 +94,4 @@ Templates use Python's `str.format()` for runtime variables. Never add literal c
 
 **Adding an ambiguous domain topic:**
 
-1. Add ownership rules to "Domain boundaries" in `research_orchestrator.md`
+1. Add ownership rules to "Domain boundaries" in `research_lead.md`

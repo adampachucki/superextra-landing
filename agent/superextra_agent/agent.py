@@ -39,7 +39,7 @@ INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).pare
 
 # --- Instruction providers (inject session state into templates) ---
 
-_RESEARCH_LEAD_TEMPLATE = (INSTRUCTIONS_DIR / "research_orchestrator.md").read_text()
+_RESEARCH_LEAD_TEMPLATE = (INSTRUCTIONS_DIR / "research_lead.md").read_text()
 
 
 def _research_lead_instruction(ctx):

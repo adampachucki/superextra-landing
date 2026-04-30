@@ -131,7 +131,6 @@ def _notes_llm_disabled() -> bool:
 def _deterministic_note(milestone: str) -> str:
     return {
         "context_start": "I'm checking the venue and likely peer set before drafting the answer.",
-        "plan_ready": "I'm narrowing the research path before validating the strongest signals.",
         "research_placeholder": "I'm validating the strongest signals across source and review coverage.",
         "research_result": "I'm comparing the strongest evidence across sources before drafting the answer.",
     }[milestone]

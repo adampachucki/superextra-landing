@@ -8,9 +8,7 @@ from __future__ import annotations
 
 from superextra_agent.specialist_catalog import (
     AUTHOR_TO_OUTPUT_KEY,
-    OUTPUT_KEY_TO_LABEL,
     ROLE_TITLES,
-    SPECIALIST_OUTPUT_KEYS,
     SPECIALIST_RESULT_KEYS,
     SPECIALISTS,
 )
@@ -28,14 +26,6 @@ def test_names_are_unique():
 
 def test_author_to_output_key_covers_every_specialist():
     assert set(AUTHOR_TO_OUTPUT_KEY) == {s.name for s in SPECIALISTS}
-
-
-def test_output_key_to_label_covers_every_specialist():
-    assert set(OUTPUT_KEY_TO_LABEL) == {s.output_key for s in SPECIALISTS}
-
-
-def test_specialist_output_keys_cover_every_specialist():
-    assert set(SPECIALIST_OUTPUT_KEYS) == {s.name for s in SPECIALISTS}
 
 
 def test_role_titles_cover_every_specialist():

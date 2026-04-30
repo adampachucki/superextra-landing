@@ -108,14 +108,12 @@ class GearRunState:
         mapped = map_event(event, self.mapping_state)
         self.timeline_builder.observe_event(event, self.mapping_state)
 
-        # Filter timeline events: detail events go through accept_detail
-        # for dedupe; drafting events are emitted at most once per turn.
+        # Filter detail events through accept_detail for dedupe.
         events_to_write: list[dict[str, Any]] = []
         for ev in mapped.get("timeline_events") or []:
-            kind = ev.get("kind")
-            if kind == "detail" and not self.timeline_builder.accept_detail(ev):
-                continue
-            if kind == "drafting" and not self.timeline_builder.mark_drafting():
+            if ev.get("kind") == "detail" and not self.timeline_builder.accept_detail(
+                ev
+            ):
                 continue
             events_to_write.append(ev)
 
@@ -158,7 +156,10 @@ class GearRunState:
         """
         extras: list[dict[str, Any]] = []
 
-        if milestones.get("context_started") and not self.timeline_builder.context_note_emitted:
+        if (
+            milestones.get("context_started")
+            and not self.timeline_builder.context_note_emitted
+        ):
             note = self.timeline_builder.add_note(
                 milestone="context_start",
                 text=_deterministic_note("context_start"),
@@ -168,29 +169,9 @@ class GearRunState:
                 extras.append(note)
 
         if (
-            milestones.get("plan_ready_text")
-            and not self.timeline_builder.plan_note_emitted
-            and self.timeline_builder.pending_plan_fallback is None
+            milestones.get("research_started")
+            and not self.timeline_builder.research_placeholder_emitted
         ):
-            counts_snapshot = self.timeline_builder.counts_snapshot()
-            self.timeline_builder.pending_plan_fallback = {
-                "text": _deterministic_note("plan_ready"),
-                "counts": counts_snapshot,
-            }
-            self.note_tasks.append(
-                asyncio.create_task(
-                    _emit_note_task(
-                        writer=self.timeline_writer,
-                        builder=self.timeline_builder,
-                        milestone="plan_ready",
-                        query_text=self.query_text,
-                        input_text=str(milestones["plan_ready_text"])[:1500],
-                        counts_snapshot=counts_snapshot,
-                    )
-                )
-            )
-
-        if milestones.get("research_started") and not self.timeline_builder.research_placeholder_emitted:
             note = self.timeline_builder.add_note(
                 milestone="research_placeholder",
                 text=_deterministic_note("research_placeholder"),

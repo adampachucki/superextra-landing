@@ -1,7 +1,7 @@
 # Agent routing — floor experimentation handoff
 
 **Date:** 2026-04-29
-**Status:** Open work — handoff to whoever picks up the floor question
+**Status:** Superseded 2026-04-30 by `docs/agent-routing-collapse-plan-2026-04-29.md`
 **Predecessor:** `docs/agent-routing-rearchitecture-deploy-log-2026-04-29.md` —
 the AgentTool migration shipped on 2026-04-29 (commit `a313b50`); this doc
 is about the _next_ phase of that work, deliberately deferred.

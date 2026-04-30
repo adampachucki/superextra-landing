@@ -391,14 +391,12 @@ async def test_finalize_propagates_cancellation():
         await state.finalize()
 
 
-# ── _maybe_emit_notes spawns LLM-backed tasks for 'plan_ready' / 'research_result' ──
+# ── _maybe_emit_notes spawns LLM-backed tasks for 'research_result' ──
 
 
 @pytest.mark.asyncio
-async def test_maybe_emit_notes_spawns_task_for_plan_ready(monkeypatch):
-    """plan_ready and research_result milestones spawn LLM-backed note
-    tasks (deterministic notes are written immediately, plus a task is
-    scheduled for the LLM-backed enrichment)."""
+async def test_maybe_emit_notes_spawns_task_for_research_result(monkeypatch):
+    """research_result milestones spawn an LLM-backed note task."""
     state = _make_state()
 
     spawned: list[str] = []
@@ -412,17 +410,16 @@ async def test_maybe_emit_notes_spawns_task_for_plan_ready(monkeypatch):
 
     extras = state._maybe_emit_notes(
         {
-            "plan_ready_text": "Plan is ready",
             "research_result_text": "Research is done",
         }
     )
-    # No deterministic notes returned for these two (they're LLM-backed)
-    # — the spawned tasks will write the notes via _emit_note_task.
+    # No deterministic note is returned; the spawned task writes it via
+    # _emit_note_task.
     assert extras == []
-    assert len(state.note_tasks) == 2
+    assert len(state.note_tasks) == 1
     # Drain spawned tasks so they don't leak warnings
     await asyncio.gather(*state.note_tasks)
-    assert sorted(spawned) == ["plan_ready", "research_result"]
+    assert spawned == ["research_result"]
 
 
 def test_maybe_emit_notes_returns_deterministic_for_context_start():

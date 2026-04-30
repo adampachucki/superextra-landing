@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-29
 **Owner:** Adam (PM); execution: Claude
-**Status:** Draft, pre-execution
+**Status:** Implemented and deployed 2026-04-30
 **Predecessors:**
 
 - `docs/agent-routing-rearchitecture-deploy-log-2026-04-29.md` — AgentTool migration shipped 2026-04-29 (commit `a313b50`).
@@ -513,6 +513,14 @@ key. New pipeline diagram.
 That's it. **No floor eval re-run. No A/B comparison.** Adam's call:
 ship and observe.
 
+**Execution update, 2026-04-30:** collapse implementation shipped in
+commits `22d2540` and `8fb24d3`, then deployed to Agent Engine via
+operation `8495080385296728064`. Agent pytest, Vitest, Cloud Functions
+tests, `npm run build`, `npm run check`, cloudpickle smoke,
+stale-reference scan, and live smoke coverage passed. Firestore rules
+tests were blocked in one local VM because Java was not installed for
+the emulator, then covered by CI during the deploy path.
+
 ### 9. Deploy
 
 Per the prior migration's deploy log:
@@ -571,15 +579,17 @@ don't pre-build for them.
 
 Pre-merge:
 
-- [ ] All four test suites pass.
-- [ ] **Terminal-author mapping test passes** — `research_lead` →
+- [x] All four test suites pass. Local status: pytest, Vitest, and
+      functions pass; rules blocked by missing Java in one VM and
+      covered by CI.
+- [x] **Terminal-author mapping test passes** — `research_lead` →
       `final_report` state_delta recognized as terminal. P0; without
       this turns won't finalize.
-- [ ] **Empty-output negative test passes** — empty/whitespace
+- [x] **Empty-output negative test passes** — empty/whitespace
       `final_report` from `research_lead` does not map to `complete`
       and ends through the existing `empty_or_malformed_reply` path.
-- [ ] Cloudpickle smoke passes.
-- [ ] No leftover `synthesizer`, `gap_researcher`, `research_plan`,
+- [x] Cloudpickle smoke passes.
+- [x] No leftover `synthesizer`, `gap_researcher`, `research_plan`,
       `gap_research_result`, `_drafting_started`, `_synth_fallback_callback`,
       `_mark_drafting`, `_classify_synth_response`, `_build_fallback_report`
       references in production code.
@@ -590,14 +600,14 @@ Pre-deploy:
 
 Post-deploy:
 
-- [ ] One production query through the UI returns a structured report
+- [x] One production query through the UI returns a structured report
       (executive summary, ≥2 headings by insight theme, follow-up
       questions, sources cited).
-- [ ] **Turn finalizes correctly** (`session.status=complete`,
+- [x] **Turn finalizes correctly** (`session.status=complete`,
       `turn.status=complete`, `final_reply` populated). This is the
       load-bearing P0 verification — if this fails, the terminal
       mapping wasn't done correctly and we hotfix.
-- [ ] No new errors in Vertex AI Agent Engine logs in the first hour.
+- [x] No new errors in Vertex AI Agent Engine logs in the first hour.
 
 That's it. Ship.
 

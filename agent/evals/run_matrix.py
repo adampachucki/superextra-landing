@@ -288,12 +288,12 @@ async def _run_matrix_in_process(args: argparse.Namespace) -> int:
             status = (
                 "TIMEOUT" if rec["timed_out"] else ("ERROR" if rec["error"] else "OK")
             )
-            synth = rec.get("synth_outcome", "?")
+            final = rec.get("final_outcome", "?")
             n_drawer = len(rec.get("drawer_sources") or [])
             n_fetched = len(rec.get("fetched_urls") or [])
             print(
                 f"[runner] ({idx}/{len(combos)}) {status} "
-                f"elapsed={rec['elapsed_s']:.1f}s synth={synth} "
+                f"elapsed={rec['elapsed_s']:.1f}s final={final} "
                 f"drawer={n_drawer} fetched={n_fetched} "
                 f"specialists={rec.get('specialists_dispatched')} "
                 f"err={rec['error']}",

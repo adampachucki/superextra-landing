@@ -199,12 +199,6 @@ SPECIALISTS: tuple[Specialist, ...] = (
 #: Specialist author -> state output_key. Used by `firestore_events`.
 AUTHOR_TO_OUTPUT_KEY: dict[str, str] = {s.name: s.output_key for s in SPECIALISTS}
 
-#: state output_key → UI label.
-OUTPUT_KEY_TO_LABEL: dict[str, str] = {s.output_key: s.label for s in SPECIALISTS}
-
-#: Specialist name → output_key.
-SPECIALIST_OUTPUT_KEYS: dict[str, str] = {s.name: s.output_key for s in SPECIALISTS}
-
 #: Specialist instruction name → role_title for `specialist_base.md`.
 ROLE_TITLES: dict[str, str] = {
     (s.instruction_name or s.name): s.role_title for s in SPECIALISTS

@@ -13,23 +13,10 @@ from urllib.parse import urlparse
 
 from superextra_agent.firestore_events import (
     _get,
-    _has_state_delta,
     _iter_function_calls,
     _state_delta,
     extract_sources_from_grounding,
 )
-
-# Sentinel text emitted by _should_run_gap_researcher when it skips.
-# Any other gap_research_result value means gap actually ran.
-_GAP_SKIP_TEXTS = {
-    "No specialist outputs to analyze.",
-    "All assigned specialists succeeded; no gaps to research.",
-    "All called specialists succeeded; no gaps to research.",
-}
-
-# Sentinel text embedded by _build_fallback_report in agent.py. Presence
-# in final_report indicates the synth fallback path fired.
-_SYNTH_FALLBACK_MARKER = "_Final synthesis didn't produce a response."
 
 
 def _domain_of(url: str) -> str:
@@ -49,10 +36,8 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
         provider_pills: list[dict]           # _tool_src_* state_delta entries
         drawer_sources: list[dict]           # what sources[] would contain
         specialists_dispatched: list[str]    # specialist tool calls observed
-        gap_ran: bool
-        synth_outcome: "ok" | "fallback" | "unknown"
-        final_report: str                    # synthesizer/follow_up final text
-        research_plan: str                   # orchestrator's plan text
+        final_outcome: "ok" | "unknown"
+        final_report: str                    # research_lead/follow_up final text
         specialist_outputs: dict[str, str]   # output_key → text
         tool_call_counts: dict[str, int]     # per-tool call counts
         authors_seen: dict[str, int]         # author → event count
@@ -69,9 +54,7 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
     fetched_urls: set[str] = set()
     provider_pills: list[dict] = []
     specialists_dispatched: list[str] = []
-    gap_result_text: str | None = None
     final_report: str = ""
-    research_plan: str = ""
     specialist_outputs: dict[str, str] = {}
     tool_call_counts: dict[str, int] = {}
     authors_seen: dict[str, int] = {}
@@ -100,19 +83,15 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                     fetched_urls.add(url)
 
         # state_delta inspection: provider pills, historical dispatch keys,
-        # outputs, synth fallback.
+        # and specialist/final outputs.
         sd = _state_delta(event)
         for key, value in sd.items():
             if key.startswith("_tool_src_") and isinstance(value, dict):
                 provider_pills.append(value)
             elif key == "specialist_briefs" and isinstance(value, dict):
                 specialists_dispatched = sorted(value.keys())
-            elif key == "research_plan" and isinstance(value, str):
-                research_plan = value
             elif key == "final_report" and isinstance(value, str):
                 final_report = value
-            elif key == "gap_research_result" and isinstance(value, str):
-                gap_result_text = value
             elif key.endswith("_result") and isinstance(value, str):
                 specialist_outputs[key] = value
 
@@ -143,16 +122,7 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
         except Exception:
             pass  # best-effort — if catalog import fails, leave empty
 
-    # gap_ran: true iff the gap researcher produced non-sentinel output
-    gap_ran = bool(gap_result_text) and gap_result_text not in _GAP_SKIP_TEXTS
-
-    # synth_outcome: detect fallback stitch via its sentinel phrase
-    if not final_report:
-        synth_outcome = "unknown"
-    elif _SYNTH_FALLBACK_MARKER in final_report:
-        synth_outcome = "fallback"
-    else:
-        synth_outcome = "ok"
+    final_outcome = "ok" if final_report else "unknown"
 
     # Drawer sources: what worker_main._merge_source would have produced —
     # grounding URLs (deduped) + provider pills (deduped by URL).
@@ -190,10 +160,8 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
         "provider_pills": provider_pills,
         "drawer_sources": drawer_sources,
         "specialists_dispatched": specialists_dispatched,
-        "gap_ran": gap_ran,
-        "synth_outcome": synth_outcome,
+        "final_outcome": final_outcome,
         "final_report": final_report,
-        "research_plan": research_plan,
         "specialist_outputs": specialist_outputs,
         "tool_call_counts": tool_call_counts,
         "authors_seen": authors_seen,

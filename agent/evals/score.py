@@ -387,8 +387,8 @@ async def _score_file(path: Path, no_judge: bool, venue_own: dict[str, set[str]]
         "elapsed_s": run.get("elapsed_s"),
         "timed_out": run.get("timed_out"),
         "error": run.get("error"),
-        "synth_outcome": run.get("synth_outcome"),
-        "gap_ran": run.get("gap_ran"),
+        "final_outcome": run.get("final_outcome")
+        or ("ok" if run.get("final_report") else "unknown"),
         "specialists_dispatched": ",".join(run.get("specialists_dispatched") or []),
         # Phase 1
         "p1_urls": phase1["n_urls"],

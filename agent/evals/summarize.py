@@ -2,8 +2,8 @@
 
 Reads the CSV produced by `score.py` and emits a terminal-friendly
 summary: per-variant aggregates, per-venue breakdown, primary-probe
-breakdown, and a flag list for degenerate runs (synth_fallback, errors,
-timeouts, low judge scores).
+breakdown, and a flag list for degenerate runs (missing final report,
+errors, timeouts, low judge scores).
 
 Usage:
     .venv/bin/python evals/summarize.py --csv evals/scores/V0.csv
@@ -38,7 +38,13 @@ def _load(paths: list[Path]) -> list[dict]:
 
 
 def _aggregate(rows: list[dict], label: str) -> dict:
-    ok_rows = [r for r in rows if r.get("synth_outcome") == "ok" and not r.get("timed_out") == "True" and not r.get("error")]
+    ok_rows = [
+        r
+        for r in rows
+        if r.get("final_outcome") == "ok"
+        and not r.get("timed_out") == "True"
+        and not r.get("error")
+    ]
 
     def avg(field, source=None):
         source = source if source is not None else ok_rows
@@ -56,10 +62,9 @@ def _aggregate(rows: list[dict], label: str) -> dict:
         "label": label,
         "n_total": len(rows),
         "n_ok": len(ok_rows),
-        "n_synth_fallback": sum(1 for r in rows if r.get("synth_outcome") == "fallback"),
+        "n_missing_final": sum(1 for r in rows if r.get("final_outcome") != "ok"),
         "n_error": sum(1 for r in rows if r.get("error")),
         "n_timeout": sum(1 for r in rows if r.get("timed_out") == "True"),
-        "n_gap_ran": sum(1 for r in ok_rows if r.get("gap_ran") == "True"),
         "p1_top_domain_share": avg("p1_top_domain_share"),
         "final_top_domain_share": avg("final_top_domain_share"),
         "p1_category_count": mean_int("p1_category_count"),
@@ -76,8 +81,11 @@ def _aggregate(rows: list[dict], label: str) -> dict:
 
 def _print_block(title: str, agg: dict) -> None:
     print(f"\n── {title} ─────────────────────────")
-    print(f"runs ok/fallback/error/timeout: {agg['n_ok']}/{agg['n_synth_fallback']}/{agg['n_error']}/{agg['n_timeout']}  (total {agg['n_total']})")
-    print(f"gap_ran rate: {agg['n_gap_ran']}/{agg['n_ok']}")
+    print(
+        "runs ok/missing_final/error/timeout: "
+        f"{agg['n_ok']}/{agg['n_missing_final']}/{agg['n_error']}/{agg['n_timeout']} "
+        f"(total {agg['n_total']})"
+    )
     print()
     print(f"  top_domain_share   phase1={agg['p1_top_domain_share']}   final={agg['final_top_domain_share']}")
     print(f"  category_count     phase1={agg['p1_category_count']}     final={agg['final_category_count']} (out of 8)")
@@ -95,7 +103,7 @@ def _print_block(title: str, agg: dict) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv", action="append", required=True, help="path to scored CSV (repeat for multi-variant)")
-    parser.add_argument("--degenerate-flag", action="store_true", help="list runs with synth_fallback / errors / low scores")
+    parser.add_argument("--degenerate-flag", action="store_true", help="list runs with missing final report / errors / low scores")
     args = parser.parse_args()
 
     all_rows = _load([Path(p) for p in args.csv])
@@ -129,8 +137,8 @@ def main() -> int:
         print("\n── degenerate / flagged runs ─────────────────────────")
         for r in all_rows:
             flags = []
-            if r.get("synth_outcome") != "ok":
-                flags.append(f"synth={r.get('synth_outcome')}")
+            if r.get("final_outcome") != "ok":
+                flags.append(f"final={r.get('final_outcome')}")
             if r.get("error"):
                 flags.append(f"err={r.get('error')}")
             if r.get("timed_out") == "True":

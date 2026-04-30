@@ -129,10 +129,8 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
         "grounding_sources": [],
         "milestones": {
             "context_started": False,
-            "plan_ready_text": None,
             "research_started": False,
             "research_result_text": None,
-            "drafting_started": False,
         },
     }
 
