@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Audit recent turns for empty/short/errored final reports.
 
-Queries Firestore for turns in the last N hours and flags:
+Queries Firestore for turns created in the last N hours and flags:
 
   - errored: turn has an `error` field set
   - not_complete: turn status is anything but `complete` (excluding turns
@@ -64,6 +64,7 @@ def main() -> int:
     args = parser.parse_args()
 
     from google.cloud import firestore
+    from google.cloud.firestore_v1 import FieldFilter
 
     fs = firestore.Client(project=args.project)
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -76,11 +77,12 @@ def main() -> int:
     ok = 0
     in_flight_skipped = 0
 
-    for t in fs.collection_group("turns").stream():
+    query = fs.collection_group("turns").where(
+        filter=FieldFilter("createdAt", ">=", cutoff)
+    )
+    for t in query.stream():
         d = t.to_dict()
         started = d.get("startedAt") or d.get("createdAt")
-        if started and started < cutoff:
-            continue
         if started and started > inflight_grace and d.get("status") != "complete":
             in_flight_skipped += 1
             continue

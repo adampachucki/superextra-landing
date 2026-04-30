@@ -499,8 +499,8 @@ class FirestoreProgressPlugin(BasePlugin):
 
         # Order matters:
         #   1. stop_heartbeat — late ticks can't clobber the terminal write
-        #   2. finalize — drains notes (with cancel-stragglers + gather),
-        #      closes writer, awaits title with timeout, builds payload
+        #   2. finalize — closes writer, awaits title with timeout,
+        #      builds payload
         #   3. fenced terminal write with bounded retry on transient
         #      Firestore errors (the answer is in process memory only;
         #      losing it on a retry-exhausted blip is unrecoverable).

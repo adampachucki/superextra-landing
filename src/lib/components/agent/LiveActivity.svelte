@@ -54,8 +54,6 @@
 					status="done"
 					showConnector={false}
 				/>
-			{:else if ev.kind === 'drafting'}
-				<ProgressEventRow label={ev.text} status="running" showConnector={false} />
 			{/if}
 		{/each}
 	</ProgressWrapper>

@@ -194,7 +194,7 @@ def test_google_reviews_uses_saved_place_name():
     assert mapped["timeline_events"][0]["text"] == "12 reviews for Noma"
 
 
-def test_research_milestone_is_exposed():
+def test_specialist_grounding_sources_are_exposed():
     research = map_event(
         _event(
             author="guest_intelligence",
@@ -204,17 +204,7 @@ def test_research_milestone_is_exposed():
         ),
         {},
     )
-    assert research["milestones"]["research_result_text"] == "Guests praise speed and consistency."
     assert research["grounding_sources"] == [{"title": "Review", "url": "https://maps.example/review"}]
-
-
-def test_research_started_fires_on_specialist_detail_rows():
-    ev = _event(
-        author="review_analyst",
-        function_calls=[("google_search", {"query": "tripadvisor goldies berlin"})],
-    )
-    mapped = map_event(ev, {})
-    assert mapped["milestones"]["research_started"] is True
 
 
 def test_research_lead_complete_uses_grounding_sources():

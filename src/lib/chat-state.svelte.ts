@@ -132,7 +132,6 @@ let turns = $state<Turn[]>([]);
 let liveTimeline = $state<TimelineEvent[]>([]);
 let loadState = $state<LoadState>('idle');
 let placeContextState = $state<PlaceContext | null>(null);
-let typingMessageTimestamp = $state<number | null>(null);
 // While a startNewChat POST is in flight, the active-session listener can
 // race it: the listener attaches optimistically and the first server-
 // confirmed snapshot can land before agentStream's Firestore txn does (gap
@@ -151,16 +150,6 @@ let activeTurnsUnsubscribe: Unsubscribe | null = null;
 let activeEventsUnsubscribe: Unsubscribe | null = null;
 let loadTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
 let currentEventsRunId: string | null = null;
-
-// Typewriter tracking: turnIndexes that we've seen transition running→complete
-// in this browser session. Turns already complete on initial load are NOT in
-// this set, so they render as historical text without animation. Plain Set/Map
-// are fine here — these are internal dedup structures and don't need to trigger
-// UI reactivity.
-// eslint-disable-next-line svelte/prefer-svelte-reactivity
-const typewriterEligibleTurns = new Set<number>();
-// eslint-disable-next-line svelte/prefer-svelte-reactivity
-const previousTurnStatus = new Map<number, Turn['status']>();
 
 // Events dedup — reconnects replay the same doc; key on (runId, attempt,
 // seqInAttempt) to avoid duplicating timeline rows across resubscribes.
@@ -274,9 +263,6 @@ function clearActiveState() {
 	liveTimeline = [];
 	loadState = 'idle';
 	placeContextState = null;
-	typingMessageTimestamp = null;
-	typewriterEligibleTurns.clear();
-	previousTurnStatus.clear();
 	renderedEventKeys.clear();
 }
 
@@ -390,24 +376,6 @@ async function attachActiveListeners(sid: string) {
 					error: (data.error as string | null | undefined) ?? null
 				};
 				next.push(turn);
-
-				// Typewriter rule (plan §10): a running→complete transition
-				// observed in the current browser session marks the turn as
-				// typewriter-eligible. Turns that are already complete when
-				// we first see them are NOT eligible.
-				const prev = previousTurnStatus.get(turnIndex);
-				if (prev && prev !== 'complete' && status === 'complete') {
-					typewriterEligibleTurns.add(turnIndex);
-					// Only animate the latest turn's reply, and only if a
-					// drafting event is in flight (matching the prior UX).
-					const reply = turn.reply;
-					if (reply && turn.completedAtMs !== null) {
-						if (liveTimeline.some((e) => e.kind === 'drafting')) {
-							typingMessageTimestamp = turn.completedAtMs ?? Date.now();
-						}
-					}
-				}
-				previousTurnStatus.set(turnIndex, status);
 			});
 			turns = next;
 			maybeAttachEventsListener();
@@ -709,12 +677,6 @@ export const chatState = {
 	},
 	get liveTimeline(): TimelineEvent[] {
 		return liveTimeline;
-	},
-	get typingMessageTimestamp(): number | null {
-		return typingMessageTimestamp;
-	},
-	set typingMessageTimestamp(v: number | null) {
-		typingMessageTimestamp = v;
 	},
 	get isStreaming(): boolean {
 		return liveTimeline.length > 0;

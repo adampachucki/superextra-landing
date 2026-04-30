@@ -92,7 +92,7 @@ describe('ChatThread', () => {
 		vi.unstubAllGlobals();
 	});
 
-	it('does not render a duplicate final counts row in the completed summary', async () => {
+	it('renders completed-turn duration without dead note rows', async () => {
 		const obs = captureObservers();
 		chatState.selectSession('sid-1');
 		await waitUntil(() => !!obs.turns('sid-1'));
@@ -115,21 +115,11 @@ describe('ChatThread', () => {
 						userMessage: 'review summary',
 						status: 'complete',
 						reply: 'Agent reply',
-						// Summary expandable is now gated on elapsedMs >= 30s AND
-						// non-empty sources (c9ce679) — fixture must satisfy both
-						// or the "Opened 1 source" note text won't render.
 						sources: [{ title: 'Source A', url: 'https://example.com/a' }],
 						turnSummary: {
 							startedAtMs: 0,
 							finishedAtMs: 35_000,
 							elapsedMs: 35_000,
-							notes: [
-								{
-									text: 'I checked the strongest signals.',
-									noteSource: 'deterministic',
-									counts: { webQueries: 0, sources: 1, venues: 0, platforms: 0 }
-								}
-							],
 							finalCounts: { webQueries: 0, sources: 1, venues: 0, platforms: 0 }
 						},
 						createdAt: { toMillis: () => 1000 },
@@ -141,6 +131,7 @@ describe('ChatThread', () => {
 
 		expect(chatState.messages).toHaveLength(2);
 		const { body } = render(ChatThread, { props: {} });
-		expect(body.match(/Opened 1 source/g)).toHaveLength(1);
+		expect(body).toContain('Worked for 35s');
+		expect(body).not.toContain('Opened 1 source');
 	});
 });

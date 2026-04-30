@@ -3,29 +3,14 @@
 	import { chatState } from '$lib/chat-state.svelte';
 	import { tts } from '$lib/tts.svelte';
 	import { splitChartSegments } from '$lib/chart-blocks';
-	import { createTypewriter } from '$lib/typewriter';
-	import type { ChatSourceProvider, TurnCounts } from '$lib/chat-types';
+	import type { ChatSourceProvider } from '$lib/chat-types';
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
 	import ChartBlock from './ChartBlock.svelte';
 
 	marked.setOptions({ breaks: true, gfm: true });
 
 	let scrollEl: HTMLDivElement | undefined = $state();
-	let typedReply = $state('');
-	let activeTypedTimestamp: number | null = null;
 	let now = $state(Date.now());
-
-	const replyTyper = createTypewriter({
-		onUpdate: (value) => {
-			typedReply = value;
-		},
-		onDone: () => {
-			if (chatState.typingMessageTimestamp === activeTypedTimestamp) {
-				chatState.typingMessageTimestamp = null;
-			}
-		},
-		charsPerFrame: 4
-	});
 
 	$effect(() => {
 		chatState.messages.length;
@@ -46,35 +31,8 @@
 		return () => clearInterval(timer);
 	});
 
-	$effect(() => {
-		const ts = chatState.typingMessageTimestamp;
-		if (!ts) {
-			activeTypedTimestamp = null;
-			typedReply = '';
-			replyTyper.stop();
-			return;
-		}
-		if (activeTypedTimestamp === ts) return;
-		const message = [...chatState.messages].reverse().find((msg) => msg.timestamp === ts);
-		if (!message) return;
-		activeTypedTimestamp = ts;
-		typedReply = '';
-		replyTyper.reset();
-		replyTyper.setTarget(message.text);
-		return () => {
-			replyTyper.stop();
-		};
-	});
-
 	function renderMarkdown(text: string): string {
 		return marked.parse(text) as string;
-	}
-
-	function displayText(text: string, timestamp: number): string {
-		if (chatState.typingMessageTimestamp === timestamp && activeTypedTimestamp === timestamp) {
-			return typedReply;
-		}
-		return text;
 	}
 
 	function formatDuration(ms: number): string {
@@ -83,19 +41,6 @@
 		const seconds = totalSeconds % 60;
 		if (minutes > 0) return `${minutes}m ${seconds}s`;
 		return `${seconds}s`;
-	}
-
-	function formatCounts(counts: TurnCounts): string {
-		const parts: string[] = [];
-		if (counts.webQueries > 0)
-			parts.push(`Searched ${counts.webQueries} quer${counts.webQueries === 1 ? 'y' : 'ies'}`);
-		if (counts.sources > 0)
-			parts.push(`Opened ${counts.sources} source${counts.sources === 1 ? '' : 's'}`);
-		if (counts.venues > 0)
-			parts.push(`Checked ${counts.venues} venue${counts.venues === 1 ? '' : 's'}`);
-		if (counts.platforms > 0)
-			parts.push(`Reviewed ${counts.platforms} platform${counts.platforms === 1 ? '' : 's'}`);
-		return parts.join(', ') || 'Worked';
 	}
 
 	const SOURCES_LIMIT = 19;
@@ -122,7 +67,7 @@
 						<div
 							class="prose max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
 						>
-							{#each splitChartSegments(displayText(msg.text, msg.timestamp)) as seg, segIdx (segIdx)}
+							{#each splitChartSegments(msg.text) as seg, segIdx (segIdx)}
 								{#if seg.kind === 'chart'}
 									<ChartBlock spec={seg.spec} />
 								{:else}
@@ -183,34 +128,11 @@
 						</div>
 
 						{#if msg.turnSummary && msg.turnSummary.elapsedMs >= 30000}
-							{@const summary = msg.turnSummary}
-							{#if msg.sources?.length}
-								<details
-									class="mt-4 rounded-2xl border border-black/6 px-4 py-3 dark:border-white/10"
-								>
-									<summary class="cursor-pointer text-[13px] text-black/55 dark:text-white/55">
-										Worked for {formatDuration(summary.elapsedMs)}
-									</summary>
-									<div class="mt-4 flex flex-col gap-4">
-										{#each summary.notes as note, noteIdx (noteIdx)}
-											<div class="flex flex-col gap-1">
-												<div class="text-[14px] leading-relaxed text-black/82 dark:text-white/82">
-													{note.text}
-												</div>
-												<div class="text-[12px] text-black/38 dark:text-white/38">
-													{formatCounts(note.counts)}
-												</div>
-											</div>
-										{/each}
-									</div>
-								</details>
-							{:else}
-								<div
-									class="mt-4 rounded-2xl border border-black/6 px-4 py-3 text-[13px] text-black/55 dark:border-white/10 dark:text-white/55"
-								>
-									Worked for {formatDuration(summary.elapsedMs)}
-								</div>
-							{/if}
+							<div
+								class="mt-4 rounded-2xl border border-black/6 px-4 py-3 text-[13px] text-black/55 dark:border-white/10 dark:text-white/55"
+							>
+								Worked for {formatDuration(msg.turnSummary.elapsedMs)}
+							</div>
 						{/if}
 
 						{#if msg.sources?.length}

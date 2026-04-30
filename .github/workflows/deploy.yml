@@ -120,9 +120,8 @@ jobs:
       # The Vertex AI Reasoning Engine is updated manually via
       # `agent/scripts/redeploy_engine.py --yes` — Firebase CI does NOT
       # touch it. This step posts a workflow warning if the deployed
-      # runtime is behind HEAD, so we don't repeat the 2026-04-30 miss
-      # where the cleanup commit shipped to Firebase but Agent Engine
-      # stayed stale. Non-blocking.
+      # runtime package is behind the latest committed runtime package.
+      # Non-blocking.
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

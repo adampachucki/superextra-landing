@@ -29,11 +29,6 @@ export interface TurnSummary {
 	startedAtMs: number;
 	finishedAtMs: number;
 	elapsedMs: number;
-	notes: Array<{
-		text: string;
-		noteSource: 'deterministic' | 'llm';
-		counts: TurnCounts;
-	}>;
 	finalCounts: TurnCounts;
 }
 
@@ -58,11 +53,5 @@ export type TimelineEvent =
 				| 'Public sources'
 				| 'Warnings';
 			text: string;
-			ts?: number;
-	  }
-	| {
-			kind: 'drafting';
-			id: string;
-			text: 'Drafting the answer…';
 			ts?: number;
 	  };

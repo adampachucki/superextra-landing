@@ -127,11 +127,6 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
         "timeline_events": [],
         "complete": None,
         "grounding_sources": [],
-        "milestones": {
-            "context_started": False,
-            "research_started": False,
-            "research_result_text": None,
-        },
     }
 
     _ingest_place_names(event, state)
@@ -173,16 +168,9 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
 
     mapping["timeline_events"] = detail_events
 
-    if author == "context_enricher" and detail_events:
-        mapping["milestones"]["context_started"] = True
-
-    if author in SPECIALIST_AUTHORS and detail_events:
-        mapping["milestones"]["research_started"] = True
-
     if author in SPECIALIST_AUTHORS:
         output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
         if output_key and _has_state_delta(event, output_key):
-            mapping["milestones"]["research_result_text"] = str(_state_delta(event)[output_key])
             mapping["grounding_sources"] = extract_sources_from_grounding(event)
 
     if author in ("research_lead", "follow_up"):

@@ -44,6 +44,11 @@
 	],
 	"fieldOverrides": [
 		{
+			"collectionGroup": "turns",
+			"fieldPath": "createdAt",
+			"indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }]
+		},
+		{
 			"collectionGroup": "events",
 			"fieldPath": "expiresAt",
 			"ttl": true,

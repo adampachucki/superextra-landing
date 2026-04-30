@@ -159,6 +159,7 @@ async def test_finalize_real_reply_returns_complete_payload():
     assert turn_update["reply"] == state.final_reply
     assert turn_update["sources"] == state.final_sources
     assert "turnSummary" in turn_update
+    assert "notes" not in turn_update["turnSummary"]
     assert "completedAt" in turn_update
 
 
@@ -308,5 +309,4 @@ async def test_finalize_propagates_cancellation():
 
     with pytest.raises(asyncio.CancelledError):
         await state.finalize()
-
 

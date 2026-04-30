@@ -1,17 +1,14 @@
 """TurnSummaryBuilder + TimelineWriter for `FirestoreProgressPlugin`.
 
-These two classes own the per-turn UI-progress accumulator (which
-``notes`` to surface, which ``sources`` were touched, which ``venues``
-were resolved) and the Firestore writer that lands live timeline events
-(``sessions/{sid}/events`` subcollection).
+These two classes own the per-turn progress accumulator (which sources
+were touched, which venues were resolved) and the Firestore writer that
+lands live timeline events (``sessions/{sid}/events`` subcollection).
 
 Mutation discipline (load-bearing): every method on
 ``TurnSummaryBuilder`` is **synchronous and ``await``-free**. Concurrent
-note-task coroutines call only these synchronous methods between their
-own awaits, so a control-yield can never interleave a partial mutation.
-``TimelineWriter`` owns its own ``asyncio.Lock`` to serialise its
-Firestore writes. Together this gives the plugin its no-extra-lock
-concurrency guarantee.
+callbacks cannot interleave a partial mutation. ``TimelineWriter`` owns
+its own ``asyncio.Lock`` to serialise its Firestore writes. Together this
+gives the plugin its no-extra-lock concurrency guarantee.
 """
 
 from __future__ import annotations
@@ -74,7 +71,6 @@ class TurnSummaryBuilder:
         self.venues: set[str] = set()
         self.platforms: set[str] = set()
         self.detail_dedupe: set[tuple[str, str, str]] = set()
-        self.notes: list[dict[str, Any]] = []
 
     def observe_event(self, event: Any, state: dict[str, Any]) -> None:
         for name, args in _iter_function_calls(event):
@@ -183,7 +179,6 @@ class TurnSummaryBuilder:
             "startedAtMs": self.started_at_ms,
             "finishedAtMs": finished_at_ms,
             "elapsedMs": max(0, finished_at_ms - self.started_at_ms),
-            "notes": self.notes[:4],
             "finalCounts": self.counts_snapshot(),
         }
 

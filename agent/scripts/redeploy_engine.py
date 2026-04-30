@@ -3,11 +3,11 @@
 
 Dry-run by default. Pass --yes to call agent_engines.update(...).
 
-Tracks the deployed commit sha in a tiny GCS metadata blob alongside the
-staged pickle (`{staging_bucket}/{gcs_dir}/.deployed_commit`). Uses it to
-detect stale-runtime-vs-main and to skip noop redeploys. Pass --check to
-just print status and exit (non-zero if stale). Pass --force to override
-the noop / dirty-tree guards.
+Tracks the deployed runtime commit sha in a tiny GCS metadata blob
+alongside the staged pickle (`{staging_bucket}/{gcs_dir}/.deployed_commit`).
+Uses it to detect stale Agent Engine runtime packages and to skip noop
+redeploys. Pass --check to just print status and exit (non-zero if stale).
+Pass --force to override the noop / dirty-tree guards.
 """
 
 from __future__ import annotations
@@ -89,34 +89,28 @@ def _pickle_smoke(app: object) -> int:
 
 
 _DEPLOYED_MARKER = ".deployed_commit"
+_RUNTIME_PATHS = ("agent/superextra_agent", "agent/requirements.txt")
 
 
-def _git_head_sha(cwd: Path) -> str | None:
-    """Current HEAD commit sha; None if not in a git repo."""
+def _git_runtime_sha(cwd: Path) -> str | None:
+    """Latest commit touching the packaged Agent Engine runtime."""
     try:
         out = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
+            ["git", "log", "-n", "1", "--format=%H", "--", *_RUNTIME_PATHS],
             cwd=str(cwd),
             stderr=subprocess.DEVNULL,
         )
-        return out.decode().strip()
+        sha = out.decode().strip()
+        return sha or None
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
 
-def _git_dirty_agent_paths(cwd: Path) -> list[str]:
-    """Lines from `git status --porcelain` for agent code only."""
+def _git_dirty_runtime_paths(cwd: Path) -> list[str]:
+    """Lines from `git status --porcelain` for packaged runtime code only."""
     try:
         out = subprocess.check_output(
-            [
-                "git",
-                "status",
-                "--porcelain",
-                "--",
-                "agent/superextra_agent",
-                "agent/scripts",
-                "agent/requirements.txt",
-            ],
+            ["git", "status", "--porcelain", "--", *_RUNTIME_PATHS],
             cwd=str(cwd),
             stderr=subprocess.DEVNULL,
         )
@@ -126,10 +120,10 @@ def _git_dirty_agent_paths(cwd: Path) -> list[str]:
 
 
 def _git_log_summary(cwd: Path, deployed: str, head: str) -> str:
-    """`git log --oneline deployed..head` or empty string on failure."""
+    """Runtime-path `git log --oneline deployed..head`, or empty on failure."""
     try:
         out = subprocess.check_output(
-            ["git", "log", "--oneline", f"{deployed}..{head}"],
+            ["git", "log", "--oneline", f"{deployed}..{head}", "--", *_RUNTIME_PATHS],
             cwd=str(cwd),
             stderr=subprocess.DEVNULL,
         )
@@ -200,16 +194,17 @@ def parse_args() -> argparse.Namespace:
         "--check",
         action="store_true",
         help=(
-            "Just print HEAD vs deployed-commit status and exit. Returns "
-            "non-zero if the deployed runtime is behind HEAD."
+            "Just print latest runtime commit vs deployed runtime status and exit. "
+            "Returns non-zero if the deployed runtime is behind."
         ),
     )
     parser.add_argument(
         "--force",
         action="store_true",
         help=(
-            "Override the no-op detection (deployed sha == HEAD) and the "
-            "dirty-tree warning. Required to redeploy when nothing changed."
+            "Override the no-op detection (deployed runtime sha == latest runtime "
+            "sha) and the dirty-tree warning. Required to redeploy when nothing "
+            "changed."
         ),
     )
     return parser.parse_args()
@@ -244,49 +239,49 @@ def main() -> int:
             "(set GOOGLE_APPLICATION_CREDENTIALS or pass --credentials)"
         )
 
-    head_sha = _git_head_sha(repo_root)
+    runtime_sha = _git_runtime_sha(repo_root)
     deployed_sha = _read_deployed_commit(
         args.staging_bucket, args.gcs_dir_name, args.project
     )
-    if head_sha:
-        print(f"  HEAD commit:    {head_sha}")
+    if runtime_sha:
+        print(f"  runtime commit: {runtime_sha}")
     else:
-        print("  HEAD commit:    unknown (not a git repo?)")
+        print("  runtime commit: unknown (not a git repo?)")
     if deployed_sha:
-        print(f"  deployed sha:   {deployed_sha}")
+        print(f"  deployed runtime sha: {deployed_sha}")
     else:
-        print("  deployed sha:   no marker (first deploy after marker added)")
+        print("  deployed runtime sha: no marker (first deploy after marker added)")
 
-    is_at_head = bool(head_sha and deployed_sha and head_sha == deployed_sha)
+    is_current = bool(runtime_sha and deployed_sha and runtime_sha == deployed_sha)
 
-    # --check: print status + exit; non-zero iff stale relative to HEAD
+    # --check: print status + exit; non-zero iff stale relative to runtime commit
     if args.check:
-        if not head_sha:
+        if not runtime_sha:
             return 0
         if not deployed_sha:
             print("\nStatus: unknown — no deployed marker (run a deploy to seed it)")
             return 0
-        if is_at_head:
+        if is_current:
             print("\nStatus: ✓ up to date")
             return 0
-        log = _git_log_summary(repo_root, deployed_sha, head_sha)
-        print(f"\nStatus: ✗ STALE — runtime is behind HEAD")
+        log = _git_log_summary(repo_root, deployed_sha, runtime_sha)
+        print("\nStatus: ✗ STALE — deployed runtime is behind packaged runtime")
         if log:
-            print("Commits since last deploy:")
+            print("Runtime commits since last deploy:")
             for line in log.splitlines():
                 print(f"  {line}")
         return 1
 
-    dirty = _git_dirty_agent_paths(repo_root)
+    dirty = _git_dirty_runtime_paths(repo_root)
     if dirty:
-        print("\nWARNING: agent code has uncommitted changes:")
+        print("\nWARNING: packaged runtime has uncommitted changes:")
         for line in dirty[:10]:
             print(f"  {line}")
         if len(dirty) > 10:
             print(f"  … ({len(dirty) - 10} more)")
         print(
-            "  Deployed marker will be set to HEAD sha, which won't reflect "
-            "uncommitted work."
+            "  Deployed marker will be set to the latest committed runtime sha, "
+            "which won't reflect uncommitted work."
         )
 
     from superextra_agent.agent import app
@@ -299,9 +294,9 @@ def main() -> int:
         print("\nDry run only. Re-run with --yes to deploy.")
         return 0
 
-    if is_at_head and not args.force:
+    if is_current and not args.force:
         print(
-            "\nAgent Engine is already at HEAD. Skipping redeploy.\n"
+            "\nAgent Engine is already at the packaged runtime commit. Skipping redeploy.\n"
             "Use --force to redeploy anyway (e.g. after a marker reset)."
         )
         return 0
@@ -323,11 +318,11 @@ def main() -> int:
     )
     print(f"\nUpdated: {remote.resource_name}")
 
-    if head_sha:
+    if runtime_sha:
         _write_deployed_commit(
-            args.staging_bucket, args.gcs_dir_name, args.project, head_sha
+            args.staging_bucket, args.gcs_dir_name, args.project, runtime_sha
         )
-        print(f"  recorded:       deployed sha = {head_sha}")
+        print(f"  recorded:       deployed runtime sha = {runtime_sha}")
     return 0
 
 
