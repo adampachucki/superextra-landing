@@ -81,20 +81,6 @@ def _iter_function_calls(event: Any) -> list[tuple[int, str, dict[str, Any]]]:
     return out
 
 
-def _iter_function_responses(event: Any) -> list[tuple[int, str, dict[str, Any]]]:
-    out: list[tuple[int, str, dict[str, Any]]] = []
-    for idx, part in enumerate(_iter_parts(event)):
-        fr = _get(part, "function_response")
-        if not fr:
-            continue
-        name = _get(fr, "name")
-        if not isinstance(name, str) or not name:
-            continue
-        response = _get(fr, "response") or {}
-        out.append((idx, name, response if isinstance(response, dict) else {}))
-    return out
-
-
 async def write_event_doc(
     *,
     fs: firestore.Client,
@@ -131,19 +117,13 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
 
     _ingest_place_names(event, state)
 
-    if author == "router":
-        complete = _map_router_complete(event)
-        if complete is not None:
-            mapping["complete"] = complete
-        return mapping
-
     if author in SPECIALIST_AUTHORS:
         output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
         if output_key and _has_state_delta(event, output_key):
             mapping["grounding_sources"] = extract_sources_from_grounding(event)
 
-    if author in ("research_lead", "follow_up"):
-        complete = _map_final_complete(event)
+    if author in ("router", "research_lead", "follow_up"):
+        complete = _map_complete(event)
         if complete is not None:
             mapping["complete"] = complete
 
@@ -173,19 +153,7 @@ def extract_sources_from_grounding(event: Any) -> list[dict[str, Any]]:
     return out
 
 
-def _map_router_complete(event: Any) -> dict[str, Any] | None:
-    for _, name, _args in _iter_function_calls(event):
-        if name == "transfer_to_agent":
-            return None
-    if not _is_final(event):
-        return None
-    text = _collect_text(event).strip()
-    if not text:
-        return None
-    return {"reply": text, "sources": []}
-
-
-def _map_final_complete(event: Any) -> dict[str, Any] | None:
+def _map_complete(event: Any) -> dict[str, Any] | None:
     if not _is_final(event):
         return None
 
