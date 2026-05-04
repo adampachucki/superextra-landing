@@ -27,9 +27,7 @@ from superextra_agent.gear_run_state import GearRunState
 
 def _make_state(**overrides) -> GearRunState:
     """Build a GearRunState wired against a mocked Firestore client.
-    The TimelineWriter inside still calls `firestore_events.write_event_doc`
-    on `write_timeline`, but tests that exercise that path stub the
-    writer directly.
+    Tests that exercise Firestore writes stub the TimelineWriter directly.
     """
     fs = MagicMock(name="fs")
     defaults = dict(

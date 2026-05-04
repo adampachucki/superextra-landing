@@ -162,6 +162,7 @@ For deployment gotchas (Firebase env-var replace behavior, Firestore indexes, wa
 
 - **Always use Chrome DevTools MCP** for browser tasks — never Playwright (removed)
 - Configured with `--isolated` (temp profile per session). Dev server runs on **port 5199**.
+- **Two providers exist**: `mcp__chrome-devtools__*` (headful, fails with "Missing X server" on remote VMs) and `mcp__chrome-devtools-mcp__*` (headless, works everywhere). On the GCP VM use the `-mcp` suffix one — it's already running with `--headless --isolated --no-sandbox`. Both can drive `agent.superextra.ai` end-to-end.
 - **"browser is already running"**: `pkill -f "chrome.*chrome-devtools-mcp"` then `rm ~/.cache/chrome-devtools-mcp/chrome-profile/SingletonLock`
 - **CDP connection drops**: close Chrome DevTools (F12) — it kicks remote CDP clients
 

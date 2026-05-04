@@ -1,14 +1,13 @@
 <script lang="ts">
-	import { marked } from 'marked';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { tts } from '$lib/tts.svelte';
 	import { splitChartSegments } from '$lib/chart-blocks';
 	import type { ChatSourceProvider } from '$lib/chat-types';
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
 	import TypewriterText from '$lib/components/agent/TypewriterText.svelte';
+	import { renderMarkdown } from '$lib/markdown';
+	import { formatDuration } from '$lib/time';
 	import ChartBlock from './ChartBlock.svelte';
-
-	marked.setOptions({ breaks: true, gfm: true });
 
 	let scrollEl: HTMLDivElement | undefined = $state();
 	let now = $state(Date.now());
@@ -31,18 +30,6 @@
 		}, 1000);
 		return () => clearInterval(timer);
 	});
-
-	function renderMarkdown(text: string): string {
-		return marked.parse(text) as string;
-	}
-
-	function formatDuration(ms: number): string {
-		const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-		const minutes = Math.floor(totalSeconds / 60);
-		const seconds = totalSeconds % 60;
-		if (minutes > 0) return `${minutes}m ${seconds}s`;
-		return `${seconds}s`;
-	}
 
 	const SOURCES_LIMIT = 19;
 	const PROVIDER_LABELS: Record<ChatSourceProvider, string> = {

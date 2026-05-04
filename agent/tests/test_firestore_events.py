@@ -144,6 +144,23 @@ def test_thought_text_strips_specialist_tool_names_without_rewriting_common_pros
     assert "Operations is a tool label" in text
 
 
+def test_thought_text_strips_provider_tool_aliases():
+    ev = _event(
+        author="dynamic_researcher_1",
+        thoughts=[
+            "Use `google:search` first, then `default_api:page fetch` for the "
+            "source. If needed, default_api:fetch_web_content can read another page."
+        ],
+    )
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+    assert "google:search" not in text
+    assert "default_api:page fetch" not in text
+    assert "default_api:fetch_web_content" not in text
+    assert "Google search" in text
+    assert text.count("page fetch") == 2
+
+
 def test_grounding_search_queries_become_searching_the_web_rows():
     ev = _event(
         author="research_lead",

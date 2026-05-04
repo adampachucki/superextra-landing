@@ -8,12 +8,12 @@ dedupe. `TimelineWriter` serializes live timeline writes into
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from google.cloud import firestore
 
-from .firestore_events import write_event_doc
+EVENT_TTL_DAYS = 3
 
 
 # ── TurnSummaryBuilder ───────────────────────────────────────────────────────
@@ -71,21 +71,25 @@ class TimelineWriter:
             if self.closed:
                 return None
             self._seq_in_attempt += 1
-            return await write_event_doc(
-                fs=self._fs,
-                sid=self._sid,
-                user_id=self._user_id,
-                run_id=self._run_id,
-                attempt=self._attempt,
-                seq_in_attempt=self._seq_in_attempt,
-                event_type="timeline",
-                data=data,
+            doc = {
+                "userId": self._user_id,
+                "runId": self._run_id,
+                "attempt": self._attempt,
+                "seqInAttempt": self._seq_in_attempt,
+                "type": "timeline",
+                "data": data,
+                "ts": firestore.SERVER_TIMESTAMP,
+                "expiresAt": datetime.now(timezone.utc) + timedelta(days=EVENT_TTL_DAYS),
+            }
+            ref = (
+                self._fs.collection("sessions")
+                .document(self._sid)
+                .collection("events")
+                .document()
             )
+            await asyncio.to_thread(ref.set, doc)
+            return doc
 
     async def close(self) -> None:
         async with self._lock:
             self.closed = True
-
-    @property
-    def seq_in_attempt(self) -> int:
-        return self._seq_in_attempt

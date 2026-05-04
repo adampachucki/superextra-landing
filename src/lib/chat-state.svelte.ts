@@ -482,7 +482,7 @@ async function ensureEventsListener(sid: string, runId: string) {
 					// design — the turn doc is the sole terminal source.
 					if (data.type !== 'timeline') continue;
 					const payload = (data.data ?? {}) as TimelineEvent;
-					liveTimeline = [...liveTimeline, { ...payload, ts: Date.now() } as TimelineEvent];
+					liveTimeline = [...liveTimeline, payload];
 				}
 			},
 			(err) => {

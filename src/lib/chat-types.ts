@@ -29,7 +29,6 @@ export type TimelineEvent =
 			kind: 'note';
 			id: string;
 			text: string;
-			ts?: number;
 	  }
 	| {
 			kind: 'detail';
@@ -43,12 +42,10 @@ export type TimelineEvent =
 				| 'Public sources'
 				| 'Warnings';
 			text: string;
-			ts?: number;
 	  }
 	| {
 			kind: 'thought';
 			id: string;
 			author: string | null;
 			text: string;
-			ts?: number;
 	  };

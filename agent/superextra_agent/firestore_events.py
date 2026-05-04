@@ -2,28 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
 import re
-from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlparse
 
-from google.cloud import firestore
-
 from .specialist_catalog import AUTHOR_TO_OUTPUT_KEY, SPECIALISTS
-
-EVENT_TTL_DAYS = 3
-
-SPECIALIST_AUTHORS: set[str] = {s.name for s in SPECIALISTS}
-
-TIMELINE_FAMILIES = (
-    "Searching the web",
-    "Google Maps",
-    "TripAdvisor",
-    "Google reviews",
-    "Public sources",
-    "Warnings",
-)
 
 
 def _place_name(state: dict[str, Any] | None, place_id: str | None) -> str | None:
@@ -68,32 +51,6 @@ def _iter_parts(event: Any) -> list[Any]:
     return list(parts or [])
 
 
-async def write_event_doc(
-    *,
-    fs: firestore.Client,
-    sid: str,
-    user_id: str,
-    run_id: str,
-    attempt: int,
-    seq_in_attempt: int,
-    event_type: str,
-    data: dict[str, Any],
-) -> dict[str, Any]:
-    doc = {
-        "userId": user_id,
-        "runId": run_id,
-        "attempt": attempt,
-        "seqInAttempt": seq_in_attempt,
-        "type": event_type,
-        "data": data,
-        "ts": firestore.SERVER_TIMESTAMP,
-        "expiresAt": datetime.now(timezone.utc) + timedelta(days=EVENT_TTL_DAYS),
-    }
-    ref = fs.collection("sessions").document(sid).collection("events").document()
-    await asyncio.to_thread(ref.set, doc)
-    return doc
-
-
 def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]:
     author = _get(event, "author")
     mapping: dict[str, Any] = {
@@ -135,10 +92,9 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
             )
         )
 
-    if author in SPECIALIST_AUTHORS:
-        output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
-        if output_key and _has_state_delta(event, output_key):
-            mapping["grounding_sources"] = extract_sources_from_grounding(event)
+    output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
+    if output_key and _has_state_delta(event, output_key):
+        mapping["grounding_sources"] = extract_sources_from_grounding(event)
 
     if author in ("router", "research_lead", "follow_up"):
         complete = _map_complete(event)
@@ -163,8 +119,7 @@ def _collect_thought_text(event: Any) -> str:
         text = _get(part, "text")
         if isinstance(text, str) and text.strip():
             pieces.append(text)
-    joined = "".join(pieces).strip()
-    return _strip_tool_names(joined)
+    return _strip_tool_names("".join(pieces).strip())
 
 
 # Map internal function-tool identifiers to user-facing labels. Specialist
@@ -182,20 +137,31 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "fetch_web_content": "page fetch",
     "narrate": "narration",
 }
+_PROVIDER_TOOL_LABELS: dict[str, str] = {
+    "google:search": "Google search",
+    "default_api:page fetch": "page fetch",
+    **{f"default_api:{name}": label for name, label in _FUNCTION_TOOL_LABELS.items()},
+}
 _SPECIALIST_TOOL_LABELS: dict[str, str] = {s.name: s.label for s in SPECIALISTS}
-_TOOL_LABELS: dict[str, str] = {**_FUNCTION_TOOL_LABELS, **_SPECIALIST_TOOL_LABELS}
+_TOOL_LABELS: dict[str, str] = {
+    **_FUNCTION_TOOL_LABELS,
+    **_PROVIDER_TOOL_LABELS,
+    **_SPECIALIST_TOOL_LABELS,
+}
 
 _BARE_TOOL_LABELS: dict[str, str] = {
     name: label
     for name, label in _TOOL_LABELS.items()
-    if "_" in name or name in _FUNCTION_TOOL_LABELS
+    if "_" in name or ":" in name or name in _FUNCTION_TOOL_LABELS
 }
-_BACKTICKED_TOOL_NAME_RE = re.compile(
-    r"`(" + "|".join(re.escape(name) for name in _TOOL_LABELS) + r")`"
-)
-_BARE_TOOL_NAME_RE = re.compile(
-    r"\b(" + "|".join(re.escape(name) for name in _BARE_TOOL_LABELS) + r")\b"
-)
+
+
+def _tool_name_pattern(labels: dict[str, str]) -> str:
+    return "|".join(re.escape(name) for name in sorted(labels, key=len, reverse=True))
+
+
+_BACKTICKED_TOOL_NAME_RE = re.compile(r"`(" + _tool_name_pattern(_TOOL_LABELS) + r")`")
+_BARE_TOOL_NAME_RE = re.compile(r"\b(" + _tool_name_pattern(_BARE_TOOL_LABELS) + r")\b")
 
 
 def _strip_tool_names(text: str) -> str:
@@ -350,69 +316,68 @@ def map_tool_result(
     call_id: str | None,
 ) -> list[dict[str, Any]]:
     row_id = _tool_row_id(call_id=call_id, phase="response", name=name)
-    rows: list[dict[str, Any]] = []
     status = str(response.get("status") or "").strip().lower()
 
     if name == "get_restaurant_details" and status == "success":
         place = response.get("place") if isinstance(response.get("place"), dict) else {}
         display_name = _get(place.get("displayName") if isinstance(place, dict) else None, "text")
         if isinstance(display_name, str) and display_name.strip():
-            rows.append(_detail(row_id, "platform", "Google Maps", f"Profile for {display_name.strip()}"))
-        return rows
+            return [
+                _detail(
+                    row_id,
+                    "platform",
+                    "Google Maps",
+                    f"Profile for {display_name.strip()}",
+                )
+            ]
+        return []
 
     if name == "get_batch_restaurant_details" and status == "success":
         places = response.get("places")
         if isinstance(places, list):
-            rows.append(
-                _detail(row_id, "platform", "Google Maps", f"{len(places)} place profiles")
-            )
-        return rows
+            return [_detail(row_id, "platform", "Google Maps", f"{len(places)} place profiles")]
+        return []
 
     if name in ("find_nearby_restaurants", "search_restaurants") and status == "success":
         results = response.get("results")
         if isinstance(results, list):
             label = "nearby places" if name == "find_nearby_restaurants" else "place matches"
-            rows.append(_detail(row_id, "platform", "Google Maps", f"{len(results)} {label}"))
-        return rows
+            return [_detail(row_id, "platform", "Google Maps", f"{len(results)} {label}")]
+        return []
 
     if name == "find_tripadvisor_restaurant":
-        display_name = str(response.get("name") or "").strip() or str(response.get("title") or "").strip()
+        display_name = str(response.get("name") or "").strip() or str(
+            response.get("title") or ""
+        ).strip()
         if status == "unverified":
-            rows.append(
+            return [
                 _detail(
                     row_id,
                     "warning",
                     "Warnings",
                     f"TripAdvisor match not verified for {display_name or 'the venue'}",
                 )
-            )
-            return rows
+            ]
         if status == "success":
-            rows.append(
+            return [
                 _detail(
                     row_id,
                     "platform",
                     "TripAdvisor",
                     f"Matched {display_name}" if display_name else "Matched venue",
                 )
-            )
-        elif status == "error":
-            rows.append(
-                _detail(row_id, "warning", "Warnings", "TripAdvisor lookup failed")
-            )
-        return rows
+            ]
+        if status == "error":
+            return [_detail(row_id, "warning", "Warnings", "TripAdvisor lookup failed")]
+        return []
 
     if name == "get_tripadvisor_reviews":
         if status == "success":
             count = int(response.get("fetched_reviews") or 0)
-            rows.append(
-                _detail(row_id, "platform", "TripAdvisor", f"{count} reviews loaded")
-            )
-        elif status == "error":
-            rows.append(
-                _detail(row_id, "warning", "Warnings", "TripAdvisor reviews unavailable")
-            )
-        return rows
+            return [_detail(row_id, "platform", "TripAdvisor", f"{count} reviews loaded")]
+        if status == "error":
+            return [_detail(row_id, "warning", "Warnings", "TripAdvisor reviews unavailable")]
+        return []
 
     if name == "get_google_reviews":
         place_id = str(response.get("place_id") or "").strip()
@@ -420,22 +385,24 @@ def map_tool_result(
         if status == "success":
             count = int(response.get("total_fetched") or 0)
             label = f"{count} reviews for {place}" if place else f"{count} Google reviews"
-            rows.append(_detail(row_id, "platform", "Google reviews", label))
-        elif status == "error":
-            rows.append(
+            return [_detail(row_id, "platform", "Google reviews", label)]
+        if status == "error":
+            return [
                 _detail(
                     row_id,
                     "warning",
                     "Warnings",
-                    f"Google reviews unavailable for {place}" if place else "Google reviews unavailable",
+                    f"Google reviews unavailable for {place}"
+                    if place
+                    else "Google reviews unavailable",
                 )
-            )
-        return rows
+            ]
+        return []
 
     if name == "fetch_web_content" and status == "error":
-        rows.append(_detail(row_id, "warning", "Warnings", "Source fetch failed"))
+        return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
 
-    return rows
+    return []
 
 
 def map_tool_error(
@@ -475,13 +442,7 @@ def _state_delta(event: Any) -> dict[str, Any]:
 
 
 def _has_state_delta(event: Any, key: str) -> bool:
-    sd = _state_delta(event)
-    if key not in sd:
-        return False
-    value = sd[key]
-    if not value:
-        return False
-    return True
+    return bool(_state_delta(event).get(key))
 
 
 def _collect_text(event: Any) -> str:

@@ -1,14 +1,9 @@
 <script lang="ts">
-	import { marked } from 'marked';
+	import { renderMarkdown } from '$lib/markdown';
+	import { formatDuration } from '$lib/time';
 	import type { TimelineEvent } from '$lib/chat-types';
-	import ProgressEventRow from './ProgressEventRow.svelte';
 	import ProgressWrapper from './ProgressWrapper.svelte';
 	import TypewriterText from './TypewriterText.svelte';
-
-	marked.setOptions({ breaks: true, gfm: true });
-	function renderMarkdown(md: string): string {
-		return marked.parse(md) as string;
-	}
 
 	let {
 		events,
@@ -27,14 +22,6 @@
 		}, 1000);
 		return () => clearInterval(timer);
 	});
-
-	function formatDuration(ms: number): string {
-		const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-		const minutes = Math.floor(totalSeconds / 60);
-		const seconds = totalSeconds % 60;
-		if (minutes > 0) return `${minutes}m ${seconds}s`;
-		return `${seconds}s`;
-	}
 
 	const LEAD_AUTHORS = new Set(['router', 'context_enricher', 'research_lead', 'follow_up']);
 	const leadRe = /^\s*\*\*([^*]+)\*\*\s*([\s\S]*)$/;
@@ -134,7 +121,23 @@
 				{#if step.tools.length}
 					<div class="mt-2.5 flex flex-col gap-1.5 border-l-2 border-emerald-500/35 pl-3 dark:border-emerald-400/30">
 						{#each step.tools as tool (tool.id)}
-							<ProgressEventRow label={tool.family} detail={tool.text} />
+							<div class="relative flex items-start text-[14px] leading-snug">
+								<span
+									class="relative mt-[7px] flex h-[7px] w-[7px] shrink-0 items-center justify-center"
+								>
+									<span
+										class="h-[7px] w-[7px] rounded-full bg-emerald-500 dark:bg-emerald-400"
+									></span>
+								</span>
+								<span
+									class="ml-2.5 min-w-0 flex-1 break-words text-black/65 dark:text-white/65"
+								>
+									<span class="font-medium text-black/80 dark:text-white/80">{tool.family}</span>
+									{#if tool.text}
+										<span class="ml-1 text-black/55 dark:text-white/55">{tool.text}</span>
+									{/if}
+								</span>
+							</div>
 						{/each}
 					</div>
 				{/if}
