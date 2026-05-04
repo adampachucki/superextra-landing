@@ -37,13 +37,26 @@ export function createTypewriter({
 	return {
 		setTarget(text: string) {
 			stop();
-			target = text;
-			index = 0;
+			// If the new target extends the currently-displayed prefix, keep
+			// our position so already-revealed text doesn't re-type. This
+			// matters when a buffered thought grows as more thought-summary
+			// events arrive — the user shouldn't see prior chars vanish.
+			const displayedPrefix = target.slice(0, index);
+			if (text.startsWith(displayedPrefix)) {
+				target = text;
+			} else {
+				target = text;
+				index = 0;
+			}
 			if (!target) {
 				onDone?.();
 				return;
 			}
-			frame = requestAnimationFrame(tick);
+			if (index < target.length) {
+				frame = requestAnimationFrame(tick);
+			} else {
+				onDone?.();
+			}
 		},
 		stop
 	};

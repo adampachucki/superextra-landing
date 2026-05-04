@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { createTypewriter } from '$lib/typewriter';
+	import { onDestroy } from 'svelte';
+	import { createTypewriter, type TypewriterController } from '$lib/typewriter';
 
 	let {
 		text,
@@ -17,28 +18,35 @@
 	} = $props();
 
 	let displayed = $state('');
+	// Reuse a single typewriter across text changes — `setTarget` preserves
+	// position when the new target extends the displayed prefix, so growing
+	// thought buffers continue typing from where they left off rather than
+	// re-typing from char 0.
+	let typer: TypewriterController | null = null;
 
 	$effect(() => {
 		if (!enabled || !text) {
+			typer?.stop();
+			typer = null;
 			displayed = text;
 			return;
 		}
-
-		const typer = createTypewriter({
-			charsPerFrame,
-			onUpdate: (value) => {
-				displayed = value;
-			},
-			onDone: () => {
-				displayed = text;
-				onDone?.();
-			}
-		});
-
-		displayed = '';
+		if (!typer) {
+			typer = createTypewriter({
+				charsPerFrame,
+				onUpdate: (value) => {
+					displayed = value;
+				},
+				onDone: () => {
+					displayed = text;
+					onDone?.();
+				}
+			});
+		}
 		typer.setTarget(text);
-		return () => typer.stop();
 	});
+
+	onDestroy(() => typer?.stop());
 </script>
 
 {@render children(enabled ? displayed : text)}

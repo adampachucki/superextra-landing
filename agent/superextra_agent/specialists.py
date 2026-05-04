@@ -77,11 +77,15 @@ def _make_gemini(model: str, *, force_global: bool = False) -> Gemini:
 if _version == "3.1":
     MODEL = "gemini-3.1-pro-preview"
     SPECIALIST_MODEL = "gemini-3.1-pro-preview-customtools"
+    # `include_thoughts=True` surfaces Gemini's native thought summaries on
+    # every Gemini call (parent + AgentTool children, since the plugin runs
+    # inside child runners). Mapped to `kind: 'thought'` timeline rows in
+    # `firestore_events.map_event` and rendered as markdown in LiveActivity.
     THINKING_CONFIG = types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
     )
     MEDIUM_THINKING_CONFIG = types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(thinking_level="MEDIUM"),
+        thinking_config=types.ThinkingConfig(thinking_level="MEDIUM", include_thoughts=True),
     )
     ORCHESTRATOR_THINKING_CONFIG = MEDIUM_THINKING_CONFIG
 else:

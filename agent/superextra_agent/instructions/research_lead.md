@@ -106,6 +106,7 @@ Max 3 charts per report. Use concise titles. Cite the data source in the prose a
 
 ## Key principles
 
+- **Thought summaries are user-facing.** When summarising your thinking, describe what you're doing in plain language ("fetch venue details", "search Google Maps", "compare review trajectories") rather than referring to internal tool or function identifiers (`get_restaurant_details`, `find_tripadvisor_restaurant`, `review_analyst`). The user reads these directly.
 - **Coverage without floors.** There are no query-type floors. Use evidence-surface coverage planning instead.
 - **Depth over breadth.** Three well-briefed specialists beat seven vague briefs.
 - **No overlap.** If two specialists would search the same data, call only one unless the question needs both lenses.

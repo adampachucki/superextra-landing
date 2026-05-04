@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlparse
@@ -67,20 +68,6 @@ def _iter_parts(event: Any) -> list[Any]:
     return list(parts or [])
 
 
-def _iter_function_calls(event: Any) -> list[tuple[int, str, dict[str, Any]]]:
-    out: list[tuple[int, str, dict[str, Any]]] = []
-    for idx, part in enumerate(_iter_parts(event)):
-        fc = _get(part, "function_call")
-        if not fc:
-            continue
-        name = _get(fc, "name")
-        if not isinstance(name, str) or not name:
-            continue
-        args = _get(fc, "args") or {}
-        out.append((idx, name, args if isinstance(args, dict) else {}))
-    return out
-
-
 async def write_event_doc(
     *,
     fs: firestore.Client,
@@ -117,6 +104,37 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
 
     _ingest_place_names(event, state)
 
+    # Surface Gemini thought-summary parts (`include_thoughts=True`) as
+    # `kind: 'thought'` timeline rows so the activity panel can render the
+    # model's own narration of what it's doing. Each ADK event with thought
+    # parts produces one timeline row keyed by `(author, event_id)` so the
+    # client doesn't dedupe across genuine multi-thought events.
+    thought_text = _collect_thought_text(event)
+    if thought_text:
+        mapping["timeline_events"].append(
+            {
+                "kind": "thought",
+                "id": f"thought:{author or 'unknown'}:{_get(event, 'id') or ''}",
+                "author": author,
+                "text": thought_text,
+            }
+        )
+
+    # Surface Gemini built-in Google Search queries (grounding_metadata's
+    # web_search_queries) as `Searching the web` detail rows. The native
+    # grounding path doesn't emit `function_call(name='google_search')`,
+    # so without this branch the searches Gemini ran inline stay invisible.
+    event_id = _get(event, "id") or ""
+    for idx, query in enumerate(_extract_search_queries(event)):
+        mapping["timeline_events"].append(
+            _detail(
+                f"search:{event_id}:{idx}",
+                "search",
+                "Searching the web",
+                query,
+            )
+        )
+
     if author in SPECIALIST_AUTHORS:
         output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
         if output_key and _has_state_delta(event, output_key):
@@ -128,6 +146,93 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
             mapping["complete"] = complete
 
     return mapping
+
+
+def _collect_thought_text(event: Any) -> str:
+    """Concatenate text from parts where `part.thought` is True.
+
+    Internal tool identifiers (`get_restaurant_details`, `search_restaurants`,
+    …) sometimes leak into Gemini's thought summaries even after the prompt
+    nudge. Replace them with user-facing labels so the activity panel never
+    surfaces internal names.
+    """
+    pieces: list[str] = []
+    for part in _iter_parts(event):
+        if not _get(part, "thought"):
+            continue
+        text = _get(part, "text")
+        if isinstance(text, str) and text.strip():
+            pieces.append(text)
+    joined = "".join(pieces).strip()
+    return _strip_tool_names(joined)
+
+
+# Map internal function-tool identifiers to user-facing labels. Specialist
+# AgentTool names are derived from `SPECIALISTS` below so the scrubber follows
+# the canonical specialist roster automatically.
+_FUNCTION_TOOL_LABELS: dict[str, str] = {
+    "search_restaurants": "Google Maps search",
+    "find_nearby_restaurants": "nearby Google Maps lookup",
+    "get_restaurant_details": "venue lookup",
+    "get_batch_restaurant_details": "batch venue lookup",
+    "find_tripadvisor_restaurant": "TripAdvisor match",
+    "get_tripadvisor_reviews": "TripAdvisor reviews",
+    "get_google_reviews": "Google reviews",
+    "google_search": "Google search",
+    "fetch_web_content": "page fetch",
+    "narrate": "narration",
+}
+_SPECIALIST_TOOL_LABELS: dict[str, str] = {s.name: s.label for s in SPECIALISTS}
+_TOOL_LABELS: dict[str, str] = {**_FUNCTION_TOOL_LABELS, **_SPECIALIST_TOOL_LABELS}
+
+_BARE_TOOL_LABELS: dict[str, str] = {
+    name: label
+    for name, label in _TOOL_LABELS.items()
+    if "_" in name or name in _FUNCTION_TOOL_LABELS
+}
+_BACKTICKED_TOOL_NAME_RE = re.compile(
+    r"`(" + "|".join(re.escape(name) for name in _TOOL_LABELS) + r")`"
+)
+_BARE_TOOL_NAME_RE = re.compile(
+    r"\b(" + "|".join(re.escape(name) for name in _BARE_TOOL_LABELS) + r")\b"
+)
+
+
+def _strip_tool_names(text: str) -> str:
+    """Replace internal tool identifiers with user-facing labels.
+
+    Backticked identifiers are always scrubbed. Bare identifiers are scrubbed
+    only when they are unlikely to be normal prose; this avoids rewriting text
+    like "restaurant operations" while still catching names such as
+    `review_analyst`.
+    """
+    stripped = _BACKTICKED_TOOL_NAME_RE.sub(lambda m: _TOOL_LABELS[m.group(1)], text)
+    return _BARE_TOOL_NAME_RE.sub(lambda m: _BARE_TOOL_LABELS[m.group(1)], stripped)
+
+
+def _extract_search_queries(event: Any) -> list[str]:
+    """List the queries Gemini ran via built-in Google Search grounding.
+
+    Lives on `event.grounding_metadata.web_search_queries`. Returns an
+    empty list when no grounding metadata is attached or no queries were
+    issued. De-dupes within a single event so a model that lists the
+    same query twice doesn't render two adjacent rows.
+    """
+    gm = _get(event, "grounding_metadata")
+    if not gm:
+        return []
+    queries = _get(gm, "web_search_queries") or []
+    out: list[str] = []
+    seen: set[str] = set()
+    for q in queries:
+        if not isinstance(q, str):
+            continue
+        cleaned = q.strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        out.append(cleaned)
+    return out
 
 
 def extract_sources_from_grounding(event: Any) -> list[dict[str, Any]]:

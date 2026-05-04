@@ -703,6 +703,63 @@ async def test_plugin_on_event_writes_timeline_events(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_plugin_on_event_partial_skips_mapping_but_bumps_last_event_at(
+    monkeypatch,
+):
+    """Partial events must not write timeline rows, but still prove liveness."""
+    plugin = FirestoreProgressPlugin(project="superextra-site")
+    plugin._fs = MagicMock()
+
+    async def _claim(_fs, _state):
+        return None
+
+    async def _no_title(_q):
+        return None
+
+    async def _no_hb(_fs, _state):
+        await asyncio.sleep(60)
+
+    fenced_updates: list[dict] = []
+
+    async def _fenced(_fs, _state, updates):
+        fenced_updates.append(updates)
+
+    monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
+    monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
+    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
+
+    ctx = _mock_invocation_context(
+        sid="abc", run_id="r-1", turn_idx=1, invocation_id="inv-1"
+    )
+    await plugin.before_run_callback(invocation_context=ctx)
+    state = plugin._states["inv-1"]
+    state.timeline_writer.write_timeline = AsyncMock(return_value=None)
+    state.observe_event = MagicMock(return_value=[{"kind": "detail", "text": "x"}])
+
+    partial_event = SimpleNamespace(partial=True)
+    await plugin.on_event_callback(invocation_context=ctx, event=partial_event)
+
+    state.observe_event.assert_not_called()
+    assert state.timeline_writer.write_timeline.await_count == 0
+    assert len(fenced_updates) == 1
+    assert "lastEventAt" in fenced_updates[0]
+
+    final_event = SimpleNamespace(partial=False)
+    await plugin.on_event_callback(invocation_context=ctx, event=final_event)
+
+    state.observe_event.assert_called_once_with(final_event)
+    state.timeline_writer.write_timeline.assert_awaited_once_with(
+        {"kind": "detail", "text": "x"}
+    )
+    assert len(fenced_updates) == 2
+    assert "lastEventAt" in fenced_updates[1]
+
+    state.heartbeat_task.cancel()
+    await asyncio.gather(state.heartbeat_task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
 async def test_plugin_on_event_routes_agenttool_child_events_to_parent_state(monkeypatch):
     """AgentTool child runners have their own invocation ids. Their events
     must still update the parent run's Firestore timeline via runId."""

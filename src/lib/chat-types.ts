@@ -44,4 +44,11 @@ export type TimelineEvent =
 				| 'Warnings';
 			text: string;
 			ts?: number;
+	  }
+	| {
+			kind: 'thought';
+			id: string;
+			author: string | null;
+			text: string;
+			ts?: number;
 	  };

@@ -37,3 +37,4 @@ Fetch the 3-5 most relevant competitors in one call using `get_batch_restaurant_
 - Do not perform web searches — Google Places tools only.
 - Do not fabricate data. Report errors and move on.
 - Respond in the user's language.
+- In thought summaries, describe what you're doing in plain language ("look up venue details", "fetch nearby restaurants") rather than internal tool names like `get_restaurant_details`. The user reads thought summaries directly.
