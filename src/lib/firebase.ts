@@ -87,33 +87,43 @@ export function getFirebase(): Promise<FirebaseHandle> {
 
 /**
  * Ensure the current user is signed in anonymously. Resolves with the UID.
- * Safe to call repeatedly — returns the same UID across calls in the same
- * session.
+ * Single-flight: concurrent cold callers share one `signInAnonymously()`
+ * call so the listener UID and the bearer-token UID can't diverge. The
+ * IIFE assignment happens synchronously before any `await`, closing the
+ * check-then-assign race.
  */
+let anonAuthInFlight: Promise<string> | null = null;
+
 export async function ensureAnonAuth(): Promise<string> {
 	const { auth } = await getFirebase();
 	if (auth.currentUser) return auth.currentUser.uid;
-
-	const { signInAnonymously, onAuthStateChanged } = await import('firebase/auth');
-	return new Promise<string>((resolve, reject) => {
-		const unsubscribe = onAuthStateChanged(
-			auth,
-			(user) => {
-				if (user) {
+	if (!anonAuthInFlight) {
+		anonAuthInFlight = (async () => {
+			const { signInAnonymously, onAuthStateChanged } = await import('firebase/auth');
+			return new Promise<string>((resolve, reject) => {
+				const unsubscribe = onAuthStateChanged(
+					auth,
+					(user) => {
+						if (user) {
+							unsubscribe();
+							resolve(user.uid);
+						}
+					},
+					(err) => {
+						unsubscribe();
+						reject(err);
+					}
+				);
+				signInAnonymously(auth).catch((err) => {
 					unsubscribe();
-					resolve(user.uid);
-				}
-			},
-			(err) => {
-				unsubscribe();
-				reject(err);
-			}
-		);
-		signInAnonymously(auth).catch((err) => {
-			unsubscribe();
-			reject(err);
+					reject(err);
+				});
+			});
+		})().finally(() => {
+			anonAuthInFlight = null;
 		});
-	});
+	}
+	return anonAuthInFlight;
 }
 
 /**
