@@ -2,6 +2,34 @@
 
 Context captured after an intensive debugging session on 2026-04-17. Read this before touching the scroll / resize / multi-device path again. The short version: most of what looks fixable at the zmx layer isn't, because Claude Code's Ink renderer stores conversation messages in `<Static>` that cannot be re-emitted. Any scrollback wipe permanently destroys session history.
 
+## Stack architecture review (2026-05-06)
+
+A round of testing decomposed the mobile flow `Moshi → mosh → tmux → zmx → claude` into its parts to see which layers are actually load-bearing. Findings:
+
+**tmux is mandatory.** Moshi's session picker shows tmux sessions only — that's the discovery/switch UX on the phone. No tmux = no picker = no way to enumerate or jump between concurrent sessions from mobile. As of 2026-05-06 no iOS terminal app surfaces zmx sessions natively.
+
+**Tailscale is convenience, not infrastructure.** Connecting the phone to the VM's public IP via mosh works identically to Tailscale-routed mosh — same survive-disconnect behavior, same UDP transport. GCP firewall already allows mosh UDP 60000–61000, ET 2022, and SSH 22 from `0.0.0.0/0`. Tailscale's value is DNS (`ai-workstation` resolves), key-free auth potential (`tailscale up --ssh`), and NAT traversal. None of those are required for the basic flow.
+
+**zmx is not required for survive-disconnect.** ET on the Mac side and mosh on the phone side already keep client connections alive across network drops. The tmux session on the VM persists regardless. Eliminating zmx and running ET → tmux → claude (Mac) / mosh → tmux → claude (phone) was tested and works correctly through both desktop and mobile network outages.
+
+**zmx's "native scroll" benefit is neutralized by the tmux requirement.** The historical case for zmx was that it's a raw PTY relay with no alternate screen, so terminal-native scroll worked on the Mac. But because tmux is now mandatory (mobile picker), and tmux owns the alternate screen by definition, native scroll on the Mac is unreachable regardless of whether zmx sits underneath tmux. Whatever scroll experience tmux provides is what you get.
+
+**zmx would become valuable again only if** an iOS terminal app surfaced zmx sessions directly the way Moshi surfaces tmux. There is no such client as of 2026-05-06.
+
+**`CLAUDE_CODE_NO_FLICKER=1` must stay set.** Disabling it (tested via `env -u CLAUDE_CODE_NO_FLICKER claude` in plain ET+tmux on 2026-05-06) introduced significant rendering artifacts in the tmux pane. The variable's existing always-on injection through `~/.zx-env` is the desired state for any tmux-based stack. Don't unset it. (The "comment in `~/.bashrc` is misleading" caveat below remains accurate — the value is still applied through `~/.zx-env`.)
+
+**Implication for future simplification.** A clean, equivalent stack that drops zmx looks like:
+
+```
+Mac:    VS Code terminal → ET (34.38.81.215:2022) → tmux → claude
+Mobile: Moshi → mosh → tmux → claude
+(both attach to the same tmux server on the VM)
+```
+
+This eliminates the local Zig build, the upstream-fork branch, the resize-leader/scroll-bug surface area, and the zmx-vs-tmux sequencing dance documented in `~/zmx-tmux-scrolling.md`. The trade: no native scroll on the Mac (already true once tmux is in the path), and zmx's named-session command surface (`zmx attach NAME claude`) becomes `tmux new -As NAME 'claude'`.
+
+Not a recommendation to migrate today — just a record that the architectural premise of the rest of this doc (zmx is load-bearing) has been re-examined and found to be weaker than it looked.
+
 ## Read-this-first (for future agents / future me)
 
 - **Do not attempt to fix scroll / duplicate / stale-cells issues by broadcasting escape sequences from the zmx daemon.** Any `\x1b[3J` (clear scrollback) or `\x1b[2J` (clear visible) broadcast wipes Ink `<Static>` conversation content permanently — Static items are emitted once and never re-emitted, so wiping is irreversible data loss.
@@ -59,7 +87,7 @@ Both clients attach to the same zmx daemon. The daemon runs Claude in a single P
 
 `~/.bashrc` has `# export CLAUDE_CODE_NO_FLICKER=1` with a comment saying "Leave disabled." But the variable IS set for every new zmx session because:
 
-- `~/.zx-env` exports it (Mac-side `CVM_ET()` sources this over ET)
+- `~/.zx-env` exports it (the Mac-side ET wrapper — currently the `x` function in `~/.zshrc` — sources this over ET; historically named `CVM_ET()`)
 - tmux server global env has it (persisted from when a tmux session was started with the variable in scope, survives bashrc changes)
 
 Net effect: NO_FLICKER=1 is always injected into Claude. The bashrc comment was updated 2026-04-18 to reflect reality. If we ever actually want it off, we must unset in BOTH `~/.zx-env` AND `tmux set-environment -g -u CLAUDE_CODE_NO_FLICKER`, AND kill existing zmx daemons so their cached env goes away.
@@ -99,7 +127,7 @@ Realistically (1) is the most tractable; it's the Anthropic team's call.
 - zmx: **v0.5.0 pure upstream, no local patches**. Binary at `/usr/local/bin/zmx`, 9086224 bytes. Branch `main` at `origin/main`. No local branches.
 - `~/.zx-env`: exports NO_FLICKER=1, DISABLE_NONESSENTIAL_TRAFFIC=1, DISABLE_TERMINAL_TITLE=1.
 - tmux server env: all three set.
-- Mac `~/.zshrc` `CVM_ET()`: sources `~/.zx-env` over ET before running the command.
+- Mac `~/.zshrc` ET wrapper (`x` function, formerly `CVM_ET()`): sources `~/.zx-env` over ET before running the command.
 
 Lives with issues 2 and 3. Issue 1 (scrollback dup on re-attach) is present because Patch 1 isn't installed. Issue 4 (leader-on-resize resize storm) is **resolved** — the local patch that caused it was removed. Leader now only changes on actual user input (upstream `isUserInput`), which means you must type a key to hand leadership to a new device (no auto-switch). In practice this was already the observed behavior even with the patch installed.
 
