@@ -666,6 +666,47 @@ describe('chatState (Firestore-driven)', () => {
 			expect(chatState.liveTimeline[0]).toMatchObject({ kind: 'note', id: 'n1' });
 		});
 
+		it('keeps the live timeline on the completed agent message', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.turns('sid-1'));
+			primeRunningTurn('sid-1', obs);
+			await waitUntil(() => !!obs.events('sid-1'));
+
+			obs.events('sid-1')!.onNext(
+				eventsSnap([
+					eventChange('added', {
+						attempt: 1,
+						seqInAttempt: 1,
+						type: 'timeline',
+						data: { kind: 'note', id: 'n1', text: 'Reading sources' }
+					})
+				])
+			);
+
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'q',
+							status: 'complete',
+							reply: 'a',
+							turnSummary: { startedAtMs: 1000, finishedAtMs: 2000, elapsedMs: 1000 },
+							createdAt: { toMillis: () => 1000 },
+							completedAt: { toMillis: () => 2000 }
+						}
+					}
+				])
+			);
+
+			expect(chatState.messages[1].activityEvents).toEqual([
+				{ kind: 'note', id: 'n1', text: 'Reading sources' }
+			]);
+			expect(chatState.liveTimeline).toEqual([]);
+		});
+
 		it('detaches when the TURN doc status flips to terminal (not the session)', async () => {
 			const obs = captureObservers();
 			chatState.selectSession('sid-1');

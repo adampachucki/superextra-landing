@@ -54,6 +54,7 @@ class GearRunState:
     specialist_sources_seen: set[str] = field(default_factory=set)
     mapping_state: dict[str, Any] = field(default_factory=lambda: {"place_names": {}})
     title_task: asyncio.Task[Any] | None = None
+    partial_thought_pending: bool = False
 
     # Lifecycle
     heartbeat_task: asyncio.Task[Any] | None = None

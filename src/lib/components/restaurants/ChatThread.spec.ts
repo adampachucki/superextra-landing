@@ -130,7 +130,8 @@ describe('ChatThread', () => {
 
 		expect(chatState.messages).toHaveLength(2);
 		const { body } = render(ChatThread, { props: {} });
-		expect(body).toContain('Worked for 35s');
+		expect(body).toContain('Activity unavailable');
+		expect(body).toContain('35s total');
 		expect(body).not.toContain('Opened 1 source');
 	});
 });

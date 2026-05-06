@@ -51,6 +51,7 @@ export interface ChatMessage {
 	animateText?: boolean;
 	sources?: ChatSource[];
 	turnSummary?: TurnSummary;
+	activityEvents?: TimelineEvent[];
 }
 
 export interface PlaceContext {
@@ -163,6 +164,8 @@ const renderedEventKeys = new Set<string>();
 const previousTurnStatus = new Map<number, Turn['status']>();
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
 const replyTypewriterTurns = new Set<number>();
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const completedActivityByTurn = new Map<number, TimelineEvent[]>();
 
 // Sidebar listener state — attached lazily on first consumer access.
 let sidebarAttachStarted = false;
@@ -181,6 +184,7 @@ function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
 			turnIndex: turn.turnIndex
 		});
 		if (turn.status === 'complete' && turn.reply) {
+			const activityEvents = completedActivityByTurn.get(turn.turnIndex);
 			msgs.push({
 				role: 'agent',
 				text: turn.reply,
@@ -188,7 +192,8 @@ function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
 				turnIndex: turn.turnIndex,
 				animateText: replyTypewriterTurns.has(turn.turnIndex),
 				sources: turn.sources?.length ? turn.sources : undefined,
-				turnSummary: turn.turnSummary ?? undefined
+				turnSummary: turn.turnSummary ?? undefined,
+				activityEvents: activityEvents?.length ? activityEvents : undefined
 			});
 		}
 	}
@@ -277,6 +282,7 @@ function clearActiveState() {
 	renderedEventKeys.clear();
 	previousTurnStatus.clear();
 	replyTypewriterTurns.clear();
+	completedActivityByTurn.clear();
 }
 
 async function attachActiveListeners(sid: string) {
@@ -390,6 +396,17 @@ async function attachActiveListeners(sid: string) {
 				};
 				next.push(turn);
 				const prev = previousTurnStatus.get(turnIndex);
+				const inFlight = IN_FLIGHT_STATUSES.has(status);
+				if (inFlight) completedActivityByTurn.delete(turnIndex);
+				if (
+					prev &&
+					IN_FLIGHT_STATUSES.has(prev) &&
+					!inFlight &&
+					currentEventsRunId === turn.runId &&
+					liveTimeline.length
+				) {
+					completedActivityByTurn.set(turnIndex, [...liveTimeline]);
+				}
 				if (prev && prev !== 'complete' && status === 'complete' && turn.reply) {
 					replyTypewriterTurns.add(turnIndex);
 				}
@@ -657,6 +674,7 @@ export const chatState = {
 		return turns;
 	},
 	get loading(): boolean {
+		if (optimisticPendingSid && optimisticPendingSid === activeSid) return true;
 		const latest = turns[turns.length - 1];
 		if (!latest) {
 			// No turn doc yet, but agentStream was invoked — session status

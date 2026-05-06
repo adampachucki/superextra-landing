@@ -103,6 +103,17 @@ def test_thought_with_blank_text_is_ignored():
     assert all(row.get("kind") != "thought" for row in rows)
 
 
+def test_thought_text_normalizes_escaped_newlines():
+    ev = _event(
+        author="research_lead",
+        thoughts=["**Planning**\n\n\\n\\n\n\nFirst paragraph.\\n\\nSecond paragraph."],
+    )
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+    assert "\\n" not in text
+    assert text == "**Planning**\n\nFirst paragraph.\n\nSecond paragraph."
+
+
 def test_thought_text_strips_bare_and_backticked_tool_names():
     ev = _event(
         author="research_lead",
@@ -252,6 +263,15 @@ def test_narrate_tool_call_emits_note():
         "kind": "note",
         "id": "tool:call:call-1:narrate",
         "text": "Pulling Google reviews for Maple & Ash and Bavette's now.",
+    }
+
+
+def test_narrate_normalizes_escaped_newlines():
+    row = map_tool_call("narrate", {"text": "First line\\n\\nSecond line"}, {}, "call-1")
+    assert row == {
+        "kind": "note",
+        "id": "tool:call:call-1:narrate",
+        "text": "First line\n\nSecond line",
     }
 
 

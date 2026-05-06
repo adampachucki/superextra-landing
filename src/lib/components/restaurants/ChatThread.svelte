@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { tts } from '$lib/tts.svelte';
 	import { splitChartSegments } from '$lib/chart-blocks';
@@ -6,29 +7,30 @@
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
 	import TypewriterText from '$lib/components/agent/TypewriterText.svelte';
 	import { renderMarkdown } from '$lib/markdown';
-	import { formatDuration } from '$lib/time';
 	import ChartBlock from './ChartBlock.svelte';
 
 	let scrollEl: HTMLDivElement | undefined = $state();
-	let now = $state(Date.now());
+	let bottomEl: HTMLDivElement | undefined = $state();
+
+	const scrollKey = $derived(
+		[
+			chatState.messages.length,
+			chatState.loading,
+			chatState.error ?? '',
+			chatState.liveTimeline
+				.map((event) => `${event.id}:${'text' in event ? event.text.length : ''}`)
+				.join('|')
+		].join(':')
+	);
 
 	$effect(() => {
-		chatState.messages.length;
-		chatState.loading;
-		chatState.liveTimeline.length;
-		if (scrollEl) {
+		scrollKey;
+		if (!scrollEl) return;
+		tick().then(() => {
 			requestAnimationFrame(() => {
-				window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+				bottomEl?.scrollIntoView({ block: 'end', behavior: 'smooth' });
 			});
-		}
-	});
-
-	$effect(() => {
-		now = Date.now();
-		const timer = setInterval(() => {
-			now = Date.now();
-		}, 1000);
-		return () => clearInterval(timer);
+		});
 	});
 
 	const SOURCES_LIMIT = 19;
@@ -124,11 +126,13 @@
 							</button>
 						</div>
 
-						{#if msg.turnSummary && msg.turnSummary.elapsedMs >= 30000}
-							<div
-								class="mt-4 rounded-2xl border border-black/6 px-4 py-3 text-[13px] text-black/55 dark:border-white/10 dark:text-white/55"
-							>
-								Worked for {formatDuration(msg.turnSummary.elapsedMs)}
+						{#if msg.turnSummary}
+							<div class="mt-4">
+								<LiveActivity
+									events={msg.activityEvents ?? []}
+									elapsedMs={msg.turnSummary.elapsedMs}
+									completed
+								/>
 							</div>
 						{/if}
 
@@ -193,26 +197,13 @@
 			</div>
 		{/each}
 
-		{#if chatState.loading && chatState.liveTimeline.length > 0}
+		{#if chatState.loading}
 			<div class="msg-appear flex justify-start">
 				<div class="max-w-[95%] px-1 py-1">
 					<LiveActivity
 						events={chatState.liveTimeline}
 						startedAtMs={chatState.currentTurnStartedAtMs}
 					/>
-				</div>
-			</div>
-		{:else if chatState.loading}
-			<div class="msg-appear flex justify-start">
-				<div class="max-w-[95%] px-1 py-1">
-					<div class="flex flex-col gap-2">
-						<div class="text-[14px] text-black/55 dark:text-white/55">
-							Working for {formatDuration(now - (chatState.currentTurnStartedAtMs ?? now))}
-						</div>
-						<div class="text-[15px] leading-relaxed text-black/82 dark:text-white/82">
-							Starting research…
-						</div>
-					</div>
 				</div>
 			</div>
 		{/if}
@@ -237,6 +228,7 @@
 				</div>
 			</div>
 		{/if}
+		<div bind:this={bottomEl} aria-hidden="true"></div>
 	</div>
 </div>
 

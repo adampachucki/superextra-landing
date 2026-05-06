@@ -507,19 +507,33 @@ class FirestoreProgressPlugin(BasePlugin):
             return None
 
         timeline_events = []
-        if not getattr(event, "partial", False):
-            # observe_event maps an ADK event into 0+ timeline rows and mutates
-            # accumulator state. A mapper bug must not kill the run — receiving
-            # an event already proves the pipeline is alive, so we still bump
-            # lastEventAt below even when mapping fails.
-            try:
-                timeline_events = per.observe_event(event)
-            except Exception:  # noqa: BLE001
-                log.exception(
-                    "observe_event failed sid=%s runId=%s; continuing without timeline write",
-                    per.sid,
-                    per.run_id,
-                )
+        is_partial = getattr(event, "partial", False)
+        # observe_event maps an ADK event into 0+ timeline rows and mutates
+        # accumulator state. A mapper bug must not kill the run — receiving
+        # an event already proves the pipeline is alive, so we still bump
+        # lastEventAt below even when mapping fails.
+        try:
+            timeline_events = per.observe_event(event)
+        except Exception:  # noqa: BLE001
+            log.exception(
+                "observe_event failed sid=%s runId=%s; continuing without timeline write",
+                per.sid,
+                per.run_id,
+            )
+
+        if is_partial:
+            # Partial ADK events are useful only for early thought text. Tool
+            # rows are emitted by typed tool callbacks, and terminal/source
+            # state should come from the final aggregated event.
+            timeline_events = [ev for ev in timeline_events if ev.get("kind") == "thought"]
+            if timeline_events:
+                per.partial_thought_pending = True
+        elif per.partial_thought_pending:
+            # ADK emits a final aggregated event after the streamed partials.
+            # Keep non-thought rows from that final event but avoid replaying
+            # the same thought paragraph after the user already saw it stream.
+            timeline_events = [ev for ev in timeline_events if ev.get("kind") != "thought"]
+            per.partial_thought_pending = False
 
         # Best-effort timeline writes. TimelineWriter has its own internal
         # lock so concurrent writers don't interleave.

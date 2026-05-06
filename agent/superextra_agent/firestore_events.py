@@ -33,6 +33,11 @@ def _normalize_space(text: str) -> str:
     return " ".join(text.split())
 
 
+def _normalize_newlines(text: str) -> str:
+    text = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
 def _short_url(url: str) -> str:
     try:
         parsed = urlparse(url)
@@ -119,7 +124,7 @@ def _collect_thought_text(event: Any) -> str:
         text = _get(part, "text")
         if isinstance(text, str) and text.strip():
             pieces.append(text)
-    return _strip_tool_names("".join(pieces).strip())
+    return _strip_tool_names(_normalize_newlines("".join(pieces))).strip()
 
 
 # Map internal function-tool identifiers to user-facing labels. Specialist
@@ -269,7 +274,7 @@ def map_tool_call(
             return {
                 "kind": "note",
                 "id": row_id,
-                "text": text.strip(),
+                "text": _normalize_newlines(text).strip(),
             }
         return None
     if name == "google_search":

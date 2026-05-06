@@ -18,10 +18,9 @@
 	} = $props();
 
 	let displayed = $state('');
-	// Reuse a single typewriter across text changes — `setTarget` preserves
-	// position when the new target extends the displayed prefix, so growing
-	// thought buffers continue typing from where they left off rather than
-	// re-typing from char 0.
+	// Reuse one soft-reveal controller across text changes. `setTarget`
+	// preserves position when the new target extends the displayed prefix, so
+	// growing thought buffers keep revealing from where they left off.
 	let typer: TypewriterController | null = null;
 
 	$effect(() => {
@@ -49,4 +48,31 @@
 	onDestroy(() => typer?.stop());
 </script>
 
-{@render children(enabled ? displayed : text)}
+{#if enabled}
+	{#key displayed}
+		<div class="soft-reveal">
+			{@render children(displayed)}
+		</div>
+	{/key}
+{:else}
+	{@render children(text)}
+{/if}
+
+<style>
+	.soft-reveal {
+		animation: softReveal 180ms ease-out both;
+	}
+
+	@keyframes softReveal {
+		from {
+			opacity: 0.72;
+			transform: translateY(1px);
+			filter: blur(0.4px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+			filter: blur(0);
+		}
+	}
+</style>

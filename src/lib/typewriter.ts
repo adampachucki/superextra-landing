@@ -3,6 +3,20 @@ export interface TypewriterController {
 	stop(): void;
 }
 
+const REVEAL_INTERVAL_MS = 35;
+
+function nextRevealIndex(text: string, index: number, minChars: number): number {
+	const floor = Math.min(text.length, index + minChars);
+	if (floor >= text.length) return text.length;
+
+	const rest = text.slice(floor);
+	const boundary = rest.search(/\s+/);
+	if (boundary === -1) return text.length;
+
+	const whitespace = rest.slice(boundary).match(/^\s+/)?.[0].length ?? 0;
+	return Math.min(text.length, floor + boundary + whitespace);
+}
+
 export function createTypewriter({
 	charsPerFrame = 4,
 	onDone,
@@ -12,25 +26,36 @@ export function createTypewriter({
 	onDone?: () => void;
 	onUpdate: (text: string) => void;
 }): TypewriterController {
-	let frame: number | null = null;
+	let timer: ReturnType<typeof setTimeout> | null = null;
 	let target = '';
 	let index = 0;
+	let completedTarget: string | null = null;
 
 	function stop() {
-		if (frame !== null) {
-			cancelAnimationFrame(frame);
-			frame = null;
+		if (timer !== null) {
+			clearTimeout(timer);
+			timer = null;
 		}
 	}
 
+	function finish() {
+		if (completedTarget === target) return;
+		completedTarget = target;
+		onDone?.();
+	}
+
+	function schedule() {
+		timer = setTimeout(tick, REVEAL_INTERVAL_MS);
+	}
+
 	function tick() {
-		frame = null;
-		index = Math.min(target.length, index + charsPerFrame);
+		timer = null;
+		index = nextRevealIndex(target, index, Math.max(8, charsPerFrame * 4));
 		onUpdate(target.slice(0, index));
 		if (index < target.length) {
-			frame = requestAnimationFrame(tick);
+			schedule();
 		} else {
-			onDone?.();
+			finish();
 		}
 	}
 
@@ -48,14 +73,15 @@ export function createTypewriter({
 				target = text;
 				index = 0;
 			}
+			if (completedTarget !== target) completedTarget = null;
 			if (!target) {
-				onDone?.();
+				finish();
 				return;
 			}
 			if (index < target.length) {
-				frame = requestAnimationFrame(tick);
+				schedule();
 			} else {
-				onDone?.();
+				finish();
 			}
 		},
 		stop
