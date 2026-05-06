@@ -124,6 +124,7 @@ export async function ensureAnonAuth(): Promise<string> {
  * add latency without improving safety.
  */
 export async function getIdToken(): Promise<string> {
+	await ensureAnonAuth();
 	const { auth } = await getFirebase();
 	const user = auth.currentUser;
 	if (!user) throw new Error('No authenticated user');

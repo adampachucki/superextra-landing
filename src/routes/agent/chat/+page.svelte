@@ -667,20 +667,20 @@
 			? 'pl-64'
 			: ''}"
 	>
-		{#if chatState.active}
-			{#if chatState.loadState === 'missing' || chatState.loadState === 'loadTimedOut'}
-				<div
-					class="chat-thread-enter flex min-h-dvh items-center justify-center {mounted
-						? 'is-mounted'
-						: ''}"
-				>
-					<p class="text-[14px] text-black/40 dark:text-white/40">Couldn't load this chat</p>
-				</div>
-			{:else}
-				<div class="chat-thread-enter {mounted ? 'is-mounted' : ''}">
-					<ChatThread />
-				</div>
-			{/if}
+		{#if chatState.loadState === 'missing' || chatState.loadState === 'loadTimedOut'}
+			<div
+				class="chat-thread-enter flex min-h-dvh items-center justify-center {mounted
+					? 'is-mounted'
+					: ''}"
+			>
+				<p class="text-[14px] text-black/40 dark:text-white/40">
+					{chatState.active ? "Couldn't load this chat" : "Couldn't start this chat"}
+				</p>
+			</div>
+		{:else if chatState.active}
+			<div class="chat-thread-enter {mounted ? 'is-mounted' : ''}">
+				<ChatThread />
+			</div>
 		{:else}
 			<div
 				class="chat-thread-enter flex min-h-dvh items-center justify-center {mounted
