@@ -157,7 +157,6 @@
 		flushThought(true);
 		return out;
 	});
-	const hasActivity = $derived(steps.length > 0);
 	const showSteps = $derived(!completed || expanded);
 	const durationLabel = $derived(
 		formatDuration(
@@ -268,30 +267,27 @@
 		<button
 			type="button"
 			onclick={() => {
-				if (hasActivity) expanded = !expanded;
+				expanded = !expanded;
 			}}
-			aria-expanded={hasActivity ? expanded : undefined}
-			disabled={!hasActivity}
-				class="{showSteps && steps.length
-					? 'mt-4 border-t border-black/8 px-2 pt-3 pb-2 dark:border-white/10'
-					: 'p-2'} flex w-full items-center justify-between gap-3 rounded-xl text-left text-[13px] text-black/55 transition-colors enabled:hover:bg-black/[0.03] enabled:hover:text-black/70 dark:text-white/55 dark:enabled:hover:bg-white/[0.04] dark:enabled:hover:text-white/70"
+			aria-expanded={expanded}
+			class="{showSteps && steps.length
+				? 'mt-4 border-t border-black/8 px-2 pt-3 pb-2 dark:border-white/10'
+				: 'p-2'} flex w-full items-center justify-between gap-3 rounded-xl text-left text-[13px] text-black/55 transition-colors enabled:hover:bg-black/[0.03] enabled:hover:text-black/70 dark:text-white/55 dark:enabled:hover:bg-white/[0.04] dark:enabled:hover:text-white/70"
 		>
 			<span class="flex min-w-0 items-center gap-1.5">
-				{#if hasActivity}
-					<svg
-							class="h-3.5 w-3.5 shrink-0 transition-transform {expanded ? '-rotate-90' : ''}"
-						viewBox="0 0 16 16"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.8"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<path d="M6 4l4 4-4 4" />
-					</svg>
-				{/if}
-				<span>{hasActivity ? 'Analysis activity' : 'Activity unavailable'}</span>
+				<svg
+					class="h-3.5 w-3.5 shrink-0 transition-transform {expanded ? '-rotate-90' : ''}"
+					viewBox="0 0 16 16"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.8"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+				>
+					<path d="M6 4l4 4-4 4" />
+				</svg>
+				<span>Analysis activity</span>
 			</span>
 			<span class="shrink-0 text-[12px] text-black/45 dark:text-white/45">{durationLabel} total</span>
 		</button>

@@ -126,10 +126,10 @@
 							</button>
 						</div>
 
-						{#if msg.turnSummary}
+						{#if msg.turnSummary && msg.activityEvents?.length}
 							<div class="mt-4">
 								<LiveActivity
-									events={msg.activityEvents ?? []}
+									events={msg.activityEvents}
 									elapsedMs={msg.turnSummary.elapsedMs}
 									completed
 								/>

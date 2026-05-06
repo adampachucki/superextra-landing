@@ -373,9 +373,11 @@
 									{/if}
 								{/each}
 							</div>
-							<div class="mt-4">
-								<LiveActivity events={allTimelineEvents} elapsedMs={totalMs} completed />
-							</div>
+							{#if allTimelineEvents.length}
+								<div class="mt-4">
+									<LiveActivity events={allTimelineEvents} elapsedMs={totalMs} completed />
+								</div>
+							{/if}
 							{#if turn.sources.length}
 								<div class="mt-5 text-[12px] text-black/40 dark:text-white/40">
 									Sources ({turn.sources.length})

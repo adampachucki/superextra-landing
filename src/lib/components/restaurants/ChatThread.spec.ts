@@ -92,7 +92,7 @@ describe('ChatThread', () => {
 		vi.unstubAllGlobals();
 	});
 
-	it('renders completed-turn duration without dead note rows', async () => {
+	it('skips the completed activity shell when no captured events exist', async () => {
 		const obs = captureObservers();
 		chatState.selectSession('sid-1');
 		await waitUntil(() => !!obs.turns('sid-1'));
@@ -130,8 +130,10 @@ describe('ChatThread', () => {
 
 		expect(chatState.messages).toHaveLength(2);
 		const { body } = render(ChatThread, { props: {} });
-		expect(body).toContain('Activity unavailable');
-		expect(body).toContain('35s total');
+		expect(body).toContain('Agent reply');
+		expect(body).not.toContain('Activity unavailable');
+		expect(body).not.toContain('Analysis activity');
+		expect(body).not.toContain('35s total');
 		expect(body).not.toContain('Opened 1 source');
 	});
 });
