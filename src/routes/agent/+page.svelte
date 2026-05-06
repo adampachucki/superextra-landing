@@ -12,9 +12,8 @@
 	import RestaurantCTA from '$lib/components/restaurants/RestaurantCTA.svelte';
 
 	let leaving = $state(false);
-	let leaveError = $state<string | null>(null);
 
-	async function handleLeave({
+	function handleLeave({
 		query,
 		place
 	}: {
@@ -22,15 +21,8 @@
 		place: { name: string; secondary: string; placeId: string };
 	}) {
 		leaving = true;
-		leaveError = null;
-		try {
-			await chatState.startNewChat(query, place);
-			setTimeout(() => goto('/agent/chat'), 250);
-		} catch (err) {
-			leaving = false;
-			leaveError =
-				err instanceof Error ? err.message : 'Could not start chat. Please try again.';
-		}
+		chatState.startNewChat(query, place);
+		goto('/agent/chat');
 	}
 
 	const agentUseCases = [
@@ -97,14 +89,6 @@
 
 	<main>
 		<RestaurantHero onleave={handleLeave} />
-		{#if leaveError}
-			<div
-				class="mx-auto max-w-[720px] px-6 pb-6 text-center text-sm text-red-600 dark:text-red-400"
-				role="alert"
-			>
-				{leaveError}
-			</div>
-		{/if}
 		<About
 			headline="The market view your restaurant has been missing"
 			intro="Restaurant operators make critical decisions every day — where to open, how to price, when to hire — too often without a clear view of the market around them at all. Superextra changes that."

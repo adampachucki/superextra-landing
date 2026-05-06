@@ -147,24 +147,16 @@
 							secondary: params.get('placeSecondary') ?? ''
 						}
 					: null;
-			// Await: only strip the prefilled params on success. On failure keep
-			// the composer state + URL intact and surface the error.
-			chatState
-				.startNewChat(q, placeContext)
-				.then(() => {
-					const clean = new URL(window.location.href);
-					clean.searchParams.delete('q');
-					clean.searchParams.delete('placeName');
-					clean.searchParams.delete('placeSecondary');
-					clean.searchParams.delete('placeId');
-					history.replaceState(history.state, '', clean);
-				})
-				.catch((err: unknown) => {
-					query = q;
-					if (placeContext) place.select(placeContext);
-					sendError =
-						err instanceof Error ? err.message : 'Could not start chat. Please try again.';
-				});
+			const trimmedQ = q?.trim();
+			if (trimmedQ) {
+				chatState.startNewChat(trimmedQ, placeContext);
+				const clean = new URL(window.location.href);
+				clean.searchParams.delete('q');
+				clean.searchParams.delete('placeName');
+				clean.searchParams.delete('placeSecondary');
+				clean.searchParams.delete('placeId');
+				history.replaceState(history.state, '', clean);
+			}
 		} else if (sid) {
 			chatState.selectSession(sid);
 		}
@@ -212,17 +204,9 @@
 				return;
 			}
 			placeNudge = false;
-			const placeForSend = selectedPlace;
 			query = '';
 			resizeTextarea();
-			try {
-				await chatState.startNewChat(trimmed, placeForSend);
-			} catch (err) {
-				query = trimmed;
-				resizeTextarea();
-				sendError =
-					err instanceof Error ? err.message : 'Could not start chat. Please try again.';
-			}
+			chatState.startNewChat(trimmed, selectedPlace);
 		}
 	}
 
