@@ -321,13 +321,27 @@
 	}
 
 	let confirmDeleteId = $state<string | null>(null);
+	let deletingId = $state<string | null>(null);
 
 	function handleWindowClick(e: MouseEvent) {
-		if (!confirmDeleteId) return;
+		if (!confirmDeleteId || deletingId) return;
 		const target = e.target as HTMLElement;
 		if (!target.closest('.sb-item')) confirmDeleteId = null;
 	}
 
+	async function performDelete(sid: string) {
+		if (deletingId) return;
+		deleteError = null;
+		deletingId = sid;
+		try {
+			await chatState.deleteSession(sid);
+			confirmDeleteId = null;
+		} catch (err) {
+			deleteError = err instanceof Error ? err.message : 'Could not delete. Please try again.';
+		} finally {
+			deletingId = null;
+		}
+	}
 </script>
 
 <svelte:window onclick={handleWindowClick} />
@@ -441,13 +455,18 @@
 			<div class="flex flex-col gap-0.5">
 				{#each chatState.sessionsList as sess, i (sess.sid)}
 					{@const canDeleteRow = sess.userId === chatState.currentUid}
+					{@const isDeleting = deletingId === sess.sid}
 					<div
-						class="sb-item group relative"
+						class="sb-item group relative transition-opacity duration-200 {isDeleting
+							? 'opacity-60'
+							: ''}"
 						style="--sb-delay: {Math.min(0.38 + i * 0.05, 0.7)}s"
 						class:visible={sidebarContentVisible}
+						aria-busy={isDeleting ? 'true' : undefined}
 					>
 						<button
 							onclick={() => {
+								if (isDeleting) return;
 								if (confirmDeleteId && confirmDeleteId !== sess.sid) {
 									confirmDeleteId = null;
 									deleteError = null;
@@ -493,64 +512,52 @@
 										? 'translate-x-0 opacity-100'
 										: 'pointer-events-none -translate-x-1.5 opacity-0'}"
 								>
-									<span
-										role="button"
-										tabindex="0"
-										onclick={async (e) => {
-											e.stopPropagation();
-											deleteError = null;
-											try {
-												await chatState.deleteSession(sess.sid);
-												confirmDeleteId = null;
-											} catch (err) {
-												deleteError =
-													err instanceof Error
-														? err.message
-														: 'Could not delete. Please try again.';
-											}
-										}}
-										onkeydown={async (e) => {
-											if (e.key === 'Enter' || e.key === ' ') {
-												e.preventDefault();
+									{#if isDeleting}
+										<span class="deleting-indicator text-black/60 dark:text-white/60"
+											>Deleting…</span
+										>
+									{:else}
+										<span
+											role="button"
+											tabindex="0"
+											onclick={(e) => {
 												e.stopPropagation();
-												deleteError = null;
-												try {
-													await chatState.deleteSession(sess.sid);
-													confirmDeleteId = null;
-												} catch (err) {
-													deleteError =
-														err instanceof Error
-															? err.message
-															: 'Could not delete. Please try again.';
+												void performDelete(sess.sid);
+											}}
+											onkeydown={(e) => {
+												if (e.key === 'Enter' || e.key === ' ') {
+													e.preventDefault();
+													e.stopPropagation();
+													void performDelete(sess.sid);
 												}
-											}
-										}}
-										class="cursor-pointer text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-										>Delete</span
-									>
-									<span class="text-black/20 dark:text-white/20">&middot;</span>
-									<span
-										role="button"
-										tabindex="0"
-										onclick={(e) => {
-											e.stopPropagation();
-											confirmDeleteId = null;
-											deleteError = null;
-										}}
-										onkeydown={(e) => {
-											if (e.key === 'Enter' || e.key === ' ') {
-												e.preventDefault();
+											}}
+											class="cursor-pointer text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+											>Delete</span
+										>
+										<span class="text-black/20 dark:text-white/20">&middot;</span>
+										<span
+											role="button"
+											tabindex="0"
+											onclick={(e) => {
 												e.stopPropagation();
 												confirmDeleteId = null;
 												deleteError = null;
-											}
-										}}
-										class="cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
-										>Cancel</span
-									>
+											}}
+											onkeydown={(e) => {
+												if (e.key === 'Enter' || e.key === ' ') {
+													e.preventDefault();
+													e.stopPropagation();
+													confirmDeleteId = null;
+													deleteError = null;
+												}
+											}}
+											class="cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+											>Cancel</span
+										>
+									{/if}
 								</div>
 							</div>
-							{#if confirmDeleteId === sess.sid && deleteError}
+							{#if confirmDeleteId === sess.sid && deleteError && !isDeleting}
 								<div
 									class="mt-1 truncate text-[11px] text-red-600 dark:text-red-400"
 									role="alert"
@@ -1170,6 +1177,20 @@
 		100% {
 			opacity: 1;
 			transform: scale(1);
+		}
+	}
+
+	.deleting-indicator {
+		animation: deletingPulse 1.4s ease-in-out infinite;
+	}
+
+	@keyframes deletingPulse {
+		0%,
+		100% {
+			opacity: 0.45;
+		}
+		50% {
+			opacity: 1;
 		}
 	}
 
