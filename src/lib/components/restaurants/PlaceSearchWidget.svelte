@@ -1,21 +1,56 @@
 <script lang="ts">
-	import type { PlaceSearch } from '$lib/place-search.svelte';
+	import type { PlaceSearch, PlaceSuggestion } from '$lib/place-search.svelte';
 
 	let {
 		place,
 		inputEl = $bindable(),
 		placeholder = 'Venue name...',
+		direction = 'down',
 		onSelect
 	}: {
 		place: PlaceSearch;
 		inputEl?: HTMLInputElement;
 		placeholder?: string;
+		direction?: 'down' | 'up';
 		onSelect?: () => void;
 	} = $props();
 
-	function handleSelect(s: { name: string; secondary: string; placeId: string }) {
+	let highlight = $state(-1);
+
+	function resetHighlight() {
+		highlight = -1;
+	}
+
+	function handleSelect(s: PlaceSuggestion) {
 		place.select(s);
+		resetHighlight();
 		onSelect?.();
+	}
+
+	$effect(() => {
+		place.suggestions;
+		resetHighlight();
+	});
+
+	function onKeydown(e: KeyboardEvent) {
+		const count = place.suggestions.length;
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			place.hideSuggestions();
+			resetHighlight();
+			return;
+		}
+		if (!place.showSuggestions || count === 0) return;
+		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+			e.preventDefault();
+			const delta = e.key === 'ArrowDown' ? 1 : -1;
+			highlight = highlight < 0 ? (delta > 0 ? 0 : count - 1) : (highlight + delta + count) % count;
+			return;
+		}
+		if (e.key === 'Enter' && highlight >= 0) {
+			e.preventDefault();
+			handleSelect(place.suggestions[highlight]);
+		}
 	}
 </script>
 
@@ -28,7 +63,11 @@
 		onfocus={() => {
 			if (place.suggestions.length) place.setQuery(place.query);
 		}}
-		onblur={() => setTimeout(() => place.hideSuggestions(), 150)}
+		onblur={() => {
+			setTimeout(() => place.hideSuggestions(), 150);
+			resetHighlight();
+		}}
+		onkeydown={onKeydown}
 		{placeholder}
 		autocomplete="off"
 		autocorrect="off"
@@ -49,25 +88,31 @@
 			></path>
 		</svg>
 	{/if}
+	{#if place.showSuggestions && place.suggestions.length > 0}
+		<ul
+			class="absolute right-0 left-0 z-50 max-h-48 overflow-auto rounded-xl border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50 {direction ===
+			'up'
+				? 'bottom-full mb-1'
+				: 'top-full mt-1'}"
+		>
+			{#each place.suggestions as s, i (s.placeId)}
+				<li>
+					<button
+						type="button"
+						class="w-full cursor-pointer px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-cream-50 dark:hover:bg-white/[0.04] {i ===
+						highlight
+							? 'bg-cream-50 dark:bg-white/[0.04]'
+							: ''}"
+						onpointerdown={(e) => e.preventDefault()}
+						onclick={() => handleSelect(s)}
+					>
+						<span class="text-black dark:text-white">{s.name}</span>
+						{#if s.secondary}
+							<span class="ml-1.5 text-black/45 dark:text-white/45">{s.secondary}</span>
+						{/if}
+					</button>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 </div>
-{#if place.showSuggestions && place.suggestions.length > 0}
-	<ul
-		class="absolute top-full right-0 left-0 z-50 mt-1 max-h-48 overflow-auto rounded-xl border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50"
-	>
-		{#each place.suggestions as s (s.placeId)}
-			<li>
-				<button
-					type="button"
-					class="w-full cursor-pointer px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-cream-50 dark:hover:bg-white/[0.04]"
-					onpointerdown={(e) => e.preventDefault()}
-					onclick={() => handleSelect(s)}
-				>
-					<span class="text-black dark:text-white">{s.name}</span>
-					{#if s.secondary}
-						<span class="ml-1.5 text-black/45 dark:text-white/45">{s.secondary}</span>
-					{/if}
-				</button>
-			</li>
-		{/each}
-	</ul>
-{/if}
