@@ -1,6 +1,6 @@
 // Stuck-session watchdog. Runs every 2 minutes; flips abandoned sessions to
 // status='error' with a specific reason. Firestore can't OR across different
-// fields from one composite index, so we run three bounded queries and merge
+// fields from one composite index, so we run two bounded queries and merge
 // in code. (Deployed as `watchdog` Cloud Run function + Cloud Scheduler job
 // via firebase-functions v2 `onSchedule`.)
 //
@@ -13,15 +13,12 @@
 //   - running, heartbeat silent > 10 min → heartbeat_lost. The plugin
 //     ticks `lastHeartbeat` every 30 s; 10 min of silence means the
 //     Reasoning Engine container crashed or got descheduled.
-//   - running, lastEventAt > 5 min → pipeline_wedged. Heartbeat fresh
-//     but no ADK events — specialist stuck on a hung tool call, etc.
 
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const QUEUED_MAX_AGE_MS = 5 * 60 * 1000;
 const HEARTBEAT_MAX_AGE_MS = 10 * 60 * 1000;
-const LAST_EVENT_MAX_AGE_MS = 5 * 60 * 1000;
 const BATCH_LIMIT = 100;
 
 function toMillis(ts) {
@@ -51,12 +48,10 @@ export async function findStuckSessions(db, nowMs = Date.now()) {
 	// don't need to import the explicit Timestamp class.
 	const queuedThresholdMs = nowMs - QUEUED_MAX_AGE_MS;
 	const heartbeatThresholdMs = nowMs - HEARTBEAT_MAX_AGE_MS;
-	const eventThresholdMs = nowMs - LAST_EVENT_MAX_AGE_MS;
 	const queuedThreshold = new Date(queuedThresholdMs);
 	const heartbeatThreshold = new Date(heartbeatThresholdMs);
-	const eventThreshold = new Date(eventThresholdMs);
 
-	const [queuedSnap, heartbeatSnap, eventSnap] = await Promise.all([
+	const [queuedSnap, heartbeatSnap] = await Promise.all([
 		db
 			.collection('sessions')
 			.where('status', '==', 'queued')
@@ -67,12 +62,6 @@ export async function findStuckSessions(db, nowMs = Date.now()) {
 			.collection('sessions')
 			.where('status', '==', 'running')
 			.where('lastHeartbeat', '<', heartbeatThreshold)
-			.limit(BATCH_LIMIT)
-			.get(),
-		db
-			.collection('sessions')
-			.where('status', '==', 'running')
-			.where('lastEventAt', '<', eventThreshold)
 			.limit(BATCH_LIMIT)
 			.get()
 	]);
@@ -106,18 +95,6 @@ export async function findStuckSessions(db, nowMs = Date.now()) {
 			expectedRunId: d.currentRunId ?? null,
 			thresholdField: 'lastHeartbeat',
 			thresholdMillis: heartbeatThresholdMs
-		});
-	}
-	for (const doc of eventSnap.docs) {
-		const d = doc.data();
-		const ageMs = nowMs - (toMillis(d.lastEventAt) ?? nowMs);
-		classify(doc.id, {
-			reason: 'pipeline_wedged',
-			errorDetails: { lastEventAgeMs: ageMs },
-			expectedStatus: 'running',
-			expectedRunId: d.currentRunId ?? null,
-			thresholdField: 'lastEventAt',
-			thresholdMillis: eventThresholdMs
 		});
 	}
 

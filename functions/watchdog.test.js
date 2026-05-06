@@ -167,21 +167,6 @@ describe('findStuckSessions', () => {
 		assert.equal(out[0].reason, 'heartbeat_lost');
 	});
 
-	it('classifies wedged pipeline (fresh heartbeat, stale lastEventAt) as pipeline_wedged', async () => {
-		const plans = {
-			'sessions|status|lastEventAt|limit': mockSnap([
-				mockDoc('sid-wedge', {
-					status: 'running',
-					lastEventAt: millisTs(NOW - 7 * 60 * 1000)
-				})
-			])
-		};
-		const db = makeDb(plans);
-		const out = await findStuckSessions(db, NOW);
-		assert.equal(out.length, 1);
-		assert.equal(out[0].reason, 'pipeline_wedged');
-	});
-
 	it('dedupes by sid — queued classifier wins over heartbeat for same sid', async () => {
 		// Pathological: a doc matches multiple queries.
 		const doc = mockDoc('dup', {
