@@ -32,6 +32,7 @@
 		{placeholder}
 		autocomplete="off"
 		autocorrect="off"
+		autocapitalize="off"
 		spellcheck="false"
 		class="w-full rounded-xl border border-black/[0.08] bg-cream-50/50 px-4 py-2.5 pr-9 text-[13px] text-black placeholder:text-black/30 focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/25"
 	/>

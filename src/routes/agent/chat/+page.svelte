@@ -723,9 +723,6 @@
 						onkeydown={handleKeydown}
 						placeholder={dictation.active ? 'Start speaking...' : 'Ask a follow-up...'}
 						rows="1"
-						autocomplete="off"
-						autocapitalize="off"
-						spellcheck="false"
 						class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none dark:text-white dark:placeholder:text-white/45"
 					></textarea>
 				</div>
@@ -832,9 +829,6 @@
 									? display
 									: 'What do you want to know about your market?'}
 							rows="3"
-							autocomplete="off"
-							autocapitalize="off"
-							spellcheck="false"
 							class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating
 								? 'placeholder:text-black/70 dark:placeholder:text-white/70'
 								: 'placeholder:text-black/25 dark:placeholder:text-white/25'}"
@@ -1045,6 +1039,7 @@
 										placeholder="Restaurant name..."
 										autocomplete="off"
 										autocorrect="off"
+										autocapitalize="off"
 										spellcheck="false"
 										class="w-full rounded-xl border border-black/[0.08] bg-cream-50/50 px-4 py-2.5 pr-9 text-[13px] text-black placeholder:text-black/30 focus:border-black/25 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/25"
 									/>
