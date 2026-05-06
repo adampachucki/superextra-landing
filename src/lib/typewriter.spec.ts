@@ -22,7 +22,7 @@ describe('createTypewriter', () => {
 		typer.setTarget('abcdefg');
 		expect(updates).toEqual([]);
 
-		vi.advanceTimersByTime(35);
+		vi.advanceTimersByTime(28);
 
 		expect(updates).toEqual(['abcdefg']);
 		expect(onDone).toHaveBeenCalledTimes(1);
@@ -36,8 +36,8 @@ describe('createTypewriter', () => {
 		});
 
 		typer.setTarget('alpha beta gamma delta');
-		vi.advanceTimersByTime(35);
-		vi.advanceTimersByTime(35);
+		vi.advanceTimersByTime(28);
+		vi.advanceTimersByTime(28);
 
 		expect(updates).toEqual(['alpha beta ', 'alpha beta gamma delta']);
 	});
@@ -51,7 +51,7 @@ describe('createTypewriter', () => {
 		typer.setTarget('abcdefg');
 
 		typer.stop();
-		vi.advanceTimersByTime(35);
+		vi.advanceTimersByTime(28);
 
 		expect(updates).toEqual([]);
 	});

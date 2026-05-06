@@ -49,11 +49,9 @@
 </script>
 
 {#if enabled}
-	{#key displayed}
-		<div class="soft-reveal">
-			{@render children(displayed)}
-		</div>
-	{/key}
+	<div class="soft-reveal">
+		{@render children(displayed)}
+	</div>
 {:else}
 	{@render children(text)}
 {/if}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fade, fly } from 'svelte/transition';
+	import { fade, fly, slide } from 'svelte/transition';
 	import { formatDuration } from '$lib/time';
 	import type { TimelineEvent } from '$lib/chat-types';
 
@@ -199,8 +199,11 @@
 </script>
 
 <div class="rounded-2xl border border-black/8 bg-white/40 p-5 dark:border-white/10 dark:bg-white/[0.02]">
-	{#if showSteps && steps.length}
-		<div in:fade={{ duration: 160 }} class="flex flex-col gap-6">
+		{#if showSteps && steps.length}
+			<div
+				transition:slide={{ duration: 180 }}
+				class="flex flex-col gap-6"
+			>
 			{#each steps as step, i (step.id)}
 				<div class="relative pl-9">
 					<div
@@ -269,14 +272,14 @@
 			}}
 			aria-expanded={hasActivity ? expanded : undefined}
 			disabled={!hasActivity}
-			class="{showSteps && steps.length
-				? 'mt-4 border-t border-black/8 pt-3 dark:border-white/10'
-				: ''} flex w-full items-center justify-between gap-3 text-left text-[13px] text-black/55 dark:text-white/55"
+				class="{showSteps && steps.length
+					? 'mt-4 border-t border-black/8 px-2 pt-3 pb-2 dark:border-white/10'
+					: 'p-2'} flex w-full items-center justify-between gap-3 rounded-xl text-left text-[13px] text-black/55 transition-colors enabled:hover:bg-black/[0.03] enabled:hover:text-black/70 dark:text-white/55 dark:enabled:hover:bg-white/[0.04] dark:enabled:hover:text-white/70"
 		>
 			<span class="flex min-w-0 items-center gap-1.5">
 				{#if hasActivity}
 					<svg
-						class="h-3.5 w-3.5 shrink-0 transition-transform {expanded ? 'rotate-90' : ''}"
+							class="h-3.5 w-3.5 shrink-0 transition-transform {expanded ? '-rotate-90' : ''}"
 						viewBox="0 0 16 16"
 						fill="none"
 						stroke="currentColor"

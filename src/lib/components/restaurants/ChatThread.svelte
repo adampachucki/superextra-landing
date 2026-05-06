@@ -228,7 +228,7 @@
 				</div>
 			</div>
 		{/if}
-		<div bind:this={bottomEl} aria-hidden="true"></div>
+		<div bind:this={bottomEl} class="scroll-mb-32 md:scroll-mb-36" aria-hidden="true"></div>
 	</div>
 </div>
 

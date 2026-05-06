@@ -3,7 +3,7 @@ export interface TypewriterController {
 	stop(): void;
 }
 
-const REVEAL_INTERVAL_MS = 35;
+const REVEAL_INTERVAL_MS = 28;
 
 function nextRevealIndex(text: string, index: number, minChars: number): number {
 	const floor = Math.min(text.length, index + minChars);
@@ -50,7 +50,7 @@ export function createTypewriter({
 
 	function tick() {
 		timer = null;
-		index = nextRevealIndex(target, index, Math.max(8, charsPerFrame * 4));
+		index = nextRevealIndex(target, index, Math.max(10, charsPerFrame * 3));
 		onUpdate(target.slice(0, index));
 		if (index < target.length) {
 			schedule();
