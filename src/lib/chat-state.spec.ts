@@ -790,38 +790,22 @@ describe('chatState (Firestore-driven)', () => {
 			expect(chatState.activeSid).toBe(sid);
 		});
 
-		it('rejects an empty message without POSTing', async () => {
+		it('throws synchronously on an empty message and does not POST', () => {
 			const fetchMock = vi.fn();
 			vi.stubGlobal('fetch', fetchMock);
 			captureObservers();
 
-			await expect(chatState.startNewChat('   ', null)).rejects.toThrow(/empty/);
+			expect(() => chatState.startNewChat('   ', null)).toThrow(/empty/);
 			expect(fetchMock).not.toHaveBeenCalled();
 		});
 
-		it('propagates non-2xx responses as an error with the JSON reason', async () => {
-			const fetchMock = vi.fn(
-				async () =>
-					({
-						ok: false,
-						status: 409,
-						json: async () => ({ error: 'previous_turn_in_flight' })
-					}) as unknown as Response
-			);
-			vi.stubGlobal('fetch', fetchMock);
-			captureObservers();
-
-			await expect(chatState.startNewChat('go', null)).rejects.toThrow('previous_turn_in_flight');
-		});
-
-		it('pre-Firestore failure: POST rejects + no doc materialized → rolls back to idle (plan §6)', async () => {
-			// Phase 6 swapped the order: selectSession runs BEFORE postAgentStream
-			// so the chat panel renders immediately during the ~60–90 s gear
-			// dispatch wait. On POST rejection the helper does a single getDoc
-			// check to distinguish pre-Firestore failure (doc never materialized
-			// — local rollback required) from post-Firestore failure (txn ran,
-			// gearHandoff failed, status='error' already on the doc — listener
-			// renders error state, no rollback).
+		it('pre-Firestore failure (non-2xx) → flips loadState to missing and clears active state', async () => {
+			// startNewChat is sync and owns its POST catch. Non-2xx no longer
+			// bubbles a rejection to the caller; instead the catch runs a
+			// single getDoc check. With the test mock's empty `db: {}`, the
+			// dynamic firebase/firestore import throws inside getDoc → treated
+			// as pre-Firestore failure → local rollback to loadState='missing'
+			// so the chat page renders "Couldn't start this chat".
 			const fetchMock = vi.fn(
 				async () =>
 					({
@@ -833,13 +817,11 @@ describe('chatState (Firestore-driven)', () => {
 			vi.stubGlobal('fetch', fetchMock);
 			captureObservers();
 
-			await expect(chatState.startNewChat('hello', null)).rejects.toThrow('upstream_down');
-			// Pre-Firestore failure path: getDoc throws because the mock at the
-			// top of this file doesn't expose `getDoc` — treated as no-doc, so
-			// the catch block runs the local rollback (detachActiveListeners +
-			// clearActiveState + activeSid = null + loadState = 'idle').
-			expect(chatState.activeSid).toBeNull();
-			expect(chatState.loadState).toBe('idle');
+			const sid = chatState.startNewChat('hello', null);
+			expect(sid).toMatch(/^[0-9a-f-]{20,}$/);
+			// Wait for the fire-and-forget catch to complete its rollback.
+			await waitUntil(() => chatState.activeSid === null);
+			expect(chatState.loadState).toBe('missing');
 		});
 
 		// NB: paired tests for the post-Firestore-failure branch (POST 502 +
@@ -869,7 +851,7 @@ describe('chatState (Firestore-driven)', () => {
 			vi.stubGlobal('fetch', fetchMock);
 
 			const obs = captureObservers();
-			const startPromise = chatState.startNewChat('hello', null);
+			chatState.startNewChat('hello', null);
 
 			// Wait for the optimistic selectSession() to attach listeners.
 			await waitUntil(() => !!obs.all.find((c) => c.ref._kind === 'doc'));
@@ -886,9 +868,9 @@ describe('chatState (Firestore-driven)', () => {
 			// optimisticPendingSid guard kept it 'loading'.
 			expect(chatState.loadState).toBe('loading');
 
-			// Resolve the POST so startNewChat returns cleanly.
+			// Resolve the POST so the fire-and-forget chain completes cleanly.
 			resolveFetch!({ ok: true, status: 200, json: async () => ({}) } as unknown as Response);
-			await startPromise;
+			await waitUntil(() => true);
 		});
 	});
 
