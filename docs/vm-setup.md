@@ -33,7 +33,7 @@ Mac (VS Code / Cursor)              iPhone (Moshi)
 | `x K` / `xK`      | Wipe all sessions on the VM (`tmux kill-server`)           |
 | `c l/j/k/K`       | Same surface for codex sessions                            |
 
-Sessions persist across all client disconnects; only `tmux kill-server`, VM reboot, or the inner `claude`/`codex` process exiting destroys them.
+Sessions persist across all client disconnects. A session is destroyed only by `tmux kill-session -t NAME` (or `x k NAME`), the inner `claude`/`codex` process exiting, `tmux kill-server` (or `x K`), or VM reboot.
 
 ---
 
@@ -48,7 +48,7 @@ VS Code/Cursor terminal
 EternalTerminal (auto-reconnect TCP, persistent server-side bash)
   │
   ▼
-bash on VM (sources ~/.bashrc → ~/.zx-env → ~/.secrets)
+bash on VM (sources ~/.bashrc, which loads ~/.secrets and ~/.zx-env)
   │ runs `_x_session NAME claude` from the `x` function
   ▼
 tmux server on VM (creates session if missing, attaches client)
@@ -72,7 +72,7 @@ bash on VM (Moshi picker enumerates tmux sessions)
 Same tmux server / same session as the Mac
 ```
 
-The phone and the Mac connect to **the same tmux server**. Two clients on one session is supported by tmux natively (mirrored views, keystrokes from either client reach the pane).
+The phone and the Mac connect to **the same tmux server**. Two clients on one session is supported by tmux natively (mirrored views, keystrokes from either client reach the pane). With `window-size latest` set in `~/.tmux.conf`, the most-recently-active client's terminal size wins, so switching from Mac to iPhone (or vice versa) triggers a one-time reflow on the other client.
 
 ---
 
@@ -193,7 +193,12 @@ This wipes the entire tmux workspace on the VM. There is no whitelist. This VM's
 
 ### Mac-side aliases
 
-Same names exist in `~/.zshrc` on the Mac. They open an ET shell and invoke the VM-side `x` / `c`. Mac-side `x iap [up|down|status]` manages the IPv6-only fallback (see [IPv6-only network fallback](#ipv6-only-network-fallback) below).
+Same names exist in `~/.zshrc` on the Mac. Behavior by subcommand:
+
+- `x NAME` / `x j NAME` / `x` / `c NAME` etc. — open an ET shell to the VM and invoke the VM-side function, which lands inside the tmux session.
+- `x l` / `c l` — SSH to the VM, run `tmux list-sessions -F '#{session_name}'`, prompt locally for a name, then recurse into `x j NAME`.
+- `x k NAME` / `x K` (and `c k NAME` / `c K`) — SSH to the VM and delegate to the VM-side `x k` / `x K` via `bash -ic`. This shares the VM-side's `command -v zmx` guard so legacy zmx-daemon cleanup still happens transparently for as long as zmx is installed.
+- `x iap [up|down|status]` — Mac-only, manages the IPv6-only fallback (see [IPv6-only network fallback](#ipv6-only-network-fallback) below).
 
 ### Keyboard shortcuts (VS Code / Cursor)
 
@@ -212,7 +217,7 @@ Defined in `~/Library/Application Support/{Code,Cursor}/User/keybindings.json`. 
 
 ### `~/.bashrc` (VM) — `x` / `c` definitions
 
-Lives at lines ~130–186. Self-contained block. Excerpted:
+Lives at lines ~130–185 of a 187-line file. Self-contained block. Excerpted:
 
 ```bash
 [ -r ~/.zx-env ] && . ~/.zx-env
@@ -496,13 +501,13 @@ Session: `superextra-vm-sync`, mode `two-way-safe`. `.git` IS synced. Daemon aut
 | `mutagen sync flush`                    | Force immediate sync           |
 | `mutagen sync reset superextra-vm-sync` | Reset if stuck                 |
 
-Conflict watcher: LaunchAgent at `~/Library/LaunchAgents/com.user.mutagen-conflict-watch.plist`. Shows macOS notification on conflict.
+Mutagen daemon LaunchAgent: `~/Library/LaunchAgents/io.mutagen.mutagen.plist` (auto-started on login).
 
 ---
 
 ## Screenshots
 
-Cmd+Shift+1 on Mac captures screenshot, uploads via SCP to `/home/adam/screenshots/` on VM, copies path to clipboard. Paste into Claude Code to share images. Hotkey lives in `~/.config/skhd/skhdrc`. See `docs/screenshot-to-vm-setup.md`.
+Cmd+Shift+1 on Mac captures a screenshot, uploads via SCP to `/home/adam/screenshots/` on VM, copies the path to clipboard. Paste into Claude Code to share images. Implementation: `~/.local/bin/screenshot-to-vm` (Mac), bound by skhd at `~/.config/skhd/skhdrc`.
 
 ---
 
@@ -622,6 +627,12 @@ The `command -v zmx` guards in `_x_session` and the kill paths will then no-op, 
 ## Decision history
 
 A condensed log of stack changes and rationale, newest first. Read this when you're considering a structural change — chances are it's been tried.
+
+### 2026-05-07 — Mac zshrc: stop enumerating sessions via zmx
+
+- Mac-side `x l` / `x k` (no-arg) / `x K` (and the `c` siblings) were still calling `ssh ... "zmx list --short"` to enumerate sessions. Post-VM-zmx-drop, that returned empty — so list/kill-picker/kill-all silently no-op'd.
+- Replaced with `tmux list-sessions -F '#{session_name}'` for listing and `bash -ic 'x k …' / 'x K'` delegation for kills (delegates to VM-side, which already has the proper `command -v zmx` guard).
+- Extracted the picker logic into `_x_pick_remote` shared by `x` and `c`. Net `~/.zshrc` LOC: 304 → 283.
 
 ### 2026-05-07 — Drop zmx; unify `x` and `c` over a shared helper
 
