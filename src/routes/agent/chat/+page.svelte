@@ -35,6 +35,11 @@
 	let isMobile = $state(false);
 	let mounted = $state(false);
 	let sidebarContentVisible = $derived(sidebarOpen && mounted);
+	let activePromptPosting = $state(false);
+	let activePromptPostMessageCount = $state(0);
+	let activePromptInactive = $derived(
+		chatState.active && (chatState.loading || activePromptPosting)
+	);
 
 	$effect(() => {
 		if (!mounted) return;
@@ -91,6 +96,17 @@
 			cancelled = true;
 			clearTimeout(timeout);
 		};
+	});
+
+	$effect(() => {
+		if (!activePromptPosting) return;
+		if (
+			!chatState.active ||
+			chatState.loading ||
+			chatState.messages.length > activePromptPostMessageCount
+		) {
+			activePromptPosting = false;
+		}
 	});
 
 	$effect(() => {
@@ -183,14 +199,18 @@
 
 	async function handleSend() {
 		const trimmed = query.trim();
-		if (!trimmed || chatState.loading) return;
+		if (!trimmed || activePromptInactive) return;
 		sendError = null;
+		if (dictation.active) dictation.stop();
 		if (chatState.active) {
+			activePromptPostMessageCount = chatState.messages.length;
+			activePromptPosting = true;
 			query = '';
 			resizeTextarea();
 			try {
 				await chatState.sendFollowUp(trimmed);
 			} catch (err) {
+				activePromptPosting = false;
 				query = trimmed;
 				resizeTextarea();
 				sendError =
@@ -221,6 +241,7 @@
 	let dictationBase = '';
 
 	function handleDictation() {
+		if (activePromptInactive) return;
 		if (dictation.active) {
 			dictation.stop();
 			return;
@@ -235,6 +256,10 @@
 			const space = dictationBase && t && !dictationBase.endsWith(' ') ? ' ' : '';
 			query = dictationBase + space + t;
 		}
+	});
+
+	$effect(() => {
+		if (activePromptInactive && dictation.active) dictation.stop();
 	});
 
 	function resizeTextarea() {
@@ -696,27 +721,42 @@
 		{/if}
 		{#if chatState.active}
 			<div
-				onclick={() => inputEl?.focus()}
-				class="prompt-card cursor-text rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]"
+				onclick={() => {
+					if (!activePromptInactive) inputEl?.focus();
+				}}
+				aria-disabled={activePromptInactive}
+				class="prompt-card rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55] {activePromptInactive
+					? 'cursor-not-allowed'
+					: 'cursor-text'}"
 			>
 				<div class="px-5 pt-4">
 					<textarea
 						bind:this={inputEl}
 						bind:value={query}
 						onkeydown={handleKeydown}
-						placeholder={dictation.active ? 'Start speaking...' : 'Ask a follow-up...'}
+						disabled={activePromptInactive}
+						placeholder={activePromptInactive
+							? 'Awaiting final response...'
+							: dictation.active
+								? 'Start speaking...'
+								: 'Ask a follow-up...'}
 						rows="1"
-						class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none dark:text-white dark:placeholder:text-white/45"
+						class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none disabled:cursor-not-allowed disabled:text-black/35 disabled:placeholder:text-black/35 dark:text-white dark:placeholder:text-white/45 dark:disabled:text-white/35 dark:disabled:placeholder:text-white/35"
 					></textarea>
 				</div>
 				<div class="flex items-center justify-end gap-1 px-4 pb-4">
 					{#if dictation.supported}
 						<button
 							onclick={handleDictation}
-							aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
+							disabled={activePromptInactive}
+							aria-label={activePromptInactive
+								? 'Voice input disabled while response is pending'
+								: dictation.active
+									? 'Stop dictation'
+									: 'Voice input'}
 							class="relative flex h-8 w-8 items-center justify-center rounded-full transition-colors {dictation.active
 								? 'text-red-500'
-								: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
+								: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'} disabled:opacity-20"
 						>
 							{#if dictation.active}
 								<span
@@ -774,7 +814,7 @@
 					{/if}
 					<button
 						onclick={handleSend}
-						disabled={!query.trim() || chatState.loading}
+						disabled={!query.trim() || activePromptInactive}
 						aria-label="Send"
 						class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
 					>
