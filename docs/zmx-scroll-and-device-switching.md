@@ -1,5 +1,7 @@
 # zmx scroll and device-switching — known issues
 
+> **2026-05-07 — zmx dropped from new sessions.** The VM `~/.bashrc` `x` function now creates plain tmux sessions running `claude` directly. The analysis below applies to legacy zmx-wrapped sessions only. Once those drain, this whole document becomes archival. See "Stack architecture review (2026-05-06)" for rationale; see `~/.bashrc.bak-pre-zmx-drop-2026-05-07` for the prior implementation.
+
 Context captured after an intensive debugging session on 2026-04-17. Read this before touching the scroll / resize / multi-device path again. The short version: most of what looks fixable at the zmx layer isn't, because Claude Code's Ink renderer stores conversation messages in `<Static>` that cannot be re-emitted. Any scrollback wipe permanently destroys session history.
 
 ## Stack architecture review (2026-05-06)
