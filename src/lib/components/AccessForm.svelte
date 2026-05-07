@@ -319,7 +319,7 @@
 			{#each businessTypes as type}
 				<button
 					onclick={() => (selectedType = selectedType === type ? '' : type)}
-					class="cursor-pointer rounded-xl border px-3 py-3 text-sm transition-all duration-200
+					class="rounded-xl border px-3 py-3 text-sm transition-all duration-200
 					{selectedType === type
 						? 'border-black bg-black text-white dark:border-white dark:bg-white dark:text-black'
 						: 'border-cream-200 bg-white text-black/60 hover:border-cream-300 hover:text-black dark:bg-cream-50 dark:text-white/60 dark:hover:text-white'}"

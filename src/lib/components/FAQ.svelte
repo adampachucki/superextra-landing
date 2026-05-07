@@ -65,7 +65,7 @@
 				{#each faqs as faq, i}
 					<div>
 						<button
-							class="group flex w-full cursor-pointer items-center justify-between py-5 text-left"
+							class="group flex w-full items-center justify-between py-5 text-left"
 							aria-expanded={openIndex === i}
 							aria-controls="faq-answer-{i}"
 							onclick={() => (openIndex = openIndex === i ? -1 : i)}

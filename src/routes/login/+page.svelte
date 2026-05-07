@@ -124,7 +124,7 @@
 						<button
 							type="submit"
 							disabled={sending || !email.trim()}
-							class="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:cursor-default disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
+							class="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
 						>
 							{#if sending}
 								<svg
@@ -209,7 +209,7 @@
 			>
 			<button
 				onclick={() => theme.cycle()}
-				class="cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+				class="text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
 				aria-label="Toggle theme"
 			>
 				{#if theme.mode === 'dark'}

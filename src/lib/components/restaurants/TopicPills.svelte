@@ -214,7 +214,7 @@
 			>
 				<button
 					onclick={() => onPick(topic.query)}
-					class="topic-pill inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] whitespace-nowrap text-black/55 transition-all duration-200 hover:border-black/[0.30] hover:text-black/75 active:border-black/[0.30] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75 dark:active:border-white/[0.30] dark:active:text-white/75"
+					class="topic-pill inline-flex items-center gap-2 rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] whitespace-nowrap text-black/55 transition-all duration-200 hover:border-black/[0.30] hover:text-black/75 active:border-black/[0.30] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75 dark:active:border-white/[0.30] dark:active:text-white/75"
 				>
 					<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"
 					></span>
@@ -229,7 +229,7 @@
 			<button
 				onclick={reshuffle}
 				aria-label="Show different suggestions"
-				class="shuffle-btn group inline-flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full border border-black/[0.12] dark:border-white/[0.12]"
+				class="shuffle-btn group inline-flex h-[34px] w-[34px] items-center justify-center rounded-full border border-black/[0.12] dark:border-white/[0.12]"
 			>
 				<svg
 					class="h-3.5 w-3.5 text-black opacity-30 transition-opacity duration-200 group-hover:opacity-55 dark:text-white"

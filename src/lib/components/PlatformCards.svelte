@@ -99,7 +99,7 @@
 		</div>
 
 		<div class="mt-10 flex justify-center">
-			<button onclick={() => (expanded = !expanded)} class="cursor-pointer btn-ghost px-6 py-2.5">
+			<button onclick={() => (expanded = !expanded)} class="btn-ghost px-6 py-2.5">
 				{expanded ? 'Show less' : 'Show more'}
 			</button>
 		</div>

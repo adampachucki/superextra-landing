@@ -255,7 +255,7 @@
 							<button
 								onclick={toggleContext}
 								aria-label="Add place"
-								class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {contextOpen ||
+								class="flex h-8 w-8 items-center justify-center rounded-full transition-colors {contextOpen ||
 								selectedPlace
 									? 'text-black/60 dark:text-white/60'
 									: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
@@ -284,7 +284,7 @@
 							<button
 								disabled
 								aria-label="Map view"
-								class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15"
+								class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 							>
 								<svg
 									class="h-[18px] w-[18px]"
@@ -315,7 +315,7 @@
 									<button
 										onclick={removePlace}
 										aria-label="Remove place"
-										class="flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
+										class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
 									>
 										<svg
 											class="h-3 w-3 text-black/30 dark:text-white/30"
@@ -342,7 +342,7 @@
 								<button
 									onclick={handleDictation}
 									aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
-									class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active
+									class="relative flex h-8 w-8 items-center justify-center rounded-full transition-colors {dictation.active
 										? 'text-red-500'
 										: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
 								>
@@ -377,7 +377,7 @@
 								<button
 									disabled
 									aria-label="Voice input not supported"
-									class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15"
+									class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 								>
 									<svg
 										class="h-[18px] w-[18px]"
@@ -404,7 +404,7 @@
 							<button
 								onclick={handleExplore}
 								aria-label="Explore"
-								class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
+								class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
 							>
 								<svg
 									class="h-4 w-4 text-white dark:text-black"

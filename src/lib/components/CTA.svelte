@@ -10,10 +10,9 @@
 			Early access is now open. Limited spots available.
 		</p>
 		<div class="flex items-center gap-3">
-			<a href="/login" class="cursor-pointer btn-ghost px-6 py-2.5">Log In</a>
-			<button
-				onclick={() => formState.open()}
-				class="cursor-pointer btn-primary px-6 py-2.5 text-sm">Contact Us</button
+			<a href="/login" class="btn-ghost px-6 py-2.5">Log In</a>
+			<button onclick={() => formState.open()} class="btn-primary px-6 py-2.5 text-sm"
+				>Contact Us</button
 			>
 		</div>
 	</div>

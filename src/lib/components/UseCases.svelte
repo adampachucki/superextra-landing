@@ -139,7 +139,7 @@
 	<button
 		onclick={prev}
 		disabled={activeIndex === 0}
-		class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-cream-200 transition-colors hover:bg-cream-50 disabled:cursor-default disabled:opacity-30"
+		class="flex h-10 w-10 items-center justify-center rounded-full border border-cream-200 transition-colors hover:bg-cream-50 disabled:opacity-30"
 		aria-label="Previous"
 	>
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -149,7 +149,7 @@
 	<button
 		onclick={next}
 		disabled={activeIndex === useCases.length - 1}
-		class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-cream-200 transition-colors hover:bg-cream-50 disabled:cursor-default disabled:opacity-30"
+		class="flex h-10 w-10 items-center justify-center rounded-full border border-cream-200 transition-colors hover:bg-cream-50 disabled:opacity-30"
 		aria-label="Next"
 	>
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

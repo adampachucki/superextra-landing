@@ -86,7 +86,7 @@
 						<span class="h-4 w-px bg-black/10 dark:bg-white/10"></span>
 						<button
 							onclick={() => theme.cycle()}
-							class="cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+							class="text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
 							aria-label="Toggle theme"
 						>
 							{#if theme.mode === 'dark'}

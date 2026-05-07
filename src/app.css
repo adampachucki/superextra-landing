@@ -83,6 +83,23 @@
 		-moz-osx-font-smoothing: grayscale;
 	}
 
+	a[href]:not([aria-disabled='true']),
+	button:not(:disabled):not([aria-disabled='true']),
+	[type='button']:not(:disabled):not([aria-disabled='true']),
+	[type='submit']:not(:disabled):not([aria-disabled='true']),
+	[type='reset']:not(:disabled):not([aria-disabled='true']),
+	[role='button']:not([aria-disabled='true']) {
+		cursor: pointer;
+	}
+
+	button:disabled,
+	[type='button']:disabled,
+	[type='submit']:disabled,
+	[type='reset']:disabled,
+	[aria-disabled='true'] {
+		cursor: not-allowed;
+	}
+
 	::selection {
 		background-color: var(--color-text);
 		color: var(--color-cream);

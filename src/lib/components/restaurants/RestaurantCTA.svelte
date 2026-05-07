@@ -19,7 +19,7 @@
 		<button
 			onclick={scrollToPrompt}
 			aria-label="Scroll to prompt"
-			class="mt-8 inline-flex cursor-pointer items-center justify-center rounded-full bg-black p-4 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
+			class="mt-8 inline-flex items-center justify-center rounded-full bg-black p-4 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
 		>
 			<svg
 				class="h-5 w-5 text-white dark:text-black"

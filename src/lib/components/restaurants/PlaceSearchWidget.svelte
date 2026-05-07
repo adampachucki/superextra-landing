@@ -99,7 +99,7 @@
 				<li>
 					<button
 						type="button"
-						class="w-full cursor-pointer px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-cream-50 dark:hover:bg-white/[0.04] {i ===
+						class="w-full px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-cream-50 dark:hover:bg-white/[0.04] {i ===
 						highlight
 							? 'bg-cream-50 dark:bg-white/[0.04]'
 							: ''}"

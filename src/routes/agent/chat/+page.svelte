@@ -335,7 +335,7 @@
 	onclick={toggleSidebar}
 	onanimationend={() => (toggleBtnAnim = 'idle')}
 	aria-label="Open sidebar"
-	class="toggle-float fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80
+	class="toggle-float fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80
 	{sidebarOpen ? 'pointer-events-none' : ''}
 	{toggleBtnAnim === 'fade-out'
 		? 'toggle-out'
@@ -387,7 +387,7 @@
 		<button
 			onclick={toggleSidebar}
 			aria-label="Close sidebar"
-			class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-black/40 transition-all duration-200 hover:bg-black/[0.06] hover:text-black/60 dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-white/60"
+			class="flex h-9 w-9 items-center justify-center rounded-full text-black/40 transition-all duration-200 hover:bg-black/[0.06] hover:text-black/60 dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-white/60"
 		>
 			<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
 				<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
@@ -403,7 +403,7 @@
 				handleNewChat();
 				if (!isDesktop) sidebarOpen = false;
 			}}
-			class="sb-item mb-6 flex w-full cursor-pointer items-center gap-2 rounded-lg bg-cream-100 px-2 py-1.5 text-[13px] text-black/70 transition-colors hover:bg-cream-200 hover:text-black dark:bg-cream-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
+			class="sb-item mb-6 flex w-full items-center gap-2 rounded-lg bg-cream-100 px-2 py-1.5 text-[13px] text-black/70 transition-colors hover:bg-cream-200 hover:text-black dark:bg-cream-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
 			style="--sb-delay: 0.25s"
 			class:visible={sidebarContentVisible}
 		>
@@ -451,7 +451,7 @@
 								chatState.selectSession(sess.sid);
 								if (!isDesktop) sidebarOpen = false;
 							}}
-							class="w-full cursor-pointer rounded-lg px-2 py-2 pr-8 text-left transition-colors {sess.sid ===
+							class="w-full rounded-lg px-2 py-2 pr-8 text-left transition-colors {sess.sid ===
 							chatState.activeSid
 								? 'bg-cream-100 dark:bg-cream-100'
 								: confirmDeleteId === sess.sid
@@ -507,7 +507,7 @@
 													void performDelete(sess.sid);
 												}
 											}}
-											class="cursor-pointer text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+											class="text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
 											>Delete</span
 										>
 										<span class="text-black/20 dark:text-white/20">&middot;</span>
@@ -527,7 +527,7 @@
 													deleteError = null;
 												}
 											}}
-											class="cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+											class="text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
 											>Cancel</span
 										>
 									{/if}
@@ -549,7 +549,7 @@
 								deleteError = null;
 							}}
 								aria-label="Delete conversation"
-								class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] dark:hover:bg-white/[0.06] {confirmDeleteId ===
+								class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] dark:hover:bg-white/[0.06] {confirmDeleteId ===
 								sess.sid
 									? 'hidden'
 									: sess.sid === chatState.activeSid
@@ -593,7 +593,7 @@
 			>
 			<button
 				onclick={() => theme.cycle()}
-				class="ml-auto cursor-pointer text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+				class="ml-auto text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
 				aria-label="Toggle theme"
 			>
 				{#if theme.mode === 'dark'}
@@ -714,7 +714,7 @@
 						<button
 							onclick={handleDictation}
 							aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
-							class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active
+							class="relative flex h-8 w-8 items-center justify-center rounded-full transition-colors {dictation.active
 								? 'text-red-500'
 								: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
 						>
@@ -749,7 +749,7 @@
 						<button
 							disabled
 							aria-label="Voice input not supported"
-							class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15"
+							class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 						>
 							<svg
 								class="h-[18px] w-[18px]"
@@ -776,7 +776,7 @@
 						onclick={handleSend}
 						disabled={!query.trim() || chatState.loading}
 						aria-label="Send"
-						class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
+						class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
 					>
 						<svg
 							class="h-4 w-4 text-white dark:text-black"
@@ -824,7 +824,7 @@
 							<button
 								onclick={toggleContext}
 								aria-label="Add place"
-								class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {contextOpen ||
+								class="flex h-8 w-8 items-center justify-center rounded-full transition-colors {contextOpen ||
 								selectedPlace
 									? 'text-black/60 dark:text-white/60'
 									: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
@@ -852,7 +852,7 @@
 							<button
 								disabled
 								aria-label="Map view"
-								class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15"
+								class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 							>
 								<svg
 									class="h-[18px] w-[18px]"
@@ -882,7 +882,7 @@
 									<button
 										onclick={removePlace}
 										aria-label="Remove place"
-										class="flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
+										class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
 									>
 										<svg
 											class="h-3 w-3 text-black/30 dark:text-white/30"
@@ -909,7 +909,7 @@
 								<button
 									onclick={handleDictation}
 									aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
-									class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors {dictation.active
+									class="relative flex h-8 w-8 items-center justify-center rounded-full transition-colors {dictation.active
 										? 'text-red-500'
 										: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
 								>
@@ -944,7 +944,7 @@
 								<button
 									disabled
 									aria-label="Voice input not supported"
-									class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-black/15 dark:text-white/15"
+									class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 								>
 									<svg
 										class="h-[18px] w-[18px]"
@@ -970,7 +970,7 @@
 							<button
 								onclick={handleSend}
 								aria-label="Explore"
-								class="shrink-0 cursor-pointer rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
+								class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
 							>
 								<svg
 									class="h-4 w-4 text-white dark:text-black"
