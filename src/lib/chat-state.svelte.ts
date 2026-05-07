@@ -99,9 +99,7 @@ export interface Turn {
 	error: string | null;
 }
 
-export type LoadState = 'idle' | 'loading' | 'loaded' | 'missing' | 'loadTimedOut';
-
-const LOAD_TIMEOUT_MS = 10_000;
+export type LoadState = 'idle' | 'loading' | 'loaded' | 'missing';
 
 /** Events listener attaches only while latest turn is in these statuses. */
 const IN_FLIGHT_STATUSES = new Set(['queued', 'running', 'pending']);
@@ -144,6 +142,8 @@ let placeContextState = $state<PlaceContext | null>(null);
 // still in flight. Cleared on POST success (listener takes over) or on
 // pre-Firestore-failure local rollback.
 let optimisticPendingSid: string | null = null;
+let optimisticTurnSid: string | null = null;
+let optimisticTurnStartedAtMs: number | null = null;
 
 // Listener unsubscribes — kept outside $state because they're opaque cleanup
 // handles, not reactive values.
@@ -151,8 +151,8 @@ let sessionsListUnsubscribe: Unsubscribe | null = null;
 let activeSessionUnsubscribe: Unsubscribe | null = null;
 let activeTurnsUnsubscribe: Unsubscribe | null = null;
 let activeEventsUnsubscribe: Unsubscribe | null = null;
-let loadTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
 let currentEventsRunId: string | null = null;
+let currentEventsCompletedTurnIndex: number | null = null;
 
 // Events dedup — reconnects replay the same doc; key on (runId, attempt,
 // seqInAttempt) to avoid duplicating timeline rows across resubscribes.
@@ -260,16 +260,13 @@ function detachActiveListeners() {
 	activeTurnsUnsubscribe?.();
 	activeTurnsUnsubscribe = null;
 	detachActiveEventsListener();
-	if (loadTimeoutHandle) {
-		clearTimeout(loadTimeoutHandle);
-		loadTimeoutHandle = null;
-	}
 }
 
 function detachActiveEventsListener() {
 	activeEventsUnsubscribe?.();
 	activeEventsUnsubscribe = null;
 	currentEventsRunId = null;
+	currentEventsCompletedTurnIndex = null;
 }
 
 function clearActiveState() {
@@ -279,10 +276,35 @@ function clearActiveState() {
 	liveTimeline = [];
 	loadState = 'idle';
 	placeContextState = null;
+	optimisticTurnSid = null;
+	optimisticTurnStartedAtMs = null;
 	renderedEventKeys.clear();
 	previousTurnStatus.clear();
 	replyTypewriterTurns.clear();
 	completedActivityByTurn.clear();
+}
+
+function installOptimisticTurn(sid: string, userMessage: string) {
+	const nowMs = Date.now();
+	optimisticTurnStartedAtMs = nowMs;
+	turns = [
+		{
+			turnIndex: 1,
+			runId: '',
+			userMessage,
+			status: 'pending',
+			reply: null,
+			sources: null,
+			turnSummary: null,
+			createdAtMs: nowMs,
+			completedAtMs: null,
+			error: null
+		}
+	];
+	optimisticTurnSid = sid;
+	previousTurnStatus.set(1, 'pending');
+	if (activeSid !== sid) return;
+	loadState = 'loading';
 }
 
 async function attachActiveListeners(sid: string) {
@@ -299,15 +321,9 @@ async function attachActiveListeners(sid: string) {
 	const sessionRef = doc(db, 'sessions', sid);
 	const turnsQuery = query(collection(db, 'sessions', sid, 'turns'), orderBy('turnIndex'));
 
-	// Load state: arm the 10 s cache-only timeout. Server-confirmed snapshots
-	// clear it; cache-only snapshots do not.
+	// Load state is resolved only by server-confirmed presence/absence.
+	// Cache-only "missing" snapshots are not authoritative for fresh sids.
 	loadState = 'loading';
-	if (loadTimeoutHandle) clearTimeout(loadTimeoutHandle);
-	loadTimeoutHandle = setTimeout(() => {
-		if (activeSid === sid && loadState === 'loading') {
-			loadState = 'loadTimedOut';
-		}
-	}, LOAD_TIMEOUT_MS);
 
 	activeSessionUnsubscribe = onSnapshot(
 		sessionRef,
@@ -319,10 +335,6 @@ async function attachActiveListeners(sid: string) {
 			// fromCache-aware initial load state (plan §7). A cache-only
 			// first snapshot with exists=false is NOT authoritative.
 			if (!fromCache) {
-				if (loadTimeoutHandle) {
-					clearTimeout(loadTimeoutHandle);
-					loadTimeoutHandle = null;
-				}
 				if (exists) {
 					loadState = 'loaded';
 					// Doc materialized — clear pending guard if it was for this sid.
@@ -412,7 +424,20 @@ async function attachActiveListeners(sid: string) {
 				}
 				previousTurnStatus.set(turnIndex, status);
 			});
-			turns = next;
+			// A cold first send can receive an empty cache/server turn snapshot
+			// before agentStream's transaction-created turn is observed. Keep the
+			// local user bubble/timer visible during that gap; replace it as soon
+			// as any real turn doc arrives.
+			if (next.length > 0 && optimisticTurnSid === sid) {
+				const stillInFlight = next.some((turn) => IN_FLIGHT_STATUSES.has(turn.status));
+				if (!stillInFlight) {
+					optimisticTurnSid = null;
+					optimisticTurnStartedAtMs = null;
+				}
+			}
+			if (next.length > 0 || optimisticTurnSid !== sid || turns.length === 0) {
+				turns = next;
+			}
 			maybeAttachEventsListener();
 		},
 		(err) => {
@@ -448,8 +473,17 @@ function maybeAttachEventsListener() {
 	}
 	const inFlight = IN_FLIGHT_STATUSES.has(latest.status);
 	if (!inFlight) {
-		detachActiveEventsListener();
 		liveTimeline = [];
+		if (
+			latest.status === 'complete' &&
+			latest.turnSummary &&
+			latest.runId &&
+			!completedActivityByTurn.has(latest.turnIndex)
+		) {
+			void ensureEventsListener(sid, latest.runId, latest.turnIndex);
+		} else {
+			detachActiveEventsListener();
+		}
 		return;
 	}
 	const runId = latest.runId || session?.currentRunId || null;
@@ -457,11 +491,22 @@ function maybeAttachEventsListener() {
 	void ensureEventsListener(sid, runId);
 }
 
-async function ensureEventsListener(sid: string, runId: string) {
-	if (activeEventsUnsubscribe && currentEventsRunId === runId) return;
+async function ensureEventsListener(
+	sid: string,
+	runId: string,
+	completedTurnIndex: number | null = null
+) {
+	if (
+		activeEventsUnsubscribe &&
+		currentEventsRunId === runId &&
+		currentEventsCompletedTurnIndex === completedTurnIndex
+	) {
+		return;
+	}
 	// Different runId — detach the old listener first.
 	detachActiveEventsListener();
 	currentEventsRunId = runId;
+	currentEventsCompletedTurnIndex = completedTurnIndex;
 	// Reset the per-run dedup set; different runs legitimately share keys.
 	renderedEventKeys.clear();
 	liveTimeline = [];
@@ -471,7 +516,13 @@ async function ensureEventsListener(sid: string, runId: string) {
 		const firestoreMod = await import('firebase/firestore');
 		const { collection, onSnapshot, orderBy, query, where } = firestoreMod;
 		// Bail if the active sid/runId moved while we awaited imports.
-		if (activeSid !== sid || currentEventsRunId !== runId) return;
+		if (
+			activeSid !== sid ||
+			currentEventsRunId !== runId ||
+			currentEventsCompletedTurnIndex !== completedTurnIndex
+		) {
+			return;
+		}
 		const q = query(
 			collection(db, 'sessions', sid, 'events'),
 			where('runId', '==', runId),
@@ -482,6 +533,7 @@ async function ensureEventsListener(sid: string, runId: string) {
 			q,
 			(snap) => {
 				if (activeSid !== sid || currentEventsRunId !== runId) return;
+				const added: TimelineEvent[] = [];
 				for (const change of snap.docChanges()) {
 					if (change.type !== 'added') continue;
 					const data = change.doc.data() as {
@@ -499,7 +551,15 @@ async function ensureEventsListener(sid: string, runId: string) {
 					// design — the turn doc is the sole terminal source.
 					if (data.type !== 'timeline') continue;
 					const payload = (data.data ?? {}) as TimelineEvent;
-					liveTimeline = [...liveTimeline, payload];
+					added.push(payload);
+				}
+				if (!added.length) return;
+				if (completedTurnIndex !== null) {
+					const existing = completedActivityByTurn.get(completedTurnIndex) ?? [];
+					completedActivityByTurn.set(completedTurnIndex, [...existing, ...added]);
+					turns = [...turns];
+				} else {
+					liveTimeline = [...liveTimeline, ...added];
 				}
 			},
 			(err) => {
@@ -553,6 +613,7 @@ function startNewChat(query: string, place: PlaceContext | null): string {
 	optimisticPendingSid = sid;
 	selectSession(sid);
 	placeContextState = place;
+	installOptimisticTurn(sid, trimmed);
 
 	void postAgentStream({
 		sessionId: sid,
@@ -664,15 +725,13 @@ export const chatState = {
 		return turns;
 	},
 	get loading(): boolean {
-		if (optimisticPendingSid && optimisticPendingSid === activeSid) return true;
 		const latest = turns[turns.length - 1];
-		if (!latest) {
-			// No turn doc yet, but agentStream was invoked — session status
-			// signals the in-flight window before the turn doc lands.
-			const status = activeSession?.status;
-			return !!status && IN_FLIGHT_STATUSES.has(status);
-		}
-		return IN_FLIGHT_STATUSES.has(latest.status);
+		if (latest) return IN_FLIGHT_STATUSES.has(latest.status);
+		if (optimisticPendingSid && optimisticPendingSid === activeSid) return true;
+		// No turn doc yet, but agentStream was invoked — session status
+		// signals the in-flight window before the turn doc lands.
+		const status = activeSession?.status;
+		return !!status && IN_FLIGHT_STATUSES.has(status);
 	},
 	get error(): string {
 		const latest = turns[turns.length - 1];
@@ -703,6 +762,13 @@ export const chatState = {
 		const latest = turns[turns.length - 1];
 		if (!latest) return null;
 		if (!IN_FLIGHT_STATUSES.has(latest.status)) return null;
+		if (
+			optimisticTurnSid === activeSid &&
+			optimisticTurnStartedAtMs !== null &&
+			latest.turnIndex === 1
+		) {
+			return Math.min(latest.createdAtMs ?? optimisticTurnStartedAtMs, optimisticTurnStartedAtMs);
+		}
 		return latest.createdAtMs ?? null;
 	},
 	get liveTimeline(): TimelineEvent[] {

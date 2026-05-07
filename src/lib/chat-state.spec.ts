@@ -360,41 +360,6 @@ describe('chatState (Firestore-driven)', () => {
 				obs.session('sid-1')!.onNext(sessionSnap(null, { fromCache: false }));
 				expect(chatState.loadState).toBe('missing');
 			});
-
-			it('flips to "loadTimedOut" after 10s of only cache-only snapshots', async () => {
-				vi.useFakeTimers();
-				const obs = captureObservers();
-				chatState.selectSession('sid-1');
-				// Resolve the attach-time Promise chain under fake timers.
-				await vi.advanceTimersByTimeAsync(0);
-				expect(obs.session('sid-1')).toBeTruthy();
-
-				obs.session('sid-1')!.onNext(sessionSnap(null, { fromCache: true }));
-				expect(chatState.loadState).toBe('loading');
-
-				await vi.advanceTimersByTimeAsync(10_001);
-				expect(chatState.loadState).toBe('loadTimedOut');
-			});
-
-			it('does NOT flip to loadTimedOut once a server snap has arrived', async () => {
-				vi.useFakeTimers();
-				const obs = captureObservers();
-				chatState.selectSession('sid-1');
-				await vi.advanceTimersByTimeAsync(0);
-
-				obs
-					.session('sid-1')!
-					.onNext(
-						sessionSnap(
-							{ userId: 'uid-test', participants: ['uid-test'], lastTurnIndex: 0 },
-							{ fromCache: false }
-						)
-					);
-				expect(chatState.loadState).toBe('loaded');
-
-				await vi.advanceTimersByTimeAsync(10_001);
-				expect(chatState.loadState).toBe('loaded');
-			});
 		});
 	});
 
@@ -707,6 +672,55 @@ describe('chatState (Firestore-driven)', () => {
 			expect(chatState.liveTimeline).toEqual([]);
 		});
 
+		it('hydrates completed activity events for a completed turn opened from history', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.turns('sid-1'));
+
+			obs.session('sid-1')!.onNext(
+				sessionSnap({
+					userId: 'uid-test',
+					participants: ['uid-test'],
+					status: 'complete',
+					currentRunId: 'run-1',
+					lastTurnIndex: 1
+				})
+			);
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'q',
+							status: 'complete',
+							reply: 'a',
+							turnSummary: { startedAtMs: 1000, finishedAtMs: 2000, elapsedMs: 1000 },
+							createdAt: { toMillis: () => 1000 },
+							completedAt: { toMillis: () => 2000 }
+						}
+					}
+				])
+			);
+
+			await waitUntil(() => !!obs.events('sid-1'));
+			obs.events('sid-1')!.onNext(
+				eventsSnap([
+					eventChange('added', {
+						attempt: 1,
+						seqInAttempt: 1,
+						type: 'timeline',
+						data: { kind: 'note', id: 'n1', text: 'Reading sources' }
+					})
+				])
+			);
+
+			expect(chatState.messages[1].activityEvents).toEqual([
+				{ kind: 'note', id: 'n1', text: 'Reading sources' }
+			]);
+			expect(chatState.liveTimeline).toEqual([]);
+		});
+
 		it('detaches when the TURN doc status flips to terminal (not the session)', async () => {
 			const obs = captureObservers();
 			chatState.selectSession('sid-1');
@@ -767,6 +781,13 @@ describe('chatState (Firestore-driven)', () => {
 				secondary: '',
 				placeId: 'p1'
 			});
+			expect(chatState.messages).toHaveLength(1);
+			expect(chatState.messages[0]).toMatchObject({
+				role: 'user',
+				text: 'hello',
+				turnIndex: 1
+			});
+			expect(chatState.currentTurnStartedAtMs).toEqual(expect.any(Number));
 			// Wait for the fire-and-forget listener attach inside selectSession()
 			// to finish awaiting anon-auth / getFirebase / dynamic import.
 			await waitUntil(() => !!obs.session(sid));
@@ -788,6 +809,79 @@ describe('chatState (Firestore-driven)', () => {
 			expect(obs.session(sid)).toBeTruthy();
 			expect(obs.turns(sid)).toBeTruthy();
 			expect(chatState.activeSid).toBe(sid);
+		});
+
+		it('keeps the optimistic user message through an empty pre-turn snapshot', async () => {
+			const fetchMock = vi.fn(
+				async () =>
+					({
+						ok: true,
+						status: 200,
+						json: async () => ({})
+					}) as unknown as Response
+			);
+			vi.stubGlobal('fetch', fetchMock);
+
+			const obs = captureObservers();
+			const sid = chatState.startNewChat('hello', null);
+			await waitUntil(() => !!obs.turns(sid));
+
+			obs.turns(sid)!.onNext(turnsSnap([]));
+			expect(chatState.messages).toHaveLength(1);
+			expect(chatState.messages[0]).toMatchObject({ role: 'user', text: 'hello' });
+			const localStartedAt = chatState.currentTurnStartedAtMs;
+			expect(localStartedAt).toEqual(expect.any(Number));
+			const serverStartedAt = localStartedAt! + 1500;
+
+			obs.turns(sid)!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'hello',
+							status: 'running',
+							reply: null,
+							createdAt: { toMillis: () => serverStartedAt }
+						}
+					}
+				])
+			);
+			expect(chatState.messages[0]).toMatchObject({
+				role: 'user',
+				text: 'hello',
+				timestamp: serverStartedAt
+			});
+			expect(chatState.currentTurnStartedAtMs).toBe(localStartedAt);
+		});
+
+		it('does not stay loading once a terminal turn snapshot arrives before POST cleanup', async () => {
+			const fetchMock = vi.fn(async () => new Promise<Response>(() => {}));
+			vi.stubGlobal('fetch', fetchMock);
+
+			const obs = captureObservers();
+			const sid = chatState.startNewChat('hello', null);
+			await waitUntil(() => !!obs.turns(sid));
+			expect(chatState.loading).toBe(true);
+
+			obs.turns(sid)!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'hello',
+							status: 'complete',
+							reply: 'done',
+							createdAt: { toMillis: () => 1000 },
+							completedAt: { toMillis: () => 2000 }
+						}
+					}
+				])
+			);
+
+			expect(chatState.messages).toHaveLength(2);
+			expect(chatState.loading).toBe(false);
 		});
 
 		it('throws synchronously on an empty message and does not POST', () => {

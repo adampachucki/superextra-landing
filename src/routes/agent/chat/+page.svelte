@@ -651,7 +651,7 @@
 			? 'pl-64'
 			: ''}"
 	>
-		{#if chatState.loadState === 'missing' || chatState.loadState === 'loadTimedOut'}
+		{#if chatState.loadState === 'missing'}
 			<div
 				class="chat-thread-enter flex min-h-dvh items-center justify-center {mounted
 					? 'is-mounted'
