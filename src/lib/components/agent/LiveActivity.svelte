@@ -197,36 +197,66 @@
 	}
 </script>
 
-<div class="rounded-2xl border border-black/8 bg-white/40 p-5 dark:border-white/10 dark:bg-white/[0.02]">
-		{#if showSteps && steps.length}
-			<div
-				transition:slide={{ duration: 180 }}
-				class="flex flex-col gap-6"
+{#snippet activityToggle(extraClass: string)}
+	<button
+		type="button"
+		onclick={() => {
+			expanded = !expanded;
+		}}
+		aria-expanded={expanded}
+		class="flex w-full items-center justify-between gap-3 text-left text-[13px] text-black/55 transition-colors hover:text-black/70 dark:text-white/55 dark:hover:text-white/70 {extraClass}"
+	>
+		<span class="flex min-w-0 items-center gap-1.5">
+			<svg
+				class="h-3.5 w-3.5 shrink-0 transition-transform {expanded ? '-rotate-90' : ''}"
+				viewBox="0 0 16 16"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
 			>
-			{#each steps as step, i (step.id)}
-				<div class="relative pl-9">
-					<div
-						class="absolute top-0 left-0 flex h-7 w-7 items-center justify-center rounded-full border border-black/15 bg-white text-[12px] font-medium text-black/65 dark:border-white/20 dark:bg-cream dark:text-white/70"
-					>
-						{i + 1}
-					</div>
-					{#if i < steps.length - 1}
-						<div
-							class="absolute top-7 left-[13.5px] h-[calc(100%+1.5rem)] w-px bg-black/10 dark:bg-white/12"
-						></div>
-					{/if}
+				<path d="M6 4l4 4-4 4" />
+			</svg>
+			<span>Analysis activity</span>
+		</span>
+		<span class="shrink-0 text-[12px] text-black/45 dark:text-white/45">{durationLabel} total</span>
+	</button>
+{/snippet}
 
-					{#if step.title}
-						<div class="text-[15px] font-medium text-black/90 dark:text-white/90">
-							{step.title}
-						</div>
-					{/if}
-
-					{#each step.thoughts as thought (thought.id)}
+{#if completed && !expanded}
+	{@render activityToggle(
+		'rounded-xl border border-black/8 px-3 py-2 hover:border-black/12 hover:bg-black/[0.02] dark:border-white/10 dark:hover:border-white/15 dark:hover:bg-white/[0.03]'
+	)}
+{:else}
+	<div class="rounded-xl border border-black/8 bg-white/30 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+		{#if showSteps && steps.length}
+			<div transition:slide={{ duration: 180 }} class="flex flex-col gap-6">
+				{#each steps as step, i (step.id)}
+					<div class="relative pl-9">
 						<div
-							in:fade={{ duration: 220 }}
-							class="prose-thought mt-1.5 text-[14px] leading-relaxed text-black/80 dark:text-white/80"
+							class="absolute top-0 left-0 flex h-7 w-7 items-center justify-center rounded-full border border-black/15 bg-white text-[12px] font-medium text-black/65 dark:border-white/20 dark:bg-cream dark:text-white/70"
 						>
+							{i + 1}
+						</div>
+						{#if i < steps.length - 1}
+							<div
+								class="absolute top-7 left-[13.5px] h-[calc(100%+1.5rem)] w-px bg-black/10 dark:bg-white/12"
+							></div>
+						{/if}
+
+						{#if step.title}
+							<div class="text-[15px] font-medium text-black/90 dark:text-white/90">
+								{step.title}
+							</div>
+						{/if}
+
+						{#each step.thoughts as thought (thought.id)}
+							<div
+								in:fade={{ duration: 220 }}
+								class="prose-thought mt-1.5 text-[14px] leading-relaxed text-black/80 dark:text-white/80"
+							>
 								{#each thoughtSegments(thought) as segment (segment.key)}
 									<div in:fade={{ duration: 180 }} class="thought-segment" class:pending={segment.pending}>
 										{#each inlineSegments(segment.text) as inline (inline.key)}
@@ -234,79 +264,58 @@
 										{/each}
 									</div>
 								{/each}
-						</div>
-					{/each}
+							</div>
+						{/each}
 
-					{#if step.tools.length}
-						<div class="mt-2.5 flex flex-col gap-1.5 border-l-2 border-emerald-500/35 pl-3 dark:border-emerald-400/30">
-							{#each visibleTools(step) as tool (tool.id)}
-								<div
-									in:fly={{ y: 4, duration: 200 }}
-									class="flex items-start text-[13px] leading-snug text-black/60 dark:text-white/60"
-								>
-									<span class="break-words">{tool.text}</span>
-								</div>
-							{/each}
-							{#if hiddenToolCount(step)}
-								<button
-									type="button"
-									onclick={() => toggleTools(step.id)}
-									class="mt-0.5 w-fit cursor-pointer text-left text-[13px] leading-snug text-black/42 transition-colors hover:text-black/65 dark:text-white/42 dark:hover:text-white/65"
-								>
-									{expandedTools[step.id] ? 'Show fewer' : `Show ${hiddenToolCount(step)} more`}
-								</button>
-							{/if}
-						</div>
-					{/if}
-				</div>
-			{/each}
-		</div>
-	{/if}
-
-	{#if completed}
-		<button
-			type="button"
-			onclick={() => {
-				expanded = !expanded;
-			}}
-			aria-expanded={expanded}
-			class="{showSteps && steps.length
-				? 'mt-4 border-t border-black/8 px-2 pt-3 pb-2 dark:border-white/10'
-				: 'p-2'} flex w-full items-center justify-between gap-3 rounded-xl text-left text-[13px] text-black/55 transition-colors enabled:hover:bg-black/[0.03] enabled:hover:text-black/70 dark:text-white/55 dark:enabled:hover:bg-white/[0.04] dark:enabled:hover:text-white/70"
-		>
-			<span class="flex min-w-0 items-center gap-1.5">
-				<svg
-					class="h-3.5 w-3.5 shrink-0 transition-transform {expanded ? '-rotate-90' : ''}"
-					viewBox="0 0 16 16"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.8"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<path d="M6 4l4 4-4 4" />
-				</svg>
-				<span>Analysis activity</span>
-			</span>
-			<span class="shrink-0 text-[12px] text-black/45 dark:text-white/45">{durationLabel} total</span>
-		</button>
-	{:else}
-		<div
-			class="{steps.length
-				? 'mt-4 border-t border-black/8 pt-3 dark:border-white/10'
-				: ''} flex items-baseline justify-between gap-2"
-		>
-			<div class="flex min-w-0 items-baseline text-[13px] text-black/55 dark:text-white/55">
-				<span class="truncate">{label}</span>
-				<span class="label-typing-dots" aria-hidden="true"></span>
+						{#if step.tools.length}
+							<div
+								class="mt-2.5 flex flex-col gap-1.5 border-l-2 border-emerald-500/35 pl-3 dark:border-emerald-400/30"
+							>
+								{#each visibleTools(step) as tool (tool.id)}
+									<div
+										in:fly={{ y: 4, duration: 200 }}
+										class="flex items-start text-[13px] leading-snug text-black/60 dark:text-white/60"
+									>
+										<span class="break-words">{tool.text}</span>
+									</div>
+								{/each}
+								{#if hiddenToolCount(step)}
+									<button
+										type="button"
+										onclick={() => toggleTools(step.id)}
+										class="mt-0.5 w-fit text-left text-[13px] leading-snug text-black/42 transition-colors hover:text-black/65 dark:text-white/42 dark:hover:text-white/65"
+									>
+										{expandedTools[step.id] ? 'Show fewer' : `Show ${hiddenToolCount(step)} more`}
+									</button>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/each}
 			</div>
-			<span class="shrink-0 text-[12px] text-black/45 dark:text-white/45">
-				{durationLabel}
-			</span>
-		</div>
-	{/if}
-</div>
+		{/if}
+
+		{#if completed}
+			{@render activityToggle(
+				showSteps && steps.length ? 'mt-4 border-t border-black/8 pt-3 dark:border-white/10' : ''
+			)}
+		{:else}
+			<div
+				class="{steps.length
+					? 'mt-4 border-t border-black/8 pt-3 dark:border-white/10'
+					: ''} flex items-baseline justify-between gap-2"
+			>
+				<div class="flex min-w-0 items-baseline text-[13px] text-black/55 dark:text-white/55">
+					<span class="truncate">{label}</span>
+					<span class="label-typing-dots" aria-hidden="true"></span>
+				</div>
+				<span class="shrink-0 text-[12px] text-black/45 dark:text-white/45">
+					{durationLabel}
+				</span>
+			</div>
+		{/if}
+	</div>
+{/if}
 
 <style>
 	.label-typing-dots::after {
