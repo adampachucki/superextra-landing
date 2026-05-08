@@ -212,22 +212,23 @@ Symmetric "local vs VM" layout — each VM shortcut sits one key to the left of 
 
 Other terminal-related bindings:
 
-| Shortcut    | Action                                                                                                                         |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Cmd+Shift+B | New terminal → Claude BR profile (`claude-br` → Bedrock-routed Claude)                                                         |
-| Cmd+Shift+M | Inside a tmux pane: send `Ctrl+B $` (rename current **session**). VS Code tab + Moshi picker reflect the new name immediately. |
-| Cmd+Alt+R   | Same as Cmd+Shift+M — also sends `Ctrl+B $`. Kept for backwards-compat muscle memory.                                          |
-| Cmd+Shift+R | VS Code-only: rename the local tab label. **Doesn't sync to tmux/Moshi** — easy to confuse with the tmux rename above.         |
+| Shortcut    | Action                                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------ |
+| Cmd+Shift+B | New terminal → Claude BR profile (`claude-br` → Bedrock-routed Claude)                                       |
+| Cmd+Shift+M | Inside a tmux pane: send `Ctrl+B $` (rename current session). VS Code tab + Moshi picker update immediately. |
+| Cmd+Shift+R | Same as Cmd+Shift+M — also sends `Ctrl+B $`. Replaces the default VS Code "rename tab" (which was tab-only). |
+| Cmd+Alt+R   | Same as Cmd+Shift+M — kept for backwards-compat muscle memory.                                               |
 
 Defined in `~/Library/Application Support/{Code,Cursor}/User/keybindings.json`. Two files structurally identical; mirror changes between them.
 
-The renaming chain that makes Cmd+Shift+M work end-to-end:
+The renaming chain that makes Cmd+Shift+M (or R, or Alt+R) work end-to-end:
 
 1. `Ctrl+B $` opens tmux's session-rename prompt; you type a new name.
-2. tmux updates `#S`. With `set-titles on` + `set-titles-string "#S"` in `~/.tmux.conf`, tmux re-emits the title-set escape `\033]0;NEWNAME\007`.
-3. VS Code's xterm.js reads the escape and updates its tab title. Combined with `terminal.integrated.tabs.title: "${sequence}"` and `tabs.description: ""`, the tab label becomes just `NEWNAME` (single bold label, no duplicate).
-4. Moshi polls tmux state and shows `NEWNAME` in its picker.
-5. After rename, `x j OLDNAME` no longer works — use `x j NEWNAME` or just pick from `xl`. This is fine because pet names were dropped (see [Decision history](#decision-history)) — you primarily address sessions through pickers, not by typing names.
+2. `~/.tmux.conf` overrides the default `$` binding to open with an **empty** prompt (default would pre-fill the current name and force a backspace). Custom binding: `bind '$' command-prompt -p 'Name:' 'rename-session -- "%%"'`.
+3. tmux updates `#S`. With `set-titles on` + `set-titles-string "#S"` in `~/.tmux.conf`, tmux re-emits the title-set escape `\033]0;NEWNAME\007`.
+4. VS Code's xterm.js reads the escape and updates its tab title. Combined with `terminal.integrated.tabs.title: "${sequence}"` and `tabs.description: ""`, the tab label becomes just `NEWNAME` (single bold label).
+5. Moshi polls tmux state and shows `NEWNAME` in its picker.
+6. After rename, `x j OLDNAME` no longer works — use `x j NEWNAME` or just pick from `xl`. This is fine because pet names were dropped (see [Decision history](#decision-history)) — you primarily address sessions through pickers, not by typing names.
 
 ---
 
