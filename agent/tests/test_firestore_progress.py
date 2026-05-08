@@ -688,14 +688,14 @@ async def test_plugin_on_event_writes_timeline_events(monkeypatch):
 
     # Stub observe_event to return a known set of timeline events.
     state.observe_event = MagicMock(
-        return_value=[{"kind": "note", "text": "hello"}, {"kind": "detail", "text": "x"}]
+        return_value=[{"kind": "detail", "text": "x"}]
     )
 
     fake_event = SimpleNamespace()
     await plugin.on_event_callback(invocation_context=ctx, event=fake_event)
 
     state.observe_event.assert_called_once_with(fake_event)
-    assert state.timeline_writer.write_timeline.await_count == 2
+    assert state.timeline_writer.write_timeline.await_count == 1
 
     # Cleanup
     state.heartbeat_task.cancel()

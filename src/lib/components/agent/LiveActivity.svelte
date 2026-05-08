@@ -147,11 +147,7 @@
 				thoughtBuffer += text;
 			} else {
 				flushThought();
-				if (ev.kind === 'note') {
-					ensureStep(ev.id).thoughts.push({ id: ev.id, text: normalizeNewlines(ev.text), open: false });
-				} else {
-					ensureStep(ev.id).tools.push(ev);
-				}
+				ensureStep(ev.id).tools.push(ev);
 			}
 		}
 		flushThought(true);

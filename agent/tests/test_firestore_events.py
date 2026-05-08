@@ -223,7 +223,6 @@ def test_map_event_ignores_tool_parts_after_typed_hook_migration():
     ev = _event(
         author="research_lead",
         function_calls=[
-            ("narrate", {"text": "Pulling Google reviews now."}),
             ("google_search", {"query": "best burgers berlin"}),
         ],
         function_responses=[
@@ -250,37 +249,6 @@ def test_compaction_event_emits_no_timeline_rows():
         "complete": None,
         "grounding_sources": [],
     }
-
-
-def test_narrate_tool_call_emits_note():
-    row = map_tool_call(
-        "narrate",
-        {"text": "Pulling Google reviews for Maple & Ash and Bavette's now."},
-        {},
-        "call-1",
-    )
-    assert row == {
-        "kind": "note",
-        "id": "tool:call:call-1:narrate",
-        "text": "Pulling Google reviews for Maple & Ash and Bavette's now.",
-    }
-
-
-def test_narrate_normalizes_escaped_newlines():
-    row = map_tool_call("narrate", {"text": "First line\\n\\nSecond line"}, {}, "call-1")
-    assert row == {
-        "kind": "note",
-        "id": "tool:call:call-1:narrate",
-        "text": "First line\n\nSecond line",
-    }
-
-
-def test_narrate_with_empty_text_is_dropped():
-    assert map_tool_call("narrate", {"text": "   "}, {}, "call-1") is None
-
-
-def test_narrate_with_non_string_text_is_dropped():
-    assert map_tool_call("narrate", {"text": 123}, {}, "call-1") is None
 
 
 def test_multi_tool_call_emits_multiple_detail_rows_in_order():

@@ -180,8 +180,8 @@ class GearRunState:
 
         Sequence:
 
-          1. Close ``timeline_writer``. Narrate notes land synchronously
-             inside ``observe_event`` at event-mapping time.
+          1. Close ``timeline_writer`` after all thought and tool-detail
+             rows observed during event mapping have been queued.
           2. Await ``title_task`` with bounded ``TITLE_TIMEOUT_S``.
              ``asyncio.wait_for`` cancels-on-timeout so no straggler
              concern.

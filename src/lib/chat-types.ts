@@ -26,11 +26,6 @@ export interface TurnSummary {
 
 export type TimelineEvent =
 	| {
-			kind: 'note';
-			id: string;
-			text: string;
-	  }
-	| {
 			kind: 'detail';
 			id: string;
 			group: 'search' | 'platform' | 'source' | 'warning';

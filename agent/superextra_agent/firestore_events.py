@@ -68,7 +68,7 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
 
     # Surface Gemini thought-summary parts (`include_thoughts=True`) as
     # `kind: 'thought'` timeline rows so the activity panel can render the
-    # model's own narration of what it's doing. Each ADK event with thought
+    # model's thought summary. Each ADK event with thought
     # parts produces one timeline row keyed by `(author, event_id)` so the
     # client doesn't dedupe across genuine multi-thought events.
     thought_text = _collect_thought_text(event)
@@ -140,7 +140,6 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "get_google_reviews": "Google reviews",
     "google_search": "Google search",
     "fetch_web_content": "page fetch",
-    "narrate": "narration",
 }
 _PROVIDER_TOOL_LABELS: dict[str, str] = {
     "google:search": "Google search",
@@ -268,15 +267,6 @@ def map_tool_call(
     call_id: str | None,
 ) -> dict[str, Any] | None:
     row_id = _tool_row_id(call_id=call_id, phase="call", name=name)
-    if name == "narrate":
-        text = args.get("text")
-        if isinstance(text, str) and text.strip():
-            return {
-                "kind": "note",
-                "id": row_id,
-                "text": _normalize_newlines(text).strip(),
-            }
-        return None
     if name == "google_search":
         query = _normalize_space(str(args.get("query") or "")).strip()
         if query:

@@ -611,24 +611,24 @@ describe('chatState (Firestore-driven)', () => {
 						attempt: 1,
 						seqInAttempt: 1,
 						type: 'timeline',
-						data: { kind: 'note', id: 'n1', text: 'Looking it up' }
+						data: { kind: 'thought', id: 'n1', author: 'research_lead', text: 'Looking it up' }
 					}),
 					eventChange('modified', {
 						attempt: 1,
 						seqInAttempt: 2,
 						type: 'timeline',
-						data: { kind: 'note', id: 'n2', text: 'Should be skipped' }
+						data: { kind: 'thought', id: 'n2', author: 'research_lead', text: 'Should be skipped' }
 					}),
 					eventChange('removed', {
 						attempt: 1,
 						seqInAttempt: 3,
 						type: 'timeline',
-						data: { kind: 'note', id: 'n3', text: 'Also skipped' }
+						data: { kind: 'thought', id: 'n3', author: 'research_lead', text: 'Also skipped' }
 					})
 				])
 			);
 			expect(chatState.liveTimeline).toHaveLength(1);
-			expect(chatState.liveTimeline[0]).toMatchObject({ kind: 'note', id: 'n1' });
+			expect(chatState.liveTimeline[0]).toMatchObject({ kind: 'thought', id: 'n1' });
 		});
 
 		it('keeps the live timeline on the completed agent message', async () => {
@@ -644,7 +644,7 @@ describe('chatState (Firestore-driven)', () => {
 						attempt: 1,
 						seqInAttempt: 1,
 						type: 'timeline',
-						data: { kind: 'note', id: 'n1', text: 'Reading sources' }
+						data: { kind: 'thought', id: 'n1', author: 'research_lead', text: 'Reading sources' }
 					})
 				])
 			);
@@ -667,7 +667,7 @@ describe('chatState (Firestore-driven)', () => {
 			);
 
 			expect(chatState.messages[1].activityEvents).toEqual([
-				{ kind: 'note', id: 'n1', text: 'Reading sources' }
+				{ kind: 'thought', id: 'n1', author: 'research_lead', text: 'Reading sources' }
 			]);
 			expect(chatState.liveTimeline).toEqual([]);
 		});
@@ -710,13 +710,13 @@ describe('chatState (Firestore-driven)', () => {
 						attempt: 1,
 						seqInAttempt: 1,
 						type: 'timeline',
-						data: { kind: 'note', id: 'n1', text: 'Reading sources' }
+						data: { kind: 'thought', id: 'n1', author: 'research_lead', text: 'Reading sources' }
 					})
 				])
 			);
 
 			expect(chatState.messages[1].activityEvents).toEqual([
-				{ kind: 'note', id: 'n1', text: 'Reading sources' }
+				{ kind: 'thought', id: 'n1', author: 'research_lead', text: 'Reading sources' }
 			]);
 			expect(chatState.liveTimeline).toEqual([]);
 		});

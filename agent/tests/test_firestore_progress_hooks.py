@@ -60,25 +60,6 @@ async def test_before_tool_google_search_writes_search_pill():
 
 
 @pytest.mark.asyncio
-async def test_before_tool_narrate_writes_note():
-    plugin, state = _make_plugin_state()
-
-    await plugin.before_tool_callback(
-        tool=_tool("narrate"),
-        tool_args={"text": "Pulling menu pricing now."},
-        tool_context=_tool_context(call_id="call-note"),
-    )
-
-    state.timeline_writer.write_timeline.assert_awaited_once_with(
-        {
-            "kind": "note",
-            "id": "tool:call:call-note:narrate",
-            "text": "Pulling menu pricing now.",
-        }
-    )
-
-
-@pytest.mark.asyncio
 async def test_tool_error_fetch_web_content_writes_warning():
     plugin, state = _make_plugin_state()
 
