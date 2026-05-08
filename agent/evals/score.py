@@ -414,6 +414,8 @@ async def _score_file(path: Path, no_judge: bool, venue_own: dict[str, set[str]]
         "tokens_total": (run.get("token_totals") or {}).get("total", 0),
         "tokens_prompt": (run.get("token_totals") or {}).get("prompt", 0),
         "tokens_candidates": (run.get("token_totals") or {}).get("candidates", 0),
+        "final_chars": len(run.get("final_report") or ""),
+        "specialist_chars": sum(len(v) for v in (run.get("specialist_outputs") or {}).values()),
         "tool_call_counts": json.dumps(run.get("tool_call_counts") or {}),
     }
 

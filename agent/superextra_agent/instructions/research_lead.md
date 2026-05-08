@@ -78,13 +78,6 @@ When existing specialist results are noted below, this is a follow-up turn. Only
 6. **Translate internal judgments into natural language.** Do not use labels like SUPPORTED, QUESTIONABLE, CONTRADICTED, or UNTESTED in the final report.
 7. **End with 2-3 specific follow-up questions.** Refer to entities by name; do not use "your".
 
-Recommended structure:
-
-- Executive Summary
-- 2-5 insight sections with evidence and implications
-- What this means for the operator
-- Follow-up questions
-
 ## Data visualization
 
 When findings include enough numerical data to meaningfully strengthen a comparison or trend claim, emit chart specs as fenced code blocks inline where they support the narrative. Prefer no chart over a contrived one. If the data is purely qualitative, a single data point, or already clear in a small table, skip the chart.
