@@ -540,6 +540,87 @@ Cmd+Shift+1 on Mac captures a screenshot, uploads via SCP to `/home/adam/screens
 
 ---
 
+## Push notifications (`moshi-hook`)
+
+`moshi-hook` is a small Go daemon that bridges Claude Code / Codex (and other agents) into Moshi's iOS app. When an agent emits a hook event — `approval_required`, `task_complete`, `session_started`, `tool_running`, `tool_finished` — the daemon forwards it to Moshi over WebSocket, which surfaces it as a Live Activity on the lock screen / Dynamic Island and (depending on type) a push notification.
+
+Installed on the VM (where claude/codex actually run from `x` / `c`). Optionally also on the Mac for local Claude/Codex tabs (Cmd+Shift+C / Cmd+Shift+S).
+
+### VM install (Linux)
+
+```bash
+curl -fsSL https://getmoshi.app/install.sh | sh    # binary → ~/.local/bin/moshi-hook
+moshi-hook pair --token <token from Moshi → Settings → Agent Hooks>
+moshi-hook install                                 # writes hook entries to agent configs
+```
+
+`moshi-hook install` adds Moshi-owned entries to:
+
+- `~/.claude/settings.json` (Claude Code)
+- `~/.codex/hooks.json` (Codex)
+- `~/.opencode/`, `~/.gemini/`, `~/.cursor/`, `~/.kimi/`, `~/.qwen/` (the others, harmless if unused)
+
+User-owned hooks in those files are preserved. To remove cleanly: `moshi-hook uninstall`.
+
+### Persistent daemon (systemd user service)
+
+```ini
+# ~/.config/systemd/user/moshi-hook.service
+[Unit]
+Description=moshi-hook daemon (bridge for Moshi iOS app)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/moshi-hook serve
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+sudo loginctl enable-linger adam     # service starts at boot, no user login required
+systemctl --user daemon-reload
+systemctl --user enable --now moshi-hook
+```
+
+### Mac install (optional, covers local Claude/Codex tabs)
+
+```bash
+brew tap rjyo/moshi
+brew install moshi-hook
+moshi-hook pair --token <fresh-token-from-app>
+moshi-hook install
+brew services start moshi-hook
+```
+
+Each install (VM and Mac) needs its own pairing token — generate a fresh one from the app for each. Tokens get exchanged for a long-lived per-host credential during pairing.
+
+### Diagnostics
+
+```bash
+moshi-hook status              # pairing state, host id, socket path
+moshi-hook logs -f             # tail the daemon log
+moshi-hook usage --sync        # force a usage sync if Moshi inbox stops updating
+systemctl --user status moshi-hook
+systemctl --user restart moshi-hook
+```
+
+Logs live at `~/.local/state/moshi/hook.log`. Socket at `/run/user/1001/moshi-hook.sock`.
+
+### Update procedure
+
+```bash
+curl -fsSL https://getmoshi.app/install.sh | sh    # re-run installer (binary swap)
+systemctl --user restart moshi-hook
+```
+
+Pairing and installed hook configs survive an upgrade — no need to re-pair or re-`install`.
+
+---
+
 ## VM details
 
 |           |                                                     |
@@ -561,23 +642,28 @@ Cmd+Shift+1 on Mac captures a screenshot, uploads via SCP to `/home/adam/screens
 - **Codex CLI** at `~/.nvm/versions/node/v22.22.2/bin/codex`
 - **Tailscale** (running on VM only — backup access path)
 - **MCP servers**: GitHub (npx), Svelte, Miro, Apify
+- **moshi-hook** at `~/.local/bin/moshi-hook` (Go daemon, bridges agent events to Moshi iOS app — see [Push notifications](#push-notifications-moshi-hook))
 - **zmx** (still on disk at `/usr/local/bin/zmx` for legacy session drainage; will be removed when no zmx daemons remain)
 
 ### Config files on VM (the canonical list)
 
-| Path                                    | Purpose                                             |
-| --------------------------------------- | --------------------------------------------------- |
-| `~/.bashrc`                             | `x` / `c` definitions, sources `.zx-env`/`.secrets` |
-| `~/.zx-env`                             | `CLAUDE_CODE_*` env vars                            |
-| `~/.secrets`                            | API keys (mode 0600)                                |
-| `~/.tmux.conf`                          | tmux config                                         |
-| `~/.codex/config.toml`                  | Codex provider config (Azure)                       |
-| `~/.claude/.credentials.json`           | Claude OAuth token (mode 0600)                      |
-| `~/.claude.json`                        | MCP server config                                   |
-| `/etc/et.cfg`                           | ET server config                                    |
-| `/etc/ssh/sshd_config.d/keepalive.conf` | sshd keepalives                                     |
-| `~/src/superextra-landing/.env`         | App env vars                                        |
-| `~/src/superextra-landing/agent/.env`   | Agent env vars                                      |
+| Path                                        | Purpose                                                       |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| `~/.bashrc`                                 | `x` / `c` definitions, sources `.zx-env`/`.secrets`           |
+| `~/.zx-env`                                 | `CLAUDE_CODE_*` env vars                                      |
+| `~/.secrets`                                | API keys (mode 0600)                                          |
+| `~/.tmux.conf`                              | tmux config                                                   |
+| `~/.codex/config.toml`                      | Codex provider config (Azure)                                 |
+| `~/.codex/hooks.json`                       | Codex hooks (managed by `moshi-hook install`)                 |
+| `~/.claude/.credentials.json`               | Claude OAuth token (mode 0600)                                |
+| `~/.claude/settings.json`                   | Claude config; `hooks.Stop` populated by `moshi-hook install` |
+| `~/.claude.json`                            | MCP server config                                             |
+| `~/.config/systemd/user/moshi-hook.service` | systemd user unit running `moshi-hook serve`                  |
+| `~/.local/state/moshi/hook.log`             | moshi-hook daemon logs                                        |
+| `/etc/et.cfg`                               | ET server config                                              |
+| `/etc/ssh/sshd_config.d/keepalive.conf`     | sshd keepalives                                               |
+| `~/src/superextra-landing/.env`             | App env vars                                                  |
+| `~/src/superextra-landing/agent/.env`       | Agent env vars                                                |
 
 ---
 
@@ -656,6 +742,14 @@ The `command -v zmx` guards in `_x_session` and the kill paths will then no-op, 
 ## Decision history
 
 A condensed log of stack changes and rationale, newest first. Read this when you're considering a structural change — chances are it's been tried.
+
+### 2026-05-08 — Add `moshi-hook` for iOS push notifications
+
+Installed `moshi-hook` v0.1.8 on the VM to bridge Claude/Codex events into Moshi's iOS app. Runs as a systemd user service (`moshi-hook serve`), writes hook entries into `~/.claude/settings.json` and `~/.codex/hooks.json` (and 5 other agents' configs harmlessly). Phone gets pings on `task_complete` / `approval_required` / etc.
+
+**Why**: closes the "long claude run finishes, phone is silent" gap. Pairs naturally with Cmd+Shift+X — kick off something heavy on the VM, walk away, get pinged when done.
+
+**Mac install deferred** — covers Cmd+Shift+C / Cmd+Shift+S local sessions. Same flow via `brew tap rjyo/moshi`. Optional add-on whenever it's wanted.
 
 ### 2026-05-08 — Drop pet names; collapse session/window into one identity
 
