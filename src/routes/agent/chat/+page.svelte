@@ -237,6 +237,11 @@
 		}
 	}
 
+	function focusPromptFromCardClick(e: MouseEvent) {
+		if (e.target instanceof Element && e.target.closest('button, input, textarea, a')) return;
+		if (!activePromptInactive) inputEl?.focus();
+	}
+
 	// --- Dictation ---
 	let dictationBase = '';
 
@@ -721,9 +726,7 @@
 		{/if}
 		{#if chatState.active}
 			<div
-				onclick={() => {
-					if (!activePromptInactive) inputEl?.focus();
-				}}
+				onclick={focusPromptFromCardClick}
 				aria-disabled={activePromptInactive}
 				class="prompt-card rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55] {activePromptInactive
 					? 'cursor-not-allowed'
@@ -837,7 +840,7 @@
 			</div>
 		{:else}
 			<div
-				onclick={() => inputEl?.focus()}
+				onclick={focusPromptFromCardClick}
 				class="prompt-card cursor-text rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55]"
 			>
 				<div class="flex flex-col">

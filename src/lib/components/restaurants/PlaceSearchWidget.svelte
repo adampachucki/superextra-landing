@@ -24,6 +24,7 @@
 	function handleSelect(s: PlaceSuggestion) {
 		place.select(s);
 		resetHighlight();
+		inputEl?.blur();
 		onSelect?.();
 	}
 
