@@ -232,6 +232,45 @@ The renaming chain that makes Cmd+Shift+M (or Alt+R) work end-to-end:
 
 ---
 
+## Names you see in each UI
+
+Three layers each render the same tmux session a little differently. Worth mapping once to avoid confusion.
+
+### tmux fields
+
+- `#S` — **session name**. Set explicitly by `x` / `c` at create time, mutable via `Ctrl+B $` (Cmd+Shift+M / Alt+R). This is the **identity** that everything user-facing tracks.
+- `#W` — **window name**. Auto-tracked by tmux's `automatic-rename` to whatever process is running in the pane (`claude`, `node`, etc.). **Not displayed in any UI you use** — purely internal.
+- `pane_current_command` — what's actually running. Drives `#W`.
+
+### VS Code / Cursor terminal tab
+
+- **Bold (white)** — `terminal.integrated.tabs.title: "${sequence}"`. `${sequence}` is the OSC title-set escape from the running program. Since `~/.tmux.conf` has `set-titles-string "#S"`, this resolves to the **live session name**.
+- **Gray (description)** — `terminal.integrated.tabs.description: ""`. Intentionally empty (was duplicating the bold label otherwise).
+- **What updates it**: anything that changes `#S` (Cmd+Shift+M / Alt+R) — tmux re-emits the title escape, xterm.js reads it, tab refreshes within ~50 ms.
+- **Cmd+Shift+R**: VS Code-only inline tab rename. Sets a _manual override_ that blocks future title-escape updates for that tab. Useful for non-tmux tabs (local Claude via Cmd+Shift+C, local codex via Cmd+Shift+S) where there's no tmux to send `Ctrl+B $` to.
+
+### Moshi connect-time picker (the multi-row list of tmux sessions on the host)
+
+One label per row, **live**: the current `#S`. Each picker open queries tmux fresh, so renames are reflected immediately on next open.
+
+### Moshi active-session panel/header
+
+Two labels per card:
+
+- **Bold (white)** — live `#S`. Refreshes whenever tmux state changes. Updates on `Ctrl+B $`.
+- **Smaller (green)** — **Moshi-internal card label**, frozen at the moment you tapped a session in the picker. It captures whatever `#S` was at attach time and never updates from tmux state. Only changes when you destroy the card (detach) and create a new one (reattach), at which point a fresh card label is minted from the _then-current_ `#S`.
+
+So: white = live session name everywhere it appears. Green is a Moshi card-level snapshot you can't control from your config.
+
+### Practical implications
+
+- **Cmd+Shift+M is the only rename that matters.** It updates white in VS Code tab, Moshi picker, and Moshi panel. Green stays cosmetic / stale until you reattach.
+- **Ignore window names.** tmux's `automatic-rename` keeps churning `#W` to the running command — invisible in every UI.
+- **`Ctrl+B ,` (window rename) does nothing useful** in this stack. Don't bother.
+- **Cmd+Shift+R only for non-tmux tabs.** Inside a tmux session it just locally desynchronizes the VS Code tab from the live `#S`. Use Cmd+Shift+M for tmux sessions.
+
+---
+
 ## Configuration files
 
 ### `~/.bashrc` (VM) — `x` / `c` definitions
@@ -369,6 +408,37 @@ TCPKeepAlive no
 ```
 
 Effective interval is 120 s (vendor `50-cloudimg-settings.conf` drop-in sets 120 first; sshd is first-match-wins). Dead peers are reaped in ~6 min.
+
+### `/etc/ssh/sshd_config.d/no-root.conf` (VM)
+
+```
+PermitRootLogin no
+```
+
+Disables root login entirely (was `without-password` by default — key-based root login allowed). User-level access via `adam` is the only path.
+
+### fail2ban (VM)
+
+The VM gets ~1500–2000 SSH brute-force probe attempts per day from random bots — none can succeed (key-only auth, no `adam` username in their lists), but they're noise in the logs. fail2ban watches systemd's sshd journal and bans source IPs that fail 5 times in 10 min for 1 hour.
+
+Config at `/etc/fail2ban/jail.d/sshd.local`:
+
+```ini
+[sshd]
+enabled = true
+port    = ssh,2022
+maxretry = 5
+findtime = 10m
+bantime = 1h
+backend = systemd
+```
+
+Diagnostics:
+
+```bash
+sudo fail2ban-client status sshd      # banned IPs, current state
+sudo journalctl -u fail2ban -f        # tail
+```
 
 ---
 
@@ -643,6 +713,7 @@ Pairing and installed hook configs survive an upgrade — no need to re-pair or 
 - **Tailscale** (running on VM only — backup access path)
 - **MCP servers**: GitHub (npx), Svelte, Miro, Apify
 - **moshi-hook** at `~/.local/bin/moshi-hook` (Go daemon, bridges agent events to Moshi iOS app — see [Push notifications](#push-notifications-moshi-hook))
+- **fail2ban** (sshd brute-force log noise filter — bans probes after 5 fails in 10 min for 1 h)
 - **zmx** (still on disk at `/usr/local/bin/zmx` for legacy session drainage; will be removed when no zmx daemons remain)
 
 ### Config files on VM (the canonical list)
@@ -662,6 +733,8 @@ Pairing and installed hook configs survive an upgrade — no need to re-pair or 
 | `~/.local/state/moshi/hook.log`             | moshi-hook daemon logs                                        |
 | `/etc/et.cfg`                               | ET server config                                              |
 | `/etc/ssh/sshd_config.d/keepalive.conf`     | sshd keepalives                                               |
+| `/etc/ssh/sshd_config.d/no-root.conf`       | `PermitRootLogin no`                                          |
+| `/etc/fail2ban/jail.d/sshd.local`           | fail2ban sshd jail (5 retries / 10 min → 1 h ban)             |
 | `~/src/superextra-landing/.env`             | App env vars                                                  |
 | `~/src/superextra-landing/agent/.env`       | Agent env vars                                                |
 
@@ -742,6 +815,17 @@ The `command -v zmx` guards in `_x_session` and the kill paths will then no-op, 
 ## Decision history
 
 A condensed log of stack changes and rationale, newest first. Read this when you're considering a structural change — chances are it's been tried.
+
+### 2026-05-08 — SSH hardening: `PermitRootLogin no`, install fail2ban
+
+Audit triggered by "is the VM safe without Tailscale?" question. Findings: SSH was already key-only (`PasswordAuthentication no`, `KbdInteractiveAuthentication no`), but root login was allowed via key (`PermitRootLogin without-password`) and no rate-limiting was in place against the ~1700/day bot probe traffic. Applied two cheap hardenings:
+
+- `PermitRootLogin no` via `/etc/ssh/sshd_config.d/no-root.conf` — eliminates root as an attack vector entirely.
+- fail2ban with sshd jail — 5 retries / 10 min / 1 h ban, sources from systemd journal.
+
+These don't add real protection beyond what SSH key auth already provides (random bots couldn't get in regardless), but they reduce log noise and lock down a fallback edge case.
+
+**Public exposure unchanged**: TCP 22, 2022, 5199 plus mosh UDP 60000-61000, all from `0.0.0.0/0`. The Tailscale-only alternative (close GCP firewall, only tailnet IPs reach VM) was considered and rejected — see "Tailscale isn't load-bearing" earlier in the doc.
 
 ### 2026-05-08 — Add `moshi-hook` for iOS push notifications
 
