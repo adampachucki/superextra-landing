@@ -202,10 +202,17 @@ Same names exist in `~/.zshrc` on the Mac. Behavior by subcommand:
 
 ### Keyboard shortcuts (VS Code / Cursor)
 
+Symmetric "local vs VM" layout — each VM shortcut sits one key to the left of its local equivalent:
+
+| Local (Mac)                               | VM                                           |
+| ----------------------------------------- | -------------------------------------------- |
+| Cmd+Shift+**C** — `claude` (subscription) | Cmd+Shift+**X** — `x` on VM (claude session) |
+| Cmd+Shift+**S** — `codex-az` (Azure)      | Cmd+Shift+**A** — `c` on VM (codex session)  |
+
+Other terminal-related bindings:
+
 | Shortcut    | Action                                                                 |
 | ----------- | ---------------------------------------------------------------------- |
-| Cmd+Shift+X | New terminal → `x` on VM (Claude session)                              |
-| Cmd+Shift+A | New terminal → `codex-az` locally (Mac-side codex against Azure)       |
 | Cmd+Shift+B | New terminal → Claude BR profile (`claude-br` → Bedrock-routed Claude) |
 | Cmd+Shift+R | Rename terminal tab                                                    |
 
