@@ -35,6 +35,9 @@ These rules get violated most often. Re-read before proposing or editing code.
   - **Resend** (intake email)
 - **Never rely on training knowledge for factual claims** — versions, API signatures, behavior, defaults. Look it up or say "I don't know."
 - **Verify before recommending.** Before suggesting a function, flag, or pattern, grep the codebase or fetch the SDK source to confirm it exists in the version we're on.
+- **Verify UI changes in a browser.** Type checks and unit tests don't prove rendering. Use Chrome DevTools MCP.
+- **`firebase deploy` REPLACES function env vars** — every var the function needs at runtime must be in `functions/.env.superextra-site` at deploy time, or the next deploy quietly removes it.
+- **From the VM, ADC needs `quota_project_id=superextra-site`** or Google API calls (Firebase Hosting, Cloud Functions, Cloud Build) fail with `403 PERMISSION_DENIED`.
 
 ### When delegating to a review agent — ALWAYS pass these requirements
 
@@ -191,7 +194,7 @@ Push to `main` → `.github/workflows/deploy.yml`:
 
 The agent app itself is hosted as a Vertex AI Agent Engine Reasoning Engine; redeploy via `agent_engines.update(...)` from the agent venv when the agent code changes.
 
-For deployment gotchas (Firebase env-var replace behavior, Firestore indexes, watchdog, rerun policy, Chrome MCP E2E flow): read `docs/deployment-gotchas.md` when working on those areas — but verify every operational claim against source first. That doc is known stale for `DEFAULT_RESOURCE`, watchdog reason names, and Firestore index inventory.
+Deployment gotchas (agent engine deploy, env-var REPLACE, Firestore shape, watchdog, ADC quota, Chrome MCP E2E): `docs/deployment-gotchas.md`.
 
 ## Chrome DevTools MCP
 

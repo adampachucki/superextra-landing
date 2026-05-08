@@ -5,7 +5,7 @@ The agent runtime is hosted as a Vertex AI Agent Engine Reasoning Engine. Browse
 ## Vertex AI Agent Engine
 
 - **Redeploy via `agent/scripts/redeploy_engine.py`.** No Cloud Run build, no Dockerfile. The agent venv (`agent/.venv/`) carries the deploy tooling; the script wraps `agent_engines.update(...)`, applies the local ADC credential workaround, pickle-checks the app, and redeploys in-place when run with `--yes`. Engine resource ID stays stable across redeploys.
-- **`GEAR_REASONING_ENGINE_RESOURCE` is read by `agentStream` at request time.** Set in `functions/.env.superextra-site` (which the GHA workflow writes at deploy time) and as a fallback constant in `functions/gear-handoff.js:DEFAULT_RESOURCE`. Belt-and-suspenders: the env-var path is the override, the constant is the floor.
+- **`GEAR_REASONING_ENGINE_RESOURCE` is read by `agentStream` at request time.** Set in `functions/.env.superextra-site` (which the GHA workflow writes at deploy time). `gearHandoff()` throws if the env var is unset — no fallback constant.
 - **Calls FROM INSIDE the engine to Gemini are billed against the engine's tenant project**, not `superextra-site`. Cloud Monitoring metrics for `aiplatform.googleapis.com/generate_content_*` therefore return 0 at our project level even when gear runs are happening. Use the GCP Console → Billing UI for actual spend; see `scripts/cost_baseline.py` for the proxy queries.
 - **Filesystem inside the engine is read-only** except `/tmp`.
 
@@ -13,20 +13,20 @@ The agent runtime is hosted as a Vertex AI Agent Engine Reasoning Engine. Browse
 
 This bit one in production on 2026-04-27. `firebase deploy` reads `functions/.env.<projectId>` at deploy time and **replaces** the deployed function's env vars with whatever the file declares; vars not in the file are stripped. Consequence: every var the function needs at runtime must be in `functions/.env.superextra-site` at deploy time, or the next deploy quietly removes it.
 
-The GHA workflow writes the file fresh on each run (see `.github/workflows/deploy.yml` step "Write functions .env"). Adding a new env var means: append it to the workflow's heredoc AND add a defaulted constant in code as a floor (see `gear-handoff.js:DEFAULT_RESOURCE`).
+The GHA workflow writes the file fresh on each run (see `.github/workflows/deploy.yml` step "Write functions .env"). Adding a new env var means appending it to the workflow's heredoc.
 
 ## Firestore
 
-- **Composite indexes must be rolled out before traffic hits `agentStream`.** `firestore.indexes.json` declares: three `sessions` indexes for the watchdog's `status+queuedAt` / `lastHeartbeat` / `lastEventAt` sweeps, and a `sessions(participants array-contains, updatedAt desc)` composite for the client sidebar listener.
-- **Data shape is three-layer.** `sessions/{sid}` holds lightweight metadata + operational state (no terminal content). `sessions/{sid}/turns/{nnnn}` holds per-turn user message, reply, sources, and turn summary. `sessions/{sid}/events/{eid}` holds live activity for the in-flight turn.
-- **Terminal source is the TURN doc.** The plugin's terminal write puts `status=complete` + `reply`/`sources`/`turnSummary` on the turn doc atomically with `status=complete` + `updatedAt` on the session doc.
+Data shape and listeners are documented in CLAUDE.md's "Transport architecture" section — this section covers only what isn't there.
+
+- **Composite indexes must be rolled out before traffic hits `agentStream`.** `firestore.indexes.json` declares two `sessions` indexes for the watchdog (`status+queuedAt`, `status+lastHeartbeat`), a `sessions(participants array-contains, updatedAt desc)` composite for the client sidebar listener, and an `events(runId, attempt, seqInAttempt)` index for the in-flight events listener.
 - **Capability-URL rules.** `sessions/{sid}` allows `get` for any signed-in visitor; `list` requires `where('participants','array-contains',uid)`; all writes are Admin-SDK-only. Subcollections (`turns`, `events`) allow path-scoped `read` for any signed-in visitor; writes server-only.
 - **TTL only on events.** `events.expiresAt` is 3 days. Sessions and turns persist until the creator deletes the chat via `agentDelete`.
 
 ## Watchdog (`functions/watchdog.js`)
 
 - **Terminal flips are fenced in a transaction.** The txn re-reads the session and aborts if `status` / `currentRunId` / the stale `thresholdField` changed between the initial query and the write. Per-reason skip counters (`{missing, status_changed, run_advanced, field_freshened}`) are logged in the invocation summary.
-- **Classifier precedence**: `queue_dispatch_timeout` > `worker_lost` > `pipeline_wedged`. `findStuckSessions` dedupes by `sid`.
+- **Two flip reasons**: `handoff_start_timeout` (no heartbeat after enqueue) and `heartbeat_lost` (heartbeat went stale mid-run). `findStuckSessions` dedupes by `sid`.
 
 ## Debugging
 
