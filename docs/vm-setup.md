@@ -212,16 +212,16 @@ Symmetric "local vs VM" layout — each VM shortcut sits one key to the left of 
 
 Other terminal-related bindings:
 
-| Shortcut    | Action                                                                                                       |
-| ----------- | ------------------------------------------------------------------------------------------------------------ |
-| Cmd+Shift+B | New terminal → Claude BR profile (`claude-br` → Bedrock-routed Claude)                                       |
-| Cmd+Shift+M | Inside a tmux pane: send `Ctrl+B $` (rename current session). VS Code tab + Moshi picker update immediately. |
-| Cmd+Shift+R | Same as Cmd+Shift+M — also sends `Ctrl+B $`. Replaces the default VS Code "rename tab" (which was tab-only). |
-| Cmd+Alt+R   | Same as Cmd+Shift+M — kept for backwards-compat muscle memory.                                               |
+| Shortcut    | Action                                                                                                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cmd+Shift+B | New terminal → Claude BR profile (`claude-br` → Bedrock-routed Claude)                                                                                                    |
+| Cmd+Shift+M | Inside a tmux pane: send `Ctrl+B $` (rename current session). VS Code tab + Moshi picker update immediately.                                                              |
+| Cmd+Shift+R | VS Code-local tab rename. Use this for non-tmux tabs (local Claude via Cmd+Shift+C, local codex via Cmd+Shift+S, etc.) where there's no tmux session to send Ctrl+B $ to. |
+| Cmd+Alt+R   | Same as Cmd+Shift+M — kept for backwards-compat muscle memory.                                                                                                            |
 
 Defined in `~/Library/Application Support/{Code,Cursor}/User/keybindings.json`. Two files structurally identical; mirror changes between them.
 
-The renaming chain that makes Cmd+Shift+M (or R, or Alt+R) work end-to-end:
+The renaming chain that makes Cmd+Shift+M (or Alt+R) work end-to-end:
 
 1. `Ctrl+B $` opens tmux's session-rename prompt; you type a new name.
 2. `~/.tmux.conf` overrides the default `$` binding to open with an **empty** prompt (default would pre-fill the current name and force a backspace). Custom binding: `bind '$' command-prompt -p 'Name:' 'rename-session -- "%%"'`.
