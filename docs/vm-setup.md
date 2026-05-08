@@ -155,13 +155,14 @@ All defined in VM `~/.bashrc`. Mac side has a parallel `x` zshrc function that o
 
 ### `x` and `c` — create / attach
 
-| Invocation     | Behavior                                                                                 |
-| -------------- | ---------------------------------------------------------------------------------------- |
-| `x`            | New tmux session with a random pet-name (e.g. `fast-ant`), running `claude`              |
-| `x NAME`       | If `NAME` exists, attach. Else create with `claude`.                                     |
-| `c` / `c NAME` | Same as `x` but spawns `codex`. The VM's `~/.codex/config.toml` configures Azure Foundry |
-| `x -z NAME`    | `-z` and `-t` are accepted as no-ops for muscle memory (legacy zmx/tmux mode flags)      |
-| `x -t NAME`    | Same — no-op                                                                             |
+| Invocation  | Behavior                                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------ |
+| `x`         | New tmux session named `claude` (or `claude-2`, `claude-3`, … if it collides), running `claude`        |
+| `x NAME`    | If `NAME` exists, attach. Else create with `claude`.                                                   |
+| `c`         | Same default-naming pattern as `x` but with base `codex` (`codex`, `codex-2`, …) and runs `codex`      |
+| `c NAME`    | Like `x NAME` but for codex. VM's `~/.codex/config.toml` configures Azure Foundry as the only provider |
+| `x -z NAME` | `-z` and `-t` accepted as no-ops for muscle memory (legacy zmx/tmux mode flags)                        |
+| `x -t NAME` | Same — no-op                                                                                           |
 
 When attached from inside an existing tmux client (e.g., Moshi's picker), `x NAME` switches to the named session via `tmux switch-client`. Otherwise it does `tmux attach`.
 
@@ -211,22 +212,22 @@ Symmetric "local vs VM" layout — each VM shortcut sits one key to the left of 
 
 Other terminal-related bindings:
 
-| Shortcut    | Action                                                                                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Cmd+Shift+B | New terminal → Claude BR profile (`claude-br` → Bedrock-routed Claude)                                                                                 |
-| Cmd+Shift+M | Inside a tmux pane: send `Ctrl+B ,` (rename current window). Sticky; Moshi picker + VS Code tab + iPhone Moshi all reflect the new name automatically. |
-| Cmd+Alt+R   | Inside a tmux pane: send `Ctrl+B $` (rename session). Note: changes the session ID, so `x j OLDNAME` stops working — prefer Cmd+Shift+M.               |
-| Cmd+Shift+R | VS Code-only: rename the local tab label. **Doesn't sync to tmux/Moshi** — mostly cosmetic, easy to confuse with the tmux renames above.               |
+| Shortcut    | Action                                                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Cmd+Shift+B | New terminal → Claude BR profile (`claude-br` → Bedrock-routed Claude)                                                         |
+| Cmd+Shift+M | Inside a tmux pane: send `Ctrl+B $` (rename current **session**). VS Code tab + Moshi picker reflect the new name immediately. |
+| Cmd+Alt+R   | Same as Cmd+Shift+M — also sends `Ctrl+B $`. Kept for backwards-compat muscle memory.                                          |
+| Cmd+Shift+R | VS Code-only: rename the local tab label. **Doesn't sync to tmux/Moshi** — easy to confuse with the tmux rename above.         |
 
 Defined in `~/Library/Application Support/{Code,Cursor}/User/keybindings.json`. Two files structurally identical; mirror changes between them.
 
 The renaming chain that makes Cmd+Shift+M work end-to-end:
 
-1. `Ctrl+B ,` opens tmux's window-rename prompt; you type a new name.
-2. tmux updates `#W`. With `set-titles on` + `set-titles-string "#S:#W"` in `~/.tmux.conf`, tmux re-emits the title-set escape `\033]0;SESSION:NEWNAME\007`.
-3. VS Code's xterm.js reads the escape and updates its tab-title state. Combined with `terminal.integrated.tabs.title: "${sequence}"`, the tab label becomes `SESSION:NEWNAME`.
-4. Moshi polls tmux state and shows the new window name as the bold label in its picker.
-5. Window rename auto-disables `automatic-rename` for that window, so the manual name persists across claude restarts. (External `tmux rename-window` does **not** auto-disable, so renames from outside tmux silently revert.)
+1. `Ctrl+B $` opens tmux's session-rename prompt; you type a new name.
+2. tmux updates `#S`. With `set-titles on` + `set-titles-string "#S"` in `~/.tmux.conf`, tmux re-emits the title-set escape `\033]0;NEWNAME\007`.
+3. VS Code's xterm.js reads the escape and updates its tab title. Combined with `terminal.integrated.tabs.title: "${sequence}"` and `tabs.description: ""`, the tab label becomes just `NEWNAME` (single bold label, no duplicate).
+4. Moshi polls tmux state and shows `NEWNAME` in its picker.
+5. After rename, `x j OLDNAME` no longer works — use `x j NEWNAME` or just pick from `xl`. This is fine because pet names were dropped (see [Decision history](#decision-history)) — you primarily address sessions through pickers, not by typing names.
 
 ---
 
@@ -254,7 +255,17 @@ _x_session() {
   else tmux attach -t "=$name"; fi
 }
 
-_xc() { … dispatcher: l/j/k/K/default … }
+# Default-name picker: tries cmd, cmd-2, cmd-3, … until a free slot.
+_x_default_name() {
+  local base="$1"
+  local name="$base" n=2
+  while tmux has-session -t "=$name" 2>/dev/null; do
+    name="${base}-${n}"; n=$((n+1))
+  done
+  echo "$name"
+}
+
+_xc() { … dispatcher: l/j/k/K/default; default uses _x_default_name "$cmd" … }
 
 x() { _xc claude "$@"; }
 c() { _xc codex  "$@"; }
@@ -644,6 +655,16 @@ The `command -v zmx` guards in `_x_session` and the kill paths will then no-op, 
 ## Decision history
 
 A condensed log of stack changes and rationale, newest first. Read this when you're considering a structural change — chances are it's been tried.
+
+### 2026-05-08 — Drop pet names; collapse session/window into one identity
+
+Replaced random pet-name auto-naming (`fast-ant`, `cool-bee`, …) with command-based defaults (`claude`, `claude-2`, …). Reasoning:
+
+- VS Code's tab UI couldn't natively split window vs session into two visual slots from one tmux source. The cleanest tab showed just one bold label; pet names couldn't appear in the gray slot without modifying VS Code itself.
+- Pet names were never typed by the user — addressing happens through pickers (`xl` on Mac, Moshi's session picker on iPhone). Their only role was "memorable auto-name when I don't want to think of one".
+- Replacing with `claude`/`claude-2`/`codex`/`codex-2` keeps the zero-typing convenience while making the auto-name semantically meaningful (you can tell what it's running without opening it).
+
+Changes: VM `~/.bashrc` got a small `_x_default_name BASE` helper that walks `claude`, `claude-2`, … until a free slot. Mac `~/.zshrc` lost `_x_name` (the pet-name generator) and now passes empty arg to VM when no name is given, letting VM compute the default. tmux's `set-titles-string` simplified from `#W:#S` → `#S` (just session name; window name was redundant once pet names went away). VS Code's `Cmd+Shift+M` rebinding switched from `Ctrl+B ,` (window rename) to `Ctrl+B $` (session rename) — single rename target now.
 
 ### 2026-05-07 — Mac zshrc: stop enumerating sessions via zmx
 
