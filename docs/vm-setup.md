@@ -211,12 +211,22 @@ Symmetric "local vs VM" layout — each VM shortcut sits one key to the left of 
 
 Other terminal-related bindings:
 
-| Shortcut    | Action                                                                 |
-| ----------- | ---------------------------------------------------------------------- |
-| Cmd+Shift+B | New terminal → Claude BR profile (`claude-br` → Bedrock-routed Claude) |
-| Cmd+Shift+R | Rename terminal tab                                                    |
+| Shortcut    | Action                                                                                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Cmd+Shift+B | New terminal → Claude BR profile (`claude-br` → Bedrock-routed Claude)                                                                                 |
+| Cmd+Shift+M | Inside a tmux pane: send `Ctrl+B ,` (rename current window). Sticky; Moshi picker + VS Code tab + iPhone Moshi all reflect the new name automatically. |
+| Cmd+Alt+R   | Inside a tmux pane: send `Ctrl+B $` (rename session). Note: changes the session ID, so `x j OLDNAME` stops working — prefer Cmd+Shift+M.               |
+| Cmd+Shift+R | VS Code-only: rename the local tab label. **Doesn't sync to tmux/Moshi** — mostly cosmetic, easy to confuse with the tmux renames above.               |
 
 Defined in `~/Library/Application Support/{Code,Cursor}/User/keybindings.json`. Two files structurally identical; mirror changes between them.
+
+The renaming chain that makes Cmd+Shift+M work end-to-end:
+
+1. `Ctrl+B ,` opens tmux's window-rename prompt; you type a new name.
+2. tmux updates `#W`. With `set-titles on` + `set-titles-string "#S:#W"` in `~/.tmux.conf`, tmux re-emits the title-set escape `\033]0;SESSION:NEWNAME\007`.
+3. VS Code's xterm.js reads the escape and updates its tab-title state. Combined with `terminal.integrated.tabs.title: "${sequence}"`, the tab label becomes `SESSION:NEWNAME`.
+4. Moshi polls tmux state and shows the new window name as the bold label in its picker.
+5. Window rename auto-disables `automatic-rename` for that window, so the manual name persists across claude restarts. (External `tmux rename-window` does **not** auto-disable, so renames from outside tmux silently revert.)
 
 ---
 
