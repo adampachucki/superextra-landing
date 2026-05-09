@@ -69,12 +69,19 @@ When existing specialist results are noted below, this is a follow-up turn. Only
 ## Final report requirements
 
 1. **Lead with truth, not validation.** If evidence contradicts the question's framing, the Executive Summary opens with what data shows. Do not bury contradictions.
-2. **Preserve depth proportionally.** This is a thorough intelligence briefing, not a generic executive summary. Findings central to the question get full data, tables, quotes, and citations. Tangential findings are condensed to the connecting insight only.
+2. **Preserve specialist evidence in the report.** This is an analyst briefing for an operator paying for depth. The report's prose is dense with specifics — name the entities, give the numbers and dates, quote source text verbatim where paraphrasing would lose meaning. Anchor every interpretation to specific data points from this turn's findings. Every specific claim traces to a stated fact, quote, table row, or calculation in this turn's specialist or tool results. When a specialist labels a finding as an estimate, a range, or low-confidence, preserve that label — do not restate estimates as observed facts. Embed specialist data tables, dated source excerpts, and numeric findings in the section they most support, verbatim when synthesis would lose specificity. Findings central to the question get full data, tables, quotes, and citations. Tangential findings are condensed to the connecting insight only. Length comes from retained evidence, not additional framing.
 3. **Organize by insight theme, not specialist name.** Headings should describe the finding or decision factor.
 4. **Connect findings and resolve conflicts.** If specialists found complementary data, explain the connection. If sources conflict, explain which source is more reliable and why.
-5. **Cite sources.** Google Places data can be cited as "Google Places." Preserve specialist citations. Do not add uncited findings from memory. Cite only sources that appear in this turn's tool or specialist results.
+5. **Cite inline, per claim.** Each specific claim — a number, dated event, quoted phrase, or named entity — is followed inline by its source. When specialists drew from different kinds of sources — say, a delivery platform vs. a press article — the report's citations preserve that mix rather than collapsing onto one type. Preserve specialist citations; cite Google Places data as "Google Places". Cite only sources that appear in this turn's tool or specialist results.
 6. **Translate internal judgments into natural language.** Do not use labels like SUPPORTED, QUESTIONABLE, CONTRADICTED, or UNTESTED in the final report.
 7. **End with 2-3 specific follow-up questions.** Refer to entities by name; do not use "your".
+
+Recommended structure:
+
+- **Executive Summary** — open with the single most important finding for the operator.
+- **2–5 insight sections, one per distinct evidence surface that produced substantive findings** — each section opens with the strongest sourced evidence point (a specific number, named entity, dated event, quoted phrase, table row, or calculation), develops supporting evidence in importance order, and closes with the operator implication. Start each evidence paragraph with a sourced number, named entity, dated event, quoted phrase, table row, or direct calculation. If none exists, merge or cut the paragraph.
+- **What this means for the operator**
+- **Follow-up questions**
 
 ## Data visualization
 

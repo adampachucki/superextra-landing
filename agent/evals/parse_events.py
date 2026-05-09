@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 from superextra_agent.firestore_events import (
     _get,
-    _iter_function_calls,
+    _iter_parts,
     _state_delta,
     extract_sources_from_grounding,
 )
@@ -75,10 +75,15 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                 }
 
         # Tool calls — count and capture URLs for fetch_web_content
-        for _idx, name, args in _iter_function_calls(event):
+        for part in _iter_parts(event):
+            fc = _get(part, "function_call")
+            name = _get(fc, "name") if fc else None
+            if not name:
+                continue
             tool_call_counts[name] = tool_call_counts.get(name, 0) + 1
             if name == "fetch_web_content":
-                url = args.get("url")
+                args = _get(fc, "args") or {}
+                url = args.get("url") if isinstance(args, dict) else None
                 if isinstance(url, str) and url:
                     fetched_urls.add(url)
 

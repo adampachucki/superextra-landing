@@ -242,6 +242,12 @@ class ChatLoggerPlugin(BasePlugin):
         if llm_response.error_code:
             entry["error_code"] = llm_response.error_code
             entry["error_message"] = llm_response.error_message
+            try:
+                entry["llm_response_dump"] = _safe(
+                    llm_response.model_dump(mode="json", exclude_none=True)
+                )
+            except Exception:
+                entry["llm_response_repr"] = repr(llm_response)[:2000]
 
         if llm_response.usage_metadata:
             entry["tokens"] = {
@@ -250,13 +256,29 @@ class ChatLoggerPlugin(BasePlugin):
                 "total": llm_response.usage_metadata.total_token_count,
             }
 
-        # log text preview (first 500 chars) and function calls
+        try:
+            fr = getattr(llm_response, "finish_reason", None)
+            if fr is not None:
+                entry["finish_reason"] = str(fr)
+        except Exception:
+            pass
+
+        # log text preview (first 500 chars), function calls (with args), and part types
         if llm_response.content and llm_response.content.parts:
+            part_types: list[str] = []
             for part in llm_response.content.parts:
                 if part.text:
                     entry["text_preview"] = part.text[:500]
+                    part_types.append("thought" if getattr(part, "thought", False) else "text")
                 if part.function_call:
-                    entry.setdefault("function_calls", []).append(part.function_call.name)
+                    fc_entry: dict[str, Any] = {"name": part.function_call.name}
+                    try:
+                        fc_entry["args"] = _safe(part.function_call.args)
+                    except Exception:
+                        pass
+                    entry.setdefault("function_calls", []).append(fc_entry)
+                    part_types.append("function_call")
+            entry["part_types"] = part_types
 
         self._write(sid, entry)
         return None
