@@ -53,9 +53,7 @@
 	const label = $derived.by<string>(() => {
 		const latest = events[events.length - 1];
 		if (!latest) return 'Preparing analysis';
-		if (latest.kind === 'detail') return FAMILY_LABEL[latest.family];
-		if (latest.kind === 'thought') return authorLabel(latest.author);
-		return 'Updating analysis';
+		return latest.kind === 'detail' ? FAMILY_LABEL[latest.family] : authorLabel(latest.author);
 	});
 
 	const LEAD_AUTHORS = new Set(['router', 'context_enricher', 'research_lead', 'follow_up']);
@@ -342,11 +340,11 @@
 			content: '.';
 		}
 	}
-		.thought-segment {
-			opacity: 1;
-			transition: opacity 420ms ease;
-			white-space: pre-line;
-		}
+	.thought-segment {
+		opacity: 1;
+		transition: opacity 420ms ease;
+		white-space: pre-line;
+	}
 	.thought-inline.strong {
 		font-weight: 600;
 	}
