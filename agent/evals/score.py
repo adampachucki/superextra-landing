@@ -25,7 +25,7 @@ sys.path.insert(0, str(AGENT_DIR))
 
 
 # ── Domain → category taxonomy ─────────────────────────────────────────────
-# 8 categories, matching docs/research-depth-eval-plan.md.
+# 8 categories used by the research-depth eval harness.
 # Domains matched by suffix: a rule "trojmiasto.pl" matches foo.trojmiasto.pl too.
 
 _CATEGORY_RULES: list[tuple[str, str]] = [

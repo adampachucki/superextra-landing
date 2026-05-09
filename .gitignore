@@ -34,6 +34,7 @@ vite.config.ts.timestamp-*
 # ADK
 agent/.venv
 .adk
+.pytest_cache/
 agent/logs
 agent/test_replay.json
 __pycache__

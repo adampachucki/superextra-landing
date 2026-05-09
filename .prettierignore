@@ -14,6 +14,7 @@ build/
 
 # Agent (Python — not formatted by Prettier)
 agent/
+.pytest_cache/
 
 # Miscellaneous
 /static/

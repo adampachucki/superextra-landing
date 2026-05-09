@@ -259,7 +259,7 @@ Browser state is driven by **four live Firestore listeners** (`src/lib/chat-stat
 
 Watchdog (`watchdog.js`, scheduled by Cloud Scheduler every 2 min) flips stuck sessions to `status=error` inside a fenced transaction.
 
-Plans: `docs/gear-migration-implementation-plan-2026-04-26.md`, `docs/gear-phase9-decommission-plan-2026-04-27.md`.
+Historical migration plans are archived outside this repo; current deployment gotchas live in `docs/deployment-gotchas.md`.
 
 ## Domains & hosting sites
 

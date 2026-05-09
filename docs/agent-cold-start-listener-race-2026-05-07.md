@@ -152,8 +152,8 @@ The cold start exposed the bug, but the bug is the timer itself.
 
 `LOAD_TIMEOUT_MS = 10_000` was introduced in 5f810d5 (2026-04-23) as part
 of the original server-stored-sessions feature. Its declared purpose, per
-`docs/gear-post-review-fixes-plan-2026-04-27.md:20`, is "catches network-
-blackhole cases without false-positiving on legitimate slowness."
+the archived gear post-review fixes plan, is "catches network-blackhole
+cases without false-positiving on legitimate slowness."
 
 Walking through what `loadTimedOut` actually catches:
 

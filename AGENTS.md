@@ -119,7 +119,7 @@ Browser reads state via two `onSnapshot` observers (`sessions/{sid}` for termina
 
 Watchdog (`watchdog.js`, scheduled every 2 min) flips stuck sessions to `status=error` inside a fenced transaction.
 
-Plans: `docs/gear-migration-implementation-plan-2026-04-26.md`, `docs/gear-phase9-decommission-plan-2026-04-27.md`.
+Historical migration plans are archived outside this repo; current deployment gotchas live in `docs/deployment-gotchas.md`.
 
 ## Deployment
 
