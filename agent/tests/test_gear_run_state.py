@@ -114,8 +114,7 @@ def test_observe_event_methods_are_await_free(method_name):
 
 @pytest.mark.asyncio
 async def test_finalize_empty_reply_returns_error_payload():
-    """plan §4.1 step 4 + worker_main.py:1292 — a whitespace-only or
-    missing final_reply must produce the error terminal payload."""
+    """A whitespace-only or missing final_reply produces the error terminal payload."""
     state = _make_state()
     state.final_reply = ""  # empty
     state.timeline_writer.write_timeline = AsyncMock(return_value=None)

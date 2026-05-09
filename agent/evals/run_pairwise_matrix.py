@@ -20,22 +20,25 @@ import argparse
 import asyncio
 import csv
 import json
-import subprocess
-from pathlib import Path
 from collections import Counter
+from pathlib import Path
 
 EVALS_DIR = Path(__file__).resolve().parent
 PAIRWISE_SCRIPT = EVALS_DIR / "pairwise.py"
 PYTHON = EVALS_DIR.parent / ".venv" / "bin" / "python"
 
 
-async def _run_one(sem: asyncio.Semaphore, a_path: Path, b_path: Path,
-                   out_path: Path, model: str, a_label: str, b_label: str) -> dict | None:
+async def _run_one(
+    sem: asyncio.Semaphore,
+    a_path: Path,
+    b_path: Path,
+    out_path: Path,
+    model: str,
+    a_label: str,
+    b_label: str,
+) -> dict:
     if out_path.exists():
-        try:
-            return json.loads(out_path.read_text())
-        except Exception:
-            pass
+        return json.loads(out_path.read_text())
     out_path.parent.mkdir(parents=True, exist_ok=True)
     async with sem:
         proc = await asyncio.create_subprocess_exec(
@@ -48,14 +51,12 @@ async def _run_one(sem: asyncio.Semaphore, a_path: Path, b_path: Path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
+        _stdout, stderr = await proc.communicate()
         if proc.returncode != 0:
-            print(f"[pairwise] FAIL {a_path.name}: {stderr.decode()[-300:]}", flush=True)
-            return None
-    try:
-        return json.loads(out_path.read_text())
-    except Exception:
-        return None
+            raise RuntimeError(
+                f"[pairwise] FAIL {a_path.name}: {stderr.decode()[-300:]}"
+            )
+    return json.loads(out_path.read_text())
 
 
 async def _main() -> int:
@@ -74,30 +75,44 @@ async def _main() -> int:
     b_dir = Path(args.b_dir)
     out_dir = Path(args.out_verdicts)
 
+    a_names = {p.name for p in a_dir.glob("*.json")}
+    b_names = {p.name for p in b_dir.glob("*.json")}
+    if a_names != b_names:
+        missing_b = sorted(a_names - b_names)
+        missing_a = sorted(b_names - a_names)
+        raise RuntimeError(
+            f"[pairwise] unmatched results: "
+            f"missing from B={missing_b[:10]}, missing from A={missing_a[:10]}"
+        )
+
     pairs = []
-    for a_path in sorted(a_dir.glob("*.json")):
-        b_path = b_dir / a_path.name
-        if not b_path.exists():
-            continue
-        out_path = out_dir / a_path.name
+    for name in sorted(a_names):
+        a_path = a_dir / name
+        b_path = b_dir / name
+        out_path = out_dir / name
         pairs.append((a_path, b_path, out_path))
     print(f"[pairwise] {len(pairs)} pairs to judge", flush=True)
 
     sem = asyncio.Semaphore(args.concurrency)
-    results = await asyncio.gather(*[
-        _run_one(sem, a, b, o, args.model, args.a_label, args.b_label)
-        for (a, b, o) in pairs
-    ])
+    results = await asyncio.gather(
+        *[
+            _run_one(sem, a, b, o, args.model, args.a_label, args.b_label)
+            for (a, b, o) in pairs
+        ]
+    )
 
     # Aggregate
     rows = []
-    dim_keys = ["coverage", "specificity", "source_diversity", "actionability",
-                "specialist_set_correctness"]
+    dim_keys = [
+        "coverage",
+        "specificity",
+        "source_diversity",
+        "actionability",
+        "specialist_set_correctness",
+    ]
     overall_winners: list[str] = []
     dim_winners: dict[str, list[str]] = {k: [] for k in dim_keys}
     for (a, _, _), v in zip(pairs, results):
-        if not v:
-            continue
         winner = v.get("winner", "?")
         overall_winners.append(winner)
         for k in dim_keys:

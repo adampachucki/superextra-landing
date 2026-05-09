@@ -256,12 +256,9 @@ class ChatLoggerPlugin(BasePlugin):
                 "total": llm_response.usage_metadata.total_token_count,
             }
 
-        try:
-            fr = getattr(llm_response, "finish_reason", None)
-            if fr is not None:
-                entry["finish_reason"] = str(fr)
-        except Exception:
-            pass
+        fr = getattr(llm_response, "finish_reason", None)
+        if fr is not None:
+            entry["finish_reason"] = str(fr)
 
         # log text preview (first 500 chars), function calls (with args), and part types
         if llm_response.content and llm_response.content.parts:
@@ -269,13 +266,14 @@ class ChatLoggerPlugin(BasePlugin):
             for part in llm_response.content.parts:
                 if part.text:
                     entry["text_preview"] = part.text[:500]
-                    part_types.append("thought" if getattr(part, "thought", False) else "text")
+                    part_types.append(
+                        "thought" if getattr(part, "thought", False) else "text"
+                    )
                 if part.function_call:
-                    fc_entry: dict[str, Any] = {"name": part.function_call.name}
-                    try:
-                        fc_entry["args"] = _safe(part.function_call.args)
-                    except Exception:
-                        pass
+                    fc_entry: dict[str, Any] = {
+                        "name": part.function_call.name,
+                        "args": _safe(part.function_call.args),
+                    }
                     entry.setdefault("function_calls", []).append(fc_entry)
                     part_types.append("function_call")
             entry["part_types"] = part_types

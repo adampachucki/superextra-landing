@@ -17,6 +17,7 @@ from superextra_agent.firestore_events import (
     _state_delta,
     extract_sources_from_grounding,
 )
+from superextra_agent.specialist_catalog import SPECIALISTS
 
 
 def _domain_of(url: str) -> str:
@@ -87,20 +88,17 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                 if isinstance(url, str) and url:
                     fetched_urls.add(url)
 
-        # state_delta inspection: provider pills, historical dispatch keys,
-        # and specialist/final outputs.
+        # state_delta inspection: provider pills and specialist/final outputs.
         sd = _state_delta(event)
         for key, value in sd.items():
             if key.startswith("_tool_src_") and isinstance(value, dict):
                 provider_pills.append(value)
-            elif key == "specialist_briefs" and isinstance(value, dict):
-                specialists_dispatched = sorted(value.keys())
             elif key == "final_report" and isinstance(value, str):
                 final_report = value
             elif key.endswith("_result") and isinstance(value, str):
                 specialist_outputs[key] = value
 
-        # Token accounting from LlmResponse usage_metadata (when present).
+        # Token accounting from LlmResponse usage_metadata.
         # Not every event carries usage_metadata — only model-response events do.
         usage = _get(event, "usage_metadata")
         if usage:
@@ -113,23 +111,16 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                 if isinstance(v, int):
                     token_totals[bucket] += v
 
-    # AgentTool-shaped pipelines have no `specialist_briefs` state_delta.
-    # Derive dispatch from specialist tool calls. The state_delta branch above
-    # remains only for historical eval captures produced before 2026-04-29.
+    # Derive dispatch from specialist tool calls.
     if not specialists_dispatched:
-        try:
-            from superextra_agent.specialist_catalog import SPECIALISTS
-
-            specialist_names = {s.name for s in SPECIALISTS}
-            specialists_dispatched = sorted(
-                name for name in tool_call_counts.keys() if name in specialist_names
-            )
-        except Exception:
-            pass  # best-effort — if catalog import fails, leave empty
+        specialist_names = {s.name for s in SPECIALISTS}
+        specialists_dispatched = sorted(
+            name for name in tool_call_counts.keys() if name in specialist_names
+        )
 
     final_outcome = "ok" if final_report else "unknown"
 
-    # Drawer sources: what worker_main._merge_source would have produced —
+    # Drawer sources: what GearRunState._merge_source would have produced —
     # grounding URLs (deduped) + provider pills (deduped by URL).
     # Prefer real domain from grounding chunk's web.domain over parsed
     # redirect URL — see docstring note above.
