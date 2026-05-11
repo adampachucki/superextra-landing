@@ -301,8 +301,7 @@
 			>
 				<div class="flex min-w-0 items-baseline gap-2 text-[13px] text-black/55 dark:text-white/55">
 					<span class="work-dot" aria-hidden="true"></span>
-					<span class="truncate">{label}</span>
-					<span class="label-typing-dots" aria-hidden="true"></span>
+					<span class="truncate">{label}<span class="label-typing-dots" aria-hidden="true"></span></span>
 				</div>
 				<span class="shrink-0 text-[12px] text-black/45 dark:text-white/45">
 					{durationLabel}
@@ -334,31 +333,20 @@
 		}
 	}
 	.label-typing-dots::after {
-		content: '';
+		content: '...';
 		display: inline-block;
+		margin-left: 0.08ch;
 		width: 1.2ch;
 		text-align: left;
-		animation: label-dots-cycle 1.6s steps(1, end) infinite;
+		animation: label-dots-pulse 1.5s ease-in-out infinite;
 	}
-	@keyframes label-dots-cycle {
+	@keyframes label-dots-pulse {
 		0%,
 		100% {
-			content: '';
+			opacity: 0.25;
 		}
-		16% {
-			content: '.';
-		}
-		32% {
-			content: '..';
-		}
-		48% {
-			content: '...';
-		}
-		64% {
-			content: '..';
-		}
-		80% {
-			content: '.';
+		50% {
+			opacity: 1;
 		}
 	}
 	.thought-segment {
