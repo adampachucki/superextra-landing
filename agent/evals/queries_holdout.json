@@ -9,7 +9,7 @@
     {
       "id": "hq2_pricing_exposed_by_delivery",
       "primary_probe": true,
-      "buckets": ["pricing", "marketing_digital", "delivery_platforms"],
+      "buckets": ["pricing", "marketing_brand", "delivery_platforms"],
       "text": "Are nearby restaurants discounting or using delivery apps in ways that make our current pricing look exposed?"
     },
     {

@@ -154,8 +154,8 @@
 				></tr
 			>
 			<tr
-				><td><strong>Marketing & Digital</strong></td><td
-					>Competitor social signals and demand-generation effectiveness.</td
+				><td><strong>Marketing & Brand</strong></td><td
+					>Competitor positioning, campaigns, social signals, and demand-generation effectiveness.</td
 				></tr
 			>
 			<tr

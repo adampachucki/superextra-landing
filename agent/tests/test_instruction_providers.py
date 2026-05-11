@@ -20,6 +20,7 @@ class TestResearchLeadInstruction:
         result = _research_lead_instruction(ctx)
 
         assert "Restaurant XYZ data here" in result
+        assert "## Market Source Profiles" in result
 
     def test_default_when_missing(self):
         ctx = MockCtx(state={})
@@ -75,6 +76,7 @@ class TestMakeInstruction:
         result = provider(ctx)
 
         assert "Competitor data for area" in result
+        assert "## Market Source Profiles" not in result
 
     def test_provider_uses_default_when_missing(self):
         provider = _make_instruction("market_landscape")
@@ -84,18 +86,35 @@ class TestMakeInstruction:
 
         assert "No Google Places data available." in result
 
+    def test_review_analyst_does_not_inherit_web_fetch_instructions(self):
+        provider = _make_instruction("review_analyst")
+
+        ctx = MockCtx(
+            state={"places_context": "Target data", "_target_place_id": "ChIJtarget"}
+        )
+        result = provider(ctx)
+
+        assert "You do not have `google_search`" in result
+        assert "fetch_web_content" not in result
+        assert "## Market Source Profiles" not in result
+        assert "Pyszne.pl" not in result
+        assert "ChIJtarget" in result
+
 
 class TestFollowUpInstruction:
     def test_injects_prior_report(self):
         ctx = MockCtx(state={
             "final_report": "## Market Report\nKey findings here.",
             "places_context": "Restaurant XYZ data",
+            "market_result": "Market specialist notes",
         })
 
         result = _follow_up_instruction(ctx)
 
         assert "## Market Report" in result
         assert "Restaurant XYZ data" in result
+        assert "Market specialist notes" in result
+        assert "Market Landscape" in result
 
     def test_defaults_when_state_empty(self):
         ctx = MockCtx(state={})
@@ -103,6 +122,7 @@ class TestFollowUpInstruction:
         result = _follow_up_instruction(ctx)
 
         assert "No prior report available." in result
+        assert "No specialist notes available." in result
         assert "No restaurant data available." in result
         assert "No research plan available." not in result
 
@@ -125,6 +145,7 @@ class TestRouterInstruction:
         result = _router_instruction(ctx)
 
         assert "report has already been delivered" in result
+        assert "narrow same-target or same-area detail" in result
 
     def test_no_report_note(self):
         ctx = MockCtx(state={})

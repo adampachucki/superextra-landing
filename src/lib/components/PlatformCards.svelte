@@ -87,8 +87,8 @@
 			</PlatformCard>
 
 			<PlatformCard
-				title="Marketing & Digital"
-				desc="Social media activity, marketing channels, estimated ad spend, and tools and platforms in use across competitors."
+				title="Marketing & Brand"
+				desc="Brand positioning, campaigns, social activity, marketing channels, and platform presence across competitors."
 				mode="free"
 				separator
 			>

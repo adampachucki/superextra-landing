@@ -123,7 +123,11 @@ async def _run_conversation(messages: list[str], pre_state: dict | None = None) 
 
 # State simulating a completed research session
 REPORT_STATE = {
-    "final_report": "## Market Analysis\n\nKey findings about Restaurant XYZ...\n\nPricing is competitive at PLN 35-45 range.",
+    "final_report": (
+        "## Market Analysis\n\n"
+        "Key findings about Restaurant XYZ...\n\n"
+        "Pricing is competitive at PLN 35-45 range."
+    ),
     "places_context": "Target: Restaurant XYZ, Warsaw. Competitors: A, B, C.",
 }
 
@@ -134,6 +138,7 @@ SHOULD_FOLLOW_UP = [
     pytest.param("Summarize that in bullet points", id="reformat_request"),
     pytest.param("What did you find about pricing?", id="drill_into_existing"),
     pytest.param("Can you compare restaurants A and B from the report?", id="compare_from_report"),
+    pytest.param("Can you check if Restaurant XYZ still lists brunch?", id="narrow_current_fill_in"),
 ]
 
 
@@ -148,10 +153,9 @@ async def test_simple_followup_routes_to_follow_up(message):
     )
 
 
-# --- New research needs → should still route to research_pipeline ---
+# --- New research needs for the same target/area should still route to research_pipeline ---
 
 SHOULD_RESEARCH = [
-    pytest.param("Now analyze Restaurant D in Krakow", id="new_restaurant"),
     pytest.param("What about the delivery market in this area?", id="new_topic_not_covered"),
 ]
 
@@ -165,6 +169,22 @@ async def test_new_research_routes_to_pipeline(message):
         f"Expected transfer to research_pipeline but got: {results[0]['transferred_to']} "
         f"(response: {results[0]['response'][:200]})"
     )
+
+
+# --- New target after a report should clarify, not reuse stale context ---
+
+
+@pytest.mark.asyncio
+async def test_new_restaurant_after_report_asks_for_new_target_context():
+    """After a report, a different restaurant should not route with stale Places context."""
+    results = await _run_conversation(
+        ["Now analyze Restaurant D in Manchester"], pre_state=REPORT_STATE
+    )
+    assert results[0]["transferred_to"] is None, (
+        f"Expected clarification but got: {results[0]['transferred_to']} "
+        f"(response: {results[0]['response'][:200]})"
+    )
+    assert results[0]["response"], "Router should ask for new target context"
 
 
 # --- No prior report → should route to research_pipeline ---

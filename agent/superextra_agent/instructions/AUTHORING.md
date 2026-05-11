@@ -1,97 +1,172 @@
 # Writing Agent Instructions
 
-Read this before writing or modifying any instruction file in this directory.
+Read this before editing any file in this directory.
 
 ## Architecture
 
 ```
 Router -> research_pipeline
-           ├── Context Enricher (fetches Google Places data)
-           └── Research Lead (reconnaissance, coverage planning, specialist tool calls, final report)
+           |-- Context Enricher
+           `-- Research Lead
+               `-- Specialists through AgentTool
+
+Router -> follow_up
 ```
 
-The router classifies messages and either transfers to `research_pipeline`, transfers to `follow_up`, or asks for clarification.
+The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and writes the final report. Specialists answer one evidence surface from the Lead's brief. Follow-up answers from the existing report, specialist notes, Places context, and limited web fill-in for narrow same-target questions.
 
-**Key state keys:**
+## State Keys
 
-- `places_context` - Google Places data. Written by the enricher, read by the research lead, specialists, and follow-up agent.
-- Specialist result keys (`market_result`, `pricing_result`, etc.) - written by specialists when the research lead calls them as tools.
-- `final_report` - written by the research lead. Read by the frontend and follow-up agent.
-- `final_report_followup` - written by the follow-up agent for terminal follow-up replies without overwriting the original report.
+- `places_context`: Google Places context from the enricher.
+- `_target_place_id`, `_target_lat`, `_target_lng`: target metadata written by Places tools.
+- Specialist result keys such as `market_result`, `pricing_result`, and `review_result`: specialist outputs.
+- `final_report`: final Research Lead report.
+- `final_report_followup`: final follow-up answer, separate from the original report.
 
-**Agent roles:**
+## Rule Ownership
 
-- **Router** detects conversation state and routes.
-- **Research Lead** audits assumptions, does reconnaissance, identifies evidence surfaces, calls specialists directly as tools with specific `request` briefs, checks sufficiency, and writes the final report.
-- **Specialists** are directed researchers. They see their `request` brief and Places context, not each other's output.
-- **Follow-up** answers narrow follow-up questions from the existing report and Places context.
+| Rule type | Owner |
+| --- | --- |
+| Routing and clarification | `router.md` |
+| Places lookup and competitor context | `context_enricher.md` |
+| Research planning, specialist dispatch, sufficiency, and final report shape | `research_lead.md` |
+| Universal specialist behavior | `specialist_base.md` |
+| Market source families | `market_source_profiles.md` |
+| Specialist-specific source surface and boundaries | Specialist body files |
+| Hard tool limits, retries, errors, and caps | Tool code |
+| Citation plumbing and source validation | Product/source pipeline |
+| Eval thresholds and pass/fail criteria | Evals |
 
-## Base template system
+Put each rule in one place. If the same instruction seems needed in three prompts, move it to the shared owner or delete it.
 
-Specialist instructions use a two-file composition:
+## Prompt Style
 
-1. **`specialist_base.md`** - shared boilerplate (role line, date awareness, assignment preamble, how-to-answer, tone, boundaries)
-2. **`{specialist_name}.md`** - unique body (scope, methodology, places guidance, answer specifics)
+- Use short, plain sentences.
+- Prefer stable sections: `Job`, `Inputs`, `Process`, `Boundaries`, `Output`.
+- Avoid recipes for known eval cases.
+- Avoid "be thorough" without observable behavior.
+- Avoid hardcoded market examples in universal prompts.
+- Avoid broad claims about source availability. Say "when accessible" unless a direct tool guarantees access.
+- Keep examples for boundary decisions only.
 
-`_make_instruction()` in `specialists.py` assembles: base template with `{specialist_body}` replaced by the specialist's body, `{role_title}` replaced from `ROLE_TITLES`. Then `{places_context}` is substituted at runtime and source guidance is appended. The brief itself arrives as the AgentTool `request` user message.
+## Specialist Template System
 
-## Rules
+Specialist instructions use two prompt layers:
 
-These exist because we hit each problem at least once.
+1. `specialist_base.md`: universal specialist contract.
+2. `{specialist_name}.md`: domain-specific scope, evidence, boundaries, and output notes.
 
-1. **Agents take the path of least resistance.** If a specialist has Google Places data and isn't told to go beyond it, it will reformat that data and call it research. Every specialist body must say: Places data is your starting point, not your output.
+`specialists.py` composes the base and body. It injects:
 
-2. **Agents don't coordinate.** If scopes overlap, they produce identical output. The research lead must call specialists with non-overlapping briefs and explicit boundaries. The lead also defines a shared competitive set so all specialists analyze the same restaurants.
+- `{places_context}`;
+- `{target_place_id}` for `review_analyst`;
+- `{role_title}`;
+- `{specialist_body}`.
 
-3. **LLMs default to summarizing.** The research lead writes the final report directly, so depth preservation must be explicit in `research_lead.md`: preserve tables, quotes, numbers, and citations when they are central to the answer.
+Do not append extra shared source policy in code. `market_source_profiles.md` is injected into the Research Lead. The Lead passes relevant source expectations to specialists in each brief.
 
-4. **Specialists can't infer what they can't see.** Each specialist `request` must relay: response language, date, competitive set, what other specialists are covering, and what not to cover.
+## Specialist Body Rules
 
-5. **Relevance filtering is the research lead's job.** Specialists don't self-filter. The lead only calls specialists whose domain fits a material evidence surface.
+Each body should answer four questions:
 
-6. **"Be thorough" is not an instruction.** "Try at least 3 different search queries" is. Make methodology concrete.
+1. What evidence surface does this specialist own?
+2. What source families should it seek?
+3. What neighboring work should it avoid?
+4. What output details help the Lead synthesize?
 
-7. **Don't copy-paste across specialist body files without customizing.** Shared structure lives in `specialist_base.md`. Body files contain only domain-specific content.
+Do not paste generic source policy into body files. Do not repeat another specialist's scope. Do not include `places_context` in body files; the base already injects it.
 
-8. **Domain boundaries live in the research lead prompt.** When a topic could go to multiple specialists, add ownership rules to `research_lead.md`.
+## Research Lead Rules
 
-9. **Agents are sycophantic by default.** Two structural checkpoints enforce objectivity:
-   - **Research Lead:** Must audit assumptions, test the most important premise during reconnaissance, and translate findings into a final report that leads with data even when it contradicts the user's framing.
-   - **Specialists:** Must end every response with a "Brief alignment" statement.
+The Lead owns:
 
-## Instruction structure
+- question-type handling and premise checks when relevant;
+- evidence-surface planning;
+- specialist selection;
+- non-overlap;
+- specialist brief quality;
+- market/source guidance for each specialist brief;
+- one focused extra round if evidence is weak;
+- final report shape.
 
-**Specialist body files** contain only domain-specific content:
+The Lead should usually choose 2-4 independent evidence surfaces for first-turn operator questions. One specialist is fine for narrow questions. More specialists are justified only when they add distinct evidence.
 
-1. Your scope (domain knowledge reference)
-2. How to research (domain-specific search strategies)
-3. Restaurant context from Google Places (`{places_context}` template)
-4. Answer specifics (optional - domain-specific format requirements beyond the base)
+## Market Source Profiles
 
-The base template provides: role description, date awareness, assignment preamble, how-to-answer checklist, tone, boundaries, brief alignment requirement.
+`market_source_profiles.md` is a compact source guide for PL, UK, US, and DE plus a general source order.
 
-## Template variables
+These profiles are starting points, not checklists. They should name source families and examples that help search. They must not imply that every source exists, is accessible, or was checked.
 
-Specialist body files use `{places_context}`, injected at runtime by `_make_instruction()` in `specialists.py`. The base template uses `{role_title}` and `{specialist_body}`, resolved at import time via `str.replace()`.
+When adding a market, update this file instead of putting country-specific lists into the Lead or specialist bodies.
 
-The research lead prompt uses `{places_context}`. The follow-up prompt uses `{final_report}` and `{places_context}`. Both are resolved at runtime by instruction providers in `agent.py`.
+## Code Versus Prompt
 
-Templates use Python's `str.format()` for runtime variables. Never add literal curly braces to `.md` files - use doubled braces (`{{`, `}}`) to escape them.
+Use prompts for:
 
-## Modification checklist
+- role and responsibility;
+- when to use a source family;
+- how to state uncertainty;
+- final report shape;
+- specialist boundaries.
 
-**Adding a specialist:**
+Use code/tools/evals for:
 
-1. Create the body `.md` file (scope + methodology + Places guidance only)
-2. Add a specialist entry to `specialist_catalog.py`
-3. Add a tool override in `specialists.py` only if the specialist needs non-default tools
+- hard caps and budgets;
+- retries, timeouts, and error types;
+- auth and source access;
+- structured source metadata;
+- citation validation;
+- eval scoring and thresholds.
 
-**Adding a template variable:**
+Do not solve tool problems with longer prompt prose.
 
-1. Add `{variable_name}` to the `.md` file
-2. Update the instruction provider to resolve it from `ctx.state`
-3. Ensure an upstream agent writes to that state key
+## Template Variables
 
-**Adding an ambiguous domain topic:**
+Runtime templates use Python `str.format()`.
 
-1. Add ownership rules to "Domain boundaries" in `research_lead.md`
+Files with runtime variables:
+
+- `research_lead.md`: `{places_context}`, `{market_source_profiles}`.
+- `follow_up.md`: `{final_report}`, `{specialist_reports}`, `{places_context}`.
+- `specialist_base.md`: `{role_title}`, `{places_context}`, `{specialist_body}`.
+- `review_analyst.md`: `{target_place_id}`.
+
+Never add literal curly braces to runtime-formatted prompt files. Escape them as doubled braces: `{{` and `}}`.
+
+Chart JSON in `research_lead.md` must keep doubled braces so `.format()` leaves valid JSON.
+
+## Modification Checklist
+
+### Editing A Prompt
+
+1. Identify the rule owner.
+2. Delete duplicates before adding new wording.
+3. Keep wording short and testable.
+4. Check for literal braces.
+5. Run instruction provider tests.
+
+### Adding A Specialist
+
+1. Add a short specialist body file.
+2. Add one catalog entry in `specialist_catalog.py`.
+3. Add a tool override in `specialists.py` only if default tools are wrong.
+4. Add boundary wording to `research_lead.md` only if the new scope overlaps with an existing specialist.
+
+### Adding A Template Variable
+
+1. Add the placeholder to the prompt.
+2. Update the instruction provider.
+3. Add or update tests for successful formatting.
+4. Ensure an upstream agent or tool writes the state key.
+
+## Known Deferred Streams
+
+Keep these out of the prompt revamp unless the stream is explicitly opened:
+
+- claim-level citation plumbing;
+- website fetching improvements;
+- review fetch budget enforcement;
+- active-session target changes;
+- full follow-up research mode beyond narrow web fill-in;
+- expanded evals;
+- durable memory.

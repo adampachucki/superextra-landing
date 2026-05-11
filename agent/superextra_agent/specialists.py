@@ -99,18 +99,8 @@ MODEL_GEMINI = _make_gemini(MODEL)
 SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 
 
-_SOURCE_GUIDANCE = """
-## Source quality
-
-For quantitative claims (prices, market size, salary benchmarks, stats), prefer authoritative
-primary sources — government data, industry reports, company filings, academic research. Always
-cite the source and year. For qualitative signals (sentiment, local dynamics, recent events), any
-credible source — news, food blogs, forums, social — is legitimate; local specificity often beats
-authoritative-but-generic. If a claim only appears in non-authoritative sources, flag that.
-"""
-
-
 _SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
+
 
 def _make_instruction(name: str):
     """Create an InstructionProvider that injects shared state into the template.
@@ -119,9 +109,9 @@ def _make_instruction(name: str):
     so the instruction provider only supplies durable context.
     """
     body = (INSTRUCTIONS_DIR / f"{name}.md").read_text()
-    template = (_SPECIALIST_BASE
-                .replace("{specialist_body}", body)
-                .replace("{role_title}", ROLE_TITLES.get(name, name)))
+    template = _SPECIALIST_BASE.replace("{specialist_body}", body).replace(
+        "{role_title}", ROLE_TITLES.get(name, name)
+    )
 
     def provider(ctx):
         places_context = ctx.state.get("places_context", "No Google Places data available.")
@@ -134,7 +124,6 @@ def _make_instruction(name: str):
             places_context=places_context,
             target_place_id=target_place_id,
         )
-        instruction += _SOURCE_GUIDANCE
         return instruction
 
     return provider

@@ -53,11 +53,9 @@ SPECIALISTS: tuple[Specialist, ...] = (
         output_key="market_result",
         label="Market Landscape",
         description=(
-            "Restaurant openings, closings, competitor mapping, cuisine trends, "
-            "saturation, and white space — sourced from press, forums "
-            "(Trojmiasto.pl, Reddit), local food blogs, and government "
-            "registries. Best for 'who's new, who's gone, what's missing' "
-            "questions and trade-area scans."
+            "Competitive structure, openings, closures, saturation, white "
+            "space, and competitor mapping. Best for market dynamics and "
+            "trade-area scans."
         ),
         role_title="Market Landscape research agent",
         thinking="high",
@@ -67,15 +65,9 @@ SPECIALISTS: tuple[Specialist, ...] = (
         output_key="pricing_result",
         label="Menu & Pricing",
         description=(
-            "Competitive menu and price analysis for the target restaurant and "
-            "competitive set. Pulls live data from delivery platforms "
-            "(Pyszne.pl, Wolt, Glovo, Uber Eats, Bolt Food), making this also "
-            "the strongest live signal of who is currently operating and on "
-            "which platforms. Compares delivery markup vs dine-in pricing, "
-            "surfaces promotions, lunch deals, trending dishes, "
-            "dietary-trend adoption, and currently-operating signals from "
-            "delivery-platform availability. Does NOT cover review sentiment "
-            "about price, marketing positioning, or revenue."
+            "Menu items, category structure, price ladders, dine-in versus "
+            "delivery pricing, promotions, and competitor price positioning. "
+            "Does not cover review sentiment, digital positioning, or revenue."
         ),
         role_title="Menu & Pricing research agent",
         thinking="high",
@@ -85,10 +77,9 @@ SPECIALISTS: tuple[Specialist, ...] = (
         output_key="revenue_result",
         label="Revenue & Sales",
         description=(
-            "Revenue estimates, check-size ranges, seasonality, channel splits "
-            "between dine-in/takeaway/delivery, and platform market share. "
-            "Pulls from industry reports, Eurostat, NielsenIQ-style "
-            "aggregators, and triangulates with platform listing density."
+            "Revenue estimates, average check, seasonality, covers, channel "
+            "mix, and market-level demand economics. Uses ranges and stated "
+            "assumptions."
         ),
         role_title="Revenue & Sales research agent",
         thinking="high",
@@ -98,12 +89,10 @@ SPECIALISTS: tuple[Specialist, ...] = (
         output_key="guest_result",
         label="Guest Intelligence",
         description=(
-            "Cross-platform qualitative review sentiment via web search — "
-            "TheFork, delivery-platform reviews (Wolt/Pyszne/Glovo), food "
-            "blogs, Reddit, local forums, press coverage. Distinct from "
-            "review_analyst's structured-API analysis: this is the 'what are "
-            "people actually saying' lens. Does NOT touch Google Reviews or "
-            "TripAdvisor structured API (review_analyst's domain)."
+            "Qualitative customer voice from local press, food writers, "
+            "forums, Reddit, social posts, delivery, booking, and niche "
+            "platforms. Does not analyze structured Google Reviews or "
+            "TripAdvisor API data."
         ),
         role_title="Guest Intelligence research agent",
         thinking="medium",
@@ -113,10 +102,9 @@ SPECIALISTS: tuple[Specialist, ...] = (
         output_key="location_result",
         label="Location & Traffic",
         description=(
-            "Foot traffic, demographic catchment, purchasing power index, rent "
-            "as a market signal (vs operations which treats rent as a cost "
-            "ratio), and trade-area shape. Pulls from Eurostat, OpenStreetMap "
-            "density, mobility data, real-estate listings."
+            "Trade-area quality, public busyness signals, demographics, "
+            "anchors, access, rent as a market signal, and local demand "
+            "density."
         ),
         role_title="Location & Traffic research agent",
         thinking="medium",
@@ -126,34 +114,23 @@ SPECIALISTS: tuple[Specialist, ...] = (
         output_key="ops_result",
         label="Operations",
         description=(
-            "Cost-side benchmarks for running a restaurant: salary ranges by "
-            "role from job boards, hiring difficulty signals, supplier and "
-            "ingredient pricing trends, and rent as a cost ratio (vs "
-            "location_traffic which treats rent as a market signal). Use for "
-            "any wage/labor question, hiring feasibility, or unit-economics "
-            "framing."
+            "Labor, wage, hiring, supplier, rent-cost, and operating cost "
+            "benchmarks. Use for wage questions, hiring feasibility, and "
+            "unit-economics framing."
         ),
         role_title="Operations research agent",
         thinking="high",
     ),
     Specialist(
-        name="marketing_digital",
+        name="marketing_brand",
         output_key="marketing_result",
-        label="Marketing & Digital",
+        label="Marketing & Brand",
         description=(
-            "Live Instagram, TikTok, Facebook activity (follower count, "
-            "posting cadence, engagement, Reels) and Meta Ad Library data "
-            "(active ads, creative, launch dates) for the target restaurant "
-            "and competitive set. Canonical signal for new venues launching "
-            "(announced on social before press), brand momentum, and "
-            "competitor advertising spend. Also covers price-positioning "
-            "signals such as promo frequency, value-proposition messaging, "
-            "discount framing, delivery-platform positioning (rankings, "
-            "photo quality, menu completeness), and Google SERP/Business "
-            "Profile presence. Does NOT analyze menu line-item prices, "
-            "review sentiment, or revenue."
+            "Marketing strategy, brand positioning, campaigns, PR, public "
+            "ads, social, web, search, and platform presence. Does not "
+            "analyze line-item menu prices, review sentiment, or revenue."
         ),
-        role_title="Marketing & Digital research agent",
+        role_title="Marketing & Brand research agent",
         thinking="medium",
     ),
     Specialist(
@@ -161,13 +138,9 @@ SPECIALISTS: tuple[Specialist, ...] = (
         output_key="review_result",
         label="Review Analysis",
         description=(
-            "Quantitative review analysis from structured API sources: Google "
-            "Reviews + TripAdvisor (tourist/local breakdown, rating trends, "
-            "owner-engagement, ranking position). Apify-backed, includes "
-            "demographics. Best for hard numbers on review patterns, price/value "
-            "complaints, closure-risk signals such as review-velocity flatlines, "
-            "and defensive owner-response patterns; pair with guest_intelligence "
-            "for cross-platform qualitative."
+            "Quantitative review analysis from structured Google Reviews and "
+            "TripAdvisor tools: samples, rating trends, owner response, "
+            "visitor mix, language, and review velocity."
         ),
         role_title="Review Analyst",
         thinking="high",
@@ -177,14 +150,10 @@ SPECIALISTS: tuple[Specialist, ...] = (
         output_key="dynamic_result_1",
         label="Dynamic Research",
         description=(
-            "Flexible research agent for angles outside the 8 specialist "
-            "domains. Use for niche regulatory questions, one-off competitor "
-            "news, sector-specific events, job-board-specific labor checks, "
-            "salary benchmarks beyond operations' standard sources, or any "
-            "topic where no other specialist's data sources apply. For "
-            "wage/labor questions, pair with operations when the answer needs "
-            "current job postings or external benchmark validation. Brief "
-            "should name the exact question and where to search."
+            "Flexible research for angles outside the standard domains, such "
+            "as broad culinary trends, regulation, food safety, one-off news, "
+            "infrastructure, events, or unusual benchmarks. Brief must name "
+            "the exact gap."
         ),
         role_title="flexible research agent",
         thinking="high",

@@ -25,6 +25,7 @@ from .specialists import (
     SPECIALIST_GEMINI,
     _inject_geo_bias,
     _make_gemini,
+    _on_tool_error,
 )
 from .web_tools import fetch_web_content
 
@@ -40,6 +41,7 @@ INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).pare
 # --- Instruction providers (inject session state into templates) ---
 
 _RESEARCH_LEAD_TEMPLATE = (INSTRUCTIONS_DIR / "research_lead.md").read_text()
+_MARKET_SOURCE_PROFILES = (INSTRUCTIONS_DIR / "market_source_profiles.md").read_text()
 
 
 def _research_lead_instruction(ctx):
@@ -58,7 +60,10 @@ def _research_lead_instruction(ctx):
             "Only call specialists for angles NOT already covered, "
             "unless the follow-up explicitly needs to update or deepen an existing area."
         )
-    return _RESEARCH_LEAD_TEMPLATE.format(places_context=places_context) + follow_up_note
+    return _RESEARCH_LEAD_TEMPLATE.format(
+        places_context=places_context,
+        market_source_profiles=_MARKET_SOURCE_PROFILES,
+    ) + follow_up_note
 
 
 # --- Shared agent config ---
@@ -86,7 +91,10 @@ def _make_enricher(name="context_enricher"):
         name=name,
         model=SPECIALIST_GEMINI,
         instruction=_ENRICHER_INSTRUCTION,
-        description="Fetches structured Google Places data for the target restaurant and its competitive set.",
+        description=(
+            "Fetches structured Google Places context for a target restaurant "
+            "and competitive set when available."
+        ),
         tools=_ENRICHER_TOOLS,
         output_key="places_context",
         generate_content_config=MEDIUM_THINKING_CONFIG,
@@ -94,19 +102,32 @@ def _make_enricher(name="context_enricher"):
     )
 
 
-# --- Follow-up agent (answers from existing research, no tools) ---
+# --- Follow-up agent (answers from existing research, with narrow web fill-in) ---
 
 _FOLLOW_UP_TEMPLATE = (INSTRUCTIONS_DIR / "follow_up.md").read_text()
 
 
+def _format_specialist_reports(state):
+    """Format prior specialist outputs for follow-up use."""
+    sections = []
+    for key, label in SPECIALIST_RESULT_KEYS.items():
+        value = state.get(key)
+        if value and value != "Agent did not produce output.":
+            sections.append(f"### {label}\n\n{value}")
+    if not sections:
+        return "No specialist notes available."
+    return "\n\n".join(sections)
+
+
 def _follow_up_instruction(ctx):
-    """Inject prior report and context into the follow-up agent's instructions.
+    """Inject prior report, specialist notes, and context into follow-up instructions.
 
     Uses `.format()` — inserted values are not scanned again, so chart-fence
     JSON in `final_report` flows through verbatim.
     """
     values = {
         "final_report": ctx.state.get("final_report", "No prior report available."),
+        "specialist_reports": _format_specialist_reports(ctx.state),
         "places_context": ctx.state.get("places_context", "No restaurant data available."),
     }
     return _FOLLOW_UP_TEMPLATE.format(**values)
@@ -116,7 +137,13 @@ follow_up = LlmAgent(
     name="follow_up",
     model=_FAST_MODEL,
     instruction=_follow_up_instruction,
-    description="Answers simple follow-up questions using existing research data. No tools.",
+    description=(
+        "Answers follow-up questions using prior research, specialist notes, "
+        "restaurant context, and narrow web fill-in."
+    ),
+    tools=[google_search, fetch_web_content],
+    before_model_callback=_inject_geo_bias,
+    on_tool_error_callback=_on_tool_error,
     # Distinct from `final_report` so a follow-up reply doesn't overwrite
     # the original research report in session state. The next follow-up would
     # otherwise read its own shorter answer as "the research."
@@ -132,7 +159,10 @@ def _router_instruction(ctx):
     """Append session state info so the router knows whether a report exists."""
     has_report = bool(ctx.state.get("final_report"))
     if has_report:
-        note = "\n\n## Session state\n\nA research report has already been delivered in this conversation."
+        note = (
+            "\n\n## Session state\n\n"
+            "A research report has already been delivered in this conversation."
+        )
     else:
         note = "\n\n## Session state\n\nNo research has been done yet in this conversation."
     return _ROUTER_TEMPLATE + note

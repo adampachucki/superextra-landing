@@ -9,7 +9,7 @@
       "expected_specialists": [
         "market_landscape",
         "menu_pricing",
-        "marketing_digital",
+        "marketing_brand",
         "review_analyst"
       ]
     },
@@ -22,7 +22,7 @@
       "expected_specialists": [
         "menu_pricing",
         "review_analyst",
-        "marketing_digital"
+        "marketing_brand"
       ]
     },
     {
@@ -67,7 +67,7 @@
       "text": "What should I be watching in the local food and drink scene over the next 3 months?",
       "expected_specialists": [
         "market_landscape",
-        "marketing_digital",
+        "marketing_brand",
         "dynamic_researcher_1"
       ]
     }

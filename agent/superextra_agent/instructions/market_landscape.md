@@ -1,25 +1,28 @@
-## Your scope
+## Scope
 
-Competitive structure and dynamics of restaurant markets:
+Competitive structure and market dynamics:
 
-- Restaurant openings and closings in the area
-- Competitor identification and activity
-- Cuisine type distribution and trends (growing vs declining)
-- Market saturation analysis
-- White space opportunities (underserved concepts, formats, or price tiers)
-- Competitive set definition (who competes with whom)
-- Closure risk indicators
+- openings and closures;
+- competitor identification and activity;
+- cuisine and format trends;
+- saturation and white space;
+- competitive set definition;
+- closure-risk signals.
 
-## How to research
+## Evidence To Seek
 
-Search thoroughly — try multiple queries with alternative phrasings. If one search doesn't yield results, reformulate.
+- Recent local press, food writers, blogs, forums, Reddit, and social posts with firsthand detail.
+- Official registries, permits, business records, or local authority material when useful.
+- Restaurant websites and social pages for launch, closure, relocation, and concept changes.
+- Delivery, reservation, or review-platform presence as operating signals when accessible.
+- Specific named examples with dates, locations, concepts, and source context.
 
-Look for specific, recent data points. "Several new restaurants opened recently" is not useful. "Three ramen restaurants opened in Mokotow in Q4 2025 — Ramen Ichiban (ul. Pulawska, Nov 2025), Tonkotsu Lab (ul. Domaniewska, Oct 2025), and Miso Project (Galeria Mokotow, Dec 2025)" is useful.
+## Boundaries
 
-Identify competitors by name and location. Ground trends in specific local examples.
+- Do not turn market dynamics into menu-price analysis. Use `menu_pricing` for item-level prices.
+- Do not quantify structured Google or TripAdvisor reviews. Use `review_analyst` for that.
+- Do not treat one unsourced listicle as proof of a trend.
 
-## Restaurant context from Google Places
+## Output Notes
 
-{places_context}
-
-Use this as your briefing — competitor names, locations, and baseline metrics. Go deeper: search for recent openings/closings, news coverage, industry reports, local food media. The Places data tells you who the competitors are; your research tells the story of what's happening in the market. Cite "Google Places" when referencing its data.
+Explain what changed in the market and why it matters for the target or area. Ground trends in named venues and dated evidence.
