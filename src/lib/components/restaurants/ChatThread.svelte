@@ -4,14 +4,24 @@
 	import { tts } from '$lib/tts.svelte';
 	import { splitChartSegments } from '$lib/chart-blocks';
 	import type { ChatSourceProvider } from '$lib/chat-types';
+	import { finalAnswerReveal } from '$lib/final-answer-reveal';
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
-	import TypewriterText from '$lib/components/agent/TypewriterText.svelte';
 	import { renderMarkdown } from '$lib/markdown';
 	import ChartBlock from './ChartBlock.svelte';
 
 	let scrollEl: HTMLDivElement | undefined = $state();
 	let bottomEl: HTMLDivElement | undefined = $state();
+	let scrollRun = 0;
 
+	function isInView(node: HTMLElement) {
+		const rect = node.getBoundingClientRect();
+		return rect.top >= 0 && rect.bottom <= window.innerHeight - 160;
+	}
+
+	const revealTurnIndex = $derived.by(() => {
+		const latest = chatState.messages[chatState.messages.length - 1];
+		return latest?.role === 'agent' && latest.animateReveal ? latest.turnIndex : null;
+	});
 	const scrollKey = $derived(
 		[
 			chatState.messages.length,
@@ -26,8 +36,20 @@
 	$effect(() => {
 		scrollKey;
 		if (!scrollEl) return;
+		const turnToReveal = revealTurnIndex;
+		const run = ++scrollRun;
 		tick().then(() => {
 			requestAnimationFrame(() => {
+				if (run !== scrollRun) return;
+				if (turnToReveal !== null) {
+					const userMessage = scrollEl?.querySelector<HTMLElement>(
+						`[data-user-turn="${turnToReveal}"]`
+					);
+					if (userMessage && !isInView(userMessage)) {
+						userMessage.scrollIntoView({ block: 'start', behavior: 'smooth' });
+					}
+					return;
+				}
 				bottomEl?.scrollIntoView({ block: 'end', behavior: 'smooth' });
 			});
 		});
@@ -44,8 +66,11 @@
 
 <div bind:this={scrollEl} class="px-5 py-6 md:px-6">
 	<div class="mx-auto flex max-w-[700px] flex-col gap-5">
-		{#each chatState.messages as msg, i}
-			<div class="msg-appear flex {msg.role === 'user' ? 'justify-end' : 'justify-start'}">
+		{#each chatState.messages as msg, i (`${chatState.activeSid ?? 'local'}:${msg.turnIndex}:${msg.role}`)}
+			<div
+				class="flex {msg.role === 'user' ? 'scroll-mt-6 justify-end' : 'justify-start'}"
+				data-user-turn={msg.role === 'user' ? msg.turnIndex : undefined}
+			>
 				{#if msg.role === 'user'}
 					<div
 						class="max-w-[85%] rounded-2xl rounded-br-md bg-cream-100 px-4 py-3 text-[15px] leading-relaxed text-black dark:text-white"
@@ -56,23 +81,17 @@
 					<div class="max-w-[95%] px-1 py-1">
 						<div
 							class="prose max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
+							use:finalAnswerReveal={msg.animateReveal
+								? () => chatState.markReplyRevealed(msg.turnIndex)
+								: undefined}
 						>
-							<TypewriterText
-								text={msg.text}
-								enabled={msg.animateText ?? false}
-								charsPerFrame={4}
-								onDone={() => chatState.markReplyTyped(msg.turnIndex)}
-							>
-								{#snippet children(text)}
-									{#each splitChartSegments(text) as seg, segIdx (segIdx)}
-										{#if seg.kind === 'chart'}
-											<ChartBlock spec={seg.spec} />
-										{:else}
-											{@html renderMarkdown(seg.text)}
-										{/if}
-									{/each}
-								{/snippet}
-							</TypewriterText>
+							{#each splitChartSegments(msg.text) as seg, segIdx (segIdx)}
+								{#if seg.kind === 'chart'}
+									<ChartBlock spec={seg.spec} />
+								{:else}
+									{@html renderMarkdown(seg.text)}
+								{/if}
+							{/each}
 						</div>
 						<div class="mt-2 flex justify-end">
 							<button
@@ -145,7 +164,7 @@
 									>Sources ({msg.sources.length})</span
 								>
 								<div class="flex flex-wrap gap-1.5">
-									{#each visible as src}
+									{#each visible as src (`${src.url}:${src.title}`)}
 										{@const domain =
 											src.domain ||
 											(() => {
@@ -198,7 +217,7 @@
 		{/each}
 
 		{#if chatState.loading}
-			<div class="msg-appear flex justify-start">
+			<div class="flex justify-start">
 				<div class="max-w-[95%] px-1 py-1">
 					<LiveActivity
 						events={chatState.liveTimeline}
@@ -210,7 +229,7 @@
 
 		{#if chatState.error}
 			{@const isTimeout = chatState.error === 'timeout'}
-			<div class="msg-appear flex justify-start">
+			<div class="flex justify-start">
 				<div
 					class="flex items-center gap-3 rounded-2xl border px-5 py-3 {isTimeout
 						? 'border-amber-200/50 bg-amber-50/50 dark:border-amber-400/20 dark:bg-amber-900/10'
@@ -231,20 +250,3 @@
 		<div bind:this={bottomEl} class="scroll-mb-32 md:scroll-mb-36" aria-hidden="true"></div>
 	</div>
 </div>
-
-<style>
-	.msg-appear {
-		animation: msgIn 0.3s ease-out both;
-	}
-
-	@keyframes msgIn {
-		from {
-			opacity: 0;
-			transform: translateY(6px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-</style>

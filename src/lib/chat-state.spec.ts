@@ -439,7 +439,7 @@ describe('chatState (Firestore-driven)', () => {
 			expect(chatState.messages[1]).toMatchObject({
 				role: 'agent',
 				text: 'already done',
-				animateText: false
+				animateReveal: false
 			});
 		});
 
@@ -484,11 +484,57 @@ describe('chatState (Firestore-driven)', () => {
 			expect(agent).toMatchObject({
 				role: 'agent',
 				text: 'fresh reply',
-				animateText: true
+				animateReveal: true
 			});
 
-			chatState.markReplyTyped(agent.turnIndex);
-			expect(chatState.messages[1].animateText).toBe(false);
+			chatState.markReplyRevealed(agent.turnIndex);
+			expect(chatState.messages[1].animateReveal).toBe(false);
+		});
+
+		it('does not animate when only a cache snapshot saw the turn running', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.turns('sid-1'));
+
+			obs.turns('sid-1')!.onNext(
+				turnsSnap(
+					[
+						{
+							data: {
+								turnIndex: 1,
+								runId: 'run-1',
+								userMessage: 'cached live',
+								status: 'running',
+								reply: null,
+								createdAt: { toMillis: () => 1000 }
+							}
+						}
+					],
+					{ fromCache: true }
+				)
+			);
+
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'cached live',
+							status: 'complete',
+							reply: 'already complete on server',
+							createdAt: { toMillis: () => 1000 },
+							completedAt: { toMillis: () => 2000 }
+						}
+					}
+				])
+			);
+
+			expect(chatState.messages[1]).toMatchObject({
+				role: 'agent',
+				text: 'already complete on server',
+				animateReveal: false
+			});
 		});
 
 		it('skips incomplete agent messages — renders only the user message until the turn completes', async () => {

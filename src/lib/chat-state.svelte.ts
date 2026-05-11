@@ -48,7 +48,7 @@ export interface ChatMessage {
 	text: string;
 	timestamp: number;
 	turnIndex: number;
-	animateText?: boolean;
+	animateReveal?: boolean;
 	sources?: ChatSource[];
 	turnSummary?: TurnSummary;
 	activityEvents?: TimelineEvent[];
@@ -158,12 +158,12 @@ let currentEventsCompletedTurnIndex: number | null = null;
 // seqInAttempt) to avoid duplicating timeline rows across resubscribes.
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
 const renderedEventKeys = new Set<string>();
-// Final-answer typewriter state is intentionally local to turns observed live
+// Final-answer reveal state is intentionally local to turns observed live
 // in this browser session. Historical complete turns render immediately.
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
 const previousTurnStatus = new Map<number, Turn['status']>();
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
-const replyTypewriterTurns = new Set<number>();
+const replyRevealTurns = new Set<number>();
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
 const completedActivityByTurn = new Map<number, TimelineEvent[]>();
 
@@ -190,7 +190,7 @@ function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
 				text: turn.reply,
 				timestamp: turn.completedAtMs ?? Date.now(),
 				turnIndex: turn.turnIndex,
-				animateText: replyTypewriterTurns.has(turn.turnIndex),
+				animateReveal: replyRevealTurns.has(turn.turnIndex),
 				sources: turn.sources?.length ? turn.sources : undefined,
 				turnSummary: turn.turnSummary ?? undefined,
 				activityEvents: activityEvents?.length ? activityEvents : undefined
@@ -280,7 +280,7 @@ function clearActiveState() {
 	optimisticTurnStartedAtMs = null;
 	renderedEventKeys.clear();
 	previousTurnStatus.clear();
-	replyTypewriterTurns.clear();
+	replyRevealTurns.clear();
 	completedActivityByTurn.clear();
 }
 
@@ -388,6 +388,7 @@ async function attachActiveListeners(sid: string) {
 		turnsQuery,
 		(snap) => {
 			if (activeSid !== sid) return;
+			const fromCache = snap.metadata.fromCache;
 			const next: Turn[] = [];
 			snap.forEach((docSnap) => {
 				const data = docSnap.data() as Record<string, unknown>;
@@ -411,6 +412,7 @@ async function attachActiveListeners(sid: string) {
 				const inFlight = IN_FLIGHT_STATUSES.has(status);
 				if (inFlight) completedActivityByTurn.delete(turnIndex);
 				if (
+					!fromCache &&
 					prev &&
 					IN_FLIGHT_STATUSES.has(prev) &&
 					!inFlight &&
@@ -419,10 +421,16 @@ async function attachActiveListeners(sid: string) {
 				) {
 					completedActivityByTurn.set(turnIndex, [...liveTimeline]);
 				}
-				if (prev && prev !== 'complete' && status === 'complete' && turn.reply) {
-					replyTypewriterTurns.add(turnIndex);
+				if (
+					!fromCache &&
+					prev &&
+					IN_FLIGHT_STATUSES.has(prev) &&
+					status === 'complete' &&
+					turn.reply
+				) {
+					replyRevealTurns.add(turnIndex);
 				}
-				previousTurnStatus.set(turnIndex, status);
+				if (!fromCache) previousTurnStatus.set(turnIndex, status);
 			});
 			// A cold first send can receive an empty cache/server turn snapshot
 			// before agentStream's transaction-created turn is observed. Keep the
@@ -709,8 +717,8 @@ function reset() {
 	clearActiveState();
 }
 
-function markReplyTyped(turnIndex: number) {
-	replyTypewriterTurns.delete(turnIndex);
+function markReplyRevealed(turnIndex: number) {
+	replyRevealTurns.delete(turnIndex);
 }
 
 // ---------------------------------------------------------------------------
@@ -789,7 +797,7 @@ export const chatState = {
 	sendFollowUp,
 	selectSession,
 	deleteSession,
-	markReplyTyped,
+	markReplyRevealed,
 	reset
 };
 
