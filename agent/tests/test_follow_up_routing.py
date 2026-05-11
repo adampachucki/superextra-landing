@@ -86,12 +86,10 @@ async def _run_conversation(messages: list[str], pre_state: dict | None = None) 
     """Send messages through the test router, return routing results per turn."""
     runner = InMemoryRunner(agent=_test_router, app_name="eval")
     session = await runner.session_service.create_session(
-        app_name="eval", user_id="eval_user",
+        app_name="eval",
+        user_id="eval_user",
+        state=dict(pre_state) if pre_state else None,
     )
-
-    # Pre-populate state to simulate prior research
-    if pre_state:
-        session.state.update(pre_state)
 
     results = []
     for message in messages:
