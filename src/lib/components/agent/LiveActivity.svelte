@@ -299,7 +299,8 @@
 					? 'mt-4 border-t border-black/8 pt-3 dark:border-white/10'
 					: ''} flex items-baseline justify-between gap-2"
 			>
-				<div class="flex min-w-0 items-baseline text-[13px] text-black/55 dark:text-white/55">
+				<div class="flex min-w-0 items-baseline gap-2 text-[13px] text-black/55 dark:text-white/55">
+					<span class="work-dot" aria-hidden="true"></span>
 					<span class="truncate">{label}</span>
 					<span class="label-typing-dots" aria-hidden="true"></span>
 				</div>
@@ -312,6 +313,26 @@
 {/if}
 
 <style>
+	.work-dot {
+		position: relative;
+		top: -0.05em;
+		display: inline-block;
+		width: 0.4rem;
+		height: 0.4rem;
+		flex-shrink: 0;
+		border-radius: 999px;
+		background-color: rgb(16 185 129 / 0.55);
+		animation: work-dot-pulse 1.8s ease-in-out infinite;
+	}
+	@keyframes work-dot-pulse {
+		0%,
+		100% {
+			background-color: rgb(16 185 129 / 0.45);
+		}
+		50% {
+			background-color: rgb(16 185 129 / 0.95);
+		}
+	}
 	.label-typing-dots::after {
 		content: '';
 		display: inline-block;
