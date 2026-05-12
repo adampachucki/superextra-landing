@@ -43,6 +43,7 @@ INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).pare
 
 _RESEARCH_LEAD_TEMPLATE = (INSTRUCTIONS_DIR / "research_lead.md").read_text()
 _MARKET_SOURCE_PROFILES = (INSTRUCTIONS_DIR / "market_source_profiles.md").read_text()
+_REPORT_WRITER_TEMPLATE = (INSTRUCTIONS_DIR / "report_writer.md").read_text()
 
 
 def _research_lead_instruction(ctx):
@@ -108,15 +109,15 @@ def _make_enricher(name="context_enricher"):
 _FOLLOW_UP_TEMPLATE = (INSTRUCTIONS_DIR / "follow_up.md").read_text()
 
 
-def _format_specialist_reports(state):
-    """Format prior specialist outputs for follow-up use."""
+def _format_specialist_reports(state, default="No specialist notes available."):
+    """Format specialist outputs stored in session state."""
     sections = []
     for key, label in SPECIALIST_RESULT_KEYS.items():
         value = state.get(key)
         if value and value != "Agent did not produce output.":
             sections.append(f"### {label}\n\n{value}")
     if not sections:
-        return "No specialist notes available."
+        return default
     return "\n\n".join(sections)
 
 
@@ -132,6 +133,19 @@ def _follow_up_instruction(ctx):
         "places_context": ctx.state.get("places_context", "No restaurant data available."),
     }
     return _FOLLOW_UP_TEMPLATE.format(**values)
+
+
+def _report_writer_instruction(ctx):
+    """Inject the full research material into the final report writer."""
+    values = {
+        "places_context": ctx.state.get("places_context", "No restaurant data available."),
+        "writer_brief": ctx.state.get("writer_brief", "No writer brief available."),
+        "specialist_reports": _format_specialist_reports(
+            ctx.state,
+            default="No specialist reports available.",
+        ),
+    }
+    return _REPORT_WRITER_TEMPLATE.format(**values)
 
 
 follow_up = LlmAgent(
@@ -177,23 +191,32 @@ research_lead = LlmAgent(
     name="research_lead",
     model=MODEL_GEMINI,
     instruction=_research_lead_instruction,
-    description="Plans research, calls specialist agents as tools, and writes the final report.",
+    description="Plans research, calls specialist agents as tools, and writes the writer brief.",
     tools=[
         google_search,
         fetch_web_content,
         *(AgentTool(agent=spec, include_plugins=True) for spec in ALL_SPECIALISTS),
     ],
-    output_key="final_report",
+    output_key="writer_brief",
     generate_content_config=ORCHESTRATOR_THINKING_CONFIG,
     before_model_callback=_inject_geo_bias,
+)
+
+report_writer = LlmAgent(
+    name="report_writer",
+    model=MODEL_GEMINI,
+    instruction=_report_writer_instruction,
+    description="Writes the final user-facing research report from specialist evidence.",
+    output_key="final_report",
+    generate_content_config=ORCHESTRATOR_THINKING_CONFIG,
 )
 
 # --- Pipeline ---
 
 research_pipeline = SequentialAgent(
     name="research_pipeline",
-    sub_agents=[_make_enricher(), research_lead],
-    description="Enriches context, then plans, dispatches, and synthesizes in one lead agent.",
+    sub_agents=[_make_enricher(), research_lead, report_writer],
+    description="Enriches context, dispatches research, then writes the final report.",
 )
 
 # --- Router (root agent) ---

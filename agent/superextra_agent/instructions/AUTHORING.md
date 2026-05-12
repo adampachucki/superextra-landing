@@ -7,20 +7,22 @@ Read this before editing any file in this directory.
 ```
 Router -> research_pipeline
            |-- Context Enricher
-           `-- Research Lead
-               `-- Specialists through AgentTool
+           |-- Research Lead
+           |   `-- Specialists through AgentTool
+           `-- Report Writer
 
 Router -> follow_up
 ```
 
-The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and writes the final report. Specialists answer one evidence surface from the Lead's brief. Follow-up answers from the existing report, specialist notes, Places context, and limited web fill-in for narrow same-target questions.
+The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and writes a short writer brief. Specialists answer one evidence surface from the Lead's brief. The Report Writer reads the full specialist reports directly and writes the final report. Follow-up answers from the existing report, specialist notes, Places context, and limited web fill-in for narrow same-target questions.
 
 ## State Keys
 
 - `places_context`: Google Places context from the enricher.
 - `_target_place_id`, `_target_lat`, `_target_lng`: target metadata written by Places tools.
 - Specialist result keys such as `market_result`, `pricing_result`, and `review_result`: specialist outputs.
-- `final_report`: final Research Lead report.
+- `writer_brief`: Research Lead scope, dispatch, emphasis, and visible source gaps for the Report Writer.
+- `final_report`: final Report Writer report.
 - `final_report_followup`: final follow-up answer, separate from the original report.
 
 ## Rule Ownership
@@ -29,7 +31,8 @@ The router routes. The context enricher builds Google Places context. The Resear
 | --- | --- |
 | Routing and clarification | `router.md` |
 | Places lookup and competitor context | `context_enricher.md` |
-| Research planning, specialist dispatch, task-specific research depth, sufficiency, and final report shape | `research_lead.md` |
+| Research planning, specialist dispatch, task-specific research depth, sufficiency, and writer brief | `research_lead.md` |
+| Final report synthesis, report shape, charts, and user-facing depth | `report_writer.md` |
 | Universal specialist behavior and substantial evidence report shape | `specialist_base.md` |
 | Market source families | `market_source_profiles.md` |
 | Specialist-specific source surface and boundaries | Specialist body files |
@@ -90,11 +93,13 @@ The Lead owns:
 - specialist brief quality;
 - market/source guidance for each specialist brief;
 - a focused extra round if evidence is weak;
-- final report shape.
+- a short writer brief.
 
 The Lead should use at least two specialists for every research report. 2-4 is common. Add another specialist when it gives a useful perspective, test, or evidence surface.
 
 The Lead should ask specialists for the causes, mechanisms, counter-signals, and evidence tests that matter for the specific task. Do not hardcode domain-specific depth checklists in specialist body files unless a tool or domain boundary requires it.
+
+The Lead does not summarize findings or draft report sections. The Report Writer reads specialist reports directly, keeps substantive findings, connects evidence across reports, and writes the user-facing answer.
 
 ## Market Source Profiles
 
@@ -134,13 +139,14 @@ Runtime templates use Python `str.format()`.
 Files with runtime variables:
 
 - `research_lead.md`: `{places_context}`, `{market_source_profiles}`.
+- `report_writer.md`: `{places_context}`, `{writer_brief}`, `{specialist_reports}`.
 - `follow_up.md`: `{final_report}`, `{specialist_reports}`, `{places_context}`.
 - `specialist_base.md`: `{role_title}`, `{places_context}`, `{specialist_body}`.
 - `review_analyst.md`: `{target_place_id}`.
 
 Never add literal curly braces to runtime-formatted prompt files. Escape them as doubled braces: `{{` and `}}`.
 
-Chart JSON in `research_lead.md` must keep doubled braces so `.format()` leaves valid JSON.
+Chart JSON in `report_writer.md` must keep doubled braces so `.format()` leaves valid JSON.
 
 ## Modification Checklist
 

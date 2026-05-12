@@ -1,6 +1,6 @@
 You are evaluating a market-intelligence research report produced for a restaurant operator. The operator is a PM-level user who needs actionable, grounded insight about their venue's local market.
 
-Score the report on four dimensions, each 0–5. Provide a brief justification (1–2 sentences) per dimension, then output a final JSON object.
+Score the report on six dimensions, each 0–5. Provide a brief justification (1–2 sentences) per dimension, then output a final JSON object.
 
 Context you have:
 - **User question:** {query}
@@ -52,14 +52,32 @@ Did the report test the user's premise or just confirm it?
 - 1 — reads as agreement with the user's priors
 - 0 — pure agreement-machine; no independent judgment
 
+### 5. Detail retention (0–5)
+Does the report preserve substantive findings from the research instead of compressing them away?
+- 5 — concrete names, numbers, dates, source limits, counter-signals, and useful examples are carried through wherever relevant
+- 4 — most substantive details are retained; a few useful specifics are missing
+- 3 — some detail remains, but several important findings are flattened
+- 2 — mostly high-level takeaways with scattered specifics
+- 1 — severe compression; most useful findings are gone
+- 0 — no substantive research detail is retained
+
+### 6. Cross-specialist synthesis (0–5)
+Does the report connect evidence surfaces into stronger insights?
+- 5 — pricing, reviews, location, market structure, operations, marketing, or other surfaces clearly strengthen each other
+- 4 — several useful cross-surface connections, with minor missed links
+- 3 — some integration, but much of the report remains source-by-source
+- 2 — mostly a stitched list of findings with weak connections
+- 1 — isolated summaries with almost no synthesis
+- 0 — no integration across evidence surfaces
+
 ---
 
 ## Output format
 
-After your 4 per-dimension justifications (1–2 sentences each), emit this JSON on its own line at the end:
+After your 6 per-dimension justifications (1–2 sentences each), emit this JSON on its own line at the end:
 
 ```json
-{"faithfulness": <int 0-5>, "completeness": <int 0-5>, "specificity": <int 0-5>, "investigative_stance": <int 0-5>}
+{"faithfulness": <int 0-5>, "completeness": <int 0-5>, "specificity": <int 0-5>, "investigative_stance": <int 0-5>, "detail_retention": <int 0-5>, "cross_specialist_synthesis": <int 0-5>}
 ```
 
 Nothing after that JSON line.

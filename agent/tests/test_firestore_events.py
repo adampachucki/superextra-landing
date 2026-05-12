@@ -318,9 +318,9 @@ def test_specialist_grounding_sources_are_exposed():
     assert research["grounding_sources"] == [{"title": "Review", "url": "https://maps.example/review"}]
 
 
-def test_research_lead_complete_uses_grounding_sources():
+def test_report_writer_complete_uses_grounding_sources():
     ev = _event(
-        author="research_lead",
+        author="report_writer",
         is_final=True,
         state_delta={"final_report": "# Report"},
         grounding_chunks=[{"uri": "https://a.example", "title": "A", "domain": "a.example"}],
@@ -332,11 +332,21 @@ def test_research_lead_complete_uses_grounding_sources():
     }
 
 
-def test_research_lead_empty_final_report_does_not_complete():
+def test_report_writer_empty_final_report_does_not_complete():
+    ev = _event(
+        author="report_writer",
+        is_final=True,
+        state_delta={"final_report": "   "},
+    )
+    mapped = map_event(ev, {})
+    assert mapped["complete"] is None
+
+
+def test_research_lead_writer_brief_does_not_complete():
     ev = _event(
         author="research_lead",
         is_final=True,
-        state_delta={"final_report": "   "},
+        state_delta={"writer_brief": "Scope, specialists, and source gaps."},
     )
     mapped = map_event(ev, {})
     assert mapped["complete"] is None

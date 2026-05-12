@@ -74,6 +74,8 @@ def _aggregate(rows: list[dict], label: str) -> dict:
         "completeness": avg("completeness"),
         "specificity": avg("specificity"),
         "investigative_stance": avg("investigative_stance"),
+        "detail_retention": avg("detail_retention"),
+        "cross_specialist_synthesis": avg("cross_specialist_synthesis"),
         "tokens_total": mean_int("tokens_total"),
         "elapsed_s": mean_int("elapsed_s"),
     }
@@ -95,6 +97,8 @@ def _print_block(title: str, agg: dict) -> None:
     print(f"  completeness         {agg['completeness']}")
     print(f"  specificity          {agg['specificity']}  ← guarded")
     print(f"  investigative_stance {agg['investigative_stance']}")
+    print(f"  detail_retention     {agg['detail_retention']}")
+    print(f"  cross_synthesis      {agg['cross_specialist_synthesis']}")
     print()
     print(f"  tokens_avg  {agg['tokens_total']}")
     print(f"  elapsed_avg {agg['elapsed_s']} s")
@@ -143,7 +147,7 @@ def main() -> int:
                 flags.append(f"err={r.get('error')}")
             if r.get("timed_out") == "True":
                 flags.append("timeout")
-            for dim in ("faithfulness", "specificity"):
+            for dim in ("faithfulness", "specificity", "detail_retention"):
                 v = _f(r.get(dim))
                 if v is not None and v <= 2:
                     flags.append(f"{dim}={int(v)}")

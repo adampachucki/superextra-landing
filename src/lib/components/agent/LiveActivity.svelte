@@ -42,6 +42,7 @@
 		router: 'Routing',
 		context_enricher: 'Looking up the venue',
 		research_lead: 'Reasoning',
+		report_writer: 'Writing report',
 		follow_up: 'Following up'
 	};
 	function authorLabel(author: string | null | undefined): string {
@@ -56,7 +57,13 @@
 		return latest.kind === 'detail' ? FAMILY_LABEL[latest.family] : authorLabel(latest.author);
 	});
 
-	const LEAD_AUTHORS = new Set(['router', 'context_enricher', 'research_lead', 'follow_up']);
+	const LEAD_AUTHORS = new Set([
+		'router',
+		'context_enricher',
+		'research_lead',
+		'report_writer',
+		'follow_up'
+	]);
 	const TOOL_PREVIEW_LIMIT = 5;
 	const leadRe = /^\s*\*\*([^*]+)\*\*\s*([\s\S]*)$/;
 

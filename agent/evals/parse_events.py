@@ -38,7 +38,7 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
         drawer_sources: list[dict]           # what sources[] would contain
         specialists_dispatched: list[str]    # specialist tool calls observed
         final_outcome: "ok" | "unknown"
-        final_report: str                    # research_lead/follow_up final text
+        final_report: str                    # report_writer final text
         specialist_outputs: dict[str, str]   # output_key → text
         tool_call_counts: dict[str, int]     # per-tool call counts
         authors_seen: dict[str, int]         # author → event count

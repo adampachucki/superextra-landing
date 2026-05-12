@@ -339,6 +339,8 @@ async def _score_with_gemini(run: dict) -> dict:
         "completeness": scores.get("completeness"),
         "specificity": scores.get("specificity"),
         "investigative_stance": scores.get("investigative_stance"),
+        "detail_retention": scores.get("detail_retention"),
+        "cross_specialist_synthesis": scores.get("cross_specialist_synthesis"),
         "judge_raw_tail": text[-400:],
     }
 
@@ -425,6 +427,8 @@ async def _score_file(path: Path, no_judge: bool, venue_own: dict[str, set[str]]
             "completeness": None,
             "specificity": None,
             "investigative_stance": None,
+            "detail_retention": None,
+            "cross_specialist_synthesis": None,
             "judge_error": None if no_judge else "no_final_report",
         })
     else:
@@ -437,6 +441,8 @@ async def _score_file(path: Path, no_judge: bool, venue_own: dict[str, set[str]]
             "completeness": judge.get("completeness"),
             "specificity": judge.get("specificity"),
             "investigative_stance": judge.get("investigative_stance"),
+            "detail_retention": judge.get("detail_retention"),
+            "cross_specialist_synthesis": judge.get("cross_specialist_synthesis"),
             "judge_error": judge.get("judge_error"),
         })
 

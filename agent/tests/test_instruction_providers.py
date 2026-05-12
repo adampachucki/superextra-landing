@@ -2,6 +2,7 @@
 
 from superextra_agent.agent import (
     _follow_up_instruction,
+    _report_writer_instruction,
     _research_lead_instruction,
     _router_instruction,
 )
@@ -60,10 +61,58 @@ class TestResearchLeadInstruction:
 
         assert "Existing research from prior turn" not in result
 
-    def test_chart_json_braces_are_escaped_for_format(self):
+    def test_does_not_include_final_report_chart_contract(self):
         ctx = MockCtx(state={"places_context": "Restaurant data"})
 
         result = _research_lead_instruction(ctx)
+
+        assert "```chart" not in result
+
+
+class TestReportWriterInstruction:
+    def test_injects_writer_brief_and_specialist_reports(self):
+        ctx = MockCtx(state={
+            "places_context": "Restaurant XYZ data",
+            "writer_brief": "Focus on demand and pricing links.",
+            "market_result": "Market demand is weekday-heavy.",
+            "pricing_result": "Average entree price is 21 USD.",
+        })
+
+        result = _report_writer_instruction(ctx)
+
+        assert "Restaurant XYZ data" in result
+        assert "Focus on demand and pricing links." in result
+        assert "Market demand is weekday-heavy." in result
+        assert "Average entree price is 21 USD." in result
+        assert "### Market Landscape" in result
+        assert "### Menu & Pricing" in result
+
+    def test_defaults_when_state_empty(self):
+        ctx = MockCtx(state={})
+
+        result = _report_writer_instruction(ctx)
+
+        assert "No restaurant data available." in result
+        assert "No writer brief available." in result
+        assert "No specialist reports available." in result
+
+    def test_handles_curly_braces_in_injected_material(self):
+        ctx = MockCtx(state={
+            "places_context": "Context with {braces}",
+            "writer_brief": "Brief includes {scope}",
+            "market_result": "Source note: `{city: 'Warsaw'}`",
+        })
+
+        result = _report_writer_instruction(ctx)
+
+        assert "{braces}" in result
+        assert "{scope}" in result
+        assert "{city: 'Warsaw'}" in result
+
+    def test_chart_json_braces_are_escaped_for_format(self):
+        ctx = MockCtx(state={"writer_brief": "Brief", "market_result": "Report"})
+
+        result = _report_writer_instruction(ctx)
 
         assert '```chart\n{"type":"bar"' in result
 
