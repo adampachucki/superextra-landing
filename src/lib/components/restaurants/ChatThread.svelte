@@ -61,6 +61,22 @@
 		google_reviews: 'Google Reviews',
 		tripadvisor: 'TripAdvisor'
 	};
+	const ERROR_COPY: Record<string, string> = {
+		timeout: 'The analysis took longer than expected and was cut short.',
+		progress_stalled: 'The analysis stalled before a final answer was delivered. Please try again.',
+		heartbeat_lost:
+			'The analysis stopped because the research worker lost connection. Please try again.',
+		handoff_start_timeout: 'The analysis could not start. Please try again.',
+		handoff_failed: 'The analysis could not start. Please try again.',
+		empty_or_malformed_reply: 'The analysis finished without a usable answer. Please try again.',
+		finalize_failed: 'The analysis finished, but the answer could not be saved. Please try again.',
+		pipeline_error: 'The analysis could not be completed. Please try again.'
+	};
+
+	function errorMessage(code: string) {
+		return ERROR_COPY[code] ?? ERROR_COPY.pipeline_error;
+	}
+
 	let expandedSources: Record<number, boolean> = $state({});
 </script>
 
@@ -229,6 +245,7 @@
 
 		{#if chatState.error}
 			{@const isTimeout = chatState.error === 'timeout'}
+			{@const message = errorMessage(chatState.error)}
 			<div class="flex justify-start">
 				<div
 					class="flex items-center gap-3 rounded-2xl border px-5 py-3 {isTimeout
@@ -240,9 +257,7 @@
 							? 'text-amber-600/80 dark:text-amber-400/80'
 							: 'text-red-600/80 dark:text-red-400/80'}"
 					>
-						{isTimeout
-							? 'The analysis took longer than expected and was cut short.'
-							: chatState.error}
+						{message}
 					</span>
 				</div>
 			</div>

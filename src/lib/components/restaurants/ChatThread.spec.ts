@@ -136,4 +136,29 @@ describe('ChatThread', () => {
 		expect(body).not.toContain('35s total');
 		expect(body).not.toContain('Opened 1 source');
 	});
+
+	it('renders user-facing copy for terminal backend error codes', async () => {
+		const obs = captureObservers();
+		chatState.selectSession('sid-1');
+		await waitUntil(() => !!obs.turns('sid-1'));
+
+		obs.turns('sid-1')!.onNext(
+			turnsSnap([
+				{
+					data: {
+						turnIndex: 1,
+						runId: 'run-1',
+						userMessage: 'follow up',
+						status: 'error',
+						error: 'progress_stalled',
+						createdAt: { toMillis: () => 1000 }
+					}
+				}
+			])
+		);
+
+		const { body } = render(ChatThread, { props: {} });
+		expect(body).toContain('The analysis stalled before a final answer was delivered.');
+		expect(body).not.toContain('progress_stalled');
+	});
 });
