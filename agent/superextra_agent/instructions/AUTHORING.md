@@ -29,8 +29,8 @@ The router routes. The context enricher builds Google Places context. The Resear
 | --- | --- |
 | Routing and clarification | `router.md` |
 | Places lookup and competitor context | `context_enricher.md` |
-| Research planning, specialist dispatch, sufficiency, and final report shape | `research_lead.md` |
-| Universal specialist behavior | `specialist_base.md` |
+| Research planning, specialist dispatch, task-specific research depth, sufficiency, and final report shape | `research_lead.md` |
+| Universal specialist behavior and substantial evidence report shape | `specialist_base.md` |
 | Market source families | `market_source_profiles.md` |
 | Specialist-specific source surface and boundaries | Specialist body files |
 | Hard tool limits, retries, errors, and caps | Tool code |
@@ -53,8 +53,8 @@ Put each rule in one place. If the same instruction seems needed in three prompt
 
 Specialist instructions use two prompt layers:
 
-1. `specialist_base.md`: universal specialist contract.
-2. `{specialist_name}.md`: domain-specific scope, evidence, boundaries, and output notes.
+1. `specialist_base.md`: universal specialist contract and substantial evidence report shape.
+2. `{specialist_name}.md`: domain-specific scope, evidence, boundaries, and narrow output notes.
 
 `specialists.py` composes the base and body. It injects:
 
@@ -74,6 +74,8 @@ Each body should answer four questions:
 3. What neighboring work should it avoid?
 4. What output details help the Lead synthesize?
 
+Do not define generic "depth" rules in body files. The Lead frames depth for the specific task in the brief. Do not repeat the universal evidence-report shape from `specialist_base.md`.
+
 Do not paste generic source policy into body files. Do not repeat another specialist's scope. Do not include `places_context` in body files; the base already injects it.
 
 ## Research Lead Rules
@@ -84,12 +86,15 @@ The Lead owns:
 - evidence-surface planning;
 - specialist selection;
 - non-overlap;
+- task-specific research depth in specialist briefs;
 - specialist brief quality;
 - market/source guidance for each specialist brief;
 - one focused extra round if evidence is weak;
 - final report shape.
 
 The Lead should usually choose 2-4 independent evidence surfaces for first-turn operator questions. One specialist is fine for narrow questions. More specialists are justified only when they add distinct evidence.
+
+The Lead should ask specialists for the causes, mechanisms, counter-signals, and evidence tests that matter for the specific task. Do not hardcode domain-specific depth checklists in specialist body files unless a tool or domain boundary requires it.
 
 ## Market Source Profiles
 
@@ -106,6 +111,8 @@ Use prompts for:
 - role and responsibility;
 - when to use a source family;
 - how to state uncertainty;
+- specialist evidence report shape;
+- task-specific research depth;
 - final report shape;
 - specialist boundaries.
 

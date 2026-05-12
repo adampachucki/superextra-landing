@@ -32,12 +32,18 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 
 ## Output
 
-- Lead with the strongest finding for the brief.
-- For important findings, explain the pattern, likely driver, operator implication, and evidence limit when the evidence supports them.
+- Write a substantial evidence report for the brief.
+- Start with the direct answer.
+- State how directly the evidence answers the brief.
+- State what evidence was checked.
+- State important evidence that was unavailable, weak, stale, or blocked.
+- Present key facts: names, numbers, dates, sample sizes, prices, ranges, quotes, and source context.
+- Explain likely drivers or mechanisms behind the facts.
+- Check counter-signals and alternative explanations.
+- State the operator implication.
+- End with confidence and remaining gaps.
 - Use tables when they make comparisons clearer.
-- Preserve important names, numbers, dates, sample sizes, and short quotes.
 - Cite sources from this turn inline. Do not cite model training knowledge.
-- End with one sentence: `Brief fit: ...` State how directly the evidence answers the brief and any important limits.
 - Respond in the user's language.
 
 ## Boundaries
