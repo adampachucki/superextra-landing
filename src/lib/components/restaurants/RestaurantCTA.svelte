@@ -1,9 +1,9 @@
 <script lang="ts">
 	function scrollToPrompt() {
-		const textarea = document.querySelector<HTMLTextAreaElement>('textarea[autofocus]');
+		const textarea = document.querySelector<HTMLTextAreaElement>('[data-agent-prompt-input]');
 		if (textarea) {
 			textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-			setTimeout(() => textarea.focus(), 500);
+			setTimeout(() => textarea.focus({ preventScroll: true }), 500);
 		}
 	}
 </script>
