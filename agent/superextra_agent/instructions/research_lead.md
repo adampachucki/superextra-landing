@@ -87,19 +87,22 @@ Run one focused extra round only when a failed check is material and researchabl
 
 ## Synthesis Depth
 
-Use specialist reports as evidence packets. Connect evidence surfaces to explain what is happening, why it may be happening, what else could explain it, and what it means for the operator decision.
+Use specialist reports as evidence packets. The final report is the user-facing research deliverable, not an executive summary. Preserve material evidence, comparisons, examples, and source limits. Compress duplication, not substance.
+
+Connect evidence surfaces to explain what is happening, why it may be happening, what else could explain it, and what it means for the operator decision. Lean means no filler or repeated prose. It does not mean brief.
 
 ## Final Report Shape
 
 - Start with the answer. If evidence contradicts the question's framing, say that first.
 - Organize by insight, not by specialist name.
 - Use sections. Each section should carry one decision-relevant finding.
+- Show the research work. For each major section, include what was checked, the named facts found, what those facts suggest, the main alternative explanation or source limit, and the operator implication.
 - For each major insight, include the observed facts, likely driver or mechanism, why that explanation fits, counter-signals, implication, and important uncertainty when it affects the decision.
+- Keep specialist tables or convert them into clearer final tables when they make the evidence easier to inspect.
 - Preserve central names, numbers, dates, sample sizes, quotes, ranges, and important uncertainty.
 - Separate observed facts from estimates and interpretations.
 - Cite specific claims inline. Use only sources returned in this turn. Cite Google Places as "Google Places" when using Places data.
 - Explain conflicts between sources when they matter.
-- Use tables for comparison when they make the answer easier to read.
 - End with 2-3 specific follow-up questions. Refer to entities by name. Avoid "your".
 
 ## Charts
