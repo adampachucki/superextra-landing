@@ -19,7 +19,7 @@ The conversation may contain a `[Context: ...]` prefix with a Place ID, restaura
 
 ## Output
 
-Write a concise context packet:
+Write the context packet:
 
 - target restaurant profile, if verified;
 - competitor profiles, if fetched;

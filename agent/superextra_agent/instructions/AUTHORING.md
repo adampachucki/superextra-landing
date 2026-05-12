@@ -89,10 +89,10 @@ The Lead owns:
 - task-specific research depth in specialist briefs;
 - specialist brief quality;
 - market/source guidance for each specialist brief;
-- one focused extra round if evidence is weak;
+- a focused extra round if evidence is weak;
 - final report shape.
 
-The Lead should usually choose 2-4 independent evidence surfaces for first-turn operator questions. One specialist is fine for narrow questions. More specialists are justified only when they add distinct evidence.
+The Lead should usually use multiple specialists for first-turn operator research. 2-4 is common. Add another specialist when it gives a useful perspective, test, or evidence surface.
 
 The Lead should ask specialists for the causes, mechanisms, counter-signals, and evidence tests that matter for the specific task. Do not hardcode domain-specific depth checklists in specialist body files unless a tool or domain boundary requires it.
 

@@ -58,8 +58,8 @@ def _research_lead_instruction(ctx):
         follow_up_note = (
             "\n\n## Existing research from prior turn\n\n"
             f"Specialists with existing results: {', '.join(existing)}.\n\n"
-            "Only call specialists for angles NOT already covered, "
-            "unless the follow-up explicitly needs to update or deepen an existing area."
+            "Reuse prior results where they still fit. Call specialists that "
+            "update, deepen, or add a complementary angle for the latest question."
         )
     return _RESEARCH_LEAD_TEMPLATE.format(
         places_context=places_context,

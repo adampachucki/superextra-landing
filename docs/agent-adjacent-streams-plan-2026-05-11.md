@@ -366,8 +366,6 @@ References:
 
 ## References
 
-- Prompt revamp plan: `docs/agent-prompt-revamp-plan-2026-05-11.md`
-- Current review: `docs/current-agent-prompt-review-2026-05-11.md`
 - External standard: `docs/agent-design-prompting-standard-2026-05-09.md`
 - Google ADK evaluation criteria: https://adk.dev/evaluate/criteria/
 - Google ADK custom tools: https://adk.dev/tools-custom/

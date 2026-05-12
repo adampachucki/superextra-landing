@@ -33,8 +33,8 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 ## Output
 
 - Write a substantial evidence report for the brief.
-- Start with the direct answer.
-- State how directly the evidence answers the brief.
+- Start with the answer and the evidence behind it.
+- State how well the evidence answers the brief.
 - State what evidence was checked.
 - State important evidence that was unavailable, weak, stale, or blocked.
 - Present key facts: names, numbers, dates, sample sizes, prices, ranges, quotes, and source context.
