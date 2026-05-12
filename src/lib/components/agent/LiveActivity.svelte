@@ -301,7 +301,7 @@
 			>
 				<div class="flex min-w-0 items-baseline gap-2 text-[13px] text-black/55 dark:text-white/55">
 					<span class="work-dot" aria-hidden="true"></span>
-					<span class="truncate">{label}<span class="label-typing-dots" aria-hidden="true"></span></span>
+					<span class="truncate">{label}<span aria-hidden="true">...</span></span>
 				</div>
 				<span class="shrink-0 text-[12px] text-black/45 dark:text-white/45">
 					{durationLabel}
@@ -314,7 +314,7 @@
 <style>
 	.work-dot {
 		position: relative;
-		top: -0.05em;
+		top: calc(-0.05em - 1px);
 		display: inline-block;
 		width: 0.4rem;
 		height: 0.4rem;
@@ -330,23 +330,6 @@
 		}
 		50% {
 			background-color: rgb(16 185 129 / 0.95);
-		}
-	}
-	.label-typing-dots::after {
-		content: '...';
-		display: inline-block;
-		margin-left: 0.08ch;
-		width: 1.2ch;
-		text-align: left;
-		animation: label-dots-pulse 1.5s ease-in-out infinite;
-	}
-	@keyframes label-dots-pulse {
-		0%,
-		100% {
-			opacity: 0.25;
-		}
-		50% {
-			opacity: 1;
 		}
 	}
 	.thought-segment {
