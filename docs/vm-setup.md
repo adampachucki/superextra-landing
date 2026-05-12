@@ -328,28 +328,15 @@ set -g mouse on
 set -g escape-time 0
 set -g window-size latest
 set -g status off
-set -g visual-activity off
-set -g visual-bell off
-set -g visual-silence off
+
 set -g set-clipboard on
-
-# Override default $ session-rename binding to start with empty prompt.
-bind '$' command-prompt -p 'Name:' 'rename-session -- "%%"'
-
-# Plugins
-set -g @plugin 'tmux-plugins/tpm'
-set -g @plugin 'nhdaly/tmux-better-mouse-mode'
-set -g @scroll-speed-num-lines-per-scroll "1"
-run '~/.tmux/plugins/tpm/tpm'
-
-# Hide cursor when terminal tab loses focus, show on regain
-set -g focus-events on
-set-hook -g client-focus-out "run-shell -b 'printf \"\\033[?25l\" > #{client_tty}'"
-set-hook -g client-focus-in  "run-shell -b 'printf \"\\033[?25h\" > #{client_tty}'"
 
 set -g default-terminal "tmux-256color"
 set -ga terminal-overrides ",*256col*:RGB,*256col*:Tc"
 set -g history-limit 100000
+
+# Override default $ session-rename binding to start with empty prompt.
+bind '$' command-prompt -p 'Name:' 'rename-session -- "%%"
 ```
 
 ### Mac `~/.ssh/config` (post-migration)
@@ -357,32 +344,15 @@ set -g history-limit 100000
 Single Host block for the VM (tailnet only; public-IP block deleted):
 
 ```
-Host ai-workstation ai-workstation.tailcb8df5.ts.net 100.101.35.72
-    User adam
+Host ai-workstation
+    HostName ai-workstation.tailcb8df5.ts.net
     HostKeyAlias 34.38.81.215
-    ServerAliveInterval 15
-    ServerAliveCountMax 10
-    TCPKeepAlive no
-    ControlMaster auto
-    ControlPath ~/.ssh/sockets/%r@%h-%p
-    ControlPersist 4h
-    ObscureKeystrokeTiming no
+    User adam
     IdentitiesOnly yes
     IdentityFile ~/.ssh/id_ed25519
-    CheckHostIP no
 ```
 
-`HostKeyAlias 34.38.81.215` reuses the trusted host-key entry from before the tailnet switch (same VM, same host key). `ObscureKeystrokeTiming no` disables OpenSSH's 20 ms keystroke-timing obfuscation that adds typing latency.
-
-### `/etc/ssh/sshd_config.d/keepalive.conf` (VM)
-
-```
-ClientAliveInterval 60
-ClientAliveCountMax 3
-TCPKeepAlive no
-```
-
-Effective interval is 120 s (vendor `50-cloudimg-settings.conf` drop-in sets 120 first; sshd is first-match-wins). Dead peers are reaped in ~6 min.
+`HostKeyAlias 34.38.81.215` reuses the trusted host-key entry from before the tailnet switch (same VM, same host key) — without it, the first `ssh ai-workstation` would prompt because the tailnet FQDN has no known_hosts entry.
 
 ### `/etc/ssh/sshd_config.d/no-root.conf` (VM)
 
@@ -485,13 +455,13 @@ Both editors, in `settings.json` under `terminal.integrated.profiles.osx`:
 | `~/src/superextra-landing-vm`           | Mutagen mirror — bidirectional sync with VM |
 | VM: `/home/adam/src/superextra-landing` | The remote repo where Claude works          |
 
-Session: `superextra-vm-sync`, mode `two-way-safe`. `.git` synced. Daemon auto-starts on boot.
+Session: `ai-workstation-sync`, mode `two-way-safe`. `.git` synced. Daemon auto-starts on boot.
 
-| Command                                 | Action                         |
-| --------------------------------------- | ------------------------------ |
-| `mutagen sync list`                     | Show sync status and conflicts |
-| `mutagen sync flush`                    | Force immediate sync           |
-| `mutagen sync reset superextra-vm-sync` | Reset if stuck                 |
+| Command                                  | Action                         |
+| ---------------------------------------- | ------------------------------ |
+| `mutagen sync list`                      | Show sync status and conflicts |
+| `mutagen sync flush`                     | Force immediate sync           |
+| `mutagen sync reset ai-workstation-sync` | Reset if stuck                 |
 
 Mutagen daemon LaunchAgent: `~/Library/LaunchAgents/io.mutagen.mutagen.plist`.
 
@@ -531,7 +501,6 @@ Wants=network-online.target
 [Service]
 ExecStart=%h/.local/bin/moshi-hook serve
 Restart=on-failure
-RestartSec=5s
 
 [Install]
 WantedBy=default.target
@@ -600,7 +569,6 @@ systemctl --user status moshi-hook
 | `~/.config/systemd/user/moshi-hook.service` | systemd user unit running `moshi-hook serve`                       |
 | `~/.local/state/moshi/hook.log`             | moshi-hook daemon logs                                             |
 | `/etc/environment`                          | `MOSH_TITLE_NOPREFIX=1` (suppresses mosh's `[mosh] ` title prefix) |
-| `/etc/ssh/sshd_config.d/keepalive.conf`     | sshd keepalives                                                    |
 | `/etc/ssh/sshd_config.d/no-root.conf`       | `PermitRootLogin no`                                               |
 | `~/src/superextra-landing/.env`             | App env vars                                                       |
 | `~/src/superextra-landing/agent/.env`       | Agent env vars                                                     |
@@ -682,6 +650,20 @@ If Tailscale breaks and the VM is unreachable:
 ## Decision history
 
 A condensed log of stack changes and rationale, newest first.
+
+### 2026-05-12 — Lean cleanup pass (post-migration trim)
+
+Codex review pass to find customizations without real impact. Cuts applied:
+
+- Mac `~/.zshrc`: rewrote `x()`/`c()` as a single shared `_xc` dispatcher (DRY). Dropped `CVM_MOSH` wrapper, `VM_REPO` unused var, `-z`/`-t` no-op parser, ControlMaster socket-nurse, three duplicate provider aliases (kept `claude-br`/`claude-az`/`claude-vx`).
+- Mac `~/.ssh/config`: dropped `ServerAlive*`, `TCPKeepAlive`, `ControlMaster*`, `ObscureKeystrokeTiming`, `CheckHostIP`, multi-name aliases, and a self-restating `HostName` on the bitbucket block. Kept `HostKeyAlias` (load-bearing for trusted-key reuse). 19 → 11 lines.
+- VM `~/.tmux.conf`: dropped `visual-activity off`/`visual-bell off`/`visual-silence off` (defaults), `tmux-better-mouse-mode` plugin + tpm + `@scroll-speed` setting (unneeded after settling 1-line scroll), `focus-events on` + cursor-hide/show hooks (aesthetic edge polish). Removed `~/.tmux/plugins/` dir. 30 → 14 lines.
+- VM `/etc/ssh/sshd_config.d/keepalive.conf`: deleted (vendor `50-cloudimg-settings.conf` is first-match-wins so our file had zero effect).
+- VM moshi-hook unit: dropped `RestartSec=5s` (systemd default 100ms is fine).
+- Mac VS Code/Cursor: dropped `Cmd+Alt+R` (duplicate of `Cmd+Shift+M`), `Cmd+'` git checkout, `ctrl+shift+\`` unbinding; dropped four `remote.SSH.\*` defensive timeouts and two terminal default-restating settings.
+- Mac script: deleted `~/bin/cursor-caffeinate.sh` (legacy VS Code Remote-SSH thinking; mosh+tmux already survives sleep).
+
+Net: ~50 lines deleted across config files. No behavior change for the user; all keybindings (Cmd+Shift+X/A/C/S/M/R/B/') preserved.
 
 ### 2026-05-09 — Drop ET, mosh-only over Tailscale, close public ingress
 
