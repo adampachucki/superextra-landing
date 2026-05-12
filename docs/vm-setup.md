@@ -21,16 +21,15 @@ Mac (VS Code / Cursor)              iPhone (Moshi)
               (one session per task)
 ```
 
-| Command           | What it does                                                      |
-| ----------------- | ----------------------------------------------------------------- |
-| `x` / `x NAME`    | Create or attach to a tmux session running `claude`               |
-| `c` / `c NAME`    | Create or attach to a tmux session running `codex` (Azure)        |
-| `x l` / `xl`      | List sessions, prompt for one to join                             |
-| `x j NAME` / `xj` | Join (or create+attach) `NAME`                                    |
-| `x k NAME` / `xk` | Kill session `NAME`                                               |
-| `x K` / `xK`      | Wipe all sessions on the VM (`tmux kill-server`)                  |
-| `c l/j/k/K`       | Same surface for codex sessions                                   |
-| `xn`              | Rename a session's tmux window (the bold label in Moshi's picker) |
+| Command        | What it does                                               |
+| -------------- | ---------------------------------------------------------- |
+| `x` / `x NAME` | Create or attach to a tmux session running `claude`        |
+| `c` / `c NAME` | Create or attach to a tmux session running `codex` (Azure) |
+| `x l`          | List sessions, prompt for one to join                      |
+| `x j NAME`     | Join (or create+attach) `NAME`                             |
+| `x k NAME`     | Kill session `NAME`                                        |
+| `x K`          | Wipe all sessions on the VM (`tmux kill-server`)           |
+| `c l/j/k/K`    | Same surface for codex sessions                            |
 
 Sessions persist across all client disconnects. Destroyed only by `tmux kill-session -t NAME` (`x k NAME`), the inner `claude`/`codex` exiting, `tmux kill-server` (`x K`), or VM reboot.
 
@@ -128,36 +127,27 @@ All defined in VM `~/.bashrc`. Mac side has parallel `x` / `c` zshrc functions t
 
 When attached from inside an existing tmux client (Moshi's picker), `x NAME` switches to the named session via `tmux switch-client`. Otherwise it does `tmux attach`.
 
-### `x l` / `xl` — list and join
+### `x l` — list and join
 
 Prints the tmux session list, prompts for a name to attach. Just typing a name attaches; typing a non-existent name _creates_ it (with claude). Ctrl+C / empty input cancels.
 
-### `x j NAME` / `xj NAME` — join by name
+### `x j NAME` — join by name
 
 Same as `x NAME` (the `j` is just for muscle memory). With no argument, falls through to `x l`.
 
-### `x k NAME` / `xk NAME` — kill one session
+### `x k NAME` — kill one session
 
 ```bash
 tmux kill-session -t "=NAME"
 ```
 
-### `x K` / `xK` — kill everything
+### `x K` — kill everything
 
 ```bash
 tmux kill-server
 ```
 
 Wipes the entire tmux workspace on the VM. There is no whitelist — this VM's tmux usage is exclusively Claude/Codex sessions, so this is acceptable.
-
-### `xn` — rename window (Moshi-picker bold label)
-
-```bash
-xn SESSION NEW_LABEL    # rename window in SESSION to NEW_LABEL
-xn                       # interactive: pick a session, prompt for new name
-```
-
-Window rename is sticky (auto-disables `automatic-rename`). Session name unchanged so `x j SESSION` keeps working.
 
 ### Mac-side aliases
 
@@ -192,7 +182,7 @@ The renaming chain that makes Cmd+Shift+M work end-to-end:
 3. VS Code's xterm.js reads the escape and updates its tab title (combined with `terminal.integrated.tabs.title: "${sequence}"` and `tabs.description: ""`).
 4. Moshi polls tmux state and shows `NEWNAME` in its picker.
 
-After session rename, `x j OLDNAME` no longer works — use `x j NEWNAME` or `xl`.
+After session rename, `x j OLDNAME` no longer works — use `x j NEWNAME` or `x l`.
 
 ---
 
@@ -277,7 +267,7 @@ CVM_MOSH() { mosh adam@$VM_HOST -- bash -ic "$1"; }
 # attach goes through `mosh adam@ai-workstation -- bash -ic 'x NAME'`.
 ```
 
-`xn` (window rename), `rn` (local terminal title), `codex-az`, `gemini-vx`, the `claude-*` aliases all preserved.
+`codex-az`, `gemini-vx`, and the `claude-*` aliases all preserved.
 
 ### `~/.zx-env` (VM) — Claude Code env vars
 
@@ -394,7 +384,7 @@ Disables root login entirely. User-level access via `adam` is the only path.
 
 ### SSH
 
-Direct SSH used only for non-interactive Mac→VM commands (config pulls, scp, `xk` / `xK` delegation via `bash -ic`). Goes via tailnet. Key auth, no passwords.
+Direct SSH used only for non-interactive Mac→VM commands (config pulls, scp, `x k` / `x K` delegation via `bash -ic`). Goes via tailnet. Key auth, no passwords.
 
 ### GCP firewall rules (post-migration)
 
@@ -632,7 +622,7 @@ If Tailscale breaks and the VM is unreachable:
 
 | Problem                                                       | Fix                                                                                                                                                         |
 | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **mosh disconnect after sleep**                               | Usually auto-reconnects in 1–5 s. If not, run `xl` to rejoin — tmux session is still alive.                                                                 |
+| **mosh disconnect after sleep**                               | Usually auto-reconnects in 1–5 s. If not, run `x l` to rejoin — tmux session is still alive.                                                                |
 | **mosh exits immediately**                                    | Check Tailscale is up on Mac (`tailscale status`). Verify locale: `locale -a \| grep en_US.utf8` on VM.                                                     |
 | **Claude not authenticated**                                  | Run `claude auth login` on the VM. New token → all new sessions pick it up.                                                                                 |
 | **Codex says "config profile X not found"**                   | The VM's `~/.codex/config.toml` puts Azure at the top level, not under `[profiles.azure]`. Plain `codex` is correct. Don't use `codex --profile azure`.     |
