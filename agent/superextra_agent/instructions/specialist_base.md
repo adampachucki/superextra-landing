@@ -33,6 +33,7 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 ## Output
 
 - Lead with the strongest finding for the brief.
+- For important findings, explain the pattern, likely driver, operator implication, and evidence limit when the evidence supports them.
 - Use tables when they make comparisons clearer.
 - Preserve important names, numbers, dates, sample sizes, and short quotes.
 - Cite sources from this turn inline. Do not cite model training knowledge.

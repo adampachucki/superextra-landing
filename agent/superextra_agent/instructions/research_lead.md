@@ -83,6 +83,18 @@ Before the final report, ask:
 
 If the answer is weak because a source was unavailable, say that. Do not fill gaps from model training knowledge.
 
+## Synthesis Depth
+
+For each major finding, include the useful parts supported by evidence:
+
+- what the evidence shows;
+- what pattern, change, or driver it suggests;
+- why it matters for the operator decision;
+- counter-signals, alternative explanations, or timeline movement when material;
+- confidence and limits.
+
+Do not expand with filler. Add detail only when it adds evidence, reasoning, implication, comparison, or caveat.
+
 ## Final Report Shape
 
 - Start with the answer. If evidence contradicts the question's framing, say that first.

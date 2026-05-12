@@ -82,12 +82,12 @@ if _version == "3.1":
     # inside child runners). Mapped to `kind: 'thought'` timeline rows in
     # `firestore_events.map_event` and rendered as markdown in LiveActivity.
     THINKING_CONFIG = types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(include_thoughts=True),
+        thinking_config=types.ThinkingConfig(thinking_level="HIGH", include_thoughts=True),
     )
     MEDIUM_THINKING_CONFIG = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level="MEDIUM", include_thoughts=True),
     )
-    ORCHESTRATOR_THINKING_CONFIG = MEDIUM_THINKING_CONFIG
+    ORCHESTRATOR_THINKING_CONFIG = THINKING_CONFIG
 else:
     MODEL = "gemini-2.5-pro"
     SPECIALIST_MODEL = MODEL
