@@ -1,6 +1,6 @@
 // Stuck-session watchdog. Runs every 2 minutes; flips abandoned sessions to
 // status='error' with a specific reason. Firestore can't OR across different
-// fields from one composite index, so we run two bounded queries and merge
+// fields from one composite index, so we run bounded queries and merge
 // in code. (Deployed as `watchdog` Cloud Run function + Cloud Scheduler job
 // via firebase-functions v2 `onSchedule`.)
 //
@@ -13,12 +13,16 @@
 //   - running, heartbeat silent > 10 min → heartbeat_lost. The plugin
 //     ticks `lastHeartbeat` every 30 s; 10 min of silence means the
 //     Reasoning Engine container crashed or got descheduled.
+//   - running, no progress event > 10 min while heartbeat is fresh →
+//     progress_stalled. The worker is alive, but no user-visible event has
+//     landed; this catches model/tool failures that bypass normal finalization.
 
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const QUEUED_MAX_AGE_MS = 5 * 60 * 1000;
 const HEARTBEAT_MAX_AGE_MS = 10 * 60 * 1000;
+const PROGRESS_MAX_AGE_MS = 10 * 60 * 1000;
 const BATCH_LIMIT = 100;
 
 function toMillis(ts) {
@@ -48,10 +52,12 @@ export async function findStuckSessions(db, nowMs = Date.now()) {
 	// don't need to import the explicit Timestamp class.
 	const queuedThresholdMs = nowMs - QUEUED_MAX_AGE_MS;
 	const heartbeatThresholdMs = nowMs - HEARTBEAT_MAX_AGE_MS;
+	const progressThresholdMs = nowMs - PROGRESS_MAX_AGE_MS;
 	const queuedThreshold = new Date(queuedThresholdMs);
 	const heartbeatThreshold = new Date(heartbeatThresholdMs);
+	const progressThreshold = new Date(progressThresholdMs);
 
-	const [queuedSnap, heartbeatSnap] = await Promise.all([
+	const [queuedSnap, heartbeatSnap, progressSnap] = await Promise.all([
 		db
 			.collection('sessions')
 			.where('status', '==', 'queued')
@@ -62,6 +68,12 @@ export async function findStuckSessions(db, nowMs = Date.now()) {
 			.collection('sessions')
 			.where('status', '==', 'running')
 			.where('lastHeartbeat', '<', heartbeatThreshold)
+			.limit(BATCH_LIMIT)
+			.get(),
+		db
+			.collection('sessions')
+			.where('status', '==', 'running')
+			.where('lastEventAt', '<', progressThreshold)
 			.limit(BATCH_LIMIT)
 			.get()
 	]);
@@ -97,6 +109,26 @@ export async function findStuckSessions(db, nowMs = Date.now()) {
 			thresholdMillis: heartbeatThresholdMs
 		});
 	}
+	for (const doc of progressSnap.docs) {
+		const d = doc.data();
+		const lastHeartbeatMs = toMillis(d.lastHeartbeat);
+		if (lastHeartbeatMs === null || lastHeartbeatMs <= heartbeatThresholdMs) {
+			continue;
+		}
+		const lastEventAtMs = toMillis(d.lastEventAt);
+		classify(doc.id, {
+			reason: 'progress_stalled',
+			errorDetails: {
+				lastEventAtAgeMs: nowMs - (lastEventAtMs ?? nowMs),
+				lastHeartbeatAgeMs: nowMs - lastHeartbeatMs
+			},
+			expectedStatus: 'running',
+			expectedRunId: d.currentRunId ?? null,
+			thresholdField: 'lastEventAt',
+			thresholdMillis: progressThresholdMs,
+			heartbeatFreshAfterMillis: heartbeatThresholdMs
+		});
+	}
 
 	return [...updates.entries()].map(([sid, info]) => ({ sid, ...info }));
 }
@@ -107,13 +139,18 @@ export async function runWatchdog(db, nowMs = Date.now()) {
 	// Flip stuck sessions to error inside a transaction so a worker that
 	// completes between the initial query and the flip cannot be clobbered
 	// with status=error over a real `status=complete`. The txn re-reads the
-	// doc and aborts silently if any of the four preconditions no longer
-	// hold. Per-reason skip counters aid post-incident debugging — without
+	// doc and aborts silently if any precondition no longer holds.
+	// Per-reason skip counters aid post-incident debugging — without
 	// them a `skipped=12` summary hides whether the watchdog was racing
-	// worker completions, stale runIds, or freshened heartbeats. See plan
-	// Tier 1.4.
+	// worker completions, stale runIds, or freshened heartbeats.
 	let flipped = 0;
-	const skipReasons = { missing: 0, status_changed: 0, run_advanced: 0, field_freshened: 0 };
+	const skipReasons = {
+		missing: 0,
+		status_changed: 0,
+		run_advanced: 0,
+		field_freshened: 0,
+		freshness_lost: 0
+	};
 	for (const entry of stuck) {
 		const {
 			sid,
@@ -122,7 +159,8 @@ export async function runWatchdog(db, nowMs = Date.now()) {
 			expectedStatus,
 			expectedRunId,
 			thresholdField,
-			thresholdMillis
+			thresholdMillis,
+			heartbeatFreshAfterMillis
 		} = entry;
 		try {
 			const ref = db.collection('sessions').doc(sid);
@@ -137,6 +175,12 @@ export async function runWatchdog(db, nowMs = Date.now()) {
 				const fieldMillis = toMillis(data[thresholdField]);
 				if (fieldMillis !== null && fieldMillis > thresholdMillis) {
 					return 'field_freshened';
+				}
+				if (reason === 'progress_stalled') {
+					const heartbeatMillis = toMillis(data.lastHeartbeat);
+					if (heartbeatMillis === null || heartbeatMillis <= heartbeatFreshAfterMillis) {
+						return 'freshness_lost';
+					}
 				}
 				// Propagate the error to the in-flight turn doc atomically.
 				// agentStream's txn writes lastTurnIndex unconditionally, so
@@ -172,11 +216,13 @@ export async function runWatchdog(db, nowMs = Date.now()) {
 		skipReasons.missing +
 		skipReasons.status_changed +
 		skipReasons.run_advanced +
-		skipReasons.field_freshened;
+		skipReasons.field_freshened +
+		skipReasons.freshness_lost;
 	console.log(
 		`[watchdog] stuck=${stuck.length} flipped=${flipped} skipped=${skipped}` +
 			` (missing=${skipReasons.missing} status_changed=${skipReasons.status_changed}` +
-			` run_advanced=${skipReasons.run_advanced} field_freshened=${skipReasons.field_freshened})`
+			` run_advanced=${skipReasons.run_advanced} field_freshened=${skipReasons.field_freshened}` +
+			` freshness_lost=${skipReasons.freshness_lost})`
 	);
 	return { stuck: stuck.length, flipped, skipped, skipReasons };
 }

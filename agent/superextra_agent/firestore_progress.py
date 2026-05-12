@@ -592,10 +592,9 @@ class FirestoreProgressPlugin(BasePlugin):
                 per.run_id,
             )
             # Best-effort terminal error write so the user sees an error
-            # within ~1 s instead of waiting for watchdog (5 min) to flip
-            # `pipeline_wedged`. Wraps `_retry_critical` to match the same
-            # transient-Firestore retry semantics every other terminal
-            # write enjoys (F2 P2 from the post-review plan).
+            # quickly instead of waiting for the watchdog to flip the run.
+            # Wraps `_retry_critical` to match the same transient-Firestore
+            # retry semantics every other terminal write uses.
             try:
                 await _retry_critical(
                     lambda: fenced_session_and_turn_update(
@@ -638,10 +637,9 @@ class FirestoreProgressPlugin(BasePlugin):
                 per.run_id,
             )
         except Exception as e:  # noqa: BLE001
-            # Retry exhausted on a transient Firestore error. Run stays
-            # in 'running' until watchdog catches lastEventAt staleness
-            # at the 5 min threshold and flips to status='error' with
-            # reason 'pipeline_wedged'. The answer is lost in this rare
+            # Retry exhausted on a transient Firestore error. Run stays in
+            # 'running' until the watchdog catches stale progress and flips
+            # to status='error'. The answer is lost in this rare
             # double-failure case.
             log.error(
                 "terminal_write_exhausted sid=%s runId=%s reply_len=%s: %s",

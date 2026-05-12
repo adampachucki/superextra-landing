@@ -167,6 +167,41 @@ describe('findStuckSessions', () => {
 		assert.equal(out[0].reason, 'heartbeat_lost');
 	});
 
+	it('classifies stale progress with fresh heartbeat as progress_stalled', async () => {
+		const plans = {
+			'sessions|status|lastEventAt|limit': mockSnap([
+				mockDoc('sid-progress', {
+					status: 'running',
+					lastEventAt: millisTs(NOW - 11 * 60 * 1000),
+					lastHeartbeat: millisTs(NOW - 30 * 1000)
+				})
+			])
+		};
+		const db = makeDb(plans);
+		const out = await findStuckSessions(db, NOW);
+		assert.equal(out.length, 1);
+		assert.equal(out[0].sid, 'sid-progress');
+		assert.equal(out[0].reason, 'progress_stalled');
+		assert.equal(out[0].errorDetails.lastEventAtAgeMs, 11 * 60 * 1000);
+		assert.equal(out[0].errorDetails.lastHeartbeatAgeMs, 30 * 1000);
+	});
+
+	it('does not classify progress_stalled when heartbeat is stale', async () => {
+		const doc = mockDoc('sid-stale', {
+			status: 'running',
+			lastEventAt: millisTs(NOW - 11 * 60 * 1000),
+			lastHeartbeat: millisTs(NOW - 12 * 60 * 1000)
+		});
+		const plans = {
+			'sessions|status|lastHeartbeat|limit': mockSnap([doc]),
+			'sessions|status|lastEventAt|limit': mockSnap([doc])
+		};
+		const db = makeDb(plans);
+		const out = await findStuckSessions(db, NOW);
+		assert.equal(out.length, 1);
+		assert.equal(out[0].reason, 'heartbeat_lost');
+	});
+
 	it('dedupes by sid — queued classifier wins over heartbeat for same sid', async () => {
 		// Pathological: a doc matches multiple queries.
 		const doc = mockDoc('dup', {
@@ -207,6 +242,14 @@ describe('runWatchdog', () => {
 					lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
 					currentRunId: 'run-hb1'
 				})
+			]),
+			'sessions|status|lastEventAt|limit': mockSnap([
+				mockDoc('p1', {
+					status: 'running',
+					lastEventAt: millisTs(NOW - 11 * 60 * 1000),
+					lastHeartbeat: millisTs(NOW - 30 * 1000),
+					currentRunId: 'run-p1'
+				})
 			])
 		};
 		// Inside the txn, the doc state is unchanged — still stuck. Flip lands.
@@ -224,23 +267,31 @@ describe('runWatchdog', () => {
 				lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
 				currentRunId: 'run-hb1',
 				lastTurnIndex: 2
+			},
+			p1: {
+				status: 'running',
+				lastEventAt: millisTs(NOW - 11 * 60 * 1000),
+				lastHeartbeat: millisTs(NOW - 30 * 1000),
+				currentRunId: 'run-p1',
+				lastTurnIndex: 3
 			}
 		};
 		const db = makeDb(plans, { txReads });
 		const result = await runWatchdog(db, NOW);
 
-		assert.equal(result.stuck, 2);
-		assert.equal(result.flipped, 2);
+		assert.equal(result.stuck, 3);
+		assert.equal(result.flipped, 3);
 		assert.equal(result.skipped, 0);
-		// Two session updates + two turn updates in the same transaction pairs.
-		assert.equal(db._txUpdates.length, 4);
+		// Three session updates + three turn updates in transaction pairs.
+		assert.equal(db._txUpdates.length, 6);
 		const sessionUpdates = db._txUpdates.filter((u) => !u.id.includes('/turns/'));
 		const turnUpdates = db._txUpdates.filter((u) => u.id.includes('/turns/'));
-		assert.equal(sessionUpdates.length, 2);
-		assert.equal(turnUpdates.length, 2);
+		assert.equal(sessionUpdates.length, 3);
+		assert.equal(turnUpdates.length, 3);
 
 		const q1 = sessionUpdates.find((u) => u.id === 'q1');
 		const hb1 = sessionUpdates.find((u) => u.id === 'hb1');
+		const p1 = sessionUpdates.find((u) => u.id === 'p1');
 		assert.equal(q1.data.status, 'error');
 		assert.equal(q1.data.error, 'handoff_start_timeout');
 		// Session bump carries updatedAt sentinel so the sidebar reorders.
@@ -248,16 +299,23 @@ describe('runWatchdog', () => {
 		assert.equal(hb1.data.status, 'error');
 		assert.equal(hb1.data.error, 'heartbeat_lost');
 		assert.equal(hb1.data.updatedAt, '__server_timestamp__');
+		assert.equal(p1.data.status, 'error');
+		assert.equal(p1.data.error, 'progress_stalled');
+		assert.equal(p1.data.updatedAt, '__server_timestamp__');
 
 		// Turn doc propagation — status + error reason match the session.
 		const q1Turn = turnUpdates.find((u) => u.id === 'q1/turns/0001');
 		const hb1Turn = turnUpdates.find((u) => u.id === 'hb1/turns/0002');
+		const p1Turn = turnUpdates.find((u) => u.id === 'p1/turns/0003');
 		assert.ok(q1Turn, 'expected q1 turn doc update at turnIdx=1');
 		assert.ok(hb1Turn, 'expected hb1 turn doc update at turnIdx=2');
+		assert.ok(p1Turn, 'expected p1 turn doc update at turnIdx=3');
 		assert.equal(q1Turn.data.status, 'error');
 		assert.equal(q1Turn.data.error, 'handoff_start_timeout');
 		assert.equal(hb1Turn.data.status, 'error');
 		assert.equal(hb1Turn.data.error, 'heartbeat_lost');
+		assert.equal(p1Turn.data.status, 'error');
+		assert.equal(p1Turn.data.error, 'progress_stalled');
 	});
 
 	it('skips both writes if currentRunId advanced between scan and txn', async () => {
@@ -393,6 +451,64 @@ describe('runWatchdog', () => {
 		assert.equal(result.stuck, 1);
 		assert.equal(result.flipped, 0);
 		assert.equal(result.skipped, 1);
+		assert.equal(db._txUpdates.length, 0);
+	});
+
+	it('aborts progress_stalled if lastEventAt freshened before txn', async () => {
+		const plans = {
+			'sessions|status|lastEventAt|limit': mockSnap([
+				mockDoc('p1', {
+					status: 'running',
+					lastEventAt: millisTs(NOW - 11 * 60 * 1000),
+					lastHeartbeat: millisTs(NOW - 30 * 1000),
+					currentRunId: 'run-p1'
+				})
+			])
+		};
+		const txReads = {
+			p1: {
+				status: 'running',
+				lastEventAt: millisTs(NOW - 10 * 1000),
+				lastHeartbeat: millisTs(NOW - 30 * 1000),
+				currentRunId: 'run-p1'
+			}
+		};
+		const db = makeDb(plans, { txReads });
+		const result = await runWatchdog(db, NOW);
+
+		assert.equal(result.stuck, 1);
+		assert.equal(result.flipped, 0);
+		assert.equal(result.skipped, 1);
+		assert.equal(result.skipReasons.field_freshened, 1);
+		assert.equal(db._txUpdates.length, 0);
+	});
+
+	it('aborts progress_stalled if heartbeat became stale before txn', async () => {
+		const plans = {
+			'sessions|status|lastEventAt|limit': mockSnap([
+				mockDoc('p1', {
+					status: 'running',
+					lastEventAt: millisTs(NOW - 11 * 60 * 1000),
+					lastHeartbeat: millisTs(NOW - 30 * 1000),
+					currentRunId: 'run-p1'
+				})
+			])
+		};
+		const txReads = {
+			p1: {
+				status: 'running',
+				lastEventAt: millisTs(NOW - 11 * 60 * 1000),
+				lastHeartbeat: millisTs(NOW - 12 * 60 * 1000),
+				currentRunId: 'run-p1'
+			}
+		};
+		const db = makeDb(plans, { txReads });
+		const result = await runWatchdog(db, NOW);
+
+		assert.equal(result.stuck, 1);
+		assert.equal(result.flipped, 0);
+		assert.equal(result.skipped, 1);
+		assert.equal(result.skipReasons.freshness_lost, 1);
 		assert.equal(db._txUpdates.length, 0);
 	});
 

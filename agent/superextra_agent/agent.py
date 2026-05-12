@@ -25,11 +25,12 @@ from .specialists import (
     SPECIALIST_GEMINI,
     _inject_geo_bias,
     _make_gemini,
+    _on_model_error,
     _on_tool_error,
 )
 from .web_tools import fetch_web_content
 
-# Fast model for simple tasks (routing, follow-up) — no thinking needed.
+# Fast model for routing — no thinking needed.
 # Routed via the global Vertex AI endpoint because 2.5 Flash isn't served
 # from us-central1 (same constraint as the 3.1 models _make_gemini already
 # handles for specialists).
@@ -135,14 +136,16 @@ def _follow_up_instruction(ctx):
 
 follow_up = LlmAgent(
     name="follow_up",
-    model=_FAST_MODEL,
+    model=MODEL_GEMINI,
     instruction=_follow_up_instruction,
     description=(
         "Answers follow-up questions using prior research, specialist notes, "
         "restaurant context, and narrow web fill-in."
     ),
     tools=[google_search, fetch_web_content],
+    generate_content_config=MEDIUM_THINKING_CONFIG,
     before_model_callback=_inject_geo_bias,
+    on_model_error_callback=_on_model_error,
     on_tool_error_callback=_on_tool_error,
     # Distinct from `final_report` so a follow-up reply doesn't overwrite
     # the original research report in session state. The next follow-up would
