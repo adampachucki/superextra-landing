@@ -328,7 +328,7 @@
 			>
 				<div class="flex min-w-0 items-baseline gap-2 text-[13px] text-black/55 dark:text-white/55">
 					<span class="work-dot" aria-hidden="true"></span>
-					<span class="truncate">{label}<span aria-hidden="true">...</span></span>
+					<span class="status-shimmer truncate">{label}<span aria-hidden="true">...</span></span>
 				</div>
 				<span class="shrink-0 text-[12px] text-black/45 dark:text-white/45">
 					{durationLabel}
@@ -359,6 +359,36 @@
 			background-color: rgb(16 185 129 / 0.95);
 		}
 	}
+	.status-shimmer {
+		--status-base: rgb(0 0 0 / 0.55);
+		--status-highlight: rgb(0 0 0 / 0.78);
+
+		color: transparent;
+		background-image: linear-gradient(
+			90deg,
+			var(--status-base) 0%,
+			var(--status-base) 36%,
+			var(--status-highlight) 50%,
+			var(--status-base) 64%,
+			var(--status-base) 100%
+		);
+		background-size: 240% 100%;
+		background-clip: text;
+		-webkit-background-clip: text;
+		animation: status-shimmer 3.2s ease-in-out infinite;
+	}
+	:global(.dark) .status-shimmer {
+		--status-base: rgb(255 255 255 / 0.55);
+		--status-highlight: rgb(255 255 255 / 0.82);
+	}
+	@keyframes status-shimmer {
+		from {
+			background-position: 120% 0;
+		}
+		to {
+			background-position: -120% 0;
+		}
+	}
 	.thought-segment {
 		opacity: 1;
 		transition: opacity 420ms ease;
@@ -372,5 +402,12 @@
 	}
 	.thought-segment + .thought-segment {
 		margin-top: 0.4rem;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.status-shimmer {
+			color: var(--status-base);
+			background: none;
+			animation: none;
+		}
 	}
 </style>
