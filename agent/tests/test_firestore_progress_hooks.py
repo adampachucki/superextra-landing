@@ -13,6 +13,7 @@ from superextra_agent.gear_run_state import GearRunState
 
 def _make_plugin_state() -> tuple[FirestoreProgressPlugin, GearRunState]:
     plugin = FirestoreProgressPlugin(project="superextra-site")
+    plugin._fs = MagicMock()
     state = GearRunState(
         sid="sid-test",
         invocation_id="inv-parent",
