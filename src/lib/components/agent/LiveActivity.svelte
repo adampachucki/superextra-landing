@@ -58,6 +58,10 @@
 
 	type DetailEvent = Extract<TimelineEvent, { kind: 'detail' }>;
 
+	function isStatusDetail(event: TimelineEvent): boolean {
+		return event.kind === 'detail' && event.family === 'Analysis';
+	}
+
 	const FAMILY_LABEL: Record<DetailEvent['family'], string> = {
 		'Google Maps': 'Looking up venue data',
 		'Google reviews': 'Reading reviews',
@@ -175,6 +179,7 @@
 		};
 
 		for (const ev of events) {
+			if (isStatusDetail(ev)) continue;
 			if (ev.kind === 'thought') {
 				const text = normalizeNewlines(ev.text);
 				const author = ev.author ?? null;
