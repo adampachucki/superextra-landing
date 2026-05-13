@@ -99,7 +99,7 @@ The Lead should use at least two non-dynamic specialists for every research repo
 
 The Lead should ask specialists for the causes, mechanisms, counter-signals, and evidence tests that matter for the specific task. Do not hardcode domain-specific depth checklists in specialist body files unless a tool or domain boundary requires it.
 
-The Lead does not summarize findings or draft report sections. Its research coverage note is internal and must not guide the final report. The Report Writer reads Places context and specialist reports directly, carries forward every distinct useful item from each specialist's `Writer Material`, makes concrete findings and insights visible in a format that fits the evidence, connects evidence across reports without merging away detail, adds grounded implications for the target venue when known, and writes the user-facing answer.
+The Lead does not summarize findings or draft report sections. Its research coverage note is internal and must not guide the final report. The Report Writer reads Places context and specialist reports directly, carries forward every reader-relevant item from each specialist's `Writer Material`, makes concrete findings and insights visible in a format that fits the evidence, connects evidence across reports without merging away detail, adds grounded implications for the target venue when known, and writes the user-facing answer. It should translate material access limits into plain research caveats, not expose raw tool or fetch errors.
 
 ## Market Source Profiles
 

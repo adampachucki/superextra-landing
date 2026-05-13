@@ -84,11 +84,12 @@ integration role.
 The `report_writer` should:
 
 - treat specialist reports as the primary source material;
+- write deep research, not a compressed summary;
 - preserve every distinct finding, insight, data point, caveat, source limit,
   and implication connected to the question or Places context;
 - treat each specialist report, especially its `Writer Material` section, as
-  must-carry material unless an item is duplicated or clearly outside the
-  question;
+  must-carry research material unless an item is duplicated, clearly outside
+  the question, or raw operational noise;
 - preserve distinct insights, caveats, source limits, and implications rather
   than compressing the report to the highest-level takeaways;
 - retain names, dates, numbers, prices, sample sizes, quotes, ranges, source
@@ -99,8 +100,11 @@ The `report_writer` should:
 - connect findings across specialists rather than listing reports one by one;
 - bias toward dense, useful reporting over executive-summary brevity;
 - tighten prose only by removing exact duplicated wording, internal process
-  notes, and irrelevant dead ends; do not shorten by dropping distinct
-  findings, evidence, caveats, source notes, examples, or implications;
+  notes, raw failed searches, tool or API errors, and irrelevant dead ends; do
+  not shorten by dropping distinct findings, evidence, caveats, source notes,
+  examples, or implications;
+- translate material access limits into plain research caveats instead of
+  showing raw "could not fetch" style errors;
 - avoid new web research and new factual claims not grounded in the supplied
   reports or Places context;
 - write `final_report`.
@@ -111,8 +115,9 @@ The writer should produce an integrated report, not a summary of summaries.
 
 Specialists should not compress their evidence into only the top takeaways.
 They should surface all useful material they find: findings, citations,
-source notes, exact data, quotes, caveats, failed checks, counter-signals,
-considerations, and implications for the target venue. The bias is intentional:
+source notes, exact data, quotes, caveats, meaningful evidence limits,
+counter-signals, considerations, and implications for the target venue. The
+bias is intentional:
 the writer can remove duplicated or irrelevant material, but it cannot recover
 findings that specialists never surfaced.
 

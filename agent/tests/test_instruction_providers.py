@@ -151,10 +151,13 @@ class TestReportWriterInstruction:
 
         result = _report_writer_instruction(ctx)
 
+        assert "The customer expects deep research, not a compressed summary" in result
         assert "Do not rely on any lead-authored summary" in result
-        assert "Err on the side of showing too much useful evidence" in result
-        assert "especially its `Writer Material` section, as must-carry material" in result
+        assert "Err on the side of a long, detailed report" in result
+        assert "especially its `Writer Material` section, as must-carry research material" in result
         assert "Do not compress findings to fit an assumed length" in result
+        assert "Do not show raw access failures" in result
+        assert "Translate material access limits into plain research caveats" in result
         assert "Use the format that preserves detail most clearly" in result
         assert "what the evidence means for that venue" in result
         assert "Weave this into the synthesis or group it separately" in result
@@ -209,6 +212,8 @@ class TestMakeInstruction:
 
         assert "Surface all useful material you find" in result
         assert "Do not compress it to top takeaways" in result
+        assert "Do not include raw tool errors" in result
+        assert "meaningful evidence limits" in result
         assert "`Writer Material` section" in result
         assert "implications for the target venue" in result
 
