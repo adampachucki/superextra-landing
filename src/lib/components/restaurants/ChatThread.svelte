@@ -8,6 +8,7 @@
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
 	import { renderMarkdown } from '$lib/markdown';
 	import ChartBlock from './ChartBlock.svelte';
+	import SourceFavicon from './SourceFavicon.svelte';
 
 	let scrollEl: HTMLDivElement | undefined = $state();
 	let contentEl: HTMLDivElement | undefined = $state();
@@ -143,6 +144,26 @@
 		return ERROR_COPY[code] ?? ERROR_COPY.pipeline_error;
 	}
 
+	function sourceDomain(url: string, domain?: string): string {
+		const candidate = domain?.trim();
+		if (candidate) return cleanSourceHost(candidate);
+		try {
+			return cleanSourceHost(new URL(url).hostname);
+		} catch {
+			return '';
+		}
+	}
+
+	function cleanSourceHost(value: string): string {
+		try {
+			const host = value.includes('://') ? new URL(value).hostname : value.split('/')[0];
+			if (host.includes('vertexaisearch')) return '';
+			return host.replace(/^www\./, '');
+		} catch {
+			return '';
+		}
+	}
+
 	function thoughtCount(events: TimelineEvent[] | undefined): number {
 		return events?.filter((event) => event.kind === 'thought').length ?? 0;
 	}
@@ -250,18 +271,7 @@
 								>
 								<div class="flex flex-wrap gap-1.5">
 									{#each visible as src (`${src.url}:${src.title}`)}
-										{@const domain =
-											src.domain ||
-											(() => {
-												try {
-													const h = new URL(src.url).hostname;
-													return h.includes('vertexaisearch') ? '' : h;
-												} catch {
-													return '';
-												}
-											})() ||
-											src.title ||
-											''}
+										{@const domain = sourceDomain(src.url, src.domain)}
 										{@const label = src.provider
 											? PROVIDER_LABELS[src.provider]
 											: domain || src.title}
@@ -271,11 +281,7 @@
 											rel="noopener noreferrer"
 											class="group inline-flex items-center gap-1.5 rounded-full border border-black/5 px-2.5 py-1 no-underline transition-colors hover:border-black/10 hover:bg-black/[0.02] dark:border-white/5 dark:hover:border-white/10 dark:hover:bg-white/[0.02]"
 										>
-											<img
-												src="https://www.google.com/s2/favicons?sz=32&domain={domain}"
-												alt=""
-												class="h-3.5 w-3.5 shrink-0 rounded-sm"
-											/>
+											<SourceFavicon {domain} {label} />
 											<span
 												class="text-[12px] leading-snug text-black/50 transition-colors group-hover:text-black/70 dark:text-white/50 dark:group-hover:text-white/70"
 											>
