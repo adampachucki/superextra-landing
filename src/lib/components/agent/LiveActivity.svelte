@@ -19,6 +19,12 @@
 	let expanded = $state(false);
 	let expandedTools: Record<string, boolean> = $state({});
 
+	let idleLabel = $state<'Thinking' | 'Analyzing'>('Thinking');
+
+	function idleLabelDelay() {
+		return 2000 + Math.random() * 2000;
+	}
+
 	$effect(() => {
 		if (completed) return;
 		now = Date.now();
@@ -26,6 +32,20 @@
 			now = Date.now();
 		}, 1000);
 		return () => clearInterval(timer);
+	});
+
+	$effect(() => {
+		if (completed || events.length) return;
+		idleLabel = 'Thinking';
+		let timer: ReturnType<typeof setTimeout>;
+		const schedule = () => {
+			timer = setTimeout(() => {
+				idleLabel = idleLabel === 'Thinking' ? 'Analyzing' : 'Thinking';
+				schedule();
+			}, idleLabelDelay());
+		};
+		schedule();
+		return () => clearTimeout(timer);
 	});
 
 	type DetailEvent = Extract<TimelineEvent, { kind: 'detail' }>;
@@ -39,10 +59,10 @@
 		Warnings: 'Checking sources'
 	};
 	const AUTHOR_LABEL: Record<string, string> = {
-		router: 'Routing',
+		router: 'Choosing next steps',
 		context_enricher: 'Looking up the venue',
 		research_lead: 'Reasoning',
-		report_writer: 'Writing report',
+		report_writer: 'Drafting final report',
 		follow_up: 'Following up'
 	};
 	function authorLabel(author: string | null | undefined): string {
@@ -53,7 +73,7 @@
 
 	const label = $derived.by<string>(() => {
 		const latest = events[events.length - 1];
-		if (!latest) return 'Preparing analysis';
+		if (!latest) return idleLabel;
 		return latest.kind === 'detail' ? FAMILY_LABEL[latest.family] : authorLabel(latest.author);
 	});
 
