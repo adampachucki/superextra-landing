@@ -107,6 +107,8 @@ The `report_writer` should:
   showing raw "could not fetch" style errors;
 - avoid new web research and new factual claims not grounded in the supplied
   reports or Places context;
+- end with suggested follow-up research requests that the user can ask the
+  researcher to investigate next, not questions for the owner to answer;
 - write `final_report`.
 
 The writer should produce an integrated report, not a summary of summaries.
