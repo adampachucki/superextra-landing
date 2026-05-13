@@ -10,7 +10,7 @@ These rules get violated most often. Re-read before proposing or editing code.
 
 ### Lean, clean, root-cause
 
-- **Prefer the smallest diff that fixes the root cause.** Justify any net LOC increase. A change that removes more than it adds is usually the better change. Deleting a function, a feature, or a whole file is a legitimate fix.
+- **Optimize for the end state of the codebase, not the size of the diff.** A thorough structural fix that grows this commit but leaves the codebase smaller and cleaner is better than a small patch that wraps existing cruft in a guard. Deleting a function, a feature, or a whole file is a legitimate fix; so is rewriting a flawed module instead of patching around it.
 - **Find the root cause and remove it.** Don't patch symptoms. If a bug needs three guards to "make it work safely," the approach is wrong — step back and reconsider.
 - **Do not add guards, retries, fallbacks, abstractions, or config knobs unless tied to an observed failure, a documented external contract, or a core security/data-integrity invariant.** Trust internal invariants and framework guarantees.
 - **Don't solve rare edge cases.** A reliable core beats a fragile everything-handler. If handling a corner case meaningfully expands surface area, skip it.
@@ -43,7 +43,7 @@ These rules get violated most often. Re-read before proposing or editing code.
 
 Every review-agent prompt MUST include this brief:
 
-> Review with these priorities: find root causes, prefer the smallest reliable core, reduce net LOC, delete dead paths, and reject speculative guards, retries, fallbacks, abstractions, or rare-edge handling that expands surface area. Verify against the codebase and official docs for any touched external system. State only facts; mark uncertainty.
+> Review with these priorities: optimize for the end state of the codebase (not diff size) — favor thorough structural fixes over patches that wrap existing cruft. Find root causes, prefer the smallest reliable core, delete dead paths, and reject speculative guards, retries, fallbacks, abstractions, or rare-edge handling that expands surface area. Verify against the codebase and official docs for any touched external system. State only facts; mark uncertainty.
 
 This applies whether the delegated agent is a code reviewer, plan reviewer, security reviewer, or general-purpose investigator.
 
