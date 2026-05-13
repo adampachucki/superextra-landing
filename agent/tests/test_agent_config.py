@@ -26,7 +26,7 @@ def test_research_pipeline_ends_with_report_writer():
         "research_lead",
         "report_writer",
     ]
-    assert research_lead.output_key == "writer_brief"
+    assert research_lead.output_key == "research_coverage"
     assert report_writer.output_key == "final_report"
     assert getattr(report_writer.model, "model", None) == "gemini-3.1-pro-preview"
     assert report_writer.tools == []

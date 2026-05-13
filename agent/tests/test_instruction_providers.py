@@ -68,21 +68,33 @@ class TestResearchLeadInstruction:
 
         assert "```chart" not in result
 
-    def test_writer_brief_is_not_a_findings_filter(self):
+    def test_research_coverage_is_internal_not_report_guidance(self):
         ctx = MockCtx(state={"places_context": "Restaurant data"})
 
         result = _research_lead_instruction(ctx)
 
-        assert "writer brief is a routing note, not a findings note" in result
+        assert "internal research coverage note" in result
+        assert "The note is for audit" in result
+        assert "The report writer\ndoes not read it" in result
         assert "Do not list discovered entities" in result
         assert "Do not decide which specialist findings matter most" in result
 
+    def test_dynamic_researcher_guidance_is_verifier_or_gap_filler(self):
+        ctx = MockCtx(state={"places_context": "Restaurant data"})
+
+        result = _research_lead_instruction(ctx)
+
+        assert "Use `dynamic_researcher_1` more readily" in result
+        assert "focused verifier or gap-filler" in result
+        assert "named-entity checks" in result
+
 
 class TestReportWriterInstruction:
-    def test_injects_writer_brief_and_specialist_reports(self):
+    def test_injects_places_context_and_specialist_reports_only(self):
         ctx = MockCtx(state={
             "places_context": "Restaurant XYZ data",
             "writer_brief": "Focus on demand and pricing links.",
+            "research_coverage": "Lead thinks demand is most important.",
             "market_result": "Market demand is weekday-heavy.",
             "pricing_result": "Average entree price is 21 USD.",
         })
@@ -90,7 +102,8 @@ class TestReportWriterInstruction:
         result = _report_writer_instruction(ctx)
 
         assert "Restaurant XYZ data" in result
-        assert "Focus on demand and pricing links." in result
+        assert "Focus on demand and pricing links." not in result
+        assert "Lead thinks demand is most important." not in result
         assert "Market demand is weekday-heavy." in result
         assert "Average entree price is 21 USD." in result
         assert "### Market Landscape" in result
@@ -102,24 +115,21 @@ class TestReportWriterInstruction:
         result = _report_writer_instruction(ctx)
 
         assert "No restaurant data available." in result
-        assert "No writer brief available." in result
         assert "No specialist reports available." in result
 
     def test_handles_curly_braces_in_injected_material(self):
         ctx = MockCtx(state={
             "places_context": "Context with {braces}",
-            "writer_brief": "Brief includes {scope}",
             "market_result": "Source note: `{city: 'Warsaw'}`",
         })
 
         result = _report_writer_instruction(ctx)
 
         assert "{braces}" in result
-        assert "{scope}" in result
         assert "{city: 'Warsaw'}" in result
 
     def test_chart_json_braces_are_escaped_for_format(self):
-        ctx = MockCtx(state={"writer_brief": "Brief", "market_result": "Report"})
+        ctx = MockCtx(state={"market_result": "Report"})
 
         result = _report_writer_instruction(ctx)
 
@@ -127,14 +137,13 @@ class TestReportWriterInstruction:
 
     def test_retention_contract_preserves_all_findings(self):
         ctx = MockCtx(state={
-            "writer_brief": "Focus on openings.",
             "market_result": "Zołza closed. Matcha Ma opened.",
             "dynamic_result_1": "Nam-Viet remains operational nearby.",
         })
 
         result = _report_writer_instruction(ctx)
 
-        assert "If the writer brief omits a finding" in result
+        assert "Do not rely on any lead-authored summary" in result
         assert "Err on the side of showing too much useful evidence" in result
         assert "Complete Findings Ledger" in result
         assert "Do not collapse several concrete findings" in result

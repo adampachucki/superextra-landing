@@ -139,7 +139,6 @@ def _report_writer_instruction(ctx):
     """Inject the full research material into the final report writer."""
     values = {
         "places_context": ctx.state.get("places_context", "No restaurant data available."),
-        "writer_brief": ctx.state.get("writer_brief", "No writer brief available."),
         "specialist_reports": _format_specialist_reports(
             ctx.state,
             default="No specialist reports available.",
@@ -191,13 +190,13 @@ research_lead = LlmAgent(
     name="research_lead",
     model=MODEL_GEMINI,
     instruction=_research_lead_instruction,
-    description="Plans research, calls specialist agents as tools, and writes the writer brief.",
+    description="Plans research, calls specialist agents as tools, and records research coverage.",
     tools=[
         google_search,
         fetch_web_content,
         *(AgentTool(agent=spec, include_plugins=True) for spec in ALL_SPECIALISTS),
     ],
-    output_key="writer_brief",
+    output_key="research_coverage",
     generate_content_config=ORCHESTRATOR_THINKING_CONFIG,
     before_model_callback=_inject_geo_bias,
 )

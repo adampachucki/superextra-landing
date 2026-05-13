@@ -1,7 +1,7 @@
 # Report Writer Stage Plan
 
 Date: 2026-05-12  
-Status: first-pass implementation added
+Status: implemented; revised 2026-05-13 to remove lead-authored writer brief
 
 ## Problem
 
@@ -14,14 +14,14 @@ final answer often preserves only the highest-level takeaways. Prompt changes
 have not reliably fixed this because the architecture still routes all
 specialist evidence through the lead's synthesis step.
 
-For this product, the better bias is to surface too much substantive evidence
+For this product, the better bias is to surface too much relevant evidence
 rather than lose useful findings.
 
 ## Decision
 
 Add a terminal `report_writer` agent after `research_lead`.
 
-Use option B2:
+Use the revised B2 flow:
 
 ```text
 context_enricher
@@ -29,10 +29,11 @@ context_enricher
    - plans the research
    - briefs specialists
    - calls specialists through AgentTool
-   - writes a narrow writer_brief
+   - records internal research_coverage for audit and future loop checks
 -> report_writer
    - reads full specialist reports directly from state
-   - reads writer_brief for scope only
+   - reads Places context directly from state
+   - does not receive lead-authored summary, emphasis, or outline
    - writes final_report
 ```
 
@@ -42,56 +43,52 @@ return to the lead.
 ## Why B2
 
 B2 keeps the process deterministic while removing the lossy synthesis layer.
-The lead still contributes useful context about the research plan, but does not
-summarize findings for the writer.
+The lead still owns planning, specialist dispatch, sufficiency checks, and
+focused extra rounds. It no longer gives the writer a brief.
 
-The key distinction:
+This revision came from live-session review. Even a constrained writer brief
+became a subtle compression layer because the lead could name some findings,
+omit others, and shape the report outline. The writer now reads only Places
+context and full specialist reports.
 
-- Option A: writer receives full specialist reports and Places context.
-- Option B2: writer receives full specialist reports, Places context, and a
-  constrained lead-authored `writer_brief`.
+## Research Coverage Contract
 
-B2 is preferred because the writer benefits from knowing the user's decision
-goal, the target, the specialist briefs issued, the response language, and any
-source gaps. That context helps organize the report without letting the lead
-decide which findings matter.
+`research_coverage` is internal. It is useful for audit, debugging, evals, and a
+future LoopAgent-style completeness check. The Report Writer does not read it.
 
-The constraint is important: `writer_brief` must not include findings,
-takeaways, recommendations, or condensed specialist summaries.
+The coverage note may contain:
 
-## Writer Brief Contract
-
-`writer_brief` may contain:
-
-- user question;
-- response language;
+- user question and response language;
 - target restaurant, market, geography, and competitor set;
 - operator decision or learning goal;
 - specialists called;
 - original brief issued to each specialist;
-- requested report emphasis or format;
-- known source or tool gaps.
+- evidence surfaces covered;
+- source gaps, failed checks, stale evidence, or weak evidence;
+- unresolved questions that could justify another focused research round.
 
-`writer_brief` must not contain:
+The coverage note must not contain:
 
 - key findings;
 - top takeaways;
 - implications;
 - recommendations;
-- condensed specialist summaries;
+- discovered-entity priority lists;
 - pre-written report sections.
 
-This keeps the lead in the research-control role and the writer in the
-synthesis role.
+This keeps the lead in the research-control role and the writer in the evidence
+integration role.
 
 ## Writer Contract
 
 The `report_writer` should:
 
 - treat specialist reports as the primary source material;
-- preserve every substantive, non-duplicative finding from specialist reports;
+- preserve every relevant, non-duplicative finding from specialist reports
+  and Places context;
 - retain names, dates, numbers, prices, sample sizes, quotes, ranges, source
   limits, counter-signals, and uncertainty;
+- include a complete findings ledger before narrative synthesis;
 - connect findings across specialists rather than listing reports one by one;
 - bias toward dense, useful reporting over executive-summary brevity;
 - remove only duplicated wording, internal process notes, and irrelevant dead
@@ -131,7 +128,7 @@ Implementation shape:
 research_lead = LlmAgent(
     name="research_lead",
     ...
-    output_key="writer_brief",
+    output_key="research_coverage",
 )
 
 report_writer = LlmAgent(
@@ -150,8 +147,9 @@ research_pipeline = SequentialAgent(
 )
 ```
 
-The writer instruction provider should inject `places_context`, `writer_brief`,
-and every available specialist output from `SPECIALIST_RESULT_KEYS`.
+The writer instruction provider should inject `places_context` and every
+available specialist output from `SPECIALIST_RESULT_KEYS`. It should not inject
+`research_coverage`.
 
 ## Completion Plumbing
 
@@ -213,8 +211,8 @@ iterative prose polishing.
 ## Lean Implementation Steps
 
 1. Add `instructions/report_writer.md`.
-2. Change `research_lead.md` so the lead writes `writer_brief`, not
-   `final_report`.
+2. Change `research_lead.md` so the lead writes `research_coverage`, not
+   `final_report`, and so the coverage note stays internal.
 3. Add `_report_writer_instruction(ctx)` in `agent.py`.
 4. Add `report_writer` in `agent.py` with no tools and
    `output_key="final_report"`.
@@ -233,7 +231,7 @@ looping in the first pass.
 The current rubric already scores faithfulness, completeness, specificity, and
 investigative stance. Add two report-writer checks:
 
-- Detail retention: the final report preserves substantive specialist findings,
+- Detail retention: the final report preserves relevant specialist findings,
   including concrete names, numbers, dates, source limits, and counter-signals.
 - Cross-specialist synthesis: the final report connects findings across
   evidence surfaces instead of summarizing each specialist independently.

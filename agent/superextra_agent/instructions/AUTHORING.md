@@ -14,14 +14,14 @@ Router -> research_pipeline
 Router -> follow_up
 ```
 
-The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and writes a short writer brief. Specialists answer one evidence surface from the Lead's brief. The Report Writer reads the full specialist reports directly and writes the final report. Follow-up answers from the existing report, specialist notes, Places context, and limited web fill-in for narrow same-target questions.
+The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief. The Report Writer reads Places context and full specialist reports directly, without a lead-authored brief, and writes the final report. Follow-up answers from the existing report, specialist notes, Places context, and limited web fill-in for narrow same-target questions.
 
 ## State Keys
 
 - `places_context`: Google Places context from the enricher.
 - `_target_place_id`, `_target_lat`, `_target_lng`: target metadata written by Places tools.
 - Specialist result keys such as `market_result`, `pricing_result`, and `review_result`: specialist outputs.
-- `writer_brief`: Research Lead scope, dispatch, emphasis, and visible source gaps for the Report Writer.
+- `research_coverage`: Research Lead coverage note for audit, debugging, and future loop checks. The Report Writer does not read it.
 - `final_report`: final Report Writer report.
 - `final_report_followup`: final follow-up answer, separate from the original report.
 
@@ -31,7 +31,7 @@ The router routes. The context enricher builds Google Places context. The Resear
 | --- | --- |
 | Routing and clarification | `router.md` |
 | Places lookup and competitor context | `context_enricher.md` |
-| Research planning, specialist dispatch, task-specific research depth, sufficiency, and writer brief | `research_lead.md` |
+| Research planning, specialist dispatch, task-specific research depth, sufficiency, and research coverage | `research_lead.md` |
 | Final report synthesis, report shape, charts, and user-facing depth | `report_writer.md` |
 | Universal specialist behavior and substantial evidence report shape | `specialist_base.md` |
 | Market source families | `market_source_profiles.md` |
@@ -93,13 +93,13 @@ The Lead owns:
 - specialist brief quality;
 - market/source guidance for each specialist brief;
 - a focused extra round if evidence is weak;
-- a short writer brief.
+- short internal research coverage notes.
 
 The Lead should use at least two specialists for every research report. 2-4 is common. Add another specialist when it gives a useful perspective, test, or evidence surface.
 
 The Lead should ask specialists for the causes, mechanisms, counter-signals, and evidence tests that matter for the specific task. Do not hardcode domain-specific depth checklists in specialist body files unless a tool or domain boundary requires it.
 
-The Lead does not summarize findings or draft report sections. Its writer brief is a routing note, not a findings note. The Report Writer reads specialist reports directly, preserves all relevant concrete findings in a complete findings ledger, connects evidence across reports, and writes the user-facing answer.
+The Lead does not summarize findings or draft report sections. Its research coverage note is internal and must not guide the final report. The Report Writer reads Places context and specialist reports directly, preserves all relevant concrete findings in a complete findings ledger, connects evidence across reports, and writes the user-facing answer.
 
 ## Market Source Profiles
 
@@ -139,7 +139,7 @@ Runtime templates use Python `str.format()`.
 Files with runtime variables:
 
 - `research_lead.md`: `{places_context}`, `{market_source_profiles}`.
-- `report_writer.md`: `{places_context}`, `{writer_brief}`, `{specialist_reports}`.
+- `report_writer.md`: `{places_context}`, `{specialist_reports}`.
 - `follow_up.md`: `{final_report}`, `{specialist_reports}`, `{places_context}`.
 - `specialist_base.md`: `{role_title}`, `{places_context}`, `{specialist_body}`.
 - `review_analyst.md`: `{target_place_id}`.

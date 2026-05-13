@@ -342,11 +342,11 @@ def test_report_writer_empty_final_report_does_not_complete():
     assert mapped["complete"] is None
 
 
-def test_research_lead_writer_brief_does_not_complete():
+def test_research_lead_coverage_does_not_complete():
     ev = _event(
         author="research_lead",
         is_final=True,
-        state_delta={"writer_brief": "Scope, specialists, and source gaps."},
+        state_delta={"research_coverage": "Scope, specialists, and source gaps."},
     )
     mapped = map_event(ev, {})
     assert mapped["complete"] is None
