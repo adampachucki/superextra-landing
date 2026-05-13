@@ -1,7 +1,11 @@
 """Tests for instruction provider functions in agent.py."""
 
+from google.genai import types
+
 from superextra_agent.agent import (
-    _follow_up_instruction,
+    _CONTINUATION_NOTES_KEY,
+    _continue_research_instruction,
+    _record_continuation_notes,
     _report_writer_instruction,
     _research_lead_instruction,
     _router_instruction,
@@ -12,6 +16,15 @@ from superextra_agent.specialists import _make_instruction
 class MockCtx:
     def __init__(self, state=None):
         self.state = state or {}
+
+
+class MockCallbackCtx:
+    def __init__(self, state=None, user_text=""):
+        self.state = state or {}
+        self.user_content = types.Content(
+            role="user",
+            parts=[types.Part(text=user_text)],
+        )
 
 
 class TestResearchLeadInstruction:
@@ -220,28 +233,34 @@ class TestMakeInstruction:
         assert "implications for the target venue" in result
 
 
-class TestFollowUpInstruction:
+class TestContinueResearchInstruction:
     def test_injects_prior_report(self):
         ctx = MockCtx(state={
             "final_report": "## Market Report\nKey findings here.",
             "places_context": "Restaurant XYZ data",
             "market_result": "Market specialist notes",
+            "research_coverage": "Coverage notes and source gaps",
+            "continuation_notes": "Turn 2 found competitor A started brunch.",
         })
 
-        result = _follow_up_instruction(ctx)
+        result = _continue_research_instruction(ctx)
 
         assert "## Market Report" in result
         assert "Restaurant XYZ data" in result
         assert "Market specialist notes" in result
+        assert "Coverage notes and source gaps" in result
+        assert "competitor A started brunch" in result
         assert "Market Landscape" in result
 
     def test_defaults_when_state_empty(self):
         ctx = MockCtx(state={})
 
-        result = _follow_up_instruction(ctx)
+        result = _continue_research_instruction(ctx)
 
         assert "No prior report available." in result
         assert "No specialist notes available." in result
+        assert "No research coverage notes available." in result
+        assert "No continuation notes yet." in result
         assert "No restaurant data available." in result
         assert "No research plan available." not in result
 
@@ -251,10 +270,63 @@ class TestFollowUpInstruction:
             "places_context": "Data with {braces}",
         })
 
-        result = _follow_up_instruction(ctx)
+        result = _continue_research_instruction(ctx)
 
         assert "color={0: 'red'}" in result
         assert "{braces}" in result
+
+    def test_broad_new_work_boundary_is_explicit(self):
+        result = _continue_research_instruction(MockCtx(state={"final_report": "Existing report"}))
+
+        assert "start a new research session" in result
+        assert "Do not recreate a full market report" in result
+        assert "broad new report" in result
+        assert "different unrelated target" in result
+
+
+class TestRecordContinuationNotes:
+    def test_records_reply_in_session_state(self):
+        ctx = MockCallbackCtx(
+            state={
+                "continue_research_reply": "Competitor A added brunch on weekends.",
+                "turnIdx": 2,
+            },
+            user_text="Can you check competitor A brunch?",
+        )
+
+        _record_continuation_notes(callback_context=ctx)
+
+        notes = ctx.state[_CONTINUATION_NOTES_KEY]
+        assert "Turn 2" in notes
+        assert "competitor A brunch" in notes
+        assert "Competitor A added brunch" in notes
+
+    def test_no_reply_means_no_state_delta(self):
+        ctx = MockCallbackCtx(state={}, user_text="Question")
+
+        _record_continuation_notes(callback_context=ctx)
+
+        assert _CONTINUATION_NOTES_KEY not in ctx.state
+
+    def test_keeps_notes_bounded(self):
+        existing = "\n\n".join(
+            f"### Turn {i}\nUser asked: old\nAnswer/follow-up findings: {'x' * 1200}"
+            for i in range(10)
+        )
+        ctx = MockCallbackCtx(
+            state={
+                "continue_research_reply": "Latest useful finding.",
+                _CONTINUATION_NOTES_KEY: existing,
+            },
+            user_text="Latest question",
+        )
+
+        _record_continuation_notes(callback_context=ctx)
+
+        notes = ctx.state[_CONTINUATION_NOTES_KEY]
+        assert len(notes) <= 6000
+        assert "Latest useful finding" in notes
+        assert "Turn 0" not in notes
 
 
 class TestRouterInstruction:
@@ -264,7 +336,7 @@ class TestRouterInstruction:
         result = _router_instruction(ctx)
 
         assert "report has already been delivered" in result
-        assert "narrow same-target or same-area detail" in result
+        assert "continue_research" in result
 
     def test_no_report_note(self):
         ctx = MockCtx(state={})

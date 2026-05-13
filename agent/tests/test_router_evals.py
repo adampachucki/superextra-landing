@@ -63,15 +63,15 @@ if os.environ.get("RUN_LIVE_EVALS"):
         disallow_transfer_to_peers=True,
     )
 
-    # The production router also routes to `follow_up` when a prior report
+    # The production router also routes to `continue_research` when a prior report
     # exists. This suite runs only first-turn prompts, so the model
     # shouldn't transfer there — but a mis-route without this stub would
     # raise "agent not found" and mask the real assertion failure.
-    _stub_follow_up = LlmAgent(
-        name="follow_up",
+    _stub_continue_research = LlmAgent(
+        name="continue_research",
         model=_flash,
-        instruction="Reply with exactly: 'Follow-up activated.' Nothing else.",
-        description="Stub follow-up agent for routing tests.",
+        instruction="Reply with exactly: 'Continuation activated.' Nothing else.",
+        description="Stub continuation agent for routing tests.",
         output_key="final_report",
         disallow_transfer_to_parent=True,
         disallow_transfer_to_peers=True,
@@ -81,8 +81,8 @@ if os.environ.get("RUN_LIVE_EVALS"):
         name="router",
         model=_flash,
         instruction=(INSTRUCTIONS_DIR / "router.md").read_text(),
-        description="Routes user questions to research, follow-up, or asks for clarification.",
-        sub_agents=[_stub_pipeline, _stub_follow_up],
+        description="Routes user questions to research, continuation, or asks for clarification.",
+        sub_agents=[_stub_pipeline, _stub_continue_research],
         output_key="router_response",
     )
 

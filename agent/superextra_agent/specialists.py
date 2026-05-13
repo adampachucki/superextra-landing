@@ -158,7 +158,14 @@ def _on_tool_error(*, tool, args, tool_context, error):
     return {"error": f"Tool {tool.name} failed: {type(error).__name__}"}
 
 
-def _make_specialist(name, description, output_key, tools=None, instruction_name=None, thinking_config=None):
+def _make_specialist(
+    name,
+    description,
+    output_key=None,
+    tools=None,
+    instruction_name=None,
+    thinking_config=None,
+):
     """Create an AgentTool-compatible specialist.
 
     `include_contents='default'` is intentional: AgentTool passes the
@@ -196,6 +203,18 @@ ALL_SPECIALISTS = [
         s.name,
         s.description,
         s.output_key,
+        tools=_SPECIALIST_TOOLS.get(s.name),
+        instruction_name=s.instruction_name,
+        thinking_config=_THINKING_CONFIGS[s.thinking],
+    )
+    for s in SPECIALISTS
+]
+
+CONTINUATION_SPECIALISTS = [
+    _make_specialist(
+        s.name,
+        s.description,
+        None,
         tools=_SPECIALIST_TOOLS.get(s.name),
         instruction_name=s.instruction_name,
         thinking_config=_THINKING_CONFIGS[s.thinking],

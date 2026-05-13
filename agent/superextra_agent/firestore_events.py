@@ -101,7 +101,7 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
     if output_key and _has_state_delta(event, output_key):
         mapping["grounding_sources"] = extract_sources_from_grounding(event)
 
-    if author in ("router", "report_writer", "follow_up"):
+    if author in ("router", "report_writer", "continue_research", "follow_up"):
         complete = _map_complete(event)
         if complete is not None:
             mapping["complete"] = complete
@@ -233,10 +233,11 @@ def _map_complete(event: Any) -> dict[str, Any] | None:
         return None
 
     reply: str | None = None
-    # `final_report_followup` is the follow-up agent's output_key (kept
-    # distinct so a follow-up reply doesn't clobber the original report
-    # in session state). `final_report` is the report writer's.
-    for key in ("final_report_followup", "final_report"):
+    # `continue_research_reply` is the continuation agent's output_key (kept
+    # distinct so a continuation reply doesn't clobber the original report
+    # in session state). `final_report_followup` is kept for older deployed
+    # sessions/events. `final_report` is the report writer's.
+    for key in ("continue_research_reply", "final_report_followup", "final_report"):
         if _has_state_delta(event, key):
             candidate = _state_delta(event).get(key)
             if isinstance(candidate, str) and candidate.strip():

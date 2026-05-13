@@ -144,6 +144,8 @@ let placeContextState = $state<PlaceContext | null>(null);
 let optimisticPendingSid: string | null = null;
 let optimisticTurnSid: string | null = null;
 let optimisticTurnStartedAtMs: number | null = null;
+let optimisticTurnIndex: number | null = null;
+let optimisticTurnMessage: string | null = null;
 
 // Listener unsubscribes — kept outside $state because they're opaque cleanup
 // handles, not reactive values.
@@ -278,33 +280,59 @@ function clearActiveState() {
 	placeContextState = null;
 	optimisticTurnSid = null;
 	optimisticTurnStartedAtMs = null;
+	optimisticTurnIndex = null;
+	optimisticTurnMessage = null;
 	renderedEventKeys.clear();
 	previousTurnStatus.clear();
 	replyRevealTurns.clear();
 	completedActivityByTurn.clear();
 }
 
-function installOptimisticTurn(sid: string, userMessage: string) {
+function makeOptimisticTurn(turnIndex: number, userMessage: string, startedAtMs: number): Turn {
+	return {
+		turnIndex,
+		runId: '',
+		userMessage,
+		status: 'pending',
+		reply: null,
+		sources: null,
+		turnSummary: null,
+		createdAtMs: startedAtMs,
+		completedAtMs: null,
+		error: null
+	};
+}
+
+function installOptimisticTurn(sid: string, userMessage: string, turnIndex = 1) {
 	const nowMs = Date.now();
 	optimisticTurnStartedAtMs = nowMs;
-	turns = [
-		{
-			turnIndex: 1,
-			runId: '',
-			userMessage,
-			status: 'pending',
-			reply: null,
-			sources: null,
-			turnSummary: null,
-			createdAtMs: nowMs,
-			completedAtMs: null,
-			error: null
-		}
-	];
 	optimisticTurnSid = sid;
-	previousTurnStatus.set(1, 'pending');
+	optimisticTurnIndex = turnIndex;
+	optimisticTurnMessage = userMessage;
 	if (activeSid !== sid) return;
+	const optimistic = makeOptimisticTurn(turnIndex, userMessage, nowMs);
+	turns = [...turns.filter((turn) => turn.turnIndex !== turnIndex), optimistic].sort(
+		(a, b) => a.turnIndex - b.turnIndex
+	);
+	previousTurnStatus.set(turnIndex, 'pending');
 	loadState = 'loading';
+}
+
+function clearOptimisticTurn() {
+	optimisticTurnSid = null;
+	optimisticTurnStartedAtMs = null;
+	optimisticTurnIndex = null;
+	optimisticTurnMessage = null;
+}
+
+function removeOptimisticTurn(sid: string, turnIndex: number) {
+	if (optimisticTurnSid !== sid || optimisticTurnIndex !== turnIndex) return;
+	clearOptimisticTurn();
+	if (activeSid === sid) {
+		turns = turns.filter(
+			(turn) => !(turn.turnIndex === turnIndex && turn.runId === '' && turn.status === 'pending')
+		);
+	}
 }
 
 async function attachActiveListeners(sid: string) {
@@ -389,7 +417,7 @@ async function attachActiveListeners(sid: string) {
 		(snap) => {
 			if (activeSid !== sid) return;
 			const fromCache = snap.metadata.fromCache;
-			const next: Turn[] = [];
+			let next: Turn[] = [];
 			snap.forEach((docSnap) => {
 				const data = docSnap.data() as Record<string, unknown>;
 				const turnIndex = (data.turnIndex as number | undefined) ?? Number(docSnap.id);
@@ -432,15 +460,28 @@ async function attachActiveListeners(sid: string) {
 				}
 				if (!fromCache) previousTurnStatus.set(turnIndex, status);
 			});
-			// A cold first send can receive an empty cache/server turn snapshot
-			// before agentStream's transaction-created turn is observed. Keep the
-			// local user bubble/timer visible during that gap; replace it as soon
-			// as any real turn doc arrives.
-			if (next.length > 0 && optimisticTurnSid === sid) {
-				const stillInFlight = next.some((turn) => IN_FLIGHT_STATUSES.has(turn.status));
-				if (!stillInFlight) {
-					optimisticTurnSid = null;
-					optimisticTurnStartedAtMs = null;
+			// A send can receive a cache/server snapshot before agentStream's
+			// transaction-created turn is observed. For follow-ups this snapshot
+			// often contains older completed turns, so preserve the local pending
+			// turn until the matching server turn appears.
+			if (
+				optimisticTurnSid === sid &&
+				optimisticTurnIndex !== null &&
+				optimisticTurnStartedAtMs !== null &&
+				optimisticTurnMessage !== null
+			) {
+				const serverOptimistic = next.find((turn) => turn.turnIndex === optimisticTurnIndex);
+				if (!serverOptimistic) {
+					next = [
+						...next,
+						makeOptimisticTurn(
+							optimisticTurnIndex,
+							optimisticTurnMessage,
+							optimisticTurnStartedAtMs
+						)
+					].sort((a, b) => a.turnIndex - b.turnIndex);
+				} else if (!IN_FLIGHT_STATUSES.has(serverOptimistic.status)) {
+					clearOptimisticTurn();
 				}
 			}
 			if (next.length > 0 || optimisticTurnSid !== sid || turns.length === 0) {
@@ -494,7 +535,9 @@ function maybeAttachEventsListener() {
 		}
 		return;
 	}
-	const runId = latest.runId || session?.currentRunId || null;
+	const runId =
+		latest.runId ||
+		(session?.lastTurnIndex === latest.turnIndex ? (session.currentRunId ?? null) : null);
 	if (!runId) return;
 	void ensureEventsListener(sid, runId);
 }
@@ -667,12 +710,19 @@ async function sendFollowUp(message: string): Promise<void> {
 	if (!trimmed) return;
 	const sid = activeSid;
 	if (!sid) throw new Error('no_active_session');
-	await postAgentStream({
-		sessionId: sid,
-		message: trimmed,
-		placeContext: placeContextState,
-		isFirstMessage: false
-	});
+	const turnIndex = Math.max(activeSession?.lastTurnIndex ?? 0, turns.at(-1)?.turnIndex ?? 0) + 1;
+	installOptimisticTurn(sid, trimmed, turnIndex);
+	try {
+		await postAgentStream({
+			sessionId: sid,
+			message: trimmed,
+			placeContext: placeContextState,
+			isFirstMessage: false
+		});
+	} catch (err) {
+		removeOptimisticTurn(sid, turnIndex);
+		throw err;
+	}
 }
 
 function selectSession(sid: string) {
@@ -773,7 +823,7 @@ export const chatState = {
 		if (
 			optimisticTurnSid === activeSid &&
 			optimisticTurnStartedAtMs !== null &&
-			latest.turnIndex === 1
+			optimisticTurnIndex === latest.turnIndex
 		) {
 			return Math.min(latest.createdAtMs ?? optimisticTurnStartedAtMs, optimisticTurnStartedAtMs);
 		}

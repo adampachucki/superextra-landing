@@ -19,6 +19,7 @@ from .places_tools import (
 from .specialist_catalog import SPECIALIST_RESULT_KEYS
 from .specialists import (
     ALL_SPECIALISTS,
+    CONTINUATION_SPECIALISTS,
     MEDIUM_THINKING_CONFIG,
     MODEL_GEMINI,
     ORCHESTRATOR_THINKING_CONFIG,
@@ -104,9 +105,13 @@ def _make_enricher(name="context_enricher"):
     )
 
 
-# --- Follow-up agent (answers from existing research, with narrow web fill-in) ---
+# --- Continuation agent (answers from existing research, with focused deepening) ---
 
-_FOLLOW_UP_TEMPLATE = (INSTRUCTIONS_DIR / "follow_up.md").read_text()
+_CONTINUE_RESEARCH_TEMPLATE = (INSTRUCTIONS_DIR / "continue_research.md").read_text()
+_CONTINUATION_NOTES_KEY = "continuation_notes"
+_MAX_CONTINUATION_NOTES_CHARS = 6000
+_MAX_CONTINUATION_NOTE_ANSWER_CHARS = 1600
+_MAX_CONTINUATION_NOTE_QUESTION_CHARS = 500
 
 
 def _format_specialist_reports(state, default="No specialist notes available."):
@@ -121,8 +126,61 @@ def _format_specialist_reports(state, default="No specialist notes available."):
     return "\n\n".join(sections)
 
 
-def _follow_up_instruction(ctx):
-    """Inject prior report, specialist notes, and context into follow-up instructions.
+def _content_text(content) -> str:
+    parts = getattr(content, "parts", None) or []
+    return "\n".join(
+        part.text for part in parts if isinstance(getattr(part, "text", None), str)
+    ).strip()
+
+
+def _compact_for_notes(text: str, limit: int) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 3].rstrip() + "..."
+
+
+def _append_continuation_note(existing: str, entry: str) -> str:
+    chunks = [chunk.strip() for chunk in existing.split("\n\n") if chunk.strip()]
+    chunks.append(entry.strip())
+    while chunks and len("\n\n".join(chunks)) > _MAX_CONTINUATION_NOTES_CHARS:
+        chunks.pop(0)
+    return "\n\n".join(chunks)
+
+
+def _record_continuation_notes(*, callback_context):
+    """Persist compact same-session continuation memory through ADK state.
+
+    This intentionally uses the documented delta-aware `callback_context.state`
+    path rather than Firestore-side memory. The original report and specialist
+    state remain immutable; continuation turns accumulate in a separate state
+    key that future continuation prompts can read.
+    """
+    reply = callback_context.state.get("continue_research_reply")
+    if not isinstance(reply, str) or not reply.strip():
+        return None
+
+    user_text = _content_text(getattr(callback_context, "user_content", None))
+    existing = callback_context.state.get(_CONTINUATION_NOTES_KEY, "")
+    if not isinstance(existing, str):
+        existing = ""
+
+    turn_idx = callback_context.state.get("turnIdx")
+    label = f"Turn {turn_idx}" if isinstance(turn_idx, int) else "Continuation turn"
+    entry = (
+        f"### {label}\n"
+        f"User asked: {_compact_for_notes(user_text, _MAX_CONTINUATION_NOTE_QUESTION_CHARS)}\n"
+        f"Answer/follow-up findings: "
+        f"{_compact_for_notes(reply, _MAX_CONTINUATION_NOTE_ANSWER_CHARS)}"
+    )
+    updated = _append_continuation_note(existing, entry)
+    if updated != existing:
+        callback_context.state[_CONTINUATION_NOTES_KEY] = updated
+    return None
+
+
+def _continue_research_instruction(ctx):
+    """Inject prior report, specialist notes, and context into continuation instructions.
 
     Uses `.format()` — inserted values are not scanned again, so chart-fence
     JSON in `final_report` flows through verbatim.
@@ -130,9 +188,15 @@ def _follow_up_instruction(ctx):
     values = {
         "final_report": ctx.state.get("final_report", "No prior report available."),
         "specialist_reports": _format_specialist_reports(ctx.state),
+        "research_coverage": ctx.state.get(
+            "research_coverage", "No research coverage notes available."
+        ),
+        "continuation_notes": ctx.state.get(
+            _CONTINUATION_NOTES_KEY, "No continuation notes yet."
+        ),
         "places_context": ctx.state.get("places_context", "No restaurant data available."),
     }
-    return _FOLLOW_UP_TEMPLATE.format(**values)
+    return _CONTINUE_RESEARCH_TEMPLATE.format(**values)
 
 
 def _report_writer_instruction(ctx):
@@ -147,23 +211,32 @@ def _report_writer_instruction(ctx):
     return _REPORT_WRITER_TEMPLATE.format(**values)
 
 
-follow_up = LlmAgent(
-    name="follow_up",
+continue_research = LlmAgent(
+    name="continue_research",
     model=MODEL_GEMINI,
-    instruction=_follow_up_instruction,
+    instruction=_continue_research_instruction,
     description=(
-        "Answers follow-up questions using prior research, specialist notes, "
-        "restaurant context, and narrow web fill-in."
+        "Continues an existing research thread using prior research, venue "
+        "context, focused source checks, and bounded specialist deepening."
     ),
-    tools=[google_search, fetch_web_content],
+    tools=[
+        google_search,
+        fetch_web_content,
+        *_ENRICHER_TOOLS,
+        *(
+            AgentTool(agent=spec, include_plugins=True)
+            for spec in CONTINUATION_SPECIALISTS
+        ),
+    ],
     generate_content_config=MEDIUM_THINKING_CONFIG,
     before_model_callback=_inject_geo_bias,
     on_model_error_callback=_on_model_error,
     on_tool_error_callback=_on_tool_error,
-    # Distinct from `final_report` so a follow-up reply doesn't overwrite
-    # the original research report in session state. The next follow-up would
-    # otherwise read its own shorter answer as "the research."
-    output_key="final_report_followup",
+    after_agent_callback=_record_continuation_notes,
+    # Distinct from `final_report` so a continuation reply doesn't overwrite
+    # the original research report in session state. The next continuation
+    # should still read the original full report as the durable base.
+    output_key="continue_research_reply",
 )
 
 # --- Router instruction provider ---
@@ -224,8 +297,8 @@ _router = LlmAgent(
     name="router",
     model=_FAST_MODEL,
     instruction=_router_instruction,
-    description="Routes user questions to research, follow-up, or asks for clarification.",
-    sub_agents=[research_pipeline, follow_up],
+    description="Routes user questions to research, continuation, or asks for clarification.",
+    sub_agents=[research_pipeline, continue_research],
     output_key="router_response",
 )
 

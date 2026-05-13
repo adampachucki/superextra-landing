@@ -11,10 +11,10 @@ Router -> research_pipeline
            |   `-- Specialists through AgentTool
            `-- Report Writer
 
-Router -> follow_up
+Router -> continue_research
 ```
 
-The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief and surface as much useful writer material as possible. The Report Writer reads Places context and full specialist reports directly, without a lead-authored brief, and writes the final report. Follow-up answers from the existing report, specialist notes, Places context, and limited web fill-in for narrow same-target questions.
+The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief and surface as much useful writer material as possible. The Report Writer reads Places context and full specialist reports directly, without a lead-authored brief, and writes the final report. Continue Research answers from the existing report, specialist notes, Places context, focused source checks, and bounded non-durable specialist deepening. Broad new reports should become new research sessions instead of being merged into the old thread.
 
 ## State Keys
 
@@ -23,7 +23,10 @@ The router routes. The context enricher builds Google Places context. The Resear
 - Specialist result keys such as `market_result`, `pricing_result`, `review_result`, `dynamic_result_1`, `dynamic_result_2`, and `dynamic_result_3`: specialist outputs.
 - `research_coverage`: Research Lead coverage note for audit, debugging, and future loop checks. The Report Writer does not read it.
 - `final_report`: final Report Writer report.
-- `final_report_followup`: final follow-up answer, separate from the original report.
+- `continue_research_reply`: final continuation answer, separate from the original report.
+- `continuation_notes`: compact same-session continuation memory written by the continuation agent's `after_agent_callback`.
+
+Continuation specialist helpers do not write specialist result keys. This keeps the original research base stable across follow-up turns.
 
 ## Rule Ownership
 
@@ -140,7 +143,7 @@ Files with runtime variables:
 
 - `research_lead.md`: `{places_context}`, `{market_source_profiles}`.
 - `report_writer.md`: `{places_context}`, `{specialist_reports}`.
-- `follow_up.md`: `{final_report}`, `{specialist_reports}`, `{places_context}`.
+- `continue_research.md`: `{final_report}`, `{specialist_reports}`, `{research_coverage}`, `{continuation_notes}`, `{places_context}`.
 - `specialist_base.md`: `{role_title}`, `{places_context}`, `{specialist_body}`.
 - `review_analyst.md`: `{target_place_id}`.
 
@@ -179,7 +182,6 @@ Keep these out of the prompt revamp unless the stream is explicitly opened:
 - claim-level citation plumbing;
 - website fetching improvements;
 - review fetch budget enforcement;
-- active-session target changes;
-- full follow-up research mode beyond narrow web fill-in;
+- active-session target changes beyond continuation-scope source checks;
 - expanded evals;
 - durable memory.

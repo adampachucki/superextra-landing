@@ -71,6 +71,7 @@
 		context_enricher: 'Looking up the venue',
 		research_lead: 'Reasoning',
 		report_writer: 'Drafting final report',
+		continue_research: 'Continuing research',
 		follow_up: 'Following up'
 	};
 	function authorLabel(author: string | null | undefined): string {
@@ -90,6 +91,7 @@
 		'context_enricher',
 		'research_lead',
 		'report_writer',
+		'continue_research',
 		'follow_up'
 	]);
 	const TOOL_PREVIEW_LIMIT = 5;

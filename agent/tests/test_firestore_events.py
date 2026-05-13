@@ -352,17 +352,47 @@ def test_research_lead_coverage_does_not_complete():
     assert mapped["complete"] is None
 
 
-def test_followup_complete_reads_final_report_followup_key():
-    """The follow-up agent writes to `final_report_followup`, not `final_report`.
-    Mapper must pick up the follow-up reply without falling back to
+def test_continue_research_complete_reads_continue_research_reply_key():
+    """The continuation agent writes to `continue_research_reply`, not `final_report`.
+    Mapper must pick up the continuation reply without falling back to
     `final_report` (which still holds the original research report)."""
+    ev = _event(
+        author="continue_research",
+        is_final=True,
+        state_delta={
+            "continue_research_reply": "Short continuation answer.",
+            # `final_report` is untouched — still holds the prior research.
+            # Mapper must NOT pick this up for the continuation event.
+            "final_report": "# Original full research report",
+        },
+    )
+    mapped = map_event(ev, {})
+    assert mapped["complete"] == {
+        "reply": "Short continuation answer.",
+        "sources": [],
+    }
+
+
+def test_continue_research_notes_state_delta_does_not_complete_or_emit_activity():
+    ev = _event(
+        author="continue_research",
+        is_final=True,
+        state_delta={"continuation_notes": "Turn 2 compact memory."},
+    )
+    mapped = map_event(ev, {})
+    assert mapped == {
+        "timeline_events": [],
+        "complete": None,
+        "grounding_sources": [],
+    }
+
+
+def test_legacy_followup_complete_still_reads_final_report_followup_key():
     ev = _event(
         author="follow_up",
         is_final=True,
         state_delta={
             "final_report_followup": "Short follow-up answer.",
-            # `final_report` is untouched — still holds the prior research.
-            # Mapper must NOT pick this up for the follow-up event.
             "final_report": "# Original full research report",
         },
     )

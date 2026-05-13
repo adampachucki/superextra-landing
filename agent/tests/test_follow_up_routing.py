@@ -1,8 +1,8 @@
-"""Follow-up routing evals.
+"""Continuation routing evals.
 
 Tests that the router correctly routes:
-- Simple follow-ups (after a report) → follow_up agent
-- New research needs (after a report) → research_pipeline
+- Simple continuations (after a report) → continue_research agent
+- New research needs (after a report) → continue_research agent
 - First messages (no report) → research_pipeline (unchanged)
 
 Uses stub agents and InMemoryRunner. Each test costs 1-2 flash calls.
@@ -62,11 +62,11 @@ if os.environ.get("RUN_LIVE_EVALS"):
         disallow_transfer_to_peers=True,
     )
 
-    _stub_follow_up = LlmAgent(
-        name="follow_up",
+    _stub_continue_research = LlmAgent(
+        name="continue_research",
         model=_flash,
-        instruction="Reply with exactly: 'Follow-up activated.' Nothing else.",
-        description="Stub follow-up agent for routing tests.",
+        instruction="Reply with exactly: 'Continuation activated.' Nothing else.",
+        description="Stub continuation agent for routing tests.",
         output_key="final_report",
         disallow_transfer_to_parent=True,
         disallow_transfer_to_peers=True,
@@ -76,8 +76,8 @@ if os.environ.get("RUN_LIVE_EVALS"):
         name="router",
         model=_flash,
         instruction=_router_instruction,
-        description="Routes user questions to research, follow-up, or asks for clarification.",
-        sub_agents=[_stub_pipeline, _stub_follow_up],
+        description="Routes user questions to research, continuation, or asks for clarification.",
+        sub_agents=[_stub_pipeline, _stub_continue_research],
         output_key="router_response",
     )
 
@@ -130,7 +130,7 @@ REPORT_STATE = {
 }
 
 
-# --- Simple follow-ups → should route to follow_up ---
+# --- Simple follow-ups → should route to continue_research ---
 
 SHOULD_FOLLOW_UP = [
     pytest.param("Summarize that in bullet points", id="reformat_request"),
@@ -142,16 +142,16 @@ SHOULD_FOLLOW_UP = [
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("message", SHOULD_FOLLOW_UP)
-async def test_simple_followup_routes_to_follow_up(message):
-    """After a report is delivered, simple follow-ups go to follow_up agent."""
+async def test_simple_followup_routes_to_continue_research(message):
+    """After a report is delivered, simple follow-ups go to the continuation agent."""
     results = await _run_conversation([message], pre_state=REPORT_STATE)
-    assert results[0]["transferred_to"] == "follow_up", (
-        f"Expected transfer to follow_up but got: {results[0]['transferred_to']} "
+    assert results[0]["transferred_to"] == "continue_research", (
+        f"Expected transfer to continue_research but got: {results[0]['transferred_to']} "
         f"(response: {results[0]['response'][:200]})"
     )
 
 
-# --- New research needs for the same target/area should still route to research_pipeline ---
+# --- New research needs after a report should stay in continuation ---
 
 SHOULD_RESEARCH = [
     pytest.param("What about the delivery market in this area?", id="new_topic_not_covered"),
@@ -160,29 +160,33 @@ SHOULD_RESEARCH = [
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("message", SHOULD_RESEARCH)
-async def test_new_research_routes_to_pipeline(message):
-    """After a report, follow-ups needing new data go to research_pipeline."""
+async def test_new_research_routes_to_continue_research(message):
+    """After a report, new data requests stay in continuation.
+
+    The continuation agent decides whether to answer with focused research or
+    suggest a new session; the router should not jam a full pipeline into the
+    old thread.
+    """
     results = await _run_conversation([message], pre_state=REPORT_STATE)
-    assert results[0]["transferred_to"] == "research_pipeline", (
-        f"Expected transfer to research_pipeline but got: {results[0]['transferred_to']} "
+    assert results[0]["transferred_to"] == "continue_research", (
+        f"Expected transfer to continue_research but got: {results[0]['transferred_to']} "
         f"(response: {results[0]['response'][:200]})"
     )
 
 
-# --- New target after a report should clarify, not reuse stale context ---
+# --- New target after a report should stay in continuation ---
 
 
 @pytest.mark.asyncio
-async def test_new_restaurant_after_report_asks_for_new_target_context():
-    """After a report, a different restaurant should not route with stale Places context."""
+async def test_new_restaurant_after_report_routes_to_continue_research():
+    """After a report, the continuation agent owns new-session suggestions."""
     results = await _run_conversation(
         ["Now analyze Restaurant D in Manchester"], pre_state=REPORT_STATE
     )
-    assert results[0]["transferred_to"] is None, (
-        f"Expected clarification but got: {results[0]['transferred_to']} "
+    assert results[0]["transferred_to"] == "continue_research", (
+        f"Expected continuation but got: {results[0]['transferred_to']} "
         f"(response: {results[0]['response'][:200]})"
     )
-    assert results[0]["response"], "Router should ask for new target context"
 
 
 # --- No prior report → should route to research_pipeline ---
