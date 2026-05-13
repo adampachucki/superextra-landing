@@ -9,6 +9,7 @@
 	import { formatRelativeTime } from '$lib/format-time';
 
 	let inputEl: HTMLTextAreaElement | undefined = $state();
+	let promptBarEl: HTMLDivElement | undefined = $state();
 	let query = $state('');
 	let composerResetKey = $state(0);
 	let sidebarOpen = $state(false);
@@ -84,6 +85,21 @@
 		const relativeTimer = setInterval(() => {
 			relativeNow = Date.now();
 		}, 30_000);
+		let promptFrame: number | null = null;
+		const updatePromptHeight = () => {
+			promptFrame = null;
+			const height = promptBarEl?.getBoundingClientRect().height ?? 0;
+			document.documentElement.style.setProperty('--chat-prompt-height', `${Math.ceil(height)}px`);
+		};
+		const schedulePromptHeight = () => {
+			if (promptFrame !== null) cancelAnimationFrame(promptFrame);
+			promptFrame = requestAnimationFrame(updatePromptHeight);
+		};
+		const promptResizeObserver =
+			typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedulePromptHeight);
+		if (promptBarEl) promptResizeObserver?.observe(promptBarEl);
+		window.addEventListener('resize', schedulePromptHeight);
+		schedulePromptHeight();
 
 		// Sign the visitor into Firebase anonymously in the background. Downstream
 		// phases (Firestore session/event reads, ID-token-verified Cloud Function
@@ -125,7 +141,13 @@
 		tick().then(() => {
 			mounted = true;
 		});
-		return () => clearInterval(relativeTimer);
+		return () => {
+			clearInterval(relativeTimer);
+			promptResizeObserver?.disconnect();
+			window.removeEventListener('resize', schedulePromptHeight);
+			if (promptFrame !== null) cancelAnimationFrame(promptFrame);
+			document.documentElement.style.removeProperty('--chat-prompt-height');
+		};
 	});
 
 	// Keep URL in sync with active session
@@ -581,7 +603,7 @@
 <div class="chat-enter relative min-h-dvh {mounted ? 'is-mounted' : ''}">
 	<!-- Main area (flows in document, page-level scroll) -->
 	<div
-		class="relative min-h-dvh pb-40 transition-[padding-left] duration-300 ease-out {isDesktop &&
+		class="chat-main relative min-h-dvh transition-[padding-left] duration-300 ease-out {isDesktop &&
 		sidebarOpen
 			? 'pl-64'
 			: ''}"
@@ -615,6 +637,7 @@
 <!-- Input bar (fixed, outside chat-enter) -->
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div
+	bind:this={promptBarEl}
 	class="fixed right-0 bottom-0 left-0 z-20 bg-[var(--color-cream)] transition-[left] duration-300 ease-out {isDesktop &&
 	sidebarOpen
 		? 'left-64'
@@ -759,6 +782,10 @@
 </div>
 
 <style>
+	.chat-main {
+		padding-bottom: calc(var(--chat-prompt-height, 8rem) + 2rem);
+	}
+
 	.prompt-card {
 		box-shadow:
 			0 1px 2px rgba(0, 0, 0, 0.02),

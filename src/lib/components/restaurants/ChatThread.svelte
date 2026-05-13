@@ -10,8 +10,10 @@
 	import ChartBlock from './ChartBlock.svelte';
 
 	let scrollEl: HTMLDivElement | undefined = $state();
+	let contentEl: HTMLDivElement | undefined = $state();
 	let bottomEl: HTMLDivElement | undefined = $state();
 	let scrollRun = 0;
+	let scrollFrame: number | null = null;
 	let scrolledSid: string | null = null;
 
 	function isInView(node: HTMLElement) {
@@ -33,6 +35,47 @@
 				.join('|')
 		].join(':')
 	);
+
+	function promptBottomOffset() {
+		const raw = getComputedStyle(document.documentElement).getPropertyValue('--chat-prompt-height');
+		const promptHeight = Number.parseFloat(raw);
+		return (Number.isFinite(promptHeight) ? promptHeight : 128) + 16;
+	}
+
+	function bottomScrollTop() {
+		if (!bottomEl) return null;
+		const scroller = document.scrollingElement ?? document.documentElement;
+		const target =
+			scroller.scrollTop +
+			bottomEl.getBoundingClientRect().top -
+			window.innerHeight +
+			promptBottomOffset();
+		return Math.max(0, Math.min(target, scroller.scrollHeight - window.innerHeight));
+	}
+
+	function scrollToBottom(behavior: ScrollBehavior) {
+		const top = bottomScrollTop();
+		if (top === null) return;
+		if (behavior === 'auto') {
+			const scroller = document.scrollingElement ?? document.documentElement;
+			scroller.scrollTop = top;
+			return;
+		}
+		window.scrollTo({ top, behavior });
+	}
+
+	function scheduleBottomScroll(behavior: ScrollBehavior) {
+		if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+		scrollFrame = requestAnimationFrame(() => {
+			scrollFrame = null;
+			scrollToBottom(behavior);
+		});
+	}
+
+	function isNearBottom() {
+		const scroller = document.scrollingElement ?? document.documentElement;
+		return scroller.scrollHeight - (window.scrollY + window.innerHeight) < 320;
+	}
 
 	$effect(() => {
 		scrollKey;
@@ -57,10 +100,23 @@
 					}
 					return;
 				}
-				bottomEl?.scrollIntoView({ block: 'end', behavior });
+				scrollToBottom(behavior);
 				scrolledSid = sid;
 			});
 		});
+	});
+
+	$effect(() => {
+		if (!contentEl || typeof ResizeObserver === 'undefined') return;
+		const observer = new ResizeObserver(() => {
+			if (!chatState.loading || !isNearBottom()) return;
+			scheduleBottomScroll('smooth');
+		});
+		observer.observe(contentEl);
+		return () => {
+			observer.disconnect();
+			if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+		};
 	});
 
 	const SOURCES_LIMIT = 19;
@@ -95,7 +151,7 @@
 </script>
 
 <div bind:this={scrollEl} class="px-5 py-6 md:px-6">
-	<div class="mx-auto flex max-w-[700px] flex-col gap-5">
+	<div bind:this={contentEl} class="mx-auto flex max-w-[700px] flex-col gap-5">
 		{#each chatState.messages as msg, i (`${chatState.activeSid ?? 'local'}:${msg.turnIndex}:${msg.role}`)}
 			<div
 				class="flex {msg.role === 'user' ? 'scroll-mt-6 justify-end' : 'justify-start'}"
@@ -275,11 +331,15 @@
 				</div>
 			</div>
 		{/if}
-		<div bind:this={bottomEl} class="scroll-mb-32 md:scroll-mb-36" aria-hidden="true"></div>
+		<div bind:this={bottomEl} class="chat-bottom-anchor" aria-hidden="true"></div>
 	</div>
 </div>
 
 <style>
+	.chat-bottom-anchor {
+		scroll-margin-bottom: calc(var(--chat-prompt-height, 8rem) + 1rem);
+	}
+
 	:global(.chat-markdown .markdown-table-scroll) {
 		width: 100%;
 		max-width: 100%;
