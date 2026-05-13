@@ -19,10 +19,18 @@
 	let expanded = $state(false);
 	let expandedTools: Record<string, boolean> = $state({});
 
-	let idleLabel = $state<'Thinking' | 'Analyzing'>('Thinking');
+	const IDLE_LABELS = ['Thinking', 'Working', 'Analyzing'] as const;
+	type IdleLabel = (typeof IDLE_LABELS)[number];
+
+	let idleLabel = $state<IdleLabel>(IDLE_LABELS[0]);
 
 	function idleLabelDelay() {
 		return 2000 + Math.random() * 2000;
+	}
+
+	function nextIdleLabel(label: IdleLabel): IdleLabel {
+		const index = IDLE_LABELS.indexOf(label);
+		return IDLE_LABELS[(index + 1) % IDLE_LABELS.length];
 	}
 
 	$effect(() => {
@@ -36,11 +44,11 @@
 
 	$effect(() => {
 		if (completed || events.length) return;
-		idleLabel = 'Thinking';
+		idleLabel = IDLE_LABELS[0];
 		let timer: ReturnType<typeof setTimeout>;
 		const schedule = () => {
 			timer = setTimeout(() => {
-				idleLabel = idleLabel === 'Thinking' ? 'Analyzing' : 'Thinking';
+				idleLabel = nextIdleLabel(idleLabel);
 				schedule();
 			}, idleLabelDelay());
 		};
