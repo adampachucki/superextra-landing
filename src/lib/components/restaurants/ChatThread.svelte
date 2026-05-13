@@ -56,6 +56,8 @@
 	});
 
 	const SOURCES_LIMIT = 19;
+	const SOURCE_COUNT_MIN = 5;
+	const ACTIVITY_EVENT_MIN = 2;
 	const PROVIDER_LABELS: Record<ChatSourceProvider, string> = {
 		google_maps: 'Google Maps',
 		google_reviews: 'Google Reviews',
@@ -161,10 +163,10 @@
 							</button>
 						</div>
 
-						{#if msg.turnSummary && msg.activityEvents?.length}
+						{#if msg.turnSummary && (msg.activityEvents?.length ?? 0) >= ACTIVITY_EVENT_MIN}
 							<div class="mt-4">
 								<LiveActivity
-									events={msg.activityEvents}
+									events={msg.activityEvents ?? []}
 									elapsedMs={msg.turnSummary.elapsedMs}
 									completed
 								/>
@@ -172,12 +174,13 @@
 						{/if}
 
 						{#if msg.sources?.length}
-							{@const showAll = expandedSources[i]}
+							{@const showAll = expandedSources[msg.turnIndex]}
 							{@const visible = showAll ? msg.sources : msg.sources.slice(0, SOURCES_LIMIT)}
-							{@const remaining = msg.sources.length - SOURCES_LIMIT}
 							<div class="mt-5">
 								<span class="mb-2 block text-[12px] font-medium text-black/40 dark:text-white/40"
-									>Sources ({msg.sources.length})</span
+									>Sources{msg.sources.length >= SOURCE_COUNT_MIN
+										? ` (${msg.sources.length})`
+										: ''}</span
 								>
 								<div class="flex flex-wrap gap-1.5">
 									{#each visible as src (`${src.url}:${src.title}`)}
@@ -214,14 +217,14 @@
 											</span>
 										</a>
 									{/each}
-									{#if remaining > 0 && !showAll}
+									{#if msg.sources.length > SOURCES_LIMIT && !showAll}
 										<button
 											onclick={() => {
-												expandedSources[i] = true;
+												expandedSources[msg.turnIndex] = true;
 											}}
 											class="inline-flex items-center rounded-full border border-black/5 px-2.5 py-1 text-[12px] leading-snug text-black/40 transition-colors hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60"
 										>
-											+{remaining} more
+											+{msg.sources.length - SOURCES_LIMIT} more
 										</button>
 									{/if}
 								</div>

@@ -50,6 +50,9 @@ function captureObservers() {
 		},
 		turns(sid: string) {
 			return captured.find((c) => c.ref._ref?._path === `sessions/${sid}/turns`);
+		},
+		events(sid: string) {
+			return captured.find((c) => c.ref._ref?._path === `sessions/${sid}/events`);
 		}
 	};
 }
@@ -74,12 +77,75 @@ function turnsSnap(entries: Array<{ data: Record<string, unknown> }>, { fromCach
 	};
 }
 
+function eventsSnap(events: Record<string, unknown>[]) {
+	return {
+		metadata: { fromCache: false },
+		docChanges: () =>
+			events.map((data, index) => ({
+				type: 'added' as const,
+				doc: { data: () => ({ attempt: 1, seqInAttempt: index + 1, type: 'timeline', data }) }
+			}))
+	};
+}
+
 async function waitUntil(fn: () => boolean, timeout = 2000) {
 	const start = Date.now();
 	while (!fn()) {
 		if (Date.now() - start > timeout) throw new Error('waitUntil timed out');
 		await new Promise((r) => setTimeout(r, 5));
 	}
+}
+
+async function primeCompleteTurn({
+	sid = 'sid-1',
+	sourceCount = 0,
+	turnSummary = null
+}: {
+	sid?: string;
+	sourceCount?: number;
+	turnSummary?: { startedAtMs: number; finishedAtMs: number; elapsedMs: number } | null;
+} = {}) {
+	const obs = captureObservers();
+	chatState.selectSession(sid);
+	await waitUntil(() => !!obs.turns(sid));
+
+	const turn: Record<string, unknown> = {
+		turnIndex: 1,
+		runId: 'run-1',
+		userMessage: 'review summary',
+		status: 'complete',
+		reply: 'Agent reply',
+		createdAt: { toMillis: () => 1000 },
+		completedAt: { toMillis: () => 36_000 }
+	};
+	if (sourceCount > 0) {
+		turn.sources = Array.from({ length: sourceCount }, (_, i) => ({
+			title: `Source ${i + 1}`,
+			url: `https://example.com/${i + 1}`
+		}));
+	}
+	if (turnSummary) turn.turnSummary = turnSummary;
+
+	obs.session(sid)!.onNext(
+		sessionSnap({
+			userId: 'uid-test',
+			participants: ['uid-test'],
+			status: 'complete',
+			currentRunId: 'run-1',
+			lastTurnIndex: 1
+		})
+	);
+	obs.turns(sid)!.onNext(turnsSnap([{ data: turn }]));
+	return { obs, sid };
+}
+
+async function addEvents(
+	obs: ReturnType<typeof captureObservers>,
+	sid: string,
+	events: Record<string, unknown>[]
+) {
+	await waitUntil(() => !!obs.events(sid));
+	obs.events(sid)!.onNext(eventsSnap(events));
 }
 
 describe('ChatThread', () => {
@@ -92,41 +158,14 @@ describe('ChatThread', () => {
 		vi.unstubAllGlobals();
 	});
 
-	it('skips the completed activity shell when no captured events exist', async () => {
-		const obs = captureObservers();
-		chatState.selectSession('sid-1');
-		await waitUntil(() => !!obs.turns('sid-1'));
-
-		obs.session('sid-1')!.onNext(
-			sessionSnap({
-				userId: 'uid-test',
-				participants: ['uid-test'],
-				status: 'complete',
-				currentRunId: 'run-1',
-				lastTurnIndex: 1
-			})
-		);
-		obs.turns('sid-1')!.onNext(
-			turnsSnap([
-				{
-					data: {
-						turnIndex: 1,
-						runId: 'run-1',
-						userMessage: 'review summary',
-						status: 'complete',
-						reply: 'Agent reply',
-						sources: [{ title: 'Source A', url: 'https://example.com/a' }],
-						turnSummary: {
-							startedAtMs: 0,
-							finishedAtMs: 35_000,
-							elapsedMs: 35_000
-						},
-						createdAt: { toMillis: () => 1000 },
-						completedAt: { toMillis: () => 36_000 }
-					}
-				}
-			])
-		);
+	it('hides low-count source and activity metadata', async () => {
+		const { obs, sid } = await primeCompleteTurn({
+			sourceCount: 1,
+			turnSummary: { startedAtMs: 0, finishedAtMs: 35_000, elapsedMs: 35_000 }
+		});
+		await addEvents(obs, sid, [
+			{ kind: 'thought', id: 'n1', author: 'research_lead', text: 'Reading sources' }
+		]);
 
 		expect(chatState.messages).toHaveLength(2);
 		const { body } = render(ChatThread, { props: {} });
@@ -135,6 +174,30 @@ describe('ChatThread', () => {
 		expect(body).not.toContain('Analysis activity');
 		expect(body).not.toContain('35s total');
 		expect(body).not.toContain('Opened 1 source');
+		expect(body).toContain('Sources');
+		expect(body).not.toContain('Sources (1)');
+	});
+
+	it('shows source and activity metadata once thresholds are met', async () => {
+		const { obs, sid } = await primeCompleteTurn({
+			sourceCount: 5,
+			turnSummary: { startedAtMs: 1000, finishedAtMs: 2000, elapsedMs: 1000 }
+		});
+		await addEvents(obs, sid, [
+			{ kind: 'thought', id: 'n1', author: 'research_lead', text: 'Reading sources' },
+			{
+				kind: 'detail',
+				id: 'd1',
+				group: 'source',
+				family: 'Public sources',
+				text: 'Opened source'
+			}
+		]);
+
+		const { body } = render(ChatThread, { props: {} });
+		expect(body).toContain('Sources (5)');
+		expect(body).toContain('Analysis activity');
+		expect(body).toContain('1s total');
 	});
 
 	it('renders user-facing copy for terminal backend error codes', async () => {
