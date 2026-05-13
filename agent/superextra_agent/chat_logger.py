@@ -22,6 +22,8 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
 from google.adk.tools.base_tool import BaseTool
 
+from .cloud_logging import emit_cloud_log
+
 if TYPE_CHECKING:
     from google.adk.agents.invocation_context import InvocationContext
     from google.adk.tools.tool_context import ToolContext
@@ -33,6 +35,16 @@ _default_logs = Path(__file__).parent.parent / "logs"
 LOGS_DIR = Path("/tmp/agent_logs") if _os.environ.get("K_SERVICE") else _default_logs
 
 logger = logging.getLogger(__name__)
+
+_CLOUD_EVENTS = {
+    "invocation_start",
+    "invocation_end",
+    "agent_start",
+    "agent_end",
+    "model_request",
+    "model_response",
+    "model_error",
+}
 
 
 def _now() -> str:
@@ -112,6 +124,16 @@ class ChatLoggerPlugin(BasePlugin):
 
     def _write(self, session_id: str, entry: dict) -> None:
         entry.setdefault("ts", _now())
+        if entry.get("event") in _CLOUD_EVENTS:
+            severity = "ERROR" if entry.get("event") == "model_error" else "INFO"
+            cloud_entry = {k: v for k, v in entry.items() if k != "event"}
+            emit_cloud_log(
+                str(entry["event"]),
+                severity=severity,
+                sid=session_id,
+                firestore_sid=session_id.removeprefix("se-"),
+                **cloud_entry,
+            )
         try:
             with self._log_file(session_id).open("a") as f:
                 f.write(json.dumps(entry, default=str, ensure_ascii=False) + "\n")

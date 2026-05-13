@@ -42,6 +42,7 @@ from google.cloud import firestore
 from google.genai import types
 from typing_extensions import override
 
+from .cloud_logging import emit_cloud_log
 from .firestore_events import map_tool_call, map_tool_error, map_tool_result
 from .gear_run_state import GearRunState
 from .notes import _generate_title
@@ -413,6 +414,64 @@ class FirestoreProgressPlugin(BasePlugin):
                 per.run_id,
             )
 
+    def _stage_for_agent(self, agent_name: str | None) -> str:
+        if agent_name == "report_writer":
+            return "writing_final_report"
+        if agent_name == "research_lead":
+            return "planning_research"
+        if agent_name == "context_enricher":
+            return "building_context"
+        if agent_name == "router":
+            return "routing"
+        if agent_name == "continue_research":
+            return "continuing_research"
+        if agent_name:
+            return "specialist_research"
+        return "agent_work"
+
+    async def _write_active_stage(
+        self,
+        per: GearRunState,
+        *,
+        agent_name: str | None,
+        stage: str | None = None,
+        model: str | None = None,
+        invocation_id: str | None = None,
+    ) -> None:
+        update: dict[str, Any] = {
+            "activeAgent": agent_name or "unknown",
+            "activeStage": stage or self._stage_for_agent(agent_name),
+            "activeStageStartedAt": firestore.SERVER_TIMESTAMP,
+        }
+        if model is not None:
+            update["activeModel"] = model
+        else:
+            update["activeModel"] = firestore.DELETE_FIELD
+        if invocation_id is not None:
+            update["activeInvocationId"] = invocation_id
+
+        emit_cloud_log(
+            "active_stage",
+            sid=per.sid,
+            run_id=per.run_id,
+            turn_idx=per.turn_idx,
+            agent=agent_name,
+            stage=update["activeStage"],
+            model=model,
+            invocation_id=invocation_id,
+        )
+
+        try:
+            await fenced_session_update(self._client(), per, update)
+        except OwnershipLost:
+            pass
+        except Exception:  # noqa: BLE001
+            log.exception(
+                "active stage write failed sid=%s runId=%s; continuing",
+                per.sid,
+                per.run_id,
+            )
+
     @override
     async def before_run_callback(self, *, invocation_context: InvocationContext):
         if _is_nested_invocation(invocation_context):
@@ -475,6 +534,31 @@ class FirestoreProgressPlugin(BasePlugin):
         # Firestore await before model work begins, without waiting on the
         # Firestore write itself.
         await asyncio.sleep(0)
+        return None
+
+    @override
+    async def before_agent_callback(self, *, agent, callback_context):
+        per = self._state_for_context(callback_context, allow_run_id_fallback=True)
+        if per is None:
+            return None
+        await self._write_active_stage(
+            per,
+            agent_name=getattr(agent, "name", None) or callback_context.agent_name,
+            invocation_id=callback_context.invocation_id,
+        )
+        return None
+
+    @override
+    async def before_model_callback(self, *, callback_context, llm_request):
+        per = self._state_for_context(callback_context, allow_run_id_fallback=True)
+        if per is None:
+            return None
+        await self._write_active_stage(
+            per,
+            agent_name=callback_context.agent_name,
+            model=getattr(llm_request, "model", None),
+            invocation_id=callback_context.invocation_id,
+        )
         return None
 
     @override
@@ -614,6 +698,13 @@ class FirestoreProgressPlugin(BasePlugin):
         #      Firestore errors (the answer is in process memory only;
         #      losing it on a retry-exhausted blip is unrecoverable).
         await per.stop_heartbeat()
+        emit_cloud_log(
+            "finalize_start",
+            sid=per.sid,
+            run_id=per.run_id,
+            turn_idx=per.turn_idx,
+            has_final_reply=bool(per.final_reply),
+        )
         try:
             session_update, turn_update, _status = await per.finalize()
         except Exception:  # noqa: BLE001
@@ -635,6 +726,7 @@ class FirestoreProgressPlugin(BasePlugin):
                             "status": "error",
                             "error": "finalize_failed",
                             "updatedAt": firestore.SERVER_TIMESTAMP,
+                            "activeStage": "finalize_failed",
                         },
                         {
                             "status": "error",
@@ -655,11 +747,30 @@ class FirestoreProgressPlugin(BasePlugin):
                 )
             return None
 
+        if session_update.get("status") == "complete":
+            session_update.update(
+                {
+                    "activeAgent": firestore.DELETE_FIELD,
+                    "activeStage": firestore.DELETE_FIELD,
+                    "activeStageStartedAt": firestore.DELETE_FIELD,
+                    "activeModel": firestore.DELETE_FIELD,
+                    "activeInvocationId": firestore.DELETE_FIELD,
+                }
+            )
+
         try:
             await _retry_critical(
                 lambda: fenced_session_and_turn_update(
                     self._client(), per, session_update, turn_update
                 )
+            )
+            emit_cloud_log(
+                "finalize_success",
+                sid=per.sid,
+                run_id=per.run_id,
+                turn_idx=per.turn_idx,
+                status=session_update.get("status"),
+                reply_len=len(per.final_reply or ""),
             )
         except OwnershipLost:
             log.warning(

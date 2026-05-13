@@ -4,7 +4,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from google.cloud import firestore
 
+from superextra_agent import firestore_progress
 from superextra_agent.firestore_progress import FirestoreProgressPlugin
 from superextra_agent.gear_run_state import GearRunState
 
@@ -36,6 +38,39 @@ def _tool_context(*, invocation_id: str = "inv-parent", call_id: str = "call-1")
         agent_name="research_lead",
         session=SimpleNamespace(id="se-sid-test", state={"runId": "run-test"}),
     )
+
+
+@pytest.mark.asyncio
+async def test_before_model_writes_active_stage(monkeypatch):
+    plugin, _state = _make_plugin_state()
+    updates: list[dict] = []
+
+    async def _fenced(_fs, _state, update):
+        updates.append(update)
+
+    monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
+
+    callback_context = SimpleNamespace(
+        invocation_id="inv-parent",
+        agent_name="report_writer",
+        session=SimpleNamespace(id="se-sid-test", state={"runId": "run-test"}),
+    )
+    llm_request = SimpleNamespace(model="gemini-3.1-pro")
+
+    await plugin.before_model_callback(
+        callback_context=callback_context,
+        llm_request=llm_request,
+    )
+
+    assert updates == [
+        {
+            "activeAgent": "report_writer",
+            "activeStage": "writing_final_report",
+            "activeStageStartedAt": firestore.SERVER_TIMESTAMP,
+            "activeModel": "gemini-3.1-pro",
+            "activeInvocationId": "inv-parent",
+        }
+    ]
 
 
 @pytest.mark.asyncio
