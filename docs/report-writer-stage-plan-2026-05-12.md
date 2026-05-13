@@ -88,7 +88,9 @@ The `report_writer` should:
   and Places context;
 - retain names, dates, numbers, prices, sample sizes, quotes, ranges, source
   limits, counter-signals, and uncertainty;
-- include a complete findings ledger before narrative synthesis;
+- make all relevant concrete findings visible in the format that fits the
+  evidence: table, grouped bullets, short sections, or compact narrative;
+- include grounded implications for the target venue when one is known;
 - connect findings across specialists rather than listing reports one by one;
 - bias toward dense, useful reporting over executive-summary brevity;
 - remove only duplicated wording, internal process notes, and irrelevant dead
@@ -98,6 +100,24 @@ The `report_writer` should:
 - write `final_report`.
 
 The writer should produce an integrated report, not a summary of summaries.
+
+## Specialist Output Contract
+
+Specialists should not compress their evidence into only the top takeaways.
+They should surface all useful material they find: findings, citations,
+source notes, exact data, quotes, caveats, failed checks, counter-signals,
+considerations, and implications for the target venue. The bias is intentional:
+the writer can remove duplicated or irrelevant material, but it cannot recover
+findings that specialists never surfaced.
+
+## Dynamic Research Slots
+
+The lead can call multiple dynamic researchers when the task needs flexible
+deep dives, cross-signal connections, cause or mechanism research, verification,
+non-standard evidence, or a focused extra round. Use
+`dynamic_researcher_1`, then `dynamic_researcher_2`, then
+`dynamic_researcher_3`. Each writes a separate state key, so a later dynamic
+call does not overwrite an earlier one.
 
 ## Recommended Pipeline
 

@@ -79,13 +79,14 @@ class TestResearchLeadInstruction:
         assert "Do not list discovered entities" in result
         assert "Do not decide which specialist findings matter most" in result
 
-    def test_dynamic_researcher_guidance_is_verifier_or_gap_filler(self):
+    def test_dynamic_researcher_guidance_is_deep_dive_or_connector(self):
         ctx = MockCtx(state={"places_context": "Restaurant data"})
 
         result = _research_lead_instruction(ctx)
 
-        assert "Use `dynamic_researcher_1` more readily" in result
-        assert "focused verifier or gap-filler" in result
+        assert "flexible deep dive, verification, or cross-signal connection" in result
+        assert "`dynamic_researcher_1`, then `dynamic_researcher_2`, then `dynamic_researcher_3`" in result
+        assert "causes, mechanisms, relationships between findings" in result
         assert "named-entity checks" in result
 
 
@@ -139,17 +140,23 @@ class TestReportWriterInstruction:
         ctx = MockCtx(state={
             "market_result": "Zołza closed. Matcha Ma opened.",
             "dynamic_result_1": "Nam-Viet remains operational nearby.",
+            "dynamic_result_2": "Filmor has a visible launch signal.",
+            "dynamic_result_3": "Brassica has weak closure evidence.",
         })
 
         result = _report_writer_instruction(ctx)
 
         assert "Do not rely on any lead-authored summary" in result
         assert "Err on the side of showing too much useful evidence" in result
-        assert "Complete Findings Ledger" in result
+        assert "Use the format that preserves detail most clearly" in result
+        assert "what the evidence means for that venue" in result
+        assert "Weave this into the synthesis or group it separately" in result
         assert "Do not collapse several concrete findings" in result
         assert "Do not omit evidence to make room for follow-up questions" in result
         assert "Zołza closed" in result
         assert "Nam-Viet remains operational nearby" in result
+        assert "Filmor has a visible launch signal" in result
+        assert "Brassica has weak closure evidence" in result
 
 
 class TestMakeInstruction:
@@ -183,6 +190,16 @@ class TestMakeInstruction:
         assert "## Market Source Profiles" not in result
         assert "Pyszne.pl" not in result
         assert "ChIJtarget" in result
+
+    def test_specialists_surface_writer_material(self):
+        provider = _make_instruction("market_landscape")
+
+        result = provider(MockCtx(state={"places_context": "Target data"}))
+
+        assert "Surface all useful material you find" in result
+        assert "Do not compress it to top takeaways" in result
+        assert "`Writer Material` section" in result
+        assert "implications for the target venue" in result
 
 
 class TestFollowUpInstruction:

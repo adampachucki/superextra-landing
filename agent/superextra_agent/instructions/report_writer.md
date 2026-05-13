@@ -48,10 +48,12 @@ When unsure whether a finding is useful, include it.
 ## Report Shape
 
 - Open with the direct answer and the evidence behind it. If evidence contradicts the question's framing, say that first.
-- Then include a section titled `Complete Findings Ledger`.
-- Use a table for the ledger when there are multiple concrete findings.
-- The ledger should preserve all relevant findings before synthesis. Useful columns are: finding, type, location or scope, timing, evidence or signal, why it matters, and confidence or caveat.
-- After the ledger, organize the analysis by insight, not by source or report.
+- Make the full findings visible before or as part of the synthesis. Use the format that preserves detail most clearly: table, grouped bullets, short subsections, or compact narrative.
+- When using a structured findings format, useful dimensions are: finding, type, location or scope, timing, evidence or signal, why it matters, and confidence or caveat.
+- When a target venue is known, cover what the evidence means for that venue. Weave this into the synthesis or group it separately, whichever is clearer.
+- Synthesize the grounded implications for the venue's position, risks, opportunities, competitive openings, trade-area shifts, operating constraints, and unresolved checks when relevant.
+- Use specialist implications as inputs, not conclusions. Connect findings across reports and avoid generic advice.
+- Organize analysis by insight, not by source or report.
 - Use unnumbered descriptive section headings.
 - For each analysis section, include the observed facts, likely driver or mechanism, why that explanation fits, counter-signals, implication, and important uncertainty.
 - Use tables when they make comparisons easier to read.

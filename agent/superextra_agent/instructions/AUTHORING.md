@@ -14,13 +14,13 @@ Router -> research_pipeline
 Router -> follow_up
 ```
 
-The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief. The Report Writer reads Places context and full specialist reports directly, without a lead-authored brief, and writes the final report. Follow-up answers from the existing report, specialist notes, Places context, and limited web fill-in for narrow same-target questions.
+The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief and surface as much useful writer material as possible. The Report Writer reads Places context and full specialist reports directly, without a lead-authored brief, and writes the final report. Follow-up answers from the existing report, specialist notes, Places context, and limited web fill-in for narrow same-target questions.
 
 ## State Keys
 
 - `places_context`: Google Places context from the enricher.
 - `_target_place_id`, `_target_lat`, `_target_lng`: target metadata written by Places tools.
-- Specialist result keys such as `market_result`, `pricing_result`, and `review_result`: specialist outputs.
+- Specialist result keys such as `market_result`, `pricing_result`, `review_result`, `dynamic_result_1`, `dynamic_result_2`, and `dynamic_result_3`: specialist outputs.
 - `research_coverage`: Research Lead coverage note for audit, debugging, and future loop checks. The Report Writer does not read it.
 - `final_report`: final Report Writer report.
 - `final_report_followup`: final follow-up answer, separate from the original report.
@@ -95,11 +95,11 @@ The Lead owns:
 - a focused extra round if evidence is weak;
 - short internal research coverage notes.
 
-The Lead should use at least two specialists for every research report. 2-4 is common. Add another specialist when it gives a useful perspective, test, or evidence surface.
+The Lead should use at least two specialists for every research report. 2-4 is common. Add another specialist when it gives a useful perspective, test, or evidence surface. For flexible deep dives, cross-signal connections, verification, or gap-filling, use the next unused dynamic researcher slot instead of reusing the same one.
 
 The Lead should ask specialists for the causes, mechanisms, counter-signals, and evidence tests that matter for the specific task. Do not hardcode domain-specific depth checklists in specialist body files unless a tool or domain boundary requires it.
 
-The Lead does not summarize findings or draft report sections. Its research coverage note is internal and must not guide the final report. The Report Writer reads Places context and specialist reports directly, preserves all relevant concrete findings in a complete findings ledger, connects evidence across reports, and writes the user-facing answer.
+The Lead does not summarize findings or draft report sections. Its research coverage note is internal and must not guide the final report. The Report Writer reads Places context and specialist reports directly, makes all relevant concrete findings visible in a format that fits the evidence, connects evidence across reports, adds grounded implications for the target venue when known, and writes the user-facing answer.
 
 ## Market Source Profiles
 

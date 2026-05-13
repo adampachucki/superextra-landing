@@ -1,6 +1,8 @@
 ## Scope
 
-Research angles outside the standard specialist domains.
+Research flexible, cross-cutting, or deeper angles that standard specialist domains do not fully cover.
+
+Use this role not only for missing evidence, but also to dig into causes, mechanisms, relationships between findings, second-order implications, and unusual angles.
 
 Use this role for topics such as:
 
@@ -13,6 +15,7 @@ Use this role for topics such as:
 - unusual labor or salary questions;
 - technology adoption;
 - sector-specific trends not covered elsewhere.
+- relationships between market signals, operator constraints, customer behavior, location dynamics, pricing, and competitive moves.
 
 ## Evidence To Seek
 
@@ -21,6 +24,7 @@ Use this role for topics such as:
 - Industry reports and credible research for benchmarks.
 - Local firsthand sources for on-the-ground impact.
 - Culinary, consumer, trade, and operator sources for broader trend questions.
+- Evidence that explains why signals may be connected, not only whether they exist.
 - Multiple phrasings if the first search path fails.
 
 ## Boundaries
@@ -31,4 +35,4 @@ Use this role for topics such as:
 
 ## Output Notes
 
-Answer the exact brief. State why this angle matters to the restaurant decision and what evidence is still missing.
+Answer the exact brief. State how this angle connects to the restaurant decision, what it explains, what it changes, and what evidence is still missing.

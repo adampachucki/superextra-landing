@@ -33,7 +33,7 @@ class Specialist:
             — `"high"` for quantitative-inference / strategic work,
             `"medium"` for pattern-matching / aggregation.
         instruction_name: Optional override for which `.md` template to
-            load. Defaults to `name`. `dynamic_researcher_1` reuses the
+            load. Defaults to `name`. Dynamic researchers reuse the
             generic `dynamic_researcher` template.
     """
     name: str
@@ -148,12 +148,40 @@ SPECIALISTS: tuple[Specialist, ...] = (
     Specialist(
         name="dynamic_researcher_1",
         output_key="dynamic_result_1",
-        label="Dynamic Research",
+        label="Dynamic Research 1",
         description=(
-            "Flexible research for angles outside the standard domains, such "
-            "as broad culinary trends, regulation, food safety, one-off news, "
-            "infrastructure, events, or unusual benchmarks. Brief must name "
-            "the exact gap."
+            "Flexible deep research for cross-cutting or non-standard angles: "
+            "causes, mechanisms, relationships between signals, broader "
+            "trends, regulation, one-off news, infrastructure, events, or "
+            "unusual benchmarks. Brief must name the exact angle."
+        ),
+        role_title="flexible research agent",
+        thinking="high",
+        instruction_name="dynamic_researcher",
+    ),
+    Specialist(
+        name="dynamic_researcher_2",
+        output_key="dynamic_result_2",
+        label="Dynamic Research 2",
+        description=(
+            "Flexible deep research for cross-cutting or non-standard angles: "
+            "causes, mechanisms, relationships between signals, broader "
+            "trends, regulation, one-off news, infrastructure, events, or "
+            "unusual benchmarks. Brief must name the exact angle."
+        ),
+        role_title="flexible research agent",
+        thinking="high",
+        instruction_name="dynamic_researcher",
+    ),
+    Specialist(
+        name="dynamic_researcher_3",
+        output_key="dynamic_result_3",
+        label="Dynamic Research 3",
+        description=(
+            "Flexible deep research for cross-cutting or non-standard angles: "
+            "causes, mechanisms, relationships between signals, broader "
+            "trends, regulation, one-off news, infrastructure, events, or "
+            "unusual benchmarks. Brief must name the exact angle."
         ),
         role_title="flexible research agent",
         thinking="high",

@@ -37,5 +37,20 @@ def test_specialist_result_keys_cover_every_specialist_output():
     assert set(SPECIALIST_RESULT_KEYS) == {s.output_key for s in SPECIALISTS}
 
 
+def test_dynamic_researchers_have_separate_state_slots():
+    dynamic = [s for s in SPECIALISTS if s.name.startswith("dynamic_researcher_")]
+
+    assert [s.name for s in dynamic] == [
+        "dynamic_researcher_1",
+        "dynamic_researcher_2",
+        "dynamic_researcher_3",
+    ]
+    assert [s.output_key for s in dynamic] == [
+        "dynamic_result_1",
+        "dynamic_result_2",
+        "dynamic_result_3",
+    ]
+
+
 def test_thinking_level_is_valid():
     assert all(s.thinking in {"high", "medium"} for s in SPECIALISTS)
