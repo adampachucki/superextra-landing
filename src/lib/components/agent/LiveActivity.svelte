@@ -389,7 +389,7 @@
 		background-repeat: no-repeat;
 		background-clip: text;
 		-webkit-background-clip: text;
-		animation: status-shimmer 4.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+		animation: status-shimmer 5.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 	}
 	:global(.dark) .status-shimmer {
 		--status-base: rgb(255 255 255 / 0.55);
@@ -399,7 +399,14 @@
 		0% {
 			background-position: 100% 0;
 		}
-		58%,
+		28%,
+		34.99% {
+			background-position: 0% 0;
+		}
+		35% {
+			background-position: 100% 0;
+		}
+		63%,
 		100% {
 			background-position: 0% 0;
 		}
