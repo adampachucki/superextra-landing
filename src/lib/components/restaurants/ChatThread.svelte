@@ -369,8 +369,8 @@
 	}
 
 	@media (max-width: 640px) {
-		:global(.chat-markdown .markdown-table-scroll table:has(tr > :nth-child(4))) {
-			min-width: 36rem;
+		:global(.chat-markdown .markdown-table-scroll table) {
+			min-width: max(100%, min(56rem, calc(var(--markdown-table-columns, 1) * 12rem)));
 		}
 	}
 </style>
