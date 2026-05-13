@@ -12,6 +12,7 @@
 	let scrollEl: HTMLDivElement | undefined = $state();
 	let bottomEl: HTMLDivElement | undefined = $state();
 	let scrollRun = 0;
+	let scrolledSid: string | null = null;
 
 	function isInView(node: HTMLElement) {
 		const rect = node.getBoundingClientRect();
@@ -35,8 +36,14 @@
 
 	$effect(() => {
 		scrollKey;
-		if (!scrollEl) return;
-		const turnToReveal = revealTurnIndex;
+		const sid = chatState.activeSid;
+		if (!sid) {
+			scrolledSid = null;
+			return;
+		}
+		if (!scrollEl || chatState.messages.length === 0) return;
+		const behavior: ScrollBehavior = scrolledSid === sid ? 'smooth' : 'auto';
+		const turnToReveal = behavior === 'smooth' ? revealTurnIndex : null;
 		const run = ++scrollRun;
 		tick().then(() => {
 			requestAnimationFrame(() => {
@@ -50,7 +57,8 @@
 					}
 					return;
 				}
-				bottomEl?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+				bottomEl?.scrollIntoView({ block: 'end', behavior });
+				scrolledSid = sid;
 			});
 		});
 	});
