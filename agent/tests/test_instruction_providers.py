@@ -284,6 +284,14 @@ class TestContinueResearchInstruction:
         assert "broad new report" in result
         assert "different unrelated target" in result
 
+    def test_source_discovery_goes_through_helpers(self):
+        result = _continue_research_instruction(MockCtx(state={"final_report": "Existing report"}))
+
+        assert "do focused research through one focused helper" in result
+        assert "Use direct venue lookup tools only" in result
+        assert "Use direct source fetches only when the URL is already known" in result
+        assert "Do not do source-discovery searches directly in this agent" in result
+
 
 class TestRecordContinuationNotes:
     def test_records_reply_in_session_state(self):

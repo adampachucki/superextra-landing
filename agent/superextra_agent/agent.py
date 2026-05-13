@@ -217,10 +217,9 @@ continue_research = LlmAgent(
     instruction=_continue_research_instruction,
     description=(
         "Continues an existing research thread using prior research, venue "
-        "context, focused source checks, and bounded specialist deepening."
+        "context, observable focused helpers, and bounded specialist deepening."
     ),
     tools=[
-        google_search,
         fetch_web_content,
         *_ENRICHER_TOOLS,
         *(

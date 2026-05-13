@@ -34,6 +34,7 @@ export type TimelineEvent =
 				| 'Google Maps'
 				| 'TripAdvisor'
 				| 'Google reviews'
+				| 'Analysis'
 				| 'Public sources'
 				| 'Warnings';
 			text: string;

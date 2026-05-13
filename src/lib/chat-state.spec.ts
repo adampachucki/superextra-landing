@@ -1111,6 +1111,91 @@ describe('chatState (Firestore-driven)', () => {
 			});
 		});
 
+		it('attaches follow-up events as soon as the session exposes the new run id', async () => {
+			const fetchMock: Mock = vi.fn(
+				async () =>
+					({
+						ok: true,
+						status: 200,
+						json: async () => ({ ok: true, runId: 'run-2' })
+					}) as unknown as Response
+			);
+			vi.stubGlobal('fetch', fetchMock);
+
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.session('sid-1') && !!obs.turns('sid-1'));
+			obs.session('sid-1')!.onNext(
+				sessionSnap({
+					userId: 'uid-test',
+					participants: ['uid-test'],
+					status: 'complete',
+					currentRunId: 'run-1',
+					lastTurnIndex: 1
+				})
+			);
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'original',
+							status: 'complete',
+							reply: 'answer',
+							createdAt: { toMillis: () => 1000 },
+							completedAt: { toMillis: () => 2000 }
+						}
+					}
+				])
+			);
+
+			await chatState.sendFollowUp('deeper question');
+			obs.session('sid-1')!.onNext(
+				sessionSnap({
+					userId: 'uid-test',
+					participants: ['uid-test'],
+					status: 'running',
+					currentRunId: 'run-2',
+					lastTurnIndex: 2
+				})
+			);
+
+			await waitUntil(() => !!obs.events('sid-1'));
+			const ev = obs.events('sid-1')!;
+			const constraints =
+				(ev.ref as { _constraints?: Array<Record<string, unknown>> })._constraints ?? [];
+			const wheres = constraints.filter((c) => (c as { _kind?: string })._kind === 'where');
+			expect(wheres[0]).toMatchObject({ f: 'runId', v: 'run-2' });
+
+			ev.onNext(
+				eventsSnap([
+					eventChange('added', {
+						attempt: 1,
+						seqInAttempt: 1,
+						type: 'timeline',
+						data: {
+							kind: 'detail',
+							id: 'run-start:run-2',
+							group: 'platform',
+							family: 'Analysis',
+							text: 'Continuing research'
+						}
+					})
+				])
+			);
+
+			expect(chatState.liveTimeline).toEqual([
+				{
+					kind: 'detail',
+					id: 'run-start:run-2',
+					group: 'platform',
+					family: 'Analysis',
+					text: 'Continuing research'
+				}
+			]);
+		});
+
 		it('throws if no active session', async () => {
 			vi.stubGlobal(
 				'fetch',

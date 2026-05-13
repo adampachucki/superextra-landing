@@ -110,6 +110,32 @@ async def claim_invocation(fs: firestore.Client, state: GearRunState) -> None:
     )
 
 
+async def write_run_started_event(state: GearRunState) -> None:
+    """Persist one immediate timeline row after a run is claimed.
+
+    Gemini thought summaries can arrive only when a short continuation model
+    call finishes. This row gives the UI real progress as soon as the Agent
+    Engine owns the run, without fabricating model reasoning.
+    """
+    try:
+        text = "Continuing research" if state.turn_idx > 1 else "Starting research"
+        await state.observe_typed_pill(
+            {
+                "kind": "detail",
+                "id": f"run-start:{state.run_id}",
+                "group": "platform",
+                "family": "Analysis",
+                "text": text,
+            }
+        )
+    except Exception:  # noqa: BLE001
+        log.exception(
+            "run-start timeline write failed sid=%s runId=%s; continuing",
+            state.sid,
+            state.run_id,
+        )
+
+
 def _fenced_logic(
     txn: firestore.Transaction,
     session_ref: firestore.DocumentReference,
@@ -444,6 +470,11 @@ class FirestoreProgressPlugin(BasePlugin):
 
         self._states[invocation_context.invocation_id] = state
         state.heartbeat_task = asyncio.create_task(_heartbeat_loop(fs, state))
+        asyncio.create_task(write_run_started_event(state))
+        # Yield once so the best-effort run-start task can enter its first
+        # Firestore await before model work begins, without waiting on the
+        # Firestore write itself.
+        await asyncio.sleep(0)
         return None
 
     @override

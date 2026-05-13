@@ -63,6 +63,7 @@
 		'Google reviews': 'Reading reviews',
 		TripAdvisor: 'Cross-referencing TripAdvisor',
 		'Searching the web': 'Searching the web',
+		Analysis: 'Continuing research',
 		'Public sources': 'Reading sources',
 		Warnings: 'Checking sources'
 	};
@@ -83,7 +84,10 @@
 	const label = $derived.by<string>(() => {
 		const latest = events[events.length - 1];
 		if (!latest) return idleLabel;
-		return latest.kind === 'detail' ? FAMILY_LABEL[latest.family] : authorLabel(latest.author);
+		if (latest.kind === 'detail') {
+			return latest.family === 'Analysis' ? latest.text : FAMILY_LABEL[latest.family];
+		}
+		return authorLabel(latest.author);
 	});
 
 	const LEAD_AUTHORS = new Set([

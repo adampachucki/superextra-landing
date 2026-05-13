@@ -3,7 +3,7 @@
 	import { chatState } from '$lib/chat-state.svelte';
 	import { tts } from '$lib/tts.svelte';
 	import { splitChartSegments } from '$lib/chart-blocks';
-	import type { ChatSourceProvider } from '$lib/chat-types';
+	import type { ChatSourceProvider, TimelineEvent } from '$lib/chat-types';
 	import { finalAnswerReveal } from '$lib/final-answer-reveal';
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
 	import { renderMarkdown } from '$lib/markdown';
@@ -65,7 +65,7 @@
 
 	const SOURCES_LIMIT = 19;
 	const SOURCE_COUNT_MIN = 5;
-	const ACTIVITY_EVENT_MIN = 2;
+	const ACTIVITY_THOUGHT_MIN = 2;
 	const PROVIDER_LABELS: Record<ChatSourceProvider, string> = {
 		google_maps: 'Google Maps',
 		google_reviews: 'Google Reviews',
@@ -85,6 +85,10 @@
 
 	function errorMessage(code: string) {
 		return ERROR_COPY[code] ?? ERROR_COPY.pipeline_error;
+	}
+
+	function thoughtCount(events: TimelineEvent[] | undefined): number {
+		return events?.filter((event) => event.kind === 'thought').length ?? 0;
 	}
 
 	let expandedSources: Record<number, boolean> = $state({});
@@ -171,7 +175,7 @@
 							</button>
 						</div>
 
-						{#if msg.turnSummary && (msg.activityEvents?.length ?? 0) >= ACTIVITY_EVENT_MIN}
+						{#if msg.turnSummary && thoughtCount(msg.activityEvents) >= ACTIVITY_THOUGHT_MIN}
 							<div class="mt-4">
 								<LiveActivity
 									events={msg.activityEvents ?? []}
@@ -181,14 +185,12 @@
 							</div>
 						{/if}
 
-						{#if msg.sources?.length}
+						{#if msg.sources && msg.sources.length >= SOURCE_COUNT_MIN}
 							{@const showAll = expandedSources[msg.turnIndex]}
 							{@const visible = showAll ? msg.sources : msg.sources.slice(0, SOURCES_LIMIT)}
 							<div class="mt-5">
 								<span class="mb-2 block text-[12px] font-medium text-black/40 dark:text-white/40"
-									>Sources{msg.sources.length >= SOURCE_COUNT_MIN
-										? ` (${msg.sources.length})`
-										: ''}</span
+									>Sources ({msg.sources.length})</span
 								>
 								<div class="flex flex-wrap gap-1.5">
 									{#each visible as src (`${src.url}:${src.title}`)}

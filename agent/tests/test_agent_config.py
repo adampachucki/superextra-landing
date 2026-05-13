@@ -20,10 +20,10 @@ from superextra_agent.web_tools import fetch_web_content
 
 
 def test_continue_research_uses_tool_compatible_model_config():
-    """Continuation keeps focused source-check tools on the compatible model family."""
+    """Continuation keeps focused helpers and observable direct tools."""
     assert continue_research.model is MODEL_GEMINI
     assert continue_research.generate_content_config is MEDIUM_THINKING_CONFIG
-    assert google_search in continue_research.tools
+    assert google_search not in continue_research.tools
     assert fetch_web_content in continue_research.tools
     assert any(
         getattr(tool, "name", "") == "market_landscape" for tool in continue_research.tools

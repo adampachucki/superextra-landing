@@ -200,6 +200,29 @@ def test_grounding_search_queries_dedupe_within_event():
     assert [r["text"] for r in search_rows] == ["warsaw pizza", "warsaw pasta"]
 
 
+def test_non_durable_specialist_grounding_sources_are_captured():
+    ev = _event(
+        author="market_landscape",
+        grounding_chunks=[
+            {
+                "uri": "https://example.com/malika",
+                "title": "Malika closure",
+                "domain": "example.com",
+            }
+        ],
+    )
+
+    mapped = map_event(ev, {})
+
+    assert mapped["grounding_sources"] == [
+        {
+            "url": "https://example.com/malika",
+            "title": "Malika closure",
+            "domain": "example.com",
+        }
+    ]
+
+
 def test_event_without_grounding_emits_no_search_rows():
     ev = _event(author="research_lead", texts=["plain text"])
     rows = map_event(ev, {})["timeline_events"]

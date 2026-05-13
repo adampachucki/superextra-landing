@@ -100,6 +100,13 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
     output_key = AUTHOR_TO_OUTPUT_KEY.get(author)
     if output_key and _has_state_delta(event, output_key):
         mapping["grounding_sources"] = extract_sources_from_grounding(event)
+    elif author in AUTHOR_TO_OUTPUT_KEY:
+        # Continuation helpers are deliberately non-durable (`output_key=None`)
+        # so they do not overwrite the original specialist state. Their
+        # grounded source checks still need to feed the final turn's source
+        # list, so collect grounding from specialist-authored events even when
+        # no state delta is present.
+        mapping["grounding_sources"] = extract_sources_from_grounding(event)
 
     if author in ("router", "report_writer", "continue_research", "follow_up"):
         complete = _map_complete(event)

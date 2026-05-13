@@ -14,7 +14,7 @@ Router -> research_pipeline
 Router -> continue_research
 ```
 
-The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief and surface as much useful writer material as possible. The Report Writer reads Places context and full specialist reports directly, without a lead-authored brief, and writes the final report. Continue Research answers from the existing report, specialist notes, Places context, focused source checks, and bounded non-durable specialist deepening. Broad new reports should become new research sessions instead of being merged into the old thread.
+The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief and surface as much useful writer material as possible. The Report Writer reads Places context and full specialist reports directly, without a lead-authored brief, and writes the final report. Continue Research answers from the existing report, specialist notes, Places context, direct venue/known-URL checks, and bounded non-durable specialist deepening. Source discovery belongs in focused helpers, not direct continuation-agent search. Broad new reports should become new research sessions instead of being merged into the old thread.
 
 ## State Keys
 

@@ -174,7 +174,7 @@ describe('ChatThread', () => {
 		expect(body).not.toContain('Analysis activity');
 		expect(body).not.toContain('35s total');
 		expect(body).not.toContain('Opened 1 source');
-		expect(body).toContain('Sources');
+		expect(body).not.toContain('Sources');
 		expect(body).not.toContain('Sources (1)');
 	});
 
@@ -185,6 +185,7 @@ describe('ChatThread', () => {
 		});
 		await addEvents(obs, sid, [
 			{ kind: 'thought', id: 'n1', author: 'research_lead', text: 'Reading sources' },
+			{ kind: 'thought', id: 'n2', author: 'report_writer', text: 'Checking evidence' },
 			{
 				kind: 'detail',
 				id: 'd1',

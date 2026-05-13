@@ -434,6 +434,12 @@ async def test_plugin_before_run_registers_state_and_spawns_heartbeat(monkeypatc
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _hb)
+    run_start_calls: list[tuple[int, str]] = []
+
+    async def _run_started(_state):
+        run_start_calls.append((_state.turn_idx, _state.run_id))
+
+    monkeypatch.setattr(firestore_progress, "write_run_started_event", _run_started)
     # Block the title task too (it's a separate coroutine).
     async def _no_title(_q):
         return None
@@ -444,8 +450,10 @@ async def test_plugin_before_run_registers_state_and_spawns_heartbeat(monkeypatc
         sid="abc", run_id="r-1", turn_idx=1, invocation_id="inv-1"
     )
     out = await plugin.before_run_callback(invocation_context=ctx)
+    await asyncio.sleep(0)
     assert out is None
     assert claim_calls == 1
+    assert run_start_calls == [(1, "r-1")]
     assert "inv-1" in plugin._states
     state = plugin._states["inv-1"]
     assert state.heartbeat_task is not None
