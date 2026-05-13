@@ -382,16 +382,16 @@
 		background-image: linear-gradient(
 			90deg,
 			var(--status-base) 0%,
-			var(--status-base) 44%,
+			var(--status-base) 38%,
 			var(--status-highlight) 50%,
-			var(--status-base) 56%,
+			var(--status-base) 62%,
 			var(--status-base) 100%
 		);
-		background-size: 300% 100%;
+		background-size: 260% 100%;
 		background-repeat: no-repeat;
 		background-clip: text;
 		-webkit-background-clip: text;
-		animation: status-shimmer 5.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+		animation: status-shimmer 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 	}
 	:global(.dark) .status-shimmer {
 		--status-base: rgb(255 255 255 / 0.55);
@@ -401,14 +401,7 @@
 		0% {
 			background-position: 100% 0;
 		}
-		28%,
-		34.99% {
-			background-position: 0% 0;
-		}
-		35% {
-			background-position: 100% 0;
-		}
-		63%,
+		42%,
 		100% {
 			background-position: 0% 0;
 		}
