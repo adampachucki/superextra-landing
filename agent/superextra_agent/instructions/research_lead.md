@@ -89,6 +89,9 @@ Run a focused extra round when a failed check is material and researchable with 
 
 Your final output is a writer brief, not the user-facing report.
 
+The writer brief is a routing note, not a findings note. It must help the
+writer understand the task without deciding which discovered findings matter.
+
 Include:
 
 - User question and response language.
@@ -96,10 +99,13 @@ Include:
 - Operator decision or learning goal.
 - Specialists called.
 - The brief sent to each specialist.
-- Requested emphasis, table needs, or chart needs.
+- Suggested report structure, table needs, or chart needs.
 - Source gaps, failed checks, stale evidence, or weak evidence that should be visible.
 
 Do not summarize findings, rank takeaways, write conclusions, write recommendations, or draft final report sections. The report writer reads the full specialist reports directly.
+Do not list discovered entities, dates, numbers, openings, closures, or examples as "requested emphasis."
+Do not decide which specialist findings matter most.
+If the writer needs to retain a discovered item, it will read it from the specialist report.
 
 ## Boundaries
 

@@ -99,7 +99,7 @@ The Lead should use at least two specialists for every research report. 2-4 is c
 
 The Lead should ask specialists for the causes, mechanisms, counter-signals, and evidence tests that matter for the specific task. Do not hardcode domain-specific depth checklists in specialist body files unless a tool or domain boundary requires it.
 
-The Lead does not summarize findings or draft report sections. The Report Writer reads specialist reports directly, keeps substantive findings, connects evidence across reports, and writes the user-facing answer.
+The Lead does not summarize findings or draft report sections. Its writer brief is a routing note, not a findings note. The Report Writer reads specialist reports directly, preserves all relevant concrete findings in a complete findings ledger, connects evidence across reports, and writes the user-facing answer.
 
 ## Market Source Profiles
 

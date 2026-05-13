@@ -68,6 +68,15 @@ class TestResearchLeadInstruction:
 
         assert "```chart" not in result
 
+    def test_writer_brief_is_not_a_findings_filter(self):
+        ctx = MockCtx(state={"places_context": "Restaurant data"})
+
+        result = _research_lead_instruction(ctx)
+
+        assert "writer brief is a routing note, not a findings note" in result
+        assert "Do not list discovered entities" in result
+        assert "Do not decide which specialist findings matter most" in result
+
 
 class TestReportWriterInstruction:
     def test_injects_writer_brief_and_specialist_reports(self):
@@ -115,6 +124,23 @@ class TestReportWriterInstruction:
         result = _report_writer_instruction(ctx)
 
         assert '```chart\n{"type":"bar"' in result
+
+    def test_retention_contract_preserves_all_findings(self):
+        ctx = MockCtx(state={
+            "writer_brief": "Focus on openings.",
+            "market_result": "Zołza closed. Matcha Ma opened.",
+            "dynamic_result_1": "Nam-Viet remains operational nearby.",
+        })
+
+        result = _report_writer_instruction(ctx)
+
+        assert "If the writer brief omits a finding" in result
+        assert "Err on the side of showing too much useful evidence" in result
+        assert "Complete Findings Ledger" in result
+        assert "Do not collapse several concrete findings" in result
+        assert "Do not omit evidence to make room for follow-up questions" in result
+        assert "Zołza closed" in result
+        assert "Nam-Viet remains operational nearby" in result
 
 
 class TestMakeInstruction:
