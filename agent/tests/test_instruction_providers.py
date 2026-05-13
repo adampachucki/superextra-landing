@@ -178,9 +178,10 @@ class TestReportWriterInstruction:
         assert "Do not compress several insights into one broad takeaway" in result
         assert "every specialist report has visible representation" in result
         assert "do not let synthesis merge away concrete findings" in result
-        assert "2-4 suggested follow-up research requests" in result
-        assert "things the user can ask the researcher to investigate next" in result
-        assert "not as questions for the owner to answer" in result
+        assert "2-4 suggested follow-up research prompts" in result
+        assert "short, ready-to-send user prompt" in result
+        assert 'Do not write "Ask the researcher to", "Request a deep dive"' in result
+        assert "owner-facing questions" in result
         assert "Do not omit evidence to make room for them" in result
         assert "Zołza closed" in result
         assert "Nam-Viet remains operational nearby" in result

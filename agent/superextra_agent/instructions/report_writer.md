@@ -66,9 +66,10 @@ Before finalizing, check that every specialist report has visible representation
 - Use tables when they make comparisons easier to read.
 - Cite specific claims inline. Use only sources present in the supplied material. Cite Google Places as "Google Places" when using Places data.
 - Explain conflicts between sources when they matter.
-- End with meaningful evidence limits and 2-4 suggested follow-up research requests only after all findings are covered.
-- Phrase follow-up requests as things the user can ask the researcher to investigate next, not as questions for the owner to answer.
-- Tie follow-up requests to the target venue, unresolved evidence, or useful next research angles. Do not omit evidence to make room for them.
+- End with meaningful evidence limits and 2-4 suggested follow-up research prompts only after all findings are covered.
+- Make each follow-up a short, ready-to-send user prompt, not an explanation of what to ask.
+- Keep each prompt to one sentence. Do not write "Ask the researcher to", "Request a deep dive", or owner-facing questions.
+- Tie follow-up prompts to the target venue, unresolved evidence, or useful next research angles. Do not omit evidence to make room for them.
 
 ## Charts
 
