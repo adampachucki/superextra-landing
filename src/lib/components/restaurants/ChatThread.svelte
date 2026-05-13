@@ -287,8 +287,22 @@
 	}
 
 	:global(.chat-markdown .markdown-table-scroll table) {
-		width: max-content;
+		width: 100%;
 		min-width: 100%;
 		margin: 0;
+		table-layout: auto;
+	}
+
+	:global(.chat-markdown .markdown-table-scroll th),
+	:global(.chat-markdown .markdown-table-scroll td) {
+		white-space: normal;
+		overflow-wrap: anywhere;
+		word-break: normal;
+	}
+
+	@media (max-width: 640px) {
+		:global(.chat-markdown .markdown-table-scroll table:has(tr > :nth-child(4))) {
+			min-width: 36rem;
+		}
 	}
 </style>
