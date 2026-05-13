@@ -244,7 +244,7 @@
 			expanded = !expanded;
 		}}
 		aria-expanded={expanded}
-		class="flex w-full items-center justify-between gap-3 text-left text-[13px] text-black/55 transition-colors hover:text-black/70 dark:text-white/55 dark:hover:text-white/70 {extraClass}"
+		class="flex w-full items-center justify-between gap-3 text-left text-[13px] text-black/50 transition-colors hover:text-black/64 dark:text-white/50 dark:hover:text-white/64 {extraClass}"
 	>
 		<span class="flex min-w-0 items-center gap-1.5">
 			<svg
@@ -261,7 +261,7 @@
 			</svg>
 			<span>Analysis activity</span>
 		</span>
-		<span class="shrink-0 text-[12px] text-black/45 dark:text-white/45">{durationLabel} total</span>
+		<span class="shrink-0 text-[12px] text-black/40 dark:text-white/40">{durationLabel} total</span>
 	</button>
 {/snippet}
 
@@ -276,69 +276,69 @@
 			? 'w-56'
 			: ''}"
 	>
-		{#if showSteps && steps.length}
-			<div transition:slide={{ duration: 180 }} class="flex flex-col gap-6">
-				{#each steps as step, i (step.id)}
-					<div class="relative pl-9">
-						<div
-							class="absolute top-0 left-0 flex h-7 w-7 items-center justify-center rounded-full border border-black/15 bg-white text-[12px] font-medium text-black/65 dark:border-white/20 dark:bg-cream dark:text-white/70"
-						>
-							{i + 1}
+			{#if showSteps && steps.length}
+				<div transition:slide={{ duration: 180 }} class="flex flex-col gap-6">
+					{#each steps as step, i (step.id)}
+						<div class="relative pl-9">
+							<div
+								class="absolute top-0 left-0 flex h-7 w-7 items-center justify-center rounded-full border border-black/15 bg-white text-[12px] font-medium text-black/58 dark:border-white/20 dark:bg-cream dark:text-white/62"
+							>
+								{i + 1}
+							</div>
+							{#if i < steps.length - 1}
+								<div
+									class="absolute top-7 left-[13.5px] h-[calc(100%+1.5rem)] w-px bg-black/10 dark:bg-white/12"
+								></div>
+							{/if}
+
+							{#if step.title}
+								<div class="text-[15px] font-medium text-black/76 dark:text-white/78">
+									{step.title}
+								</div>
+							{/if}
+
+							{#each step.thoughts as thought (thought.id)}
+								<div
+									in:fade={{ duration: 220 }}
+									class="prose-thought mt-1.5 text-[14px] leading-relaxed text-black/70 dark:text-white/72"
+								>
+									{#each thoughtSegments(thought) as segment (segment.key)}
+										<div in:fade={{ duration: 180 }} class="thought-segment" class:pending={segment.pending}>
+											{#each inlineSegments(segment.text) as inline (inline.key)}
+												<span class="thought-inline" class:strong={inline.strong}>{inline.text}</span>
+											{/each}
+										</div>
+									{/each}
+								</div>
+							{/each}
+
+							{#if step.tools.length}
+								<div
+									class="mt-2.5 flex flex-col gap-1.5 border-l-2 border-emerald-500/35 pl-3 dark:border-emerald-400/30"
+								>
+									{#each visibleTools(step) as tool (tool.id)}
+										<div
+											in:fly={{ y: 4, duration: 200 }}
+											class="flex items-start text-[13px] leading-snug text-black/54 dark:text-white/56"
+										>
+											<span class="break-words">{tool.text}</span>
+										</div>
+									{/each}
+									{#if hiddenToolCount(step)}
+										<button
+											type="button"
+											onclick={() => toggleTools(step.id)}
+											class="mt-0.5 w-fit text-left text-[13px] leading-snug text-black/38 transition-colors hover:text-black/58 dark:text-white/38 dark:hover:text-white/58"
+										>
+											{expandedTools[step.id] ? 'Show fewer' : `Show ${hiddenToolCount(step)} more`}
+										</button>
+									{/if}
+								</div>
+							{/if}
 						</div>
-						{#if i < steps.length - 1}
-							<div
-								class="absolute top-7 left-[13.5px] h-[calc(100%+1.5rem)] w-px bg-black/10 dark:bg-white/12"
-							></div>
-						{/if}
-
-						{#if step.title}
-							<div class="text-[15px] font-medium text-black/90 dark:text-white/90">
-								{step.title}
-							</div>
-						{/if}
-
-						{#each step.thoughts as thought (thought.id)}
-							<div
-								in:fade={{ duration: 220 }}
-								class="prose-thought mt-1.5 text-[14px] leading-relaxed text-black/80 dark:text-white/80"
-							>
-								{#each thoughtSegments(thought) as segment (segment.key)}
-									<div in:fade={{ duration: 180 }} class="thought-segment" class:pending={segment.pending}>
-										{#each inlineSegments(segment.text) as inline (inline.key)}
-											<span class="thought-inline" class:strong={inline.strong}>{inline.text}</span>
-										{/each}
-									</div>
-								{/each}
-							</div>
-						{/each}
-
-						{#if step.tools.length}
-							<div
-								class="mt-2.5 flex flex-col gap-1.5 border-l-2 border-emerald-500/35 pl-3 dark:border-emerald-400/30"
-							>
-								{#each visibleTools(step) as tool (tool.id)}
-									<div
-										in:fly={{ y: 4, duration: 200 }}
-										class="flex items-start text-[13px] leading-snug text-black/60 dark:text-white/60"
-									>
-										<span class="break-words">{tool.text}</span>
-									</div>
-								{/each}
-								{#if hiddenToolCount(step)}
-									<button
-										type="button"
-										onclick={() => toggleTools(step.id)}
-										class="mt-0.5 w-fit text-left text-[13px] leading-snug text-black/42 transition-colors hover:text-black/65 dark:text-white/42 dark:hover:text-white/65"
-									>
-										{expandedTools[step.id] ? 'Show fewer' : `Show ${hiddenToolCount(step)} more`}
-									</button>
-								{/if}
-							</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{/if}
+					{/each}
+				</div>
+			{/if}
 
 		{#if completed}
 			{@render activityToggle(
@@ -350,11 +350,11 @@
 					? 'mt-4 border-t border-black/8 pt-3 dark:border-white/10'
 					: ''} flex items-baseline justify-between gap-2"
 			>
-				<div class="flex min-w-0 flex-1 items-baseline gap-2 text-[13px] text-black/55 dark:text-white/55">
+				<div class="flex min-w-0 flex-1 items-baseline gap-2 text-[13px] text-black/50 dark:text-white/50">
 					<span class="work-dot" aria-hidden="true"></span>
 					<span class="status-shimmer truncate">{label}<span aria-hidden="true">...</span></span>
 				</div>
-				<span class="min-w-[4ch] shrink-0 text-right text-[12px] tabular-nums text-black/45 dark:text-white/45">
+				<span class="min-w-[4ch] shrink-0 text-right text-[12px] tabular-nums text-black/40 dark:text-white/40">
 					{durationLabel}
 				</span>
 			</div>
@@ -384,8 +384,8 @@
 		}
 	}
 	.status-shimmer {
-		--status-base: rgb(0 0 0 / 0.55);
-		--status-highlight: rgb(0 0 0 / 0.78);
+		--status-base: rgb(0 0 0 / 0.48);
+		--status-highlight: rgb(0 0 0 / 0.76);
 
 		color: transparent;
 		background-image: linear-gradient(
@@ -403,8 +403,8 @@
 		animation: status-shimmer 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 	}
 	:global(.dark) .status-shimmer {
-		--status-base: rgb(255 255 255 / 0.55);
-		--status-highlight: rgb(255 255 255 / 0.82);
+		--status-base: rgb(255 255 255 / 0.48);
+		--status-highlight: rgb(255 255 255 / 0.8);
 	}
 	@keyframes status-shimmer {
 		0% {
