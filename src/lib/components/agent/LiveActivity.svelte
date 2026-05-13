@@ -259,7 +259,12 @@
 		'rounded-xl border border-black/8 px-3 py-2 hover:border-black/12 hover:bg-black/[0.02] dark:border-white/10 dark:hover:border-white/15 dark:hover:bg-white/[0.03]'
 	)}
 {:else}
-	<div class="rounded-xl border border-black/8 bg-white/30 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+	<div
+		class="rounded-xl border border-black/8 bg-white/30 p-4 dark:border-white/10 dark:bg-white/[0.02] {!completed &&
+		!steps.length
+			? 'w-56'
+			: ''}"
+	>
 		{#if showSteps && steps.length}
 			<div transition:slide={{ duration: 180 }} class="flex flex-col gap-6">
 				{#each steps as step, i (step.id)}
@@ -334,11 +339,11 @@
 					? 'mt-4 border-t border-black/8 pt-3 dark:border-white/10'
 					: ''} flex items-baseline justify-between gap-2"
 			>
-				<div class="flex min-w-0 items-baseline gap-2 text-[13px] text-black/55 dark:text-white/55">
+				<div class="flex min-w-0 flex-1 items-baseline gap-2 text-[13px] text-black/55 dark:text-white/55">
 					<span class="work-dot" aria-hidden="true"></span>
 					<span class="status-shimmer truncate">{label}<span aria-hidden="true">...</span></span>
 				</div>
-				<span class="shrink-0 text-[12px] text-black/45 dark:text-white/45">
+				<span class="min-w-[4ch] shrink-0 text-right text-[12px] tabular-nums text-black/45 dark:text-white/45">
 					{durationLabel}
 				</span>
 			</div>
@@ -375,26 +380,28 @@
 		background-image: linear-gradient(
 			90deg,
 			var(--status-base) 0%,
-			var(--status-base) 36%,
+			var(--status-base) 44%,
 			var(--status-highlight) 50%,
-			var(--status-base) 64%,
+			var(--status-base) 56%,
 			var(--status-base) 100%
 		);
-		background-size: 240% 100%;
+		background-size: 300% 100%;
+		background-repeat: no-repeat;
 		background-clip: text;
 		-webkit-background-clip: text;
-		animation: status-shimmer 3.2s ease-in-out infinite;
+		animation: status-shimmer 4.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 	}
 	:global(.dark) .status-shimmer {
 		--status-base: rgb(255 255 255 / 0.55);
 		--status-highlight: rgb(255 255 255 / 0.82);
 	}
 	@keyframes status-shimmer {
-		from {
-			background-position: 120% 0;
+		0% {
+			background-position: 100% 0;
 		}
-		to {
-			background-position: -120% 0;
+		58%,
+		100% {
+			background-position: 0% 0;
 		}
 	}
 	.thought-segment {
