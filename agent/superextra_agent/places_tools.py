@@ -1,9 +1,15 @@
 import atexit
 import asyncio
 import os
-import uuid
 import httpx
 
+from .place_state import (
+    get_original_target_place_id,
+    set_original_target_once,
+    source_title,
+    tool_source_key,
+    upsert_google_place,
+)
 from .secrets import get_secret
 
 BASE_URL = "https://places.googleapis.com/v1"
@@ -87,6 +93,13 @@ async def get_restaurant_details(place_id: str, tool_context=None) -> dict:
         place_id: The Google Places ID (e.g. 'ChIJN1t_tDeuEmsRUsoyG83frY4').
                   Found in the [Context: ...] prefix of the user's message.
     """
+    result = await _fetch_restaurant_details(place_id)
+    if result.get("status") == "success" and tool_context:
+        _record_restaurant_details(place_id, result["place"], tool_context)
+    return result
+
+
+async def _fetch_restaurant_details(place_id: str) -> dict:
     try:
         client = _get_client()
         resp = await client.get(
@@ -101,46 +114,39 @@ async def get_restaurant_details(place_id: str, tool_context=None) -> dict:
         place = resp.json()
         if not isinstance(place, dict):
             return {"status": "error", "error_message": "Unexpected response format from Places API"}
-        # Stash per-place metadata so downstream tools (esp. apify_tools.
-        # get_google_reviews) can cite the right restaurant without extra API
-        # calls. `_place_name_<pid>` is per-place and written every call —
-        # batch competitor fetches need to populate it too. `_target_place_id`
-        # is set on the first Places call (the enricher's target fetch by
-        # convention) and independent of whether location came back, so target
-        # identity survives a location-less response. `_target_lat`/`_target_lng`
-        # and the Google Maps source pill are gated on the current call being
-        # the target — without that gate, a later competitor batch could
-        # silently overwrite missing target coords with the competitor's, and
-        # downstream geo-bias / TripAdvisor verification would point at the
-        # wrong venue.
-        if tool_context:
-            if "_target_place_id" not in tool_context.state:
-                tool_context.state["_target_place_id"] = place_id
-
-            name = (place.get("displayName") or {}).get("text")
-            if name:
-                tool_context.state[f"_place_name_{place_id}"] = name
-
-            if tool_context.state.get("_target_place_id") == place_id:
-                loc = place.get("location", {})
-                if (
-                    loc.get("latitude") and loc.get("longitude")
-                    and "_target_lat" not in tool_context.state
-                ):
-                    tool_context.state["_target_lat"] = loc["latitude"]
-                    tool_context.state["_target_lng"] = loc["longitude"]
-
-                maps_uri = place.get("googleMapsUri")
-                if maps_uri:
-                    tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
-                        "provider": "google_maps",
-                        "title": "Google Maps",
-                        "url": maps_uri,
-                        "domain": "google.com",
-                    }
         return {"status": "success", "place": place}
     except Exception as e:
         return {"status": "error", "error_message": str(e)}
+
+
+def _record_restaurant_details(place_id: str, place: dict, tool_context) -> None:
+    """Persist compact per-place state and provider source metadata."""
+    state = tool_context.state
+    upsert_google_place(state, place_id, place)
+
+    existing_target = get_original_target_place_id(state)
+    if existing_target:
+        set_original_target_once(
+            state,
+            existing_target,
+            place if existing_target == place_id else None,
+        )
+    else:
+        set_original_target_once(state, place_id, place)
+
+    name = (place.get("displayName") or {}).get("text")
+    if name:
+        state[f"_place_name_{place_id}"] = name
+
+    maps_uri = place.get("googleMapsUri")
+    if maps_uri:
+        state[tool_source_key("google_maps", place_id)] = {
+            "provider": "google_maps",
+            "title": source_title(state, place_id, "Google Maps"),
+            "url": maps_uri,
+            "domain": "google.com",
+            "place_id": place_id,
+        }
 
 
 async def find_nearby_restaurants(latitude: float, longitude: float, radius: float = 1000.0) -> dict:
@@ -184,9 +190,8 @@ async def get_batch_restaurant_details(place_ids: list[str], tool_context=None) 
     """Get full Google Places profiles for multiple restaurants at once.
     Much faster than calling get_restaurant_details one at a time.
 
-    Forwards `tool_context` to each inner call so `_place_name_<pid>` keys
-    get populated for every restaurant (target + competitors), enabling
-    per-place source citations downstream.
+    Fetches concurrently, then records compact per-place state sequentially so
+    source metadata and `_place_name_<pid>` keys are populated consistently.
 
     Args:
         place_ids: List of Google Places IDs to fetch (max 10).
@@ -195,7 +200,7 @@ async def get_batch_restaurant_details(place_ids: list[str], tool_context=None) 
         return {"status": "error", "error_message": "No place_ids provided"}
     place_ids = place_ids[:10]
     results = await asyncio.gather(
-        *(get_restaurant_details(pid, tool_context=tool_context) for pid in place_ids),
+        *(_fetch_restaurant_details(pid) for pid in place_ids),
         return_exceptions=True,
     )
     places = []
@@ -203,6 +208,8 @@ async def get_batch_restaurant_details(place_ids: list[str], tool_context=None) 
         if isinstance(result, Exception):
             places.append({"place_id": pid, "status": "error", "error_message": str(result)})
         else:
+            if result.get("status") == "success" and tool_context:
+                _record_restaurant_details(pid, result["place"], tool_context)
             places.append(result)
     return {"status": "success", "places": places}
 

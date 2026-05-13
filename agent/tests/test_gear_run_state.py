@@ -222,6 +222,75 @@ def test_observe_event_returns_timeline_list():
     assert isinstance(out, list)
 
 
+def test_observe_event_drains_tool_source_state_delta():
+    state = _make_state()
+    source = {
+        "provider": "google_maps",
+        "place_id": "ChIJtarget",
+        "url": "https://maps.google.com/?cid=target",
+        "title": "Google Maps - Target",
+    }
+
+    state.observe_event(_fake_event(state_delta={"_tool_src_google_maps_abc": source}))
+
+    assert state.specialist_sources == [source]
+
+
+def test_source_dedupe_keeps_same_url_for_distinct_provider_or_place():
+    state = _make_state()
+    url = "https://www.google.com/maps/place/?q=place_id:ChIJtarget"
+
+    state._merge_source({
+        "provider": "google_maps",
+        "place_id": "ChIJtarget",
+        "url": url,
+        "title": "Google Maps - Target",
+    })
+    state._merge_source({
+        "provider": "google_reviews",
+        "place_id": "ChIJtarget",
+        "url": url,
+        "title": "Google Reviews - Target",
+    })
+    state._merge_source({
+        "provider": "google_reviews",
+        "place_id": "ChIJtarget",
+        "url": url,
+        "title": "Google Reviews - Target duplicate",
+    })
+
+    assert [s["provider"] for s in state.specialist_sources] == [
+        "google_maps",
+        "google_reviews",
+    ]
+
+
+def test_capture_final_preserves_place_scoped_sources_with_same_url():
+    state = _make_state()
+    url = "https://www.google.com/maps/place/?q=place_id:ChIJtarget"
+    state.specialist_sources = [
+        {
+            "provider": "google_maps",
+            "place_id": "ChIJtarget",
+            "url": url,
+            "title": "Google Maps - Target",
+        },
+        {
+            "provider": "google_reviews",
+            "place_id": "ChIJtarget",
+            "url": url,
+            "title": "Google Reviews - Target",
+        },
+    ]
+
+    state._capture_final({"reply": "answer"})
+
+    assert [s["provider"] for s in state.final_sources] == [
+        "google_maps",
+        "google_reviews",
+    ]
+
+
 @pytest.mark.asyncio
 async def test_observe_typed_pill_dedupes_detail_rows():
     state = _make_state()

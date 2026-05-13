@@ -105,6 +105,37 @@ def _ctx_with_target(lat: float | None = TARGET_COORDS[0], lng: float | None = T
                 self.state["_target_lng"] = lng
     return MockCtx()
 
+
+def _ctx_with_place(
+    place_id: str = "ChIJtarget",
+    *,
+    lat: float | None = TARGET_COORDS[0],
+    lng: float | None = TARGET_COORDS[1],
+    name: str = "Umami",
+    target_place_id: str = "ChIJtarget",
+) -> "MockCtx":
+    class MockCtx:
+        def __init__(self):
+            self.state = {
+                "_target_place_id": target_place_id,
+                "original_target_place_id": target_place_id,
+                "places_by_id": {
+                    place_id: {
+                        "google_place_id": place_id,
+                        "name": name,
+                    }
+                },
+            }
+            if lat is not None:
+                self.state["places_by_id"][place_id]["lat"] = lat
+            if lng is not None:
+                self.state["places_by_id"][place_id]["lng"] = lng
+            if place_id == target_place_id and lat is not None and lng is not None:
+                self.state["_target_lat"] = lat
+                self.state["_target_lng"] = lng
+
+    return MockCtx()
+
 REVIEWS_RESPONSE_PAGE_0 = {
     "search_information": {"total_reviews": 886},
     "reviews": [
@@ -156,7 +187,7 @@ class TestFindTripadvisorRestaurant:
     async def test_success_when_coords_close(self):
         """Happy path: TripAdvisor's coords match the target's coords within
         the 150m threshold → status=success with full payload."""
-        ctx = _ctx_with_target()
+        ctx = _ctx_with_place()
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
             _mock_response(SEARCH_RESPONSE),
@@ -172,6 +203,7 @@ class TestFindTripadvisorRestaurant:
             )
 
         assert result["status"] == "success"
+        assert result["google_place_id"] == "ChIJtarget"
         assert result["place_id"] == "6796040"
         assert result["name"] == "Umami P-Berg"
         assert result["rating"] == 4.1
@@ -191,7 +223,7 @@ class TestFindTripadvisorRestaurant:
         candidate's coords (52.536, 13.421 Berlin — the fixture's built-in
         Umami location), we must return `unverified` and strip every rich
         field so no wrong-venue data leaks downstream."""
-        ctx = _ctx_with_target(lat=54.347, lng=18.658)  # Bar Leon's Gdansk coords
+        ctx = _ctx_with_place(lat=54.347, lng=18.658, name="Bar Leon")
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
             _mock_response(SEARCH_RESPONSE),
@@ -216,19 +248,17 @@ class TestFindTripadvisorRestaurant:
         assert "sample_reviews" not in result
 
     @pytest.mark.asyncio
-    async def test_unverified_when_target_coords_missing(self):
-        """Pessimistic default: if the enricher never populated _target_lat/lng
-        (degraded run), we can't verify identity via coordinates → unverified,
-        no pill. Better no pill than a wrong one."""
-        ctx = _ctx_with_target(lat=None, lng=None)
-        mock_client = AsyncMock()
-        mock_client.get = AsyncMock(side_effect=[
-            _mock_response(SEARCH_RESPONSE),
-            _mock_response(PLACE_RESPONSE),
-        ])
+    async def test_unverified_when_place_coords_missing(self):
+        """If the requested Google place has no coords, don't call SerpAPI."""
+        ctx = _ctx_with_place(lat=None, lng=None)
 
-        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
-             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+        with patch(
+            "superextra_agent.tripadvisor_tools._get_client",
+            side_effect=AssertionError("client should not be created"),
+        ), patch(
+            "superextra_agent.tripadvisor_tools._get_api_key",
+            side_effect=AssertionError("api key should not be read"),
+        ):
             result = await find_tripadvisor_restaurant(
                 "Umami", "Berlin",
                 google_place_id="ChIJtarget",
@@ -242,7 +272,7 @@ class TestFindTripadvisorRestaurant:
     async def test_unverified_when_address_link_missing(self):
         """Some TripAdvisor responses may omit address_link. Without coords
         to verify, we can't accept the match."""
-        ctx = _ctx_with_target()
+        ctx = _ctx_with_place()
         place_response_no_link = {
             "place_result": {**PLACE_RESPONSE["place_result"], "address_link": ""},
         }
@@ -266,9 +296,9 @@ class TestFindTripadvisorRestaurant:
     @pytest.mark.asyncio
     async def test_search_uses_name_area_ssrc_and_lat_lon(self):
         """Query shape verification. `q` is always `f"{name} {area}"` (no
-        street address). `ssrc=r` filters to eateries. When target coords are
-        in state, `lat`/`lon` biases SerpAPI's ranking."""
-        ctx = _ctx_with_target()
+        street address). `ssrc=r` filters to eateries. The requested Google
+        place coords bias SerpAPI's ranking."""
+        ctx = _ctx_with_place()
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
             _mock_response(SEARCH_RESPONSE),
@@ -291,10 +321,9 @@ class TestFindTripadvisorRestaurant:
         assert search_params["lon"] == str(TARGET_COORDS[1])
 
     @pytest.mark.asyncio
-    async def test_search_omits_lat_lon_when_target_coords_missing(self):
-        """If the enricher hasn't populated target coords, the search call
-        omits `lat`/`lon` rather than sending empty/None values."""
-        ctx = _ctx_with_target(lat=None, lng=None)
+    async def test_legacy_target_coords_fallback_when_registry_missing(self):
+        """Old sessions can still verify the original target from _target_*."""
+        ctx = _ctx_with_target(lat=TARGET_COORDS[0], lng=TARGET_COORDS[1])
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
             _mock_response(SEARCH_RESPONSE),
@@ -303,19 +332,20 @@ class TestFindTripadvisorRestaurant:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            await find_tripadvisor_restaurant(
+            result = await find_tripadvisor_restaurant(
                 "Umami", "Berlin", google_place_id="ChIJtarget", tool_context=ctx,
             )
 
         search_params = mock_client.get.call_args_list[0].kwargs["params"]
-        assert "lat" not in search_params
-        assert "lon" not in search_params
+        assert result["status"] == "success"
+        assert search_params["lat"] == str(TARGET_COORDS[0])
+        assert search_params["lon"] == str(TARGET_COORDS[1])
 
     @pytest.mark.asyncio
     async def test_unverified_when_no_places_returned(self):
         """Search ran but returned no candidates at all — unverified, not
         error. Error status is reserved for transport/API failures."""
-        ctx = _ctx_with_target()
+        ctx = _ctx_with_place()
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(return_value=_mock_response({"places": []}))
 
@@ -331,7 +361,7 @@ class TestFindTripadvisorRestaurant:
     async def test_error_when_serpapi_search_fails(self):
         """Transport failure on the search call → error (distinct from
         unverified). Timeline wording and metrics can distinguish."""
-        ctx = _ctx_with_target()
+        ctx = _ctx_with_place()
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(return_value=_mock_response({}, status_code=500))
 
@@ -347,7 +377,7 @@ class TestFindTripadvisorRestaurant:
     @pytest.mark.asyncio
     async def test_error_when_serpapi_detail_fails(self):
         """Transport failure on the detail call → error."""
-        ctx = _ctx_with_target()
+        ctx = _ctx_with_place()
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
             _mock_response(SEARCH_RESPONSE),
@@ -365,15 +395,12 @@ class TestFindTripadvisorRestaurant:
 
 
 class TestFindTripadvisorRestaurantSourceWrite:
-    """Source-pill gate uses `google_place_id == _target_place_id` AND the
-    coord-verification gate (status=success). Pills only write on verified
-    target matches."""
+    """Source pills write for any verified Google place."""
 
     @pytest.mark.asyncio
     async def test_writes_source_on_verified_target_match(self):
-        """Happy path: target coords match candidate's coords, google_place_id
-        matches _target_place_id → pill writes."""
-        ctx = _ctx_with_target(target_place_id="ChIJtarget")
+        """Happy path: Google place coords match candidate coords → pill writes."""
+        ctx = _ctx_with_place(target_place_id="ChIJtarget", name="Umami")
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
             _mock_response(SEARCH_RESPONSE),
@@ -390,15 +417,17 @@ class TestFindTripadvisorRestaurantSourceWrite:
         assert len(source_keys) == 1
         entry = ctx.state[source_keys[0]]
         assert entry["provider"] == "tripadvisor"
-        assert entry["title"] == "TripAdvisor"
+        assert entry["title"] == "TripAdvisor - Umami"
         assert entry["domain"] == "tripadvisor.com"
         assert entry["url"] == "https://www.tripadvisor.com/Restaurant_Review-umami-p-berg"
+        assert entry["place_id"] == "ChIJtarget"
+        assert ctx.state["places_by_id"]["ChIJtarget"]["tripadvisor"]["place_id"] == "6796040"
 
     @pytest.mark.asyncio
     async def test_skips_source_when_coords_diverge(self):
         """2026-04-24 Bar Leon regression — search returns a candidate at a
         different address; coord check rejects it; no pill."""
-        ctx = _ctx_with_target(lat=54.347, lng=18.658, target_place_id="ChIJtarget")
+        ctx = _ctx_with_place(lat=54.347, lng=18.658, target_place_id="ChIJtarget", name="Bar Leon")
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
             _mock_response(SEARCH_RESPONSE),
@@ -414,11 +443,12 @@ class TestFindTripadvisorRestaurantSourceWrite:
         assert not any(k.startswith("_tool_src_") for k in ctx.state)
 
     @pytest.mark.asyncio
-    async def test_skips_source_when_place_id_is_competitor(self):
-        """Competitor lookup: coords happen to match, but google_place_id
-        doesn't match _target_place_id → no pill (the pill would link to the
-        competitor, defeating the point of target-only attribution)."""
-        ctx = _ctx_with_target(target_place_id="ChIJnoma")
+    async def test_writes_source_when_place_id_is_competitor(self):
+        ctx = _ctx_with_place(
+            place_id="ChIJgeranium",
+            target_place_id="ChIJnoma",
+            name="Geranium",
+        )
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
             _mock_response(SEARCH_RESPONSE),
@@ -433,21 +463,24 @@ class TestFindTripadvisorRestaurantSourceWrite:
                 tool_context=ctx,
             )
 
-        assert not any(k.startswith("_tool_src_") for k in ctx.state)
+        source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
+        assert len(source_keys) == 1
+        assert ctx.state[source_keys[0]]["title"] == "TripAdvisor - Geranium"
+        assert ctx.state[source_keys[0]]["place_id"] == "ChIJgeranium"
 
     @pytest.mark.asyncio
     async def test_skips_source_when_place_id_empty(self):
         """Defense in depth: empty google_place_id (LLM schema violation) →
         no pill even if everything else would have passed."""
         ctx = _ctx_with_target(target_place_id="ChIJtarget")
-        mock_client = AsyncMock()
-        mock_client.get = AsyncMock(side_effect=[
-            _mock_response(SEARCH_RESPONSE),
-            _mock_response(PLACE_RESPONSE),
-        ])
 
-        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
-             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+        with patch(
+            "superextra_agent.tripadvisor_tools._get_client",
+            side_effect=AssertionError("client should not be created"),
+        ), patch(
+            "superextra_agent.tripadvisor_tools._get_api_key",
+            side_effect=AssertionError("api key should not be read"),
+        ):
             await find_tripadvisor_restaurant(
                 "Umami", "Berlin",
                 google_place_id="",
@@ -557,12 +590,13 @@ class TestApiKeyRequired:
     async def test_missing_key_raises(self):
         # Clear env AND block the Secret Manager fallback. Without the SM
         # patch this test would reach production Secret Manager from CI.
+        ctx = _ctx_with_place(place_id="ChIJdummy", target_place_id="ChIJdummy", name="Test")
         with patch.dict("os.environ", {}, clear=True), \
              patch("superextra_agent.tripadvisor_tools._client", None), \
              patch("superextra_agent.secrets._get_client",
                    side_effect=RuntimeError("sm unreachable in test")):
             result = await find_tripadvisor_restaurant(
-                "Test", "Berlin", google_place_id="ChIJdummy"
+                "Test", "Berlin", google_place_id="ChIJdummy", tool_context=ctx,
             )
             assert result["status"] == "error"
             assert "SERPAPI_API_KEY" in result["error_message"]

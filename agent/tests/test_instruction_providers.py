@@ -215,7 +215,15 @@ class TestMakeInstruction:
         provider = _make_instruction("review_analyst")
 
         ctx = MockCtx(
-            state={"places_context": "Target data", "_target_place_id": "ChIJtarget"}
+            state={
+                "places_context": "Target data",
+                "places_by_id": {
+                    "ChIJtarget": {
+                        "google_place_id": "ChIJtarget",
+                        "name": "Target",
+                    }
+                },
+            }
         )
         result = provider(ctx)
 
@@ -224,6 +232,8 @@ class TestMakeInstruction:
         assert "## Market Source Profiles" not in result
         assert "Pyszne.pl" not in result
         assert "ChIJtarget" in result
+        assert "Target Google Place ID" not in result
+        assert "For each requested place" in result
 
     def test_specialists_surface_writer_material(self):
         provider = _make_instruction("market_landscape")
@@ -243,6 +253,14 @@ class TestContinueResearchInstruction:
         ctx = MockCtx(state={
             "final_report": "## Market Report\nKey findings here.",
             "places_context": "Restaurant XYZ data",
+            "places_by_id": {
+                "ChIJcomp": {
+                    "google_place_id": "ChIJcomp",
+                    "name": "Competitor A",
+                    "lat": 1.0,
+                    "lng": 2.0,
+                }
+            },
             "market_result": "Market specialist notes",
             "research_coverage": "Coverage notes and source gaps",
             "continuation_notes": "Turn 2 found competitor A started brunch.",
@@ -256,6 +274,8 @@ class TestContinueResearchInstruction:
         assert "Coverage notes and source gaps" in result
         assert "competitor A started brunch" in result
         assert "Market Landscape" in result
+        assert "Competitor A" in result
+        assert "Google Place ID: ChIJcomp" in result
 
     def test_defaults_when_state_empty(self):
         ctx = MockCtx(state={})
@@ -267,6 +287,7 @@ class TestContinueResearchInstruction:
         assert "No research coverage notes available." in result
         assert "No continuation notes yet." in result
         assert "No restaurant data available." in result
+        assert "No structured place registry available." in result
         assert "No research plan available." not in result
 
     def test_handles_curly_braces_in_report(self):
@@ -293,6 +314,8 @@ class TestContinueResearchInstruction:
 
         assert "do focused research through one focused helper" in result
         assert "Use direct venue lookup tools only" in result
+        assert "Structured provider lookups are allowed" in result
+        assert "Google Reviews, TripAdvisor" in result
         assert "Use direct source fetches only when the URL is already known" in result
         assert "Do not do source-discovery searches directly in this agent" in result
 

@@ -1,9 +1,9 @@
 import atexit
 import logging
-import uuid
 
 import httpx
 
+from .place_state import source_title, tool_source_key
 from .secrets import get_secret
 
 logger = logging.getLogger(__name__)
@@ -101,22 +101,16 @@ async def get_google_reviews(place_id: str, max_reviews: int = 50, tool_context=
                 review["owner_response"] = owner_resp
             reviews.append(review)
 
-        # Register one "Google Reviews" provider source — target only. The
-        # enricher writes `_target_place_id` on the first Places call, so by
-        # the time this tool runs the key is set; competitor calls silently
-        # skip. The unique `_tool_src_<uuid>` key pattern is still needed for
-        # the worker-side drain even though we now write at most once per
-        # turn, because other tools use the same pattern and the drain
-        # doesn't care how many entries there are.
-        if (
-            tool_context
-            and tool_context.state.get("_target_place_id") == place_id
-        ):
-            tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
+        # Register the provider source for the exact Google Place ID used.
+        # Review bodies stay turn-local; only the source metadata lands in
+        # bounded provider/place session state.
+        if tool_context:
+            tool_context.state[tool_source_key("google_reviews", place_id)] = {
                 "provider": "google_reviews",
-                "title": "Google Reviews",
+                "title": source_title(tool_context.state, place_id, "Google Reviews"),
                 "url": f"https://www.google.com/maps/place/?q=place_id:{place_id}",
                 "domain": "google.com",
+                "place_id": place_id,
             }
 
         return {

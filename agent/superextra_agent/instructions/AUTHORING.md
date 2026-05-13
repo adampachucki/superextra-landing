@@ -19,7 +19,9 @@ The router routes. The context enricher builds Google Places context. The Resear
 ## State Keys
 
 - `places_context`: Google Places context from the enricher.
-- `_target_place_id`, `_target_lat`, `_target_lng`: target metadata written by Places tools.
+- `places_by_id`: compact session-local place registry keyed by Google Place ID.
+- `original_target_place_id`: immutable original target identity.
+- `_target_place_id`, `_target_lat`, `_target_lng`: legacy target metadata and current geo-bias input written by Places tools.
 - Specialist result keys such as `market_result`, `pricing_result`, `review_result`, `dynamic_result_1`, `dynamic_result_2`, and `dynamic_result_3`: specialist outputs.
 - `research_coverage`: Research Lead coverage note for audit, debugging, and future loop checks. The Report Writer does not read it.
 - `final_report`: final Report Writer report.
@@ -65,7 +67,7 @@ Specialist instructions use two prompt layers:
 `specialists.py` composes the base and body. It injects:
 
 - `{places_context}`;
-- `{target_place_id}` for `review_analyst`;
+- `{known_places_context}`;
 - `{role_title}`;
 - `{specialist_body}`.
 
@@ -143,9 +145,8 @@ Files with runtime variables:
 
 - `research_lead.md`: `{places_context}`, `{market_source_profiles}`.
 - `report_writer.md`: `{places_context}`, `{specialist_reports}`.
-- `continue_research.md`: `{final_report}`, `{specialist_reports}`, `{research_coverage}`, `{continuation_notes}`, `{places_context}`.
-- `specialist_base.md`: `{role_title}`, `{places_context}`, `{specialist_body}`.
-- `review_analyst.md`: `{target_place_id}`.
+- `continue_research.md`: `{final_report}`, `{specialist_reports}`, `{research_coverage}`, `{continuation_notes}`, `{places_context}`, `{known_places_context}`.
+- `specialist_base.md`: `{role_title}`, `{places_context}`, `{known_places_context}`, `{specialist_body}`.
 
 Never add literal curly braces to runtime-formatted prompt files. Escape them as doubled braces: `{{` and `}}`.
 

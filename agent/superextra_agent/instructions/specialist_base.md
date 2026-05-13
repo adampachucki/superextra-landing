@@ -14,6 +14,10 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 
 {places_context}
 
+## Known Places
+
+{known_places_context}
+
 {specialist_body}
 
 ## Process

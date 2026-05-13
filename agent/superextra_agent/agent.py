@@ -16,6 +16,7 @@ from .places_tools import (
     get_restaurant_details,
     search_restaurants,
 )
+from .place_state import format_known_places_context
 from .specialist_catalog import SPECIALIST_RESULT_KEYS
 from .specialists import (
     ALL_SPECIALISTS,
@@ -195,6 +196,7 @@ def _continue_research_instruction(ctx):
             _CONTINUATION_NOTES_KEY, "No continuation notes yet."
         ),
         "places_context": ctx.state.get("places_context", "No restaurant data available."),
+        "known_places_context": format_known_places_context(ctx.state),
     }
     return _CONTINUE_RESEARCH_TEMPLATE.format(**values)
 

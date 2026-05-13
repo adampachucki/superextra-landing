@@ -54,7 +54,10 @@ class TestGetRestaurantDetails:
         assert ctx.state["_target_lat"] == 52.5
         assert ctx.state["_target_lng"] == 13.4
         assert ctx.state["_target_place_id"] == "test123"
+        assert ctx.state["original_target_place_id"] == "test123"
         assert ctx.state["_place_name_test123"] == "Test Restaurant"
+        assert ctx.state["places_by_id"]["test123"]["name"] == "Test Restaurant"
+        assert ctx.state["places_by_id"]["test123"]["lat"] == 52.5
         # No googleMapsUri in payload → no Google Maps source pill written.
         assert not any(k.startswith("_tool_src_") for k in ctx.state)
 
@@ -80,9 +83,10 @@ class TestGetRestaurantDetails:
         assert len(src_keys) == 1
         entry = ctx.state[src_keys[0]]
         assert entry["provider"] == "google_maps"
-        assert entry["title"] == "Google Maps"
+        assert entry["title"] == "Google Maps - Target"
         assert entry["url"] == maps_uri
         assert entry["domain"] == "google.com"
+        assert entry["place_id"] == "target123"
 
     @respx.mock
     @pytest.mark.asyncio
@@ -105,11 +109,33 @@ class TestGetRestaurantDetails:
         await get_restaurant_details("noloc", tool_context=ctx)
 
         assert ctx.state["_target_place_id"] == "noloc"
+        assert ctx.state["original_target_place_id"] == "noloc"
         assert "_target_lat" not in ctx.state
         assert "_target_lng" not in ctx.state
         src_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
         assert len(src_keys) == 1
         assert ctx.state[src_keys[0]]["provider"] == "google_maps"
+
+    @respx.mock
+    @pytest.mark.asyncio
+    async def test_legacy_target_gets_original_id_and_coords_backfilled(self):
+        """Old sessions may have only `_target_place_id`; fetching that same
+        place should initialize the new registry target key and legacy coords."""
+        place_data = {
+            "displayName": {"text": "Target"},
+            "location": {"latitude": 52.5, "longitude": 13.4},
+        }
+        respx.get(f"{BASE_URL}/places/legacy-target").mock(
+            return_value=httpx.Response(200, json=place_data)
+        )
+
+        ctx = MockToolCtx()
+        ctx.state["_target_place_id"] = "legacy-target"
+        await get_restaurant_details("legacy-target", tool_context=ctx)
+
+        assert ctx.state["original_target_place_id"] == "legacy-target"
+        assert ctx.state["_target_lat"] == 52.5
+        assert ctx.state["_target_lng"] == 13.4
 
     @respx.mock
     @pytest.mark.asyncio
@@ -145,14 +171,17 @@ class TestGetRestaurantDetails:
         # Crucially, competitor coords did NOT leak into _target_lat/lng.
         assert "_target_lat" not in ctx.state
         assert "_target_lng" not in ctx.state
-        # Only the target's Google Maps source pill was written; the competitor
-        # fetch skipped both coord write and pill write.
+        # Both source pills are written, but competitor coords do not leak into
+        # legacy target coordinates.
         google_maps_srcs = [
             v for k, v in ctx.state.items()
             if k.startswith("_tool_src_") and v.get("provider") == "google_maps"
         ]
-        assert len(google_maps_srcs) == 1
-        assert google_maps_srcs[0]["url"] == "https://maps.google.com/?cid=target"
+        assert {src["url"] for src in google_maps_srcs} == {
+            "https://maps.google.com/?cid=target",
+            "https://maps.google.com/?cid=comp",
+        }
+        assert ctx.state["places_by_id"]["comp"]["lat"] == 55.6989
 
     @respx.mock
     @pytest.mark.asyncio
@@ -225,6 +254,7 @@ class TestGetBatchRestaurantDetails:
         assert ctx.state["_place_name_target"] == "Target"
         assert ctx.state["_place_name_comp1"] == "Competitor 1"
         assert ctx.state["_place_name_comp2"] == "Competitor 2"
+        assert set(ctx.state["places_by_id"]) == {"target", "comp1", "comp2"}
 
     @respx.mock
     @pytest.mark.asyncio
@@ -280,16 +310,21 @@ class TestGetBatchRestaurantDetails:
         assert ctx.state["_place_name_target"] == "Target"
         assert ctx.state["_place_name_comp1"] == "Competitor 1"
         assert ctx.state["_place_name_comp2"] == "Competitor 2"
-        # Exactly one Google Maps source survives — the target's. Competitor
-        # fetches in the batch skip the source write.
+        # Google Maps sources are place-scoped, while legacy target coords stay
+        # pinned to the original target.
         src_entries = [
             v for k, v in ctx.state.items() if k.startswith("_tool_src_")
         ]
         google_maps_entries = [
             e for e in src_entries if e.get("provider") == "google_maps"
         ]
-        assert len(google_maps_entries) == 1
-        assert google_maps_entries[0]["url"] == target_uri
+        assert {entry["url"] for entry in google_maps_entries} == {
+            target_uri,
+            comp1_uri,
+            comp2_uri,
+        }
+        assert ctx.state["places_by_id"]["comp1"]["lat"] == comp1_coords["latitude"]
+        assert ctx.state["places_by_id"]["comp2"]["lat"] == comp2_coords["latitude"]
 
 
 class TestGetApiKey:

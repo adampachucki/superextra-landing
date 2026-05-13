@@ -10,6 +10,7 @@ from google.adk.tools import google_search
 from google.genai import Client, types
 
 from .apify_tools import get_google_reviews
+from .place_state import format_known_places_context
 from .specialist_catalog import (
     ROLE_TITLES,
     SPECIALISTS,
@@ -115,14 +116,9 @@ def _make_instruction(name: str):
 
     def provider(ctx):
         places_context = ctx.state.get("places_context", "No Google Places data available.")
-        # Exposed to specialists that need the deterministic target ID (currently
-        # review_analyst.md, so TripAdvisor source pills resolve to the target
-        # venue). Other specialist templates don't reference {target_place_id};
-        # Python str.format silently ignores unused kwargs.
-        target_place_id = ctx.state.get("_target_place_id", "")
         instruction = template.format(
             places_context=places_context,
-            target_place_id=target_place_id,
+            known_places_context=format_known_places_context(ctx.state),
         )
         return instruction
 

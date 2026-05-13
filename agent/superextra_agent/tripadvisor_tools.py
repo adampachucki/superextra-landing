@@ -1,10 +1,17 @@
 import atexit
 import math
 import re
-import uuid
 
 import httpx
 
+from .place_state import (
+    get_place_coords,
+    get_place_name,
+    get_place_record,
+    source_title,
+    tool_source_key,
+    upsert_tripadvisor_match,
+)
 from .secrets import get_secret
 
 BASE_URL = "https://serpapi.com/search.json"
@@ -82,17 +89,17 @@ async def find_tripadvisor_restaurant(
 ) -> dict:
     """Find a restaurant on TripAdvisor and return its full profile.
 
-    Searches TripAdvisor (eateries only, biased toward the target's coords
-    when available), fetches the top candidate's detail page, and verifies
-    identity by comparing TripAdvisor's coordinates against the target's
-    Google Places coordinates. Two SerpAPI calls per invocation.
+    Searches TripAdvisor (eateries only, biased toward the requested Google
+    place's coords), fetches the top candidate's detail page, and verifies
+    identity by comparing TripAdvisor coordinates against that same Google
+    place. Two SerpAPI calls per verified-profile invocation.
 
     Three return statuses:
       - `success` — coord check passed (≤ 150 m). Full payload: rating,
         ranking, cuisines, tripadvisor_link, sample_reviews, etc.
       - `unverified` — search ran; top candidate's coords didn't match the
-        target. No rich fields, no link. The LLM should skip TripAdvisor for
-        this target, not retry.
+        requested Google place. No rich fields, no link. The LLM should skip
+        TripAdvisor for this place, not retry.
       - `error` — SerpAPI transport failure or response parse error.
 
     Args:
@@ -100,30 +107,49 @@ async def find_tripadvisor_restaurant(
         area: City or neighborhood for search context (e.g. 'Prenzlauer Berg Berlin').
         google_place_id: REQUIRED. The Google Place ID of the restaurant being
             looked up, copied from the Places context (e.g.
-            'ChIJN1t_tDeuEmsRUsoyG83frY4'). Used only for source-pill
-            attribution — TripAdvisor never sees it.
+            'ChIJN1t_tDeuEmsRUsoyG83frY4'). This is the local identity
+            anchor; TripAdvisor never sees it.
     """
     try:
+        state = tool_context.state if tool_context else {}
+
+        if not google_place_id:
+            return {
+                "status": "unverified",
+                "error_message": "Google Place ID is required for TripAdvisor verification",
+            }
+
+        coords = get_place_coords(state, google_place_id)
+        if not coords:
+            return {
+                "status": "unverified",
+                "error_message": "Google place profile coordinates required for TripAdvisor verification",
+            }
+
+        record = get_place_record(state, google_place_id) or {}
+        search_name = (name or get_place_name(state, google_place_id) or "").strip()
+        search_area = (area or str(record.get("formatted_address") or "")).strip()
+        query = f"{search_name} {search_area}".strip()
+        if not search_name:
+            return {
+                "status": "unverified",
+                "error_message": "Google place profile name required for TripAdvisor search",
+            }
+
         client = _get_client()
         api_key = _get_api_key()
 
         # Step 1: search. `ssrc=r` filters to eateries (otherwise the response
         # is polluted with hotels and attractions). `lat`/`lon` biases the
-        # ranking toward the target's location when we have it — verified
-        # empirically to shift candidate[1+] toward local venues. Keep the
-        # query lean: `f"{name} {area}"` — appending street addresses hurts
-        # TripAdvisor's fuzzy search, not helps it (tested).
+        # ranking toward the requested Google place.
         search_params = {
             "engine": "tripadvisor",
-            "q": f"{name} {area}",
+            "q": query,
             "ssrc": "r",
+            "lat": str(coords[0]),
+            "lon": str(coords[1]),
             "api_key": api_key,
         }
-        target_lat = tool_context.state.get("_target_lat") if tool_context else None
-        target_lng = tool_context.state.get("_target_lng") if tool_context else None
-        if target_lat and target_lng:
-            search_params["lat"] = str(target_lat)
-            search_params["lon"] = str(target_lng)
 
         search_resp = await client.get(BASE_URL, params=search_params)
         if search_resp.status_code != 200:
@@ -136,7 +162,7 @@ async def find_tripadvisor_restaurant(
         if not places:
             return {
                 "status": "unverified",
-                "error_message": f"No TripAdvisor results for '{name} {area}'",
+                "error_message": f"No TripAdvisor results for '{query}'",
             }
 
         top = places[0]
@@ -162,22 +188,20 @@ async def find_tripadvisor_restaurant(
         place_data = place_resp.json().get("place_result", {})
 
         # Identity check: compare TripAdvisor's coordinates against the
-        # target's Google Places coordinates. TripAdvisor embeds its lat/lng
-        # in the address_link as `@lat,lng`. If the target coords aren't in
-        # state (degraded run) or the address_link doesn't parse, default to
-        # unverified — can't prove identity, don't accept.
+        # requested Google place coordinates. TripAdvisor embeds its lat/lng
+        # in the address_link as `@lat,lng`.
         ta_coords = _extract_coords_from_address_link(place_data.get("address_link", ""))
-        if not (target_lat and target_lng and ta_coords):
+        if not ta_coords:
             return {
                 "status": "unverified",
                 "error_message": "Could not verify TripAdvisor match (missing coordinates)",
             }
-        distance_m = _haversine_meters((float(target_lat), float(target_lng)), ta_coords)
+        distance_m = _haversine_meters(coords, ta_coords)
         if distance_m > _COORD_MATCH_RADIUS_M:
             return {
                 "status": "unverified",
                 "error_message": (
-                    f"TripAdvisor top candidate is {distance_m:.0f}m from the target — "
+                    f"TripAdvisor top candidate is {distance_m:.0f}m from the Google place — "
                     f"treating as a different venue"
                 ),
             }
@@ -208,24 +232,29 @@ async def find_tripadvisor_restaurant(
                 review["author_hometown"] = author["hometown"]
             sample_reviews.append(review)
 
-        # Pill write. `google_place_id == _target_place_id` gate is unchanged;
-        # TripAdvisor's API doesn't speak Google IDs, so this arg is purely
-        # local gating metadata.
-        if (
-            tool_context
-            and selected_link
-            and google_place_id
-            and tool_context.state.get("_target_place_id") == google_place_id
-        ):
-            tool_context.state[f"_tool_src_{uuid.uuid4().hex}"] = {
+        if tool_context and selected_link:
+            upsert_tripadvisor_match(
+                tool_context.state,
+                google_place_id,
+                {
+                    "place_id": ta_place_id,
+                    "url": selected_link,
+                    "name": place_data.get("name"),
+                    "verified": True,
+                    "verified_distance_m": round(distance_m),
+                },
+            )
+            tool_context.state[tool_source_key("tripadvisor", google_place_id)] = {
                 "provider": "tripadvisor",
-                "title": "TripAdvisor",
+                "title": source_title(tool_context.state, google_place_id, "TripAdvisor"),
                 "url": selected_link,
                 "domain": "tripadvisor.com",
+                "place_id": google_place_id,
             }
 
         return {
             "status": "success",
+            "google_place_id": google_place_id,
             "place_id": ta_place_id,
             "name": place_data.get("name"),
             "rating": place_data.get("rating"),

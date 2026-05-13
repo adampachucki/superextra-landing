@@ -141,18 +141,21 @@ class TestGetGoogleReviews:
 
 
 class TestGoogleReviewsSourceWrite:
-    """One "Google Reviews" provider source per turn, target only. The
-    enricher sets `_target_place_id` on its first Places call; Apify calls
-    for competitors skip the source write so the final sources list stays
-    one-pill-per-provider."""
+    """Google Reviews provider sources are written for the requested place."""
 
     @pytest.mark.asyncio
     async def test_target_call_writes_provider_source(self):
-        """When `place_id == state._target_place_id`, write one canonical
-        Google Reviews source entry."""
         class MockCtx:
             def __init__(self):
-                self.state = {"_target_place_id": "ChIJtarget"}
+                self.state = {
+                    "_target_place_id": "ChIJtarget",
+                    "places_by_id": {
+                        "ChIJtarget": {
+                            "google_place_id": "ChIJtarget",
+                            "name": "Target",
+                        }
+                    },
+                }
 
         ctx = MockCtx()
         mock_client = AsyncMock()
@@ -166,17 +169,24 @@ class TestGoogleReviewsSourceWrite:
         assert len(source_keys) == 1
         entry = ctx.state[source_keys[0]]
         assert entry["provider"] == "google_reviews"
-        assert entry["title"] == "Google Reviews"
+        assert entry["title"] == "Google Reviews - Target"
         assert entry["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJtarget"
         assert entry["domain"] == "google.com"
+        assert entry["place_id"] == "ChIJtarget"
 
     @pytest.mark.asyncio
-    async def test_competitor_call_skips_source_write(self):
-        """Calls for non-target place_ids don't add a second Google Reviews
-        pill. The target's pill already covers the provider."""
+    async def test_competitor_call_writes_source_with_known_name(self):
         class MockCtx:
             def __init__(self):
-                self.state = {"_target_place_id": "ChIJtarget"}
+                self.state = {
+                    "_target_place_id": "ChIJtarget",
+                    "places_by_id": {
+                        "ChIJcomp": {
+                            "google_place_id": "ChIJcomp",
+                            "name": "Competitor",
+                        }
+                    },
+                }
 
         ctx = MockCtx()
         mock_client = AsyncMock()
@@ -187,12 +197,14 @@ class TestGoogleReviewsSourceWrite:
             await get_google_reviews("ChIJcomp", tool_context=ctx)
 
         source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
-        assert len(source_keys) == 0
+        assert len(source_keys) == 1
+        entry = ctx.state[source_keys[0]]
+        assert entry["provider"] == "google_reviews"
+        assert entry["title"] == "Google Reviews - Competitor"
+        assert entry["place_id"] == "ChIJcomp"
 
     @pytest.mark.asyncio
-    async def test_no_target_id_skips_source_write(self):
-        """Degraded run: if the enricher never set `_target_place_id`, don't
-        guess. No pill is better than a wrong one."""
+    async def test_no_known_place_still_writes_generic_source(self):
         class MockCtx:
             def __init__(self):
                 self.state = {}
@@ -206,4 +218,6 @@ class TestGoogleReviewsSourceWrite:
             await get_google_reviews("ChIJunknown", tool_context=ctx)
 
         source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
-        assert len(source_keys) == 0
+        assert len(source_keys) == 1
+        assert ctx.state[source_keys[0]]["title"] == "Google Reviews"
+        assert ctx.state[source_keys[0]]["place_id"] == "ChIJunknown"

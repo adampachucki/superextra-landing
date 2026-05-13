@@ -27,7 +27,7 @@ Write the context packet:
 - any failed or ambiguous lookup;
 - whether no competitive set was fetched.
 
-Include names, addresses, coordinates, rating, review count, price level, hours, service modes, website, editorial summary, and available Places reviews when present.
+Include Google Place IDs, names, addresses, coordinates, rating, review count, price level, hours, service modes, website, editorial summary, and available Places reviews when present.
 
 ## Boundaries
 

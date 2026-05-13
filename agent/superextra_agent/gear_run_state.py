@@ -24,6 +24,7 @@ from google.cloud import firestore
 
 from .firestore_events import map_event
 from .notes import TITLE_TIMEOUT_S
+from .place_state import TOOL_SOURCE_PREFIX
 from .timeline import TimelineWriter, TurnSummaryBuilder
 
 log = logging.getLogger(__name__)
@@ -107,13 +108,13 @@ class GearRunState:
         for entry in mapped.get("grounding_sources") or []:
             self._merge_source(entry)
 
-        # Drain `_tool_src_*` keys from the event state_delta. Each tool
-        # call writes a UNIQUE state key so parallel tool calls all survive
-        # in one event's stateDelta.
+        # Drain bounded `_tool_src_*` keys from the event state_delta. Tools key
+        # them by provider/place so parallel provider calls for different places
+        # survive without accumulating one state key per invocation.
         sd = (event.actions.state_delta if getattr(event, "actions", None) else None) or {}
         if isinstance(sd, dict):
             for key, value in sd.items():
-                if key.startswith("_tool_src_"):
+                if key.startswith(TOOL_SOURCE_PREFIX):
                     self._merge_source(value)
 
         # Capture final reply + sources on first `complete` event.
@@ -137,11 +138,22 @@ class GearRunState:
     def _merge_source(self, entry: Any) -> None:
         if not isinstance(entry, dict):
             return
-        url = entry.get("url")
-        if not url or url in self.specialist_sources_seen:
+        key = self._source_dedupe_key(entry)
+        if not key or key in self.specialist_sources_seen:
             return
-        self.specialist_sources_seen.add(url)
+        self.specialist_sources_seen.add(key)
         self.specialist_sources.append(entry)
+
+    @staticmethod
+    def _source_dedupe_key(entry: dict[str, Any]) -> str | None:
+        url = entry.get("url")
+        if not url:
+            return None
+        provider = entry.get("provider") or ""
+        place_id = entry.get("place_id") or ""
+        if provider or place_id:
+            return f"{provider}\0{place_id}\0{url}"
+        return str(url)
 
     def _capture_final(self, complete: dict[str, Any]) -> None:
         reply = complete.get("reply")
@@ -153,10 +165,10 @@ class GearRunState:
         seen: set[str] = set()
         merged: list[dict[str, Any]] = []
         for s in list(mapper_sources) + list(self.specialist_sources):
-            url = s.get("url") if isinstance(s, dict) else None
-            if not url or url in seen:
+            key = self._source_dedupe_key(s) if isinstance(s, dict) else None
+            if not key or key in seen:
                 continue
-            seen.add(url)
+            seen.add(key)
             merged.append(s)
         self.final_sources = merged
 
