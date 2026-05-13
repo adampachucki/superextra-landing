@@ -1,8 +1,19 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { formatRelativeTime } from '$lib/format-time';
 
+	let relativeNow = $state(Date.now());
 	let recent = $derived(chatState.sessionsList.slice(0, 4));
+
+	onMount(() => {
+		relativeNow = Date.now();
+		const relativeTimer = setInterval(() => {
+			relativeNow = Date.now();
+		}, 30_000);
+
+		return () => clearInterval(relativeTimer);
+	});
 </script>
 
 {#if recent.length > 0}
@@ -30,7 +41,7 @@
 						{#if sess.placeContext}
 							{sess.placeContext.name} &middot;
 						{/if}
-						{sess.updatedAtMs ? formatRelativeTime(sess.updatedAtMs) : ''}
+						{sess.updatedAtMs ? formatRelativeTime(sess.updatedAtMs, relativeNow) : ''}
 					</p>
 				</a>
 			{/each}

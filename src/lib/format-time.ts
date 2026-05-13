@@ -1,8 +1,8 @@
 /** Sidebar + recent-chats list relative-time formatting.
  *  Returns strings like "just now", "5m ago", "3h ago", "yesterday",
  *  "6d ago", or "Apr 17" for older timestamps. */
-export function formatRelativeTime(ts: number): string {
-	const diff = Date.now() - ts;
+export function formatRelativeTime(ts: number, now = Date.now()): string {
+	const diff = now - ts;
 	const minutes = Math.floor(diff / 60000);
 	if (minutes < 1) return 'just now';
 	if (minutes < 60) return `${minutes}m ago`;

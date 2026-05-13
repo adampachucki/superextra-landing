@@ -104,9 +104,9 @@
 						{msg.text}
 					</div>
 				{:else}
-					<div class="max-w-[95%] px-1 py-1">
+					<div class="max-w-[95%] min-w-0 px-1 py-1">
 						<div
-							class="prose max-w-none text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
+							class="chat-markdown prose max-w-none min-w-0 text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
 							use:finalAnswerReveal={msg.animateReveal
 								? () => chatState.markReplyRevealed(msg.turnIndex)
 								: undefined}
@@ -276,3 +276,19 @@
 		<div bind:this={bottomEl} class="scroll-mb-32 md:scroll-mb-36" aria-hidden="true"></div>
 	</div>
 </div>
+
+<style>
+	:global(.chat-markdown .markdown-table-scroll) {
+		width: 100%;
+		max-width: 100%;
+		margin: 2em 0;
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	:global(.chat-markdown .markdown-table-scroll table) {
+		width: max-content;
+		min-width: 100%;
+		margin: 0;
+	}
+</style>

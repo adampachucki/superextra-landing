@@ -17,6 +17,7 @@
 	let isDesktop = $state(false);
 	let isMobile = $state(false);
 	let mounted = $state(false);
+	let relativeNow = $state(Date.now());
 	let sidebarContentVisible = $derived(sidebarOpen && mounted);
 	let activePromptPosting = $state(false);
 	let activePromptPostMessageCount = $state(0);
@@ -79,6 +80,11 @@
 	});
 
 	onMount(() => {
+		relativeNow = Date.now();
+		const relativeTimer = setInterval(() => {
+			relativeNow = Date.now();
+		}, 30_000);
+
 		// Sign the visitor into Firebase anonymously in the background. Downstream
 		// phases (Firestore session/event reads, ID-token-verified Cloud Function
 		// calls) wait on the resolved UID via `ensureAnonAuth()`. Dynamic import
@@ -119,6 +125,7 @@
 		tick().then(() => {
 			mounted = true;
 		});
+		return () => clearInterval(relativeTimer);
 	});
 
 	// Keep URL in sync with active session
@@ -401,14 +408,14 @@
 										: 'opacity-100'}"
 								>
 									{#if sess.placeContext}
-										<span class="truncate text-black/40 dark:text-white/40"
-											>{sess.placeContext.name}</span
-										>
+										<span class="truncate text-black/40 dark:text-white/40">
+											{sess.placeContext.name}
+										</span>
 										<span class="text-black/20 dark:text-white/20">&middot;</span>
 									{/if}
-									<span class="shrink-0 text-black/30 dark:text-white/30"
-										>{sess.updatedAtMs ? formatRelativeTime(sess.updatedAtMs) : ''}</span
-									>
+									<span class="shrink-0 text-black/30 dark:text-white/30">
+										{sess.updatedAtMs ? formatRelativeTime(sess.updatedAtMs, relativeNow) : ''}
+									</span>
 								</div>
 								<div
 									class="absolute inset-0 flex items-center gap-1.5 transition-all duration-150 {confirmDeleteId ===
