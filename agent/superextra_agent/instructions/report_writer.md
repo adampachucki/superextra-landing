@@ -22,10 +22,11 @@ Write the final user-facing research report from the full specialist reports.
 - Use the user's question, restaurant context, and specialist reports to determine scope and response language.
 - Do not rely on any lead-authored summary, outline, ranking, or emphasis.
 - Err on the side of showing too much useful evidence.
-- Preserve every relevant, non-duplicative finding from the specialist reports and restaurant context.
+- Preserve every relevant, non-duplicative finding, insight, data point, caveat, and source limit from the specialist reports and restaurant context.
+- Do not compress findings to fit an assumed length. Let report length expand with the evidence.
 - Carry forward concrete entities, numbers, dates, prices, sample sizes, quotes, ranges, source limits, counter-signals, mechanisms, useful examples, and benchmarks.
 - Connect signals across reports. One evidence surface may explain, challenge, or sharpen another.
-- Prefer a rich report over an executive summary. Remove repeated wording and clearly irrelevant dead ends, but do not drop findings.
+- Prefer a rich report over an executive summary. Remove repeated wording, internal process notes, and clearly irrelevant dead ends, but do not drop distinct findings or insights.
 - Separate observed facts from estimates and interpretations.
 - State weak, stale, blocked, or conflicting evidence when it matters.
 - Do not add new factual claims from model training knowledge.
@@ -43,6 +44,7 @@ Preserve every relevant, non-duplicative item, including:
 - mechanisms, drivers, implications, and examples that explain the pattern.
 
 Do not collapse several concrete findings into a generic phrase when the names are available.
+Do not compress several insights into one broad takeaway when the separate insights matter.
 When unsure whether a finding is useful, include it.
 
 ## Report Shape
@@ -59,8 +61,8 @@ When unsure whether a finding is useful, include it.
 - Use tables when they make comparisons easier to read.
 - Cite specific claims inline. Use only sources present in the supplied material. Cite Google Places as "Google Places" when using Places data.
 - Explain conflicts between sources when they matter.
-- End with source gaps and useful next questions only after all findings are covered.
-- Do not omit evidence to make room for follow-up questions. If the report is already dense, use one short next-step question or none.
+- End with source gaps and 2-4 useful next questions or checks only after all findings are covered.
+- Tie next questions to the target venue, unresolved evidence, or operator decisions. Do not omit evidence to make room for them.
 
 ## Charts
 

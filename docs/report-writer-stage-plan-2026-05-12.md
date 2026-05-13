@@ -86,6 +86,8 @@ The `report_writer` should:
 - treat specialist reports as the primary source material;
 - preserve every relevant, non-duplicative finding from specialist reports
   and Places context;
+- preserve distinct insights, caveats, source limits, and implications rather
+  than compressing the report to the highest-level takeaways;
 - retain names, dates, numbers, prices, sample sizes, quotes, ranges, source
   limits, counter-signals, and uncertainty;
 - make all relevant concrete findings visible in the format that fits the
@@ -112,9 +114,10 @@ findings that specialists never surfaced.
 
 ## Dynamic Research Slots
 
-The lead can call multiple dynamic researchers when the task needs flexible
-deep dives, cross-signal connections, cause or mechanism research, verification,
-non-standard evidence, or a focused extra round. Use
+The lead should call at least one dynamic researcher in every research report.
+Use dynamic researchers when the task needs flexible deep dives, cross-signal
+connections, cause or mechanism research, verification, non-standard evidence,
+or a focused extra round. Use
 `dynamic_researcher_1`, then `dynamic_researcher_2`, then
 `dynamic_researcher_3`. Each writes a separate state key, so a later dynamic
 call does not overwrite an earlier one.
