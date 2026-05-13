@@ -84,8 +84,11 @@ integration role.
 The `report_writer` should:
 
 - treat specialist reports as the primary source material;
-- preserve every relevant, non-duplicative finding from specialist reports
-  and Places context;
+- preserve every distinct finding, insight, data point, caveat, source limit,
+  and implication connected to the question or Places context;
+- treat each specialist report, especially its `Writer Material` section, as
+  must-carry material unless an item is duplicated or clearly outside the
+  question;
 - preserve distinct insights, caveats, source limits, and implications rather
   than compressing the report to the highest-level takeaways;
 - retain names, dates, numbers, prices, sample sizes, quotes, ranges, source
@@ -95,8 +98,9 @@ The `report_writer` should:
 - include grounded implications for the target venue when one is known;
 - connect findings across specialists rather than listing reports one by one;
 - bias toward dense, useful reporting over executive-summary brevity;
-- remove only duplicated wording, internal process notes, and irrelevant dead
-  ends;
+- tighten prose only by removing exact duplicated wording, internal process
+  notes, and irrelevant dead ends; do not shorten by dropping distinct
+  findings, evidence, caveats, source notes, examples, or implications;
 - avoid new web research and new factual claims not grounded in the supplied
   reports or Places context;
 - write `final_report`.
@@ -114,10 +118,12 @@ findings that specialists never surfaced.
 
 ## Dynamic Research Slots
 
-The lead should call at least one dynamic researcher in every research report.
-Use dynamic researchers when the task needs flexible deep dives, cross-signal
-connections, cause or mechanism research, verification, non-standard evidence,
-or a focused extra round. Use
+The lead should call at least two non-dynamic specialists plus at least one
+dynamic researcher in every research report. Use dynamic researchers as added
+deepening passes when the task needs flexible deep dives, cross-signal
+connections, cause or mechanism research, implications, conflicts,
+second-order effects, verification, non-standard evidence, or a focused extra
+round. Do not let a dynamic researcher replace a core evidence surface. Use
 `dynamic_researcher_1`, then `dynamic_researcher_2`, then
 `dynamic_researcher_3`. Each writes a separate state key, so a later dynamic
 call does not overwrite an earlier one.

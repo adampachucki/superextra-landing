@@ -84,11 +84,14 @@ class TestResearchLeadInstruction:
 
         result = _research_lead_instruction(ctx)
 
-        assert "Include at least one dynamic researcher in every research report" in result
+        assert "Use at least two non-dynamic specialists for every research report" in result
         assert "flexible deep dive, verification, or cross-signal connection" in result
         assert "`dynamic_researcher_1`, then `dynamic_researcher_2`, then `dynamic_researcher_3`" in result
         assert "causes, mechanisms, relationships between findings" in result
         assert "named-entity checks" in result
+        assert "Use the dynamic researcher as an added deepening pass" in result
+        assert "Do not ask the dynamic researcher to repeat another specialist's evidence search" in result
+        assert "Did at least two non-dynamic specialists cover distinct evidence surfaces" in result
         assert "If no dynamic researcher has been used, run one" in result
 
 
@@ -150,12 +153,15 @@ class TestReportWriterInstruction:
 
         assert "Do not rely on any lead-authored summary" in result
         assert "Err on the side of showing too much useful evidence" in result
+        assert "especially its `Writer Material` section, as must-carry material" in result
         assert "Do not compress findings to fit an assumed length" in result
         assert "Use the format that preserves detail most clearly" in result
         assert "what the evidence means for that venue" in result
         assert "Weave this into the synthesis or group it separately" in result
         assert "Do not collapse several concrete findings" in result
         assert "Do not compress several insights into one broad takeaway" in result
+        assert "every specialist report has visible representation" in result
+        assert "do not let synthesis merge away concrete findings" in result
         assert "2-4 useful next questions or checks" in result
         assert "Do not omit evidence to make room for them" in result
         assert "Zołza closed" in result

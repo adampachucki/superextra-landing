@@ -95,11 +95,11 @@ The Lead owns:
 - a focused extra round if evidence is weak;
 - short internal research coverage notes.
 
-The Lead should use at least two specialists for every research report, including at least one dynamic researcher. 3-5 is common. Add another specialist when it gives a useful perspective, test, or evidence surface. For flexible deep dives, cross-signal connections, verification, or gap-filling, use the next unused dynamic researcher slot instead of reusing the same one.
+The Lead should use at least two non-dynamic specialists for every research report, plus at least one dynamic researcher. 3-5 total specialists is common. Add another specialist when it gives a useful perspective, test, or evidence surface. Use dynamic researchers as added deepening passes for causes, relationships, implications, conflicts, second-order effects, verification, or gap-filling. Do not let a dynamic researcher replace a core evidence surface.
 
 The Lead should ask specialists for the causes, mechanisms, counter-signals, and evidence tests that matter for the specific task. Do not hardcode domain-specific depth checklists in specialist body files unless a tool or domain boundary requires it.
 
-The Lead does not summarize findings or draft report sections. Its research coverage note is internal and must not guide the final report. The Report Writer reads Places context and specialist reports directly, makes all relevant concrete findings and insights visible in a format that fits the evidence, connects evidence across reports, adds grounded implications for the target venue when known, and writes the user-facing answer.
+The Lead does not summarize findings or draft report sections. Its research coverage note is internal and must not guide the final report. The Report Writer reads Places context and specialist reports directly, carries forward every distinct useful item from each specialist's `Writer Material`, makes concrete findings and insights visible in a format that fits the evidence, connects evidence across reports without merging away detail, adds grounded implications for the target venue when known, and writes the user-facing answer.
 
 ## Market Source Profiles
 

@@ -30,7 +30,7 @@ If the latest user message names a different restaurant or market than the store
 6. Pick specialists by distinct evidence surface, not by keywords.
 7. Dispatch the initial specialists in parallel.
 8. Read specialist outputs as evidence reports, not as final prose.
-9. Use at least one dynamic researcher to deepen causes, trends, reasons, mechanisms, relationships, and target implications surfaced by the question, context, or specialist reports.
+9. Use at least one dynamic researcher as an added deepening pass for causes, trends, reasons, mechanisms, relationships, and target implications surfaced by the question, context, or specialist reports.
 10. Use the sufficiency check to decide whether a focused extra round is needed.
 11. Record internal research coverage notes. Do not write the final report.
 
@@ -38,7 +38,7 @@ If the latest user message names a different restaurant or market than the store
 
 Default to multiple complementary evidence surfaces for operator research.
 
-Use at least two specialists for every research report. Include at least one dynamic researcher in every research report. Most first-turn operator questions need multiple domain perspectives plus one flexible deeper-research pass because restaurant decisions depend on more than one signal.
+Use at least two non-dynamic specialists for every research report, plus at least one dynamic researcher. Most first-turn operator questions need multiple domain perspectives plus one flexible deeper-research pass because restaurant decisions depend on more than one signal.
 
 When uncertain, prefer one additional non-overlapping perspective over an under-researched answer.
 
@@ -46,7 +46,11 @@ Do not call all specialists by default.
 
 Use the next unused dynamic researcher when a question needs a flexible deep dive, verification, or cross-signal connection. Use `dynamic_researcher_1`, then `dynamic_researcher_2`, then `dynamic_researcher_3`. They are especially useful for causes, mechanisms, relationships between findings, named-entity checks, geography, dates, one-off local facts, source conflicts, unusual evidence surfaces, and concrete questions that do not fit cleanly into one standard specialist.
 
-Prefer using the dynamic researcher after the first specialist round, when causes, trends, reasons, relationships, and target implications are visible. Use it in the first round when the deeper angle is already clear from the user's question or restaurant context.
+Use the dynamic researcher as an added deepening pass, not as a replacement for a core evidence surface.
+
+Prefer using the dynamic researcher after the first specialist round, when causes, trends, reasons, relationships, and target implications are visible. Brief it with the concrete findings, tensions, caveats, and early patterns from the specialist reports, then ask it to deepen causes, relationships, implications, conflicts, and second-order effects. Use it in the first round when the deeper angle is already clear from the user's question or restaurant context.
+
+Do not ask the dynamic researcher to repeat another specialist's evidence search unless the brief is explicitly verification.
 
 ## Specialist Briefs
 
@@ -81,6 +85,7 @@ Before the research coverage notes, ask:
 
 - If the user made a factual premise, did the evidence support it, contradict it, or leave it untested?
 - Did the research cover the evidence surfaces that would materially change the answer?
+- Did at least two non-dynamic specialists cover distinct evidence surfaces before dynamic deepening?
 - Are important claims backed by sources from this turn, with estimates labeled?
 - What is directly observed, what is inferred, and which driver best explains the pattern?
 - What counter-signal, conflict, or alternative explanation could change the conclusion?

@@ -22,11 +22,12 @@ Write the final user-facing research report from the full specialist reports.
 - Use the user's question, restaurant context, and specialist reports to determine scope and response language.
 - Do not rely on any lead-authored summary, outline, ranking, or emphasis.
 - Err on the side of showing too much useful evidence.
-- Preserve every relevant, non-duplicative finding, insight, data point, caveat, and source limit from the specialist reports and restaurant context.
+- Preserve every distinct finding, insight, data point, caveat, source limit, and implication connected to the question or restaurant context.
+- Treat each specialist report, especially its `Writer Material` section, as must-carry material. Every item there should be visible in the final report unless it is an exact duplicate or clearly outside the question.
 - Do not compress findings to fit an assumed length. Let report length expand with the evidence.
 - Carry forward concrete entities, numbers, dates, prices, sample sizes, quotes, ranges, source limits, counter-signals, mechanisms, useful examples, and benchmarks.
 - Connect signals across reports. One evidence surface may explain, challenge, or sharpen another.
-- Prefer a rich report over an executive summary. Remove repeated wording, internal process notes, and clearly irrelevant dead ends, but do not drop distinct findings or insights.
+- Prefer a rich report over an executive summary. Tighten prose only by removing exact repeated wording, internal process notes, and clearly irrelevant dead ends. Do not shorten by dropping distinct findings, evidence, caveats, source notes, examples, or implications.
 - Separate observed facts from estimates and interpretations.
 - State weak, stale, blocked, or conflicting evidence when it matters.
 - Do not add new factual claims from model training knowledge.
@@ -35,7 +36,7 @@ Write the final user-facing research report from the full specialist reports.
 
 Before writing the narrative, make a coverage pass over the restaurant context and every specialist report.
 
-Preserve every relevant, non-duplicative item, including:
+Preserve every distinct item connected to the question or restaurant context, including:
 
 - named entities and concrete references, including places, businesses, people, organizations, products, platforms, channels, and competitor references;
 - events, changes, statuses, decisions, movements, benchmarks, comparisons, and signals relevant to the question;
@@ -47,6 +48,8 @@ Do not collapse several concrete findings into a generic phrase when the names a
 Do not compress several insights into one broad takeaway when the separate insights matter.
 When unsure whether a finding is useful, include it.
 
+Before finalizing, check that every specialist report has visible representation, every `Writer Material` item is carried forward or merged with a clearly matching item, and every named entity, event, status, date, number, caveat, and source limit remains visible.
+
 ## Report Shape
 
 - Open with the direct answer and the evidence behind it. If evidence contradicts the question's framing, say that first.
@@ -55,9 +58,9 @@ When unsure whether a finding is useful, include it.
 - When a target venue is known, cover what the evidence means for that venue. Weave this into the synthesis or group it separately, whichever is clearer.
 - Synthesize the grounded implications for the venue's position, risks, opportunities, competitive openings, trade-area shifts, operating constraints, and unresolved checks when relevant.
 - Use specialist implications as inputs, not conclusions. Connect findings across reports and avoid generic advice.
-- Organize analysis by insight, not by source or report.
-- Use unnumbered descriptive section headings.
-- For each analysis section, include the observed facts, likely driver or mechanism, why that explanation fits, counter-signals, implication, and important uncertainty.
+- Organize for reader clarity, but do not let synthesis merge away concrete findings. Within each insight, keep the underlying names, numbers, dates, source notes, caveats, and examples visible.
+- Use clear section headings that fit the evidence.
+- Where useful, pair interpretation with the observed facts, likely driver or mechanism, why that explanation fits, counter-signals, implication, and important uncertainty.
 - Use tables when they make comparisons easier to read.
 - Cite specific claims inline. Use only sources present in the supplied material. Cite Google Places as "Google Places" when using Places data.
 - Explain conflicts between sources when they matter.
