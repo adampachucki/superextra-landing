@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { flushSync, onDestroy, onMount } from 'svelte';
 	import { dictation } from '$lib/dictation.svelte';
 	import { createPlaceSearch, type PlaceSuggestion } from '$lib/place-search.svelte';
 	import PlaceSearchWidget from './PlaceSearchWidget.svelte';
@@ -46,13 +46,13 @@
 	let inputEl: HTMLTextAreaElement | undefined = $state();
 	let placeInputEl: HTMLInputElement | undefined = $state();
 	let contextOpen = $state(false);
+	let contextVisible = $state(false);
 	let placeNudge = $state(false);
 	let display = $state(PREFIX);
 	let dictationBase = '';
 	let previousQuery = '';
 
 	let selectedPlace = $derived(place.selected);
-	let contextExpanded = $derived(contextOpen && !selectedPlace);
 	let isAnimating = $derived(!query && !dictation.active && display.length > 0);
 
 	function mobileViewport() {
@@ -74,8 +74,8 @@
 		focusWithoutScroll(inputEl);
 	}
 
-	function focusPlaceInputOnDesktop() {
-		if (!mobileViewport()) focusWithoutScroll(placeInputEl);
+	function focusPlaceInput() {
+		placeInputEl?.focus();
 	}
 
 	function resizeTextarea() {
@@ -85,18 +85,34 @@
 	}
 
 	function openContext() {
-		contextOpen = true;
-		requestAnimationFrame(focusPlaceInputOnDesktop);
+		flushSync(() => {
+			contextOpen = true;
+			contextVisible = true;
+		});
+		focusPlaceInput();
 	}
 
 	function toggleContext() {
-		contextOpen = !contextOpen;
-		if (contextOpen && !selectedPlace) requestAnimationFrame(focusPlaceInputOnDesktop);
+		const nextOpen = !contextOpen;
+		flushSync(() => {
+			contextOpen = nextOpen;
+			contextVisible = nextOpen && !selectedPlace;
+		});
+		if (contextVisible) focusPlaceInput();
 	}
 
 	function removePlace() {
 		place.clear();
 		contextOpen = false;
+		contextVisible = false;
+	}
+
+	function handlePlaceSelect() {
+		placeNudge = false;
+		focusTextarea();
+		requestAnimationFrame(() => {
+			contextVisible = false;
+		});
 	}
 
 	function handleSubmit() {
@@ -413,7 +429,7 @@
 			</p>
 		{/if}
 
-		{#if contextExpanded}
+		{#if contextVisible}
 			<div
 				class="context-slide relative mx-4 mb-4 pt-2"
 				onclick={(e) => e.stopPropagation()}
@@ -424,7 +440,7 @@
 					bind:inputEl={placeInputEl}
 					direction={placeDirection}
 					placeholder={placePlaceholder}
-					onSelect={() => (placeNudge = false)}
+					onSelect={handlePlaceSelect}
 				/>
 			</div>
 		{/if}
