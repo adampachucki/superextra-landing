@@ -110,6 +110,8 @@ The `report_writer` should:
 - end with short suggested follow-up research prompts that are ready to send
   back into the researcher, not explanations or questions for the owner to
   answer;
+- when a target venue is known, make follow-up prompts center that venue and a
+  concrete operator decision, risk, opportunity, or unresolved check;
 - write `final_report`.
 
 The writer should produce an integrated report, not a summary of summaries.

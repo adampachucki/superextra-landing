@@ -69,7 +69,9 @@ Before finalizing, check that every specialist report has visible representation
 - End with meaningful evidence limits and 2-4 suggested follow-up research prompts only after all findings are covered.
 - Make each follow-up a short, ready-to-send user prompt, not an explanation of what to ask.
 - Keep each prompt to one sentence. Do not write "Ask the researcher to", "Request a deep dive", or owner-facing questions.
-- Tie follow-up prompts to the target venue, unresolved evidence, or useful next research angles. Do not omit evidence to make room for them.
+- When a target venue is known, center each follow-up prompt on that venue and a concrete operator decision, risk, opportunity, or unresolved check.
+- Broader market, policy, rent, access, or competitor prompts are fine only when framed through what they could change for the target venue.
+- Do not end with general market questions when they can be rewritten as venue-specific research prompts. Do not omit evidence to make room for them.
 
 ## Charts
 

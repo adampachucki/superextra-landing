@@ -182,6 +182,10 @@ class TestReportWriterInstruction:
         assert "short, ready-to-send user prompt" in result
         assert 'Do not write "Ask the researcher to", "Request a deep dive"' in result
         assert "owner-facing questions" in result
+        assert "center each follow-up prompt on that venue" in result
+        assert "concrete operator decision, risk, opportunity, or unresolved check" in result
+        assert "only when framed through what they could change for the target venue" in result
+        assert "general market questions" in result
         assert "Do not omit evidence to make room for them" in result
         assert "Zołza closed" in result
         assert "Nam-Viet remains operational nearby" in result
