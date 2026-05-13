@@ -154,3 +154,4 @@ async def test_model_response_cloud_log_keeps_rich_diagnostics(tmp_path, monkeyp
     assert logged["function_calls"] == [
         {"name": "lookup_source", "args": {"url": "https://example.com/source"}}
     ]
+    assert "llm_response_dump" not in logged

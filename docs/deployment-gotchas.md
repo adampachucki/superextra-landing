@@ -8,6 +8,7 @@ The agent runtime is hosted as a Vertex AI Agent Engine Reasoning Engine. Browse
 - **`GEAR_REASONING_ENGINE_RESOURCE` is read by `agentStream` at request time.** Set in `functions/.env.superextra-site` (which the GHA workflow writes at deploy time). `gearHandoff()` throws if the env var is unset — no fallback constant.
 - **Calls FROM INSIDE the engine to Gemini are billed against the engine's tenant project**, not `superextra-site`. Cloud Monitoring metrics for `aiplatform.googleapis.com/generate_content_*` therefore return 0 at our project level even when gear runs are happening. Use the GCP Console → Billing UI for actual spend; see `scripts/cost_baseline.py` for the proxy queries.
 - **Filesystem inside the engine is read-only** except `/tmp`.
+- **Agent observability is enabled in the Agent Engine deploy script.** `agent/scripts/redeploy_engine.py` preserves/adds `GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY=true`, `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`, `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=EVENT_ONLY`, and `ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=false`. `EVENT_ONLY` intentionally captures full GenAI prompt/response content in official OTel telemetry for debugging; treat those traces/logs as sensitive production data.
 
 ## Firebase Functions deploy — env-vars REPLACE, not merge
 

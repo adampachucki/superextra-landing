@@ -30,7 +30,12 @@ RESOURCE_NAME = (
 GCS_DIR_NAME = "agent_engine_staging"
 LEGACY_ADC_ACCOUNT = "adam@finebite.co"
 TRACE_ENV_VARS = {
+    "ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS": "false",
     "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
+    # Capture GenAI prompt/response content in official OTel telemetry.
+    # This intentionally uses Agent Engine/ADK telemetry rather than a custom
+    # prompt sink so traces, logs, and model-call metadata stay correlated.
+    "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "EVENT_ONLY",
     "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
 }
 
@@ -94,11 +99,15 @@ def _pickle_smoke(app: object) -> int:
 
 
 _DEPLOYED_MARKER = ".deployed_commit"
-_RUNTIME_PATHS = ("agent/superextra_agent", "agent/requirements.txt")
+_RUNTIME_PATHS = (
+    "agent/superextra_agent",
+    "agent/requirements.txt",
+    "agent/scripts/redeploy_engine.py",
+)
 
 
 def _git_runtime_sha(cwd: Path) -> str | None:
-    """Latest commit touching the packaged Agent Engine runtime."""
+    """Latest commit touching Agent Engine runtime or deploy inputs."""
     try:
         out = subprocess.check_output(
             ["git", "log", "-n", "1", "--format=%H", "--", *_RUNTIME_PATHS],
@@ -112,7 +121,7 @@ def _git_runtime_sha(cwd: Path) -> str | None:
 
 
 def _git_dirty_runtime_paths(cwd: Path) -> list[str]:
-    """Lines from `git status --porcelain` for packaged runtime code only."""
+    """Lines from `git status --porcelain` for runtime/deploy inputs."""
     try:
         out = subprocess.check_output(
             ["git", "status", "--porcelain", "--", *_RUNTIME_PATHS],
@@ -125,7 +134,7 @@ def _git_dirty_runtime_paths(cwd: Path) -> list[str]:
 
 
 def _git_log_summary(cwd: Path, deployed: str, head: str) -> str:
-    """Runtime-path `git log --oneline deployed..head`, or empty on failure."""
+    """Runtime/deploy-path `git log --oneline deployed..head`, or empty."""
     try:
         out = subprocess.check_output(
             ["git", "log", "--oneline", f"{deployed}..{head}", "--", *_RUNTIME_PATHS],
@@ -274,9 +283,17 @@ def main() -> int:
         print("  deployed runtime sha: no marker (first deploy after marker added)")
 
     is_current = bool(runtime_sha and deployed_sha and runtime_sha == deployed_sha)
+    dirty = _git_dirty_runtime_paths(repo_root)
 
     # --check: print status + exit; non-zero iff stale relative to runtime commit
     if args.check:
+        if dirty:
+            print("\nStatus: ✗ DIRTY — runtime/deploy inputs have uncommitted changes")
+            for line in dirty[:10]:
+                print(f"  {line}")
+            if len(dirty) > 10:
+                print(f"  … ({len(dirty) - 10} more)")
+            return 1
         if not runtime_sha:
             return 0
         if not deployed_sha:
@@ -293,9 +310,8 @@ def main() -> int:
                 print(f"  {line}")
         return 1
 
-    dirty = _git_dirty_runtime_paths(repo_root)
     if dirty:
-        print("\nWARNING: packaged runtime has uncommitted changes:")
+        print("\nWARNING: runtime/deploy inputs have uncommitted changes:")
         for line in dirty[:10]:
             print(f"  {line}")
         if len(dirty) > 10:

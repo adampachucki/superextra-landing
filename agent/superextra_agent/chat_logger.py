@@ -264,12 +264,6 @@ class ChatLoggerPlugin(BasePlugin):
         if llm_response.error_code:
             entry["error_code"] = llm_response.error_code
             entry["error_message"] = llm_response.error_message
-            try:
-                entry["llm_response_dump"] = _safe(
-                    llm_response.model_dump(mode="json", exclude_none=True)
-                )
-            except Exception:
-                entry["llm_response_repr"] = repr(llm_response)[:2000]
 
         if llm_response.usage_metadata:
             entry["tokens"] = {
