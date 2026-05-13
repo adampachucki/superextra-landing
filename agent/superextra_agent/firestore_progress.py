@@ -537,18 +537,6 @@ class FirestoreProgressPlugin(BasePlugin):
         return None
 
     @override
-    async def before_agent_callback(self, *, agent, callback_context):
-        per = self._state_for_context(callback_context, allow_run_id_fallback=True)
-        if per is None:
-            return None
-        await self._write_active_stage(
-            per,
-            agent_name=getattr(agent, "name", None) or callback_context.agent_name,
-            invocation_id=callback_context.invocation_id,
-        )
-        return None
-
-    @override
     async def before_model_callback(self, *, callback_context, llm_request):
         per = self._state_for_context(callback_context, allow_run_id_fallback=True)
         if per is None:

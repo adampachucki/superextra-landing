@@ -41,6 +41,10 @@ def _tool_context(*, invocation_id: str = "inv-parent", call_id: str = "call-1")
     )
 
 
+def test_active_stage_updates_are_model_scoped():
+    assert "before_agent_callback" not in FirestoreProgressPlugin.__dict__
+
+
 @pytest.mark.asyncio
 async def test_before_model_writes_active_stage(monkeypatch):
     plugin, _state = _make_plugin_state()

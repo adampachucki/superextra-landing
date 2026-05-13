@@ -99,3 +99,58 @@ async def test_agenttool_child_model_callbacks_write_to_parent_session_log(
         "invocation_start",
         "model_request",
     ]
+
+
+@pytest.mark.asyncio
+async def test_model_response_cloud_log_keeps_rich_diagnostics(tmp_path, monkeypatch):
+    monkeypatch.setattr(chat_logger, "LOGS_DIR", tmp_path)
+    cloud_logs: list[tuple[str, dict]] = []
+
+    def _emit(event: str, **fields):
+        cloud_logs.append((event, fields))
+
+    monkeypatch.setattr(chat_logger, "emit_cloud_log", _emit)
+    plugin = ChatLoggerPlugin()
+
+    ctx = SimpleNamespace(
+        invocation_id="inv-parent",
+        agent_name="report_writer",
+        session=SimpleNamespace(id="se-parent", state={"runId": "run-1"}),
+    )
+    response = SimpleNamespace(
+        error_code=None,
+        error_message=None,
+        usage_metadata=SimpleNamespace(
+            prompt_token_count=100,
+            candidates_token_count=40,
+            total_token_count=140,
+        ),
+        finish_reason="STOP",
+        content=SimpleNamespace(
+            parts=[
+                SimpleNamespace(
+                    text="Detailed final report with venue-specific implications.",
+                    function_call=None,
+                ),
+                SimpleNamespace(
+                    text=None,
+                    function_call=SimpleNamespace(
+                        name="lookup_source",
+                        args={"url": "https://example.com/source"},
+                    ),
+                ),
+            ]
+        ),
+    )
+
+    await plugin.after_model_callback(callback_context=ctx, llm_response=response)
+
+    assert cloud_logs[0][0] == "model_response"
+    logged = cloud_logs[0][1]
+    assert logged["text_preview"] == (
+        "Detailed final report with venue-specific implications."
+    )
+    assert logged["tokens"] == {"prompt": 100, "candidates": 40, "total": 140}
+    assert logged["function_calls"] == [
+        {"name": "lookup_source", "args": {"url": "https://example.com/source"}}
+    ]
