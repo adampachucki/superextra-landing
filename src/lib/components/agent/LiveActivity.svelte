@@ -25,7 +25,7 @@
 	let idleLabel = $state<IdleLabel>(IDLE_LABELS[0]);
 
 	function idleLabelDelay() {
-		return 2000 + Math.random() * 2000;
+		return 5000 + Math.random() * 5000;
 	}
 
 	function nextIdleLabel(label: IdleLabel): IdleLabel {
