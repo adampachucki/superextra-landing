@@ -211,7 +211,11 @@ class TestMakeInstruction:
 
         assert "No Google Places data available." in result
 
-    def test_review_analyst_does_not_inherit_web_fetch_instructions(self):
+    def test_review_analyst_disclaims_web_fetch_tools(self):
+        """review_analyst is structured-tools only (TripAdvisor + Google
+        Reviews APIs). The universal specialist base mentions fetch_web_content,
+        so the body file must explicitly disclaim it to avoid confusing the
+        specialist into trying to call tools it doesn't have."""
         provider = _make_instruction("review_analyst")
 
         ctx = MockCtx(
@@ -227,8 +231,7 @@ class TestMakeInstruction:
         )
         result = provider(ctx)
 
-        assert "You do not have `google_search`" in result
-        assert "fetch_web_content" not in result
+        assert "You do not have `google_search` or page-fetch tools" in result
         assert "## Market Source Profiles" not in result
         assert "Pyszne.pl" not in result
         assert "ChIJtarget" in result

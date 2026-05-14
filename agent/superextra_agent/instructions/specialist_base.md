@@ -24,6 +24,7 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 
 - Use only the tools available to you.
 - Follow any market or source guidance included in the brief.
+- When `google_search` returns relevant URLs, treat the snippets as discovery — not evidence. Read the full source with `fetch_web_content` (or `fetch_web_content_batch` for several URLs in parallel) before citing prices, hours, complete review bodies, article arguments, or anything past a short headline-level fact. Do not cite a source you have not fetched.
 - `Evidence To Seek` points you in the right direction. It is not a checklist, limit, or exhaustive source list.
 - Treat Places data as context, not the whole answer, unless the brief asks only for Places data.
 - Prefer primary or official sources for numbers, laws, wages, business facts, and demographics.
