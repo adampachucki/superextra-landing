@@ -23,6 +23,13 @@ from google.adk.plugins.base_plugin import BasePlugin
 from google.adk.tools.base_tool import BaseTool
 
 from .cloud_logging import emit_cloud_log
+from .correlation import (
+    CorrelationFields,
+    annotate_current_span,
+    build_correlation,
+    is_nested_invocation,
+    run_id_from_context,
+)
 
 if TYPE_CHECKING:
     from google.adk.agents.invocation_context import InvocationContext
@@ -44,23 +51,15 @@ _CLOUD_EVENTS = {
     "model_request",
     "model_response",
     "model_error",
+    "tool_call",
+    "tool_result",
+    "tool_error",
+    "adk_event",
 }
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _is_nested_invocation(invocation_context: "InvocationContext") -> bool:
-    """True iff this invocation runs inside an `AgentTool`-spawned child
-    Runner. AgentTool constructs child runners with `InMemorySessionService`
-    (`agent_tool.py:233`); production parent invocations use a
-    Vertex/Firestore-backed session service.
-    """
-    from google.adk.sessions.in_memory_session_service import InMemorySessionService
-
-    svc = getattr(invocation_context, "session_service", None)
-    return isinstance(svc, InMemorySessionService)
 
 
 def _safe(obj: Any) -> Any:
@@ -106,6 +105,97 @@ def _serialize_content(content: types.Content | None) -> dict | None:
     return {"role": content.role, "parts": parts}
 
 
+def _summarize_tool_result(result: Any) -> dict[str, Any]:
+    safe = _safe(result)
+    if not isinstance(safe, dict):
+        return {"type": type(result).__name__}
+
+    summary: dict[str, Any] = {
+        "keys": sorted(str(k) for k in safe.keys())[:30],
+    }
+    status = safe.get("status")
+    if isinstance(status, str):
+        summary["status"] = status
+    for key in ("results", "reviews", "places", "sources"):
+        value = safe.get(key)
+        if isinstance(value, list):
+            summary[f"{key}_count"] = len(value)
+    for key in ("total_fetched", "fetched_reviews", "source_count"):
+        value = safe.get(key)
+        if isinstance(value, (int, float)):
+            summary[key] = value
+    return summary
+
+
+def _truncate(text: Any, limit: int = 500) -> str | None:
+    if text is None:
+        return None
+    value = str(text)
+    return value if len(value) <= limit else value[: limit - 3] + "..."
+
+
+def _cloud_payload(entry: dict[str, Any]) -> dict[str, Any]:
+    allowed = {
+        "ts",
+        "sid",
+        "adk_session_id",
+        "run_id",
+        "turn_idx",
+        "root_invocation_id",
+        "invocation_id",
+        "parent_invocation_id",
+        "user_id",
+        "agent",
+        "model",
+        "tool",
+        "call_id",
+        "duration_s",
+        "content_count",
+        "tokens",
+        "finish_reason",
+        "error_code",
+        "error_type",
+        "branch",
+        "event_id",
+        "is_final",
+        "state_delta_keys",
+        "part_types",
+        "result_summary",
+    }
+    payload = {k: v for k, v in entry.items() if k in allowed and v is not None}
+
+    if "tools" in entry:
+        tools = entry.get("tools") or []
+        payload["tool_def_count"] = len(tools) if isinstance(tools, list) else 0
+        payload["tool_defs"] = tools[:30] if isinstance(tools, list) else []
+
+    if "function_calls" in entry:
+        calls = entry.get("function_calls") or []
+        names: list[str] = []
+        if isinstance(calls, list):
+            for call in calls:
+                if isinstance(call, dict) and isinstance(call.get("name"), str):
+                    names.append(call["name"])
+                elif isinstance(call, str):
+                    names.append(call)
+        payload["function_call_count"] = len(names)
+        payload["function_call_names"] = names[:30]
+
+    args = entry.get("args")
+    if isinstance(args, dict):
+        payload["arg_keys"] = sorted(str(k) for k in args.keys())[:30]
+
+    if entry.get("text_preview") is not None:
+        payload["text_preview_chars"] = len(str(entry["text_preview"]))
+
+    if entry.get("error") is not None:
+        payload["error"] = _truncate(entry["error"])
+    if entry.get("error_message") is not None:
+        payload["error_message"] = _truncate(entry["error_message"])
+
+    return payload
+
+
 class ChatLoggerPlugin(BasePlugin):
     """Logs every chat event to per-session JSONL files in agent/logs/."""
 
@@ -115,140 +205,150 @@ class ChatLoggerPlugin(BasePlugin):
         # track model/tool call start times for duration logging
         self._model_starts: dict[str, float] = {}  # invocation_id -> time
         self._tool_starts: dict[str, float] = {}  # function_call_id -> time
-        self._parent_session_by_run_id: dict[str, str] = {}
+        self._root_by_run_id: dict[str, CorrelationFields] = {}
         self._run_id_by_root_invocation: dict[str, str] = {}
 
     def _log_file(self, session_id: str) -> Path:
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         return LOGS_DIR / f"{date}_{session_id}.jsonl"
 
-    def _write(self, session_id: str, entry: dict) -> None:
+    def _correlation_for_invocation(
+        self,
+        ctx: InvocationContext,
+        *,
+        agent: str | None = None,
+        tool: str | None = None,
+    ) -> CorrelationFields:
+        run_id = run_id_from_context(ctx)
+        root = self._root_by_run_id.get(run_id) if run_id else None
+        return build_correlation(ctx, root=root, agent=agent, tool=tool)
+
+    def _correlation_for_context(
+        self,
+        ctx: CallbackContext | ToolContext,
+        *,
+        agent: str | None = None,
+        tool: str | None = None,
+    ) -> CorrelationFields:
+        inv_ctx = getattr(ctx, "_invocation_context", None)
+        if inv_ctx is not None:
+            return self._correlation_for_invocation(inv_ctx, agent=agent, tool=tool)
+        return build_correlation(ctx, agent=agent, tool=tool)
+
+    def _write(self, correlation: CorrelationFields, entry: dict) -> None:
         entry.setdefault("ts", _now())
+        for key, value in correlation.as_log_fields().items():
+            entry.setdefault(key, value)
         if entry.get("event") in _CLOUD_EVENTS:
-            severity = "ERROR" if entry.get("event") == "model_error" else "INFO"
-            cloud_entry = {k: v for k, v in entry.items() if k != "event"}
+            severity = (
+                "ERROR"
+                if entry.get("event") in {"model_error", "tool_error"}
+                else "INFO"
+            )
+            annotate_current_span(correlation)
             emit_cloud_log(
-                str(entry["event"]),
-                severity=severity,
-                sid=session_id,
-                firestore_sid=session_id.removeprefix("se-"),
-                **cloud_entry,
+                str(entry["event"]), severity=severity, **_cloud_payload(entry)
             )
         try:
-            with self._log_file(session_id).open("a") as f:
+            with self._log_file(correlation.log_session_id()).open("a") as f:
                 f.write(json.dumps(entry, default=str, ensure_ascii=False) + "\n")
         except Exception:
             logger.exception("Failed to write chat log")
 
-    def _session_id(self, ctx: InvocationContext) -> str:
-        return self._session_id_for_invocation(ctx)
-
     def _run_id(self, ctx: InvocationContext) -> str | None:
-        state = getattr(getattr(ctx, "session", None), "state", None) or {}
-        run_id = state.get("runId") if isinstance(state, dict) else None
-        return run_id if isinstance(run_id, str) and run_id else None
-
-    def _session_id_for_invocation(self, ctx: InvocationContext) -> str:
-        if _is_nested_invocation(ctx):
-            run_id = self._run_id(ctx)
-            if run_id and run_id in self._parent_session_by_run_id:
-                return self._parent_session_by_run_id[run_id]
-        return ctx.session.id
-
-    def _session_id_for_context(self, ctx: CallbackContext | ToolContext) -> str:
-        invocation_context = getattr(ctx, "_invocation_context", None)
-        if invocation_context is not None:
-            return self._session_id_for_invocation(invocation_context)
-        return ctx.session.id
+        return run_id_from_context(ctx)
 
     # ── lifecycle ──
 
     @override
     async def before_run_callback(self, *, invocation_context: InvocationContext) -> types.Content | None:
-        if _is_nested_invocation(invocation_context):
+        if is_nested_invocation(invocation_context):
             # AgentTool child runner — parent invocation already logged
             # invocation_start. Avoid duplicate lifecycle markers.
             return None
-        sid = self._session_id(invocation_context)
+        correlation = self._correlation_for_invocation(invocation_context)
         run_id = self._run_id(invocation_context)
         if run_id:
-            self._parent_session_by_run_id[run_id] = sid
+            self._root_by_run_id[run_id] = correlation
             self._run_id_by_root_invocation[invocation_context.invocation_id] = run_id
-        self._write(sid, {
-            "event": "invocation_start",
-            "invocation_id": invocation_context.invocation_id,
-            "user_id": invocation_context.user_id,
-            "agent": getattr(invocation_context.agent, "name", None),
-        })
+        self._write(
+            correlation,
+            {
+                "event": "invocation_start",
+                "user_id": invocation_context.user_id,
+            },
+        )
         return None
 
     @override
     async def on_user_message_callback(self, *, invocation_context: InvocationContext, user_message: types.Content) -> types.Content | None:
-        sid = self._session_id(invocation_context)
-        self._write(sid, {
-            "event": "user_message",
-            "invocation_id": invocation_context.invocation_id,
-            "content": _serialize_content(user_message),
-        })
+        correlation = self._correlation_for_invocation(invocation_context)
+        self._write(
+            correlation,
+            {
+                "event": "user_message",
+                "content": _serialize_content(user_message),
+            },
+        )
         return None
 
     @override
     async def after_run_callback(self, *, invocation_context: InvocationContext) -> None:
-        if _is_nested_invocation(invocation_context):
+        if is_nested_invocation(invocation_context):
             return None
-        sid = self._session_id(invocation_context)
-        self._write(sid, {
-            "event": "invocation_end",
-            "invocation_id": invocation_context.invocation_id,
-        })
+        correlation = self._correlation_for_invocation(invocation_context)
+        self._write(correlation, {"event": "invocation_end"})
         run_id = self._run_id_by_root_invocation.pop(
             invocation_context.invocation_id, None
         )
         if run_id:
-            self._parent_session_by_run_id.pop(run_id, None)
+            self._root_by_run_id.pop(run_id, None)
 
     # ── agent ──
 
     @override
     async def before_agent_callback(self, *, agent: BaseAgent, callback_context: CallbackContext) -> types.Content | None:
-        sid = self._session_id_for_context(callback_context)
-        self._write(sid, {
-            "event": "agent_start",
-            "invocation_id": callback_context.invocation_id,
-            "agent": callback_context.agent_name,
-        })
+        correlation = self._correlation_for_context(
+            callback_context, agent=callback_context.agent_name
+        )
+        self._write(correlation, {"event": "agent_start"})
         return None
 
     @override
     async def after_agent_callback(self, *, agent: BaseAgent, callback_context: CallbackContext) -> types.Content | None:
-        sid = self._session_id_for_context(callback_context)
-        self._write(sid, {
-            "event": "agent_end",
-            "invocation_id": callback_context.invocation_id,
-            "agent": callback_context.agent_name,
-        })
+        correlation = self._correlation_for_context(
+            callback_context, agent=callback_context.agent_name
+        )
+        self._write(correlation, {"event": "agent_end"})
         return None
 
     # ── model ──
 
     @override
     async def before_model_callback(self, *, callback_context: CallbackContext, llm_request: LlmRequest) -> LlmResponse | None:
-        sid = self._session_id_for_context(callback_context)
+        correlation = self._correlation_for_context(
+            callback_context, agent=callback_context.agent_name
+        )
         inv = callback_context.invocation_id
         self._model_starts[inv] = time.monotonic()
-        self._write(sid, {
-            "event": "model_request",
-            "invocation_id": inv,
-            "agent": callback_context.agent_name,
-            "model": llm_request.model,
-            "content_count": len(llm_request.contents),
-            "tools": list(llm_request.tools_dict.keys()) if llm_request.tools_dict else [],
-        })
+        self._write(
+            correlation,
+            {
+                "event": "model_request",
+                "model": llm_request.model,
+                "content_count": len(llm_request.contents),
+                "tools": list(llm_request.tools_dict.keys())
+                if llm_request.tools_dict
+                else [],
+            },
+        )
         return None
 
     @override
     async def after_model_callback(self, *, callback_context: CallbackContext, llm_response: LlmResponse) -> LlmResponse | None:
-        sid = self._session_id_for_context(callback_context)
+        correlation = self._correlation_for_context(
+            callback_context, agent=callback_context.agent_name
+        )
         inv = callback_context.invocation_id
         duration = None
         if inv in self._model_starts:
@@ -256,8 +356,6 @@ class ChatLoggerPlugin(BasePlugin):
 
         entry: dict[str, Any] = {
             "event": "model_response",
-            "invocation_id": inv,
-            "agent": callback_context.agent_name,
             "duration_s": duration,
         }
 
@@ -294,27 +392,30 @@ class ChatLoggerPlugin(BasePlugin):
                     part_types.append("function_call")
             entry["part_types"] = part_types
 
-        self._write(sid, entry)
+        self._write(correlation, entry)
         return None
 
     @override
     async def on_model_error_callback(self, *, callback_context: CallbackContext, llm_request: LlmRequest, error: Exception) -> LlmResponse | None:
-        sid = self._session_id_for_context(callback_context)
+        correlation = self._correlation_for_context(
+            callback_context, agent=callback_context.agent_name
+        )
         inv = callback_context.invocation_id
         duration = None
         if inv in self._model_starts:
             duration = round(time.monotonic() - self._model_starts.pop(inv), 2)
 
-        self._write(sid, {
-            "event": "model_error",
-            "invocation_id": inv,
-            "agent": callback_context.agent_name,
-            "model": llm_request.model,
-            "duration_s": duration,
-            "error_type": type(error).__name__,
-            "error": str(error),
-            "traceback": traceback.format_exc(),
-        })
+        self._write(
+            correlation,
+            {
+                "event": "model_error",
+                "model": llm_request.model,
+                "duration_s": duration,
+                "error_type": type(error).__name__,
+                "error": str(error),
+                "traceback": traceback.format_exc(),
+            },
+        )
         return None
 
     # ── tools ──
@@ -323,15 +424,17 @@ class ChatLoggerPlugin(BasePlugin):
     async def before_tool_callback(self, *, tool: BaseTool, tool_args: dict[str, Any], tool_context: ToolContext) -> dict | None:
         call_id = tool_context.function_call_id or ""
         self._tool_starts[call_id] = time.monotonic()
-        sid = self._session_id_for_context(tool_context)
-        self._write(sid, {
-            "event": "tool_call",
-            "invocation_id": tool_context.invocation_id,
-            "agent": tool_context.agent_name,
-            "tool": tool.name,
-            "call_id": call_id,
-            "args": _safe(tool_args),
-        })
+        correlation = self._correlation_for_context(
+            tool_context, agent=tool_context.agent_name, tool=tool.name
+        )
+        self._write(
+            correlation,
+            {
+                "event": "tool_call",
+                "call_id": call_id,
+                "args": _safe(tool_args),
+            },
+        )
         return None
 
     @override
@@ -341,16 +444,19 @@ class ChatLoggerPlugin(BasePlugin):
         if call_id in self._tool_starts:
             duration = round(time.monotonic() - self._tool_starts.pop(call_id), 2)
 
-        sid = self._session_id_for_context(tool_context)
-        self._write(sid, {
-            "event": "tool_result",
-            "invocation_id": tool_context.invocation_id,
-            "agent": tool_context.agent_name,
-            "tool": tool.name,
-            "call_id": call_id,
-            "duration_s": duration,
-            "result_preview": str(_safe(result))[:1000],
-        })
+        correlation = self._correlation_for_context(
+            tool_context, agent=tool_context.agent_name, tool=tool.name
+        )
+        self._write(
+            correlation,
+            {
+                "event": "tool_result",
+                "call_id": call_id,
+                "duration_s": duration,
+                "result_summary": _summarize_tool_result(result),
+                "result_preview": str(_safe(result))[:1000],
+            },
+        )
         return None
 
     @override
@@ -360,31 +466,33 @@ class ChatLoggerPlugin(BasePlugin):
         if call_id in self._tool_starts:
             duration = round(time.monotonic() - self._tool_starts.pop(call_id), 2)
 
-        sid = self._session_id_for_context(tool_context)
-        self._write(sid, {
-            "event": "tool_error",
-            "invocation_id": tool_context.invocation_id,
-            "agent": tool_context.agent_name,
-            "tool": tool.name,
-            "call_id": call_id,
-            "duration_s": duration,
-            "args": _safe(tool_args),
-            "error_type": type(error).__name__,
-            "error": str(error),
-            "traceback": traceback.format_exc(),
-        })
+        correlation = self._correlation_for_context(
+            tool_context, agent=tool_context.agent_name, tool=tool.name
+        )
+        self._write(
+            correlation,
+            {
+                "event": "tool_error",
+                "call_id": call_id,
+                "duration_s": duration,
+                "args": _safe(tool_args),
+                "error_type": type(error).__name__,
+                "error": str(error),
+                "traceback": traceback.format_exc(),
+            },
+        )
         return None
 
     # ── events ──
 
     @override
     async def on_event_callback(self, *, invocation_context: InvocationContext, event: Event) -> Event | None:
-        sid = self._session_id(invocation_context)
+        correlation = self._correlation_for_invocation(
+            invocation_context, agent=event.author
+        )
         entry: dict[str, Any] = {
             "event": "adk_event",
-            "invocation_id": invocation_context.invocation_id,
             "event_id": event.id,
-            "author": event.author,
             "branch": event.branch,
             "is_final": event.is_final_response(),
         }
@@ -410,5 +518,5 @@ class ChatLoggerPlugin(BasePlugin):
         if event.actions and event.actions.state_delta:
             entry["state_delta_keys"] = list(event.actions.state_delta.keys())
 
-        self._write(sid, entry)
+        self._write(correlation, entry)
         return None

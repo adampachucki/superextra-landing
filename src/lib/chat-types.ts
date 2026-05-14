@@ -22,6 +22,22 @@ export interface TurnSummary {
 	startedAtMs: number;
 	finishedAtMs: number;
 	elapsedMs: number;
+	diagnostics?: {
+		timelineEvents: number;
+		thoughts: number;
+		details: number;
+		warnings: number;
+		modelCalls: number;
+		toolCalls: number;
+		toolResults: number;
+		toolErrors: number;
+		sourceCount: number;
+		agents: string[];
+		models: string[];
+		tools: string[];
+		msToFirstEvent?: number;
+		msToFirstThought?: number;
+	};
 }
 
 export type TimelineEvent =

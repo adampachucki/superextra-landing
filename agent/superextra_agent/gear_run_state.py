@@ -133,6 +133,7 @@ class GearRunState:
             event
         ):
             return None
+        self.timeline_builder.record_timeline_event(event)
         return await self.timeline_writer.write_timeline(event)
 
     def _merge_source(self, entry: Any) -> None:
@@ -240,7 +241,9 @@ class GearRunState:
             "status": "complete",
             "reply": self.final_reply,
             "sources": self.final_sources,
-            "turnSummary": self.timeline_builder.build_summary(),
+            "turnSummary": self.timeline_builder.build_summary(
+                source_count=len(self.final_sources)
+            ),
             "completedAt": firestore.SERVER_TIMESTAMP,
         }
         return session_update, turn_update, "complete"

@@ -25,6 +25,7 @@ def _make_plugin_state() -> tuple[FirestoreProgressPlugin, GearRunState]:
     )
     state.timeline_writer.write_timeline = AsyncMock(return_value=None)
     plugin._states["inv-parent"] = state
+    plugin._states_by_run_id["run-test"] = state
     return plugin, state
 
 
@@ -49,11 +50,16 @@ def test_active_stage_updates_are_model_scoped():
 async def test_before_model_writes_active_stage(monkeypatch):
     plugin, _state = _make_plugin_state()
     updates: list[dict] = []
+    cloud_logs: list[tuple[str, dict]] = []
 
     async def _fenced(_fs, _state, update):
         updates.append(update)
 
+    def _emit(event: str, **fields):
+        cloud_logs.append((event, fields))
+
     monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
+    monkeypatch.setattr(firestore_progress, "emit_cloud_log", _emit)
 
     callback_context = SimpleNamespace(
         invocation_id="inv-parent",
@@ -76,6 +82,44 @@ async def test_before_model_writes_active_stage(monkeypatch):
             "activeInvocationId": "inv-parent",
         }
     ]
+    assert cloud_logs[0][0] == "active_stage"
+    assert cloud_logs[0][1]["sid"] == "sid-test"
+    assert cloud_logs[0][1]["run_id"] == "run-test"
+    assert cloud_logs[0][1]["turn_idx"] == 1
+    assert cloud_logs[0][1]["root_invocation_id"] == "inv-parent"
+    assert cloud_logs[0][1]["invocation_id"] == "inv-parent"
+
+
+@pytest.mark.asyncio
+async def test_after_run_finalize_logs_use_shared_correlation(monkeypatch):
+    plugin, state = _make_plugin_state()
+    state.final_reply = "Final answer"
+    cloud_logs: list[tuple[str, dict]] = []
+
+    async def _fenced(_fs, _state, _session_update, _turn_update):
+        return None
+
+    def _emit(event: str, **fields):
+        cloud_logs.append((event, fields))
+
+    monkeypatch.setattr(firestore_progress, "fenced_session_and_turn_update", _fenced)
+    monkeypatch.setattr(firestore_progress, "emit_cloud_log", _emit)
+
+    await plugin.after_run_callback(
+        invocation_context=SimpleNamespace(
+            invocation_id="inv-parent",
+            session_service=object(),
+        )
+    )
+
+    emitted = {event: fields for event, fields in cloud_logs}
+    assert emitted["finalize_start"]["sid"] == "sid-test"
+    assert emitted["finalize_start"]["run_id"] == "run-test"
+    assert emitted["finalize_start"]["turn_idx"] == 1
+    assert emitted["finalize_start"]["root_invocation_id"] == "inv-parent"
+    assert emitted["finalize_start"]["invocation_id"] == "inv-parent"
+    assert emitted["finalize_success"]["root_invocation_id"] == "inv-parent"
+    assert emitted["finalize_success"]["invocation_id"] == "inv-parent"
 
 
 @pytest.mark.asyncio

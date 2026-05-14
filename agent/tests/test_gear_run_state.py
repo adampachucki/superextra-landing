@@ -143,6 +143,21 @@ async def test_finalize_real_reply_returns_complete_payload():
     state.final_reply = "Here's the answer: ..."
     state.final_sources = [{"url": "https://example.com", "title": "Example"}]
     state.timeline_writer.write_timeline = AsyncMock(return_value=None)
+    state.timeline_builder.record_model_call(
+        agent="report_writer", model="gemini-test"
+    )
+    state.timeline_builder.record_tool_call(
+        agent="review_analyst", tool="get_google_reviews"
+    )
+    state.timeline_builder.record_tool_result()
+    await state.observe_typed_pill(
+        {
+            "kind": "thought",
+            "id": "thought-1",
+            "author": "review_analyst",
+            "text": "Reading reviews",
+        }
+    )
 
     session_update, turn_update, status = await state.finalize()
     assert status == "complete"
@@ -152,6 +167,16 @@ async def test_finalize_real_reply_returns_complete_payload():
     assert turn_update["sources"] == state.final_sources
     assert "turnSummary" in turn_update
     assert "notes" not in turn_update["turnSummary"]
+    diagnostics = turn_update["turnSummary"]["diagnostics"]
+    assert diagnostics["sourceCount"] == 1
+    assert diagnostics["modelCalls"] == 1
+    assert diagnostics["toolCalls"] == 1
+    assert diagnostics["toolResults"] == 1
+    assert diagnostics["thoughts"] == 1
+    assert diagnostics["agents"] == ["report_writer", "review_analyst"]
+    assert diagnostics["models"] == ["gemini-test"]
+    assert diagnostics["tools"] == ["get_google_reviews"]
+    assert diagnostics["msToFirstThought"] >= 0
     assert "completedAt" in turn_update
 
 

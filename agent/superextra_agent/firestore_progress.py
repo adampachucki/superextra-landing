@@ -43,6 +43,14 @@ from google.genai import types
 from typing_extensions import override
 
 from .cloud_logging import emit_cloud_log
+from .correlation import (
+    annotate_current_span,
+    build_run_correlation,
+    is_nested_invocation,
+    normalize_firestore_sid,
+    run_id_from_context,
+    turn_idx_from_context,
+)
 from .firestore_events import map_tool_call, map_tool_error, map_tool_result
 from .gear_run_state import GearRunState
 from .notes import _generate_title
@@ -277,24 +285,6 @@ async def _heartbeat_loop(fs: firestore.Client, state: GearRunState) -> None:
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
-def _is_nested_invocation(invocation_context: InvocationContext) -> bool:
-    """True iff this invocation runs inside an `AgentTool`-spawned child
-    Runner.
-
-    `InvocationContext` has no first-class parent pointer (verified
-    against `agent/.venv/lib/python3.12/site-packages/google/adk/agents/invocation_context.py`),
-    so we discriminate by the session_service type. AgentTool's
-    `run_async` constructs the child Runner with a fresh
-    `InMemorySessionService` (`agent_tool.py:233`); top-level production
-    invocations come from agentStream which wires a Vertex AI session
-    service. Anything in-memory at run time is a nested AgentTool call.
-    """
-    from google.adk.sessions.in_memory_session_service import InMemorySessionService
-
-    svc = getattr(invocation_context, "session_service", None)
-    return isinstance(svc, InMemorySessionService)
-
-
 def _halt_content(reason: str) -> types.Content:
     """`before_run_callback` returning a ``types.Content`` triggers ADK's
     early-exit branch at ``runners.py:819``. Returning anything else
@@ -331,9 +321,8 @@ def _build_state(
     if session is None:
         log.error("plugin invoked without a session — cannot build state")
         return None
-    state_dict = (getattr(session, "state", None) or {}) if session else {}
-    run_id = state_dict.get("runId")
-    turn_idx = state_dict.get("turnIdx")
+    run_id = run_id_from_context(invocation_context)
+    turn_idx = turn_idx_from_context(invocation_context)
     if not isinstance(run_id, str) or not run_id:
         log.error("session.state missing runId; cannot build GearRunState")
         return None
@@ -344,10 +333,7 @@ def _build_state(
     # ADK creates the session under id `se-{sid}` (plan §"Verified-not-working":
     # sessionId regex disallows underscores, so agentStream prepends `se-`).
     # Strip the prefix to recover the Firestore session id.
-    if sid.startswith("se-"):
-        firestore_sid = sid[len("se-") :]
-    else:
-        firestore_sid = sid
+    firestore_sid = normalize_firestore_sid(sid) or sid
     user_id = getattr(invocation_context, "user_id", None) or ""
     return GearRunState(
         sid=firestore_sid,
@@ -372,6 +358,7 @@ class FirestoreProgressPlugin(BasePlugin):
         self._project = project
         self._fs: firestore.Client | None = None
         self._states: dict[str, GearRunState] = {}
+        self._states_by_run_id: dict[str, GearRunState] = {}
 
     def _client(self) -> firestore.Client:
         # Lazy-init inside the request context so per-request creds resolve
@@ -391,16 +378,10 @@ class FirestoreProgressPlugin(BasePlugin):
         if not allow_run_id_fallback:
             return None
 
-        session = getattr(context, "session", None)
-        state_dict = (getattr(session, "state", None) or {}) if session else {}
-        run_id = state_dict.get("runId")
+        run_id = run_id_from_context(context)
         if not isinstance(run_id, str) or not run_id:
             return None
-
-        return next(
-            (state for state in self._states.values() if state.run_id == run_id),
-            None,
-        )
+        return self._states_by_run_id.get(run_id)
 
     async def _observe_typed_pill(
         self, per: GearRunState, pill: dict[str, Any]
@@ -438,6 +419,11 @@ class FirestoreProgressPlugin(BasePlugin):
         model: str | None = None,
         invocation_id: str | None = None,
     ) -> None:
+        per.timeline_builder.record_model_call(agent=agent_name, model=model)
+        corr = build_run_correlation(
+            per, invocation_id=invocation_id, agent=agent_name
+        )
+        annotate_current_span(corr)
         update: dict[str, Any] = {
             "activeAgent": agent_name or "unknown",
             "activeStage": stage or self._stage_for_agent(agent_name),
@@ -452,13 +438,9 @@ class FirestoreProgressPlugin(BasePlugin):
 
         emit_cloud_log(
             "active_stage",
-            sid=per.sid,
-            run_id=per.run_id,
-            turn_idx=per.turn_idx,
-            agent=agent_name,
+            **corr.as_log_fields(),
             stage=update["activeStage"],
             model=model,
-            invocation_id=invocation_id,
         )
 
         try:
@@ -474,7 +456,7 @@ class FirestoreProgressPlugin(BasePlugin):
 
     @override
     async def before_run_callback(self, *, invocation_context: InvocationContext):
-        if _is_nested_invocation(invocation_context):
+        if is_nested_invocation(invocation_context):
             # AgentTool spawns a child Runner with its own InMemorySessionService
             # for each tool call. The parent invocation already owns the
             # Firestore session lifecycle (claim, heartbeat, terminal write);
@@ -528,6 +510,7 @@ class FirestoreProgressPlugin(BasePlugin):
             state.title_task = asyncio.create_task(_generate_title(state.query_text))
 
         self._states[invocation_context.invocation_id] = state
+        self._states_by_run_id[state.run_id] = state
         state.heartbeat_task = asyncio.create_task(_heartbeat_loop(fs, state))
         asyncio.create_task(write_run_started_event(state))
         # Yield once so the best-effort run-start task can enter its first
@@ -554,6 +537,10 @@ class FirestoreProgressPlugin(BasePlugin):
         per = self._state_for_context(tool_context, allow_run_id_fallback=True)
         if per is None:
             return None
+        per.timeline_builder.record_tool_call(
+            agent=getattr(tool_context, "agent_name", None),
+            tool=tool.name,
+        )
         pill = map_tool_call(
             tool.name,
             tool_args,
@@ -571,6 +558,7 @@ class FirestoreProgressPlugin(BasePlugin):
         per = self._state_for_context(tool_context, allow_run_id_fallback=True)
         if per is None:
             return None
+        per.timeline_builder.record_tool_result(error=False)
         for pill in map_tool_result(
             tool.name,
             result if isinstance(result, dict) else {},
@@ -585,6 +573,7 @@ class FirestoreProgressPlugin(BasePlugin):
         per = self._state_for_context(tool_context, allow_run_id_fallback=True)
         if per is None:
             return None
+        per.timeline_builder.record_tool_result(error=True)
         for pill in map_tool_error(
             tool.name,
             tool_args,
@@ -600,7 +589,7 @@ class FirestoreProgressPlugin(BasePlugin):
     ):
         per = self._state_for_context(
             invocation_context,
-            allow_run_id_fallback=_is_nested_invocation(invocation_context),
+            allow_run_id_fallback=is_nested_invocation(invocation_context),
         )
         if per is None:
             # Plugin saw an event for an invocation that wasn't claimed —
@@ -642,6 +631,7 @@ class FirestoreProgressPlugin(BasePlugin):
         # lock so concurrent writers don't interleave.
         for ev in timeline_events:
             try:
+                per.timeline_builder.record_timeline_event(ev)
                 await per.timeline_writer.write_timeline(ev)
             except Exception:  # noqa: BLE001
                 log.exception(
@@ -671,12 +661,14 @@ class FirestoreProgressPlugin(BasePlugin):
 
     @override
     async def after_run_callback(self, *, invocation_context: InvocationContext):
-        if _is_nested_invocation(invocation_context):
+        if is_nested_invocation(invocation_context):
             # Nested invocation (AgentTool child) — parent owns lifecycle.
             return None
         per = self._states.pop(invocation_context.invocation_id, None)
         if per is None:
             return None
+        self._states_by_run_id.pop(per.run_id, None)
+        corr = build_run_correlation(per)
 
         # Order matters:
         #   1. stop_heartbeat — late ticks can't clobber the terminal write
@@ -686,11 +678,10 @@ class FirestoreProgressPlugin(BasePlugin):
         #      Firestore errors (the answer is in process memory only;
         #      losing it on a retry-exhausted blip is unrecoverable).
         await per.stop_heartbeat()
+        annotate_current_span(corr)
         emit_cloud_log(
             "finalize_start",
-            sid=per.sid,
-            run_id=per.run_id,
-            turn_idx=per.turn_idx,
+            **corr.as_log_fields(),
             has_final_reply=bool(per.final_reply),
         )
         try:
@@ -754,9 +745,7 @@ class FirestoreProgressPlugin(BasePlugin):
             )
             emit_cloud_log(
                 "finalize_success",
-                sid=per.sid,
-                run_id=per.run_id,
-                turn_idx=per.turn_idx,
+                **corr.as_log_fields(),
                 status=session_update.get("status"),
                 reply_len=len(per.final_reply or ""),
             )
