@@ -147,6 +147,7 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "get_google_reviews": "Google reviews",
     "google_search": "Google search",
     "fetch_web_content": "page fetch",
+    "fetch_web_content_batch": "batch page fetch",
 }
 _PROVIDER_TOOL_LABELS: dict[str, str] = {
     "google:search": "Google search",
@@ -283,6 +284,14 @@ def map_tool_call(
         if url:
             return _detail(row_id, "source", "Public sources", _short_url(url))
         return None
+    if name == "fetch_web_content_batch":
+        urls = args.get("urls") or []
+        if isinstance(urls, list) and urls:
+            label = ", ".join(_short_url(str(u)) for u in urls[:3])
+            if len(urls) > 3:
+                label += f" (+{len(urls) - 3} more)"
+            return _detail(row_id, "source", "Public sources", label)
+        return None
     if name == "search_restaurants":
         query = _normalize_space(str(args.get("query") or "")).strip()
         if query:
@@ -402,6 +411,22 @@ def map_tool_result(
 
     if name == "fetch_web_content" and status == "error":
         return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
+
+    if name == "fetch_web_content_batch":
+        if status == "error":
+            return [_detail(row_id, "warning", "Warnings", "Batch source fetch failed")]
+        results = response.get("results") if isinstance(response, dict) else None
+        if isinstance(results, list):
+            failed = sum(1 for r in results if isinstance(r, dict) and r.get("status") == "error")
+            if failed:
+                return [
+                    _detail(
+                        row_id,
+                        "warning",
+                        "Warnings",
+                        f"{failed}/{len(results)} sources failed",
+                    )
+                ]
 
     return []
 

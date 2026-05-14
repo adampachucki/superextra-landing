@@ -4,6 +4,7 @@ import os
 os.environ.setdefault("GOOGLE_PLACES_API_KEY", "test-key")
 os.environ.setdefault("APIFY_TOKEN", "test-key")
 os.environ.setdefault("SERPAPI_API_KEY", "test-key")
+os.environ.setdefault("JINA_API_KEY", "test-key")
 os.environ.setdefault("GEMINI_VERSION", "3.1")
 
 import pytest
