@@ -172,158 +172,156 @@
 </script>
 
 <div bind:this={scrollEl} class="px-5 py-6 md:px-6">
-	<div bind:this={contentEl} class="mx-auto flex max-w-[700px] flex-col gap-5">
+	<div bind:this={contentEl} class="flex flex-col gap-5">
 		{#each chatState.messages as msg, i (`${chatState.activeSid ?? 'local'}:${msg.turnIndex}:${msg.role}`)}
-			<div
-				class="flex {msg.role === 'user' ? 'scroll-mt-6 justify-end' : 'justify-start'}"
-				data-user-turn={msg.role === 'user' ? msg.turnIndex : undefined}
-			>
-				{#if msg.role === 'user'}
+			{#if msg.role === 'user'}
+				<div
+					class="mx-auto flex w-full max-w-[700px] scroll-mt-6 justify-end"
+					data-user-turn={msg.turnIndex}
+				>
 					<div
 						class="max-w-[85%] rounded-2xl rounded-br-md bg-cream-100 px-4 py-3 text-[15px] leading-relaxed text-black dark:text-white"
 					>
 						{msg.text}
 					</div>
-				{:else}
-					<div class="max-w-[95%] min-w-0 px-1 py-1">
-						<div
-							class="chat-markdown prose max-w-none min-w-0 text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
-							use:finalAnswerReveal={msg.animateReveal
-								? () => chatState.markReplyRevealed(msg.turnIndex)
-								: undefined}
+				</div>
+			{:else}
+				<div class="assistant-row min-w-0 px-1 py-1">
+					<div
+						class="chat-markdown prose max-w-none min-w-0 text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
+						use:finalAnswerReveal={msg.animateReveal
+							? () => chatState.markReplyRevealed(msg.turnIndex)
+							: undefined}
+					>
+						{#each splitChartSegments(msg.text) as seg, segIdx (segIdx)}
+							{#if seg.kind === 'chart'}
+								<ChartBlock spec={seg.spec} />
+							{:else}
+								{@html renderMarkdown(seg.text)}
+							{/if}
+						{/each}
+					</div>
+					<div class="mt-2 flex max-w-[700px] justify-end">
+						<button
+							onclick={() => tts.play(i, msg.text)}
+							disabled={tts.loading === i}
+							class="group inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] transition-colors {tts.loading ===
+								i || tts.playingIndex === i
+								? 'border-black/15 bg-black/[0.03] text-black/70 hover:border-black/25 hover:bg-black/[0.06] hover:text-black/90 dark:border-white/15 dark:bg-white/[0.03] dark:text-white/70 dark:hover:border-white/25 dark:hover:bg-white/[0.06] dark:hover:text-white/90'
+								: 'border-black/5 text-black/40 hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60'}"
 						>
-							{#each splitChartSegments(msg.text) as seg, segIdx (segIdx)}
-								{#if seg.kind === 'chart'}
-									<ChartBlock spec={seg.spec} />
-								{:else}
-									{@html renderMarkdown(seg.text)}
-								{/if}
-							{/each}
-						</div>
-						<div class="mt-2 flex justify-end">
-							<button
-								onclick={() => tts.play(i, msg.text)}
-								disabled={tts.loading === i}
-								class="group inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] transition-colors {tts.loading ===
-									i || tts.playingIndex === i
-									? 'border-black/15 bg-black/[0.03] text-black/70 hover:border-black/25 hover:bg-black/[0.06] hover:text-black/90 dark:border-white/15 dark:bg-white/[0.03] dark:text-white/70 dark:hover:border-white/25 dark:hover:bg-white/[0.06] dark:hover:text-white/90'
-									: 'border-black/5 text-black/40 hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60'}"
-							>
-								{#if tts.loading === i}
-									<svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-										<circle
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											stroke-width="2"
-											opacity="0.25"
-										/>
-										<path
-											d="M4 12a8 8 0 018-8"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-										/>
-									</svg>
-									<span>Loading…</span>
-								{:else if tts.playingIndex === i}
-									<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
-										<rect x="6" y="5" width="4" height="14" rx="1" />
-										<rect x="14" y="5" width="4" height="14" rx="1" />
-									</svg>
-									<span>Stop</span>
-								{:else}
-									<svg
-										class="h-3.5 w-3.5"
-										viewBox="0 0 24 24"
-										fill="none"
+							{#if tts.loading === i}
+								<svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+									<circle
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="2"
+										opacity="0.25"
+									/>
+									<path
+										d="M4 12a8 8 0 018-8"
 										stroke="currentColor"
 										stroke-width="2"
 										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-										<path d="M15.54 8.46a5 5 0 010 7.07" />
-										<path d="M19.07 4.93a10 10 0 010 14.14" />
-									</svg>
-									<span>Read aloud</span>
-								{/if}
-							</button>
-						</div>
-
-						{#if msg.turnSummary && thoughtCount(msg.activityEvents) >= ACTIVITY_THOUGHT_MIN}
-							<div class="mt-4">
-								<LiveActivity
-									events={msg.activityEvents ?? []}
-									elapsedMs={msg.turnSummary.elapsedMs}
-									completed
-								/>
-							</div>
-						{/if}
-
-						{#if msg.sources && msg.sources.length >= SOURCE_COUNT_MIN}
-							{@const showAll = expandedSources[msg.turnIndex]}
-							{@const visible = showAll ? msg.sources : msg.sources.slice(0, SOURCES_LIMIT)}
-							<div class="mt-5">
-								<span class="mb-2 block text-[12px] font-medium text-black/40 dark:text-white/40"
-									>Sources ({msg.sources.length})</span
+									/>
+								</svg>
+								<span>Loading…</span>
+							{:else if tts.playingIndex === i}
+								<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+									<rect x="6" y="5" width="4" height="14" rx="1" />
+									<rect x="14" y="5" width="4" height="14" rx="1" />
+								</svg>
+								<span>Stop</span>
+							{:else}
+								<svg
+									class="h-3.5 w-3.5"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
 								>
-								<div class="flex flex-wrap gap-1.5">
-									{#each visible as src (`${src.url}:${src.title}`)}
-										{@const domain = sourceDomain(src.url, src.domain)}
-										{@const label = src.provider
-											? PROVIDER_LABELS[src.provider]
-											: domain || src.title}
-										<a
-											href={src.url}
-											target="_blank"
-											rel="noopener noreferrer"
-											class="group inline-flex items-center gap-1.5 rounded-full border border-black/5 px-2.5 py-1 no-underline transition-colors hover:border-black/10 hover:bg-black/[0.02] dark:border-white/5 dark:hover:border-white/10 dark:hover:bg-white/[0.02]"
-										>
-											<SourceFavicon {domain} {label} />
-											<span
-												class="text-[12px] leading-snug text-black/50 transition-colors group-hover:text-black/70 dark:text-white/50 dark:group-hover:text-white/70"
-											>
-												{label}
-											</span>
-										</a>
-									{/each}
-									{#if msg.sources.length > SOURCES_LIMIT && !showAll}
-										<button
-											onclick={() => {
-												expandedSources[msg.turnIndex] = true;
-											}}
-											class="inline-flex items-center rounded-full border border-black/5 px-2.5 py-1 text-[12px] leading-snug text-black/40 transition-colors hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60"
-										>
-											+{msg.sources.length - SOURCES_LIMIT} more
-										</button>
-									{/if}
-								</div>
-							</div>
-						{/if}
+									<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+									<path d="M15.54 8.46a5 5 0 010 7.07" />
+									<path d="M19.07 4.93a10 10 0 010 14.14" />
+								</svg>
+								<span>Read aloud</span>
+							{/if}
+						</button>
 					</div>
-				{/if}
-			</div>
+
+					{#if msg.turnSummary && thoughtCount(msg.activityEvents) >= ACTIVITY_THOUGHT_MIN}
+						<div class="mt-4 max-w-[700px]">
+							<LiveActivity
+								events={msg.activityEvents ?? []}
+								elapsedMs={msg.turnSummary.elapsedMs}
+								completed
+							/>
+						</div>
+					{/if}
+
+					{#if msg.sources && msg.sources.length >= SOURCE_COUNT_MIN}
+						{@const showAll = expandedSources[msg.turnIndex]}
+						{@const visible = showAll ? msg.sources : msg.sources.slice(0, SOURCES_LIMIT)}
+						<div class="mt-5 max-w-[700px]">
+							<span class="mb-2 block text-[12px] font-medium text-black/40 dark:text-white/40"
+								>Sources ({msg.sources.length})</span
+							>
+							<div class="flex flex-wrap gap-1.5">
+								{#each visible as src (`${src.url}:${src.title}`)}
+									{@const domain = sourceDomain(src.url, src.domain)}
+									{@const label = src.provider
+										? PROVIDER_LABELS[src.provider]
+										: domain || src.title}
+									<a
+										href={src.url}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="group inline-flex items-center gap-1.5 rounded-full border border-black/5 px-2.5 py-1 no-underline transition-colors hover:border-black/10 hover:bg-black/[0.02] dark:border-white/5 dark:hover:border-white/10 dark:hover:bg-white/[0.02]"
+									>
+										<SourceFavicon {domain} {label} />
+										<span
+											class="text-[12px] leading-snug text-black/50 transition-colors group-hover:text-black/70 dark:text-white/50 dark:group-hover:text-white/70"
+										>
+											{label}
+										</span>
+									</a>
+								{/each}
+								{#if msg.sources.length > SOURCES_LIMIT && !showAll}
+									<button
+										onclick={() => {
+											expandedSources[msg.turnIndex] = true;
+										}}
+										class="inline-flex items-center rounded-full border border-black/5 px-2.5 py-1 text-[12px] leading-snug text-black/40 transition-colors hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60"
+									>
+										+{msg.sources.length - SOURCES_LIMIT} more
+									</button>
+								{/if}
+							</div>
+						</div>
+					{/if}
+				</div>
+			{/if}
 		{/each}
 
 		{#if chatState.loading}
-			<div class="flex justify-start">
-				<div class="max-w-[95%] px-1 py-1">
-					<LiveActivity
-						events={chatState.liveTimeline}
-						startedAtMs={chatState.currentTurnStartedAtMs}
-					/>
-				</div>
+			<div class="assistant-row max-w-[700px] min-w-0 px-1 py-1">
+				<LiveActivity
+					events={chatState.liveTimeline}
+					startedAtMs={chatState.currentTurnStartedAtMs}
+				/>
 			</div>
 		{/if}
 
 		{#if chatState.error}
 			{@const isTimeout = chatState.error === 'timeout'}
 			{@const message = errorMessage(chatState.error)}
-			<div class="flex justify-start">
+			<div class="assistant-row max-w-[700px]">
 				<div
-					class="flex items-center gap-3 rounded-2xl border px-5 py-3 {isTimeout
+					class="inline-flex items-center gap-3 rounded-2xl border px-5 py-3 {isTimeout
 						? 'border-amber-200/50 bg-amber-50/50 dark:border-amber-400/20 dark:bg-amber-900/10'
 						: 'border-red-200/50 bg-red-50/50 dark:border-red-400/20 dark:bg-red-900/10'}"
 				>
@@ -346,9 +344,33 @@
 		scroll-margin-bottom: calc(var(--chat-prompt-height, 8rem) + 1rem);
 	}
 
+	/* Each assistant message row's left edge sits where a centered
+	 * 700px column would start in the available space, so text aligns
+	 * with the user-message column. The row has no right max — its
+	 * right edge follows the parent's right padding, giving tables
+	 * room to extend rightward without negative margins. */
+	.assistant-row {
+		margin-left: max(0px, calc((100% - 700px) / 2));
+		margin-right: 0;
+	}
+
+	/* Text-level prose children stay at reading width; tables (and any
+	 * other intentionally-wide block) take the row's full width. */
+	:global(.chat-markdown > p),
+	:global(.chat-markdown > ul),
+	:global(.chat-markdown > ol),
+	:global(.chat-markdown > h1),
+	:global(.chat-markdown > h2),
+	:global(.chat-markdown > h3),
+	:global(.chat-markdown > h4),
+	:global(.chat-markdown > h5),
+	:global(.chat-markdown > h6),
+	:global(.chat-markdown > blockquote),
+	:global(.chat-markdown > pre) {
+		max-width: 700px;
+	}
+
 	:global(.chat-markdown .markdown-table-scroll) {
-		width: 100%;
-		max-width: 100%;
 		margin: 2em 0;
 		overflow-x: auto;
 		-webkit-overflow-scrolling: touch;
@@ -361,14 +383,25 @@
 		table-layout: auto;
 	}
 
+	/* `overflow-wrap: break-word` (not `anywhere`) preserves each
+	 * column's natural minimum width (longest word), so short label
+	 * columns don't collapse to 1ch while the wordy column hoards
+	 * space. */
 	:global(.chat-markdown .markdown-table-scroll th),
 	:global(.chat-markdown .markdown-table-scroll td) {
 		white-space: normal;
-		overflow-wrap: anywhere;
+		overflow-wrap: break-word;
 		word-break: normal;
 	}
 
+	/* Mobile: let the table touch the right viewport edge (past the
+	 * page's px-5 padding + the assistant-row's px-1), and force a
+	 * minimum width so 4+ column tables aren't crammed into a narrow
+	 * viewport. */
 	@media (max-width: 640px) {
+		:global(.chat-markdown .markdown-table-scroll) {
+			margin-right: -1.5rem;
+		}
 		:global(.chat-markdown .markdown-table-scroll table) {
 			min-width: max(100%, min(56rem, calc(var(--markdown-table-columns, 1) * 12rem)));
 		}
