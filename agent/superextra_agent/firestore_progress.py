@@ -59,6 +59,7 @@ from .firestore_events import (
 )
 from .gear_run_state import GearRunState
 from .notes import _generate_title
+from .web_tools import clear_fetch_cache_for_run, set_fetch_run_id
 
 log = logging.getLogger(__name__)
 
@@ -547,6 +548,11 @@ class FirestoreProgressPlugin(BasePlugin):
 
         self._states[invocation_context.invocation_id] = state
         self._states_by_run_id[state.run_id] = state
+        # Bind run id for the per-run fetch result cache in web_tools.
+        # Paranoid clear handles the unlikely case of a stale entry from
+        # a prior crashed run with the same id.
+        clear_fetch_cache_for_run(state.run_id)
+        set_fetch_run_id(state.run_id)
         state.heartbeat_task = asyncio.create_task(_heartbeat_loop(fs, state))
         asyncio.create_task(write_run_started_event(state))
         # Yield once so the best-effort run-start task can enter its first
@@ -705,6 +711,7 @@ class FirestoreProgressPlugin(BasePlugin):
         if per is None:
             return None
         self._states_by_run_id.pop(per.run_id, None)
+        clear_fetch_cache_for_run(per.run_id)
         corr = build_run_correlation(per)
 
         # Order matters:

@@ -8,6 +8,9 @@ Markdown.
 """
 import asyncio
 import atexit
+import contextvars
+from urllib.parse import urlparse, urlunparse
+
 import httpx
 
 from .secrets import get_secret
@@ -18,6 +21,34 @@ TIMEOUT_S = 60.0
 # `readerlm-v2` is auth-only and ~25s per page; cap batch fanout so a
 # confused model can't kick off 50+ paid LM calls in a single tool turn.
 MAX_BATCH = 10
+
+# Gemini grounding exposes article URLs as tokenized redirects on
+# `https://vertexaisearch.cloud.google.com/grounding-api-redirect/...`.
+# Jina does not unwrap these cleanly — it fetches the redirect page
+# itself, not the article — so callers see junk content and retry. We
+# resolve the redirect to the real URL before sending it to Jina.
+VERTEX_REDIRECT_HOST = "vertexaisearch.cloud.google.com"
+VERTEX_REDIRECT_PATH_PREFIX = "/grounding-api-redirect/"
+VERTEX_UNWRAP_TIMEOUT_S = 10.0
+
+
+def _is_vertex_redirect(url: str) -> bool:
+    """True if `url` is a Vertex grounding-api-redirect URL.
+
+    Exact parsed check on scheme/host/path — a substring match would
+    fire on attacker-controlled URLs that merely embed the redirect
+    prefix in a query string or fragment, turning the unwrap step into
+    an SSRF-shaped GET from inside Agent Engine.
+    """
+    try:
+        p = urlparse(url)
+    except Exception:  # noqa: BLE001
+        return False
+    return (
+        p.scheme == "https"
+        and p.hostname == VERTEX_REDIRECT_HOST
+        and p.path.startswith(VERTEX_REDIRECT_PATH_PREFIX)
+    )
 
 _client: httpx.AsyncClient | None = None
 
@@ -42,6 +73,69 @@ def _cleanup_client():
 atexit.register(_cleanup_client)
 
 
+# ── Per-run fetch cache ──────────────────────────────────────────────────────
+# Same URL fetched twice in one run → second call returns the cached
+# result. Stops the dance where the model refetches a URL after a thin or
+# blocked response. Cache lives module-global but is keyed by run_id, set
+# via a contextvar by FirestoreProgressPlugin's before_run_callback.
+
+_fetch_run_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "_fetch_run_id", default=None
+)
+_fetch_cache: dict[tuple[str, str], dict] = {}
+# Bounded so that a run whose `after_run_callback` doesn't fire (ADK
+# 1.28.0 doesn't call it from a `finally`, so cancelled/aborted runs
+# can skip cleanup) cannot grow the cache forever. FIFO eviction by
+# insertion order — dict preserves order in 3.7+.
+_FETCH_CACHE_MAX_SIZE = 500
+
+
+def set_fetch_run_id(run_id: str) -> None:
+    """Bind the active run id to this asyncio task's context.
+
+    Called once at the start of each Agent Engine invocation. Subsequent
+    `fetch_web_content[_batch]` calls inside that task share a per-run
+    result cache keyed by (run_id, url).
+    """
+    _fetch_run_id_var.set(run_id)
+
+
+def clear_fetch_cache_for_run(run_id: str) -> None:
+    """Drop all cached fetch results for one run."""
+    for key in [k for k in _fetch_cache if k[0] == run_id]:
+        _fetch_cache.pop(key, None)
+
+
+def _cache_key(url: str) -> tuple[str, str] | None:
+    run_id = _fetch_run_id_var.get()
+    return (run_id, url) if run_id else None
+
+
+def _cache_put(key: tuple[str, str], result: dict) -> None:
+    while len(_fetch_cache) >= _FETCH_CACHE_MAX_SIZE:
+        # Evict oldest insertion (FIFO).
+        _fetch_cache.pop(next(iter(_fetch_cache)))
+    _fetch_cache[key] = result
+
+
+def _strip_fragment(url: str) -> str:
+    """Drop a URL fragment so `page#a` and `page#b` collapse to one key.
+
+    Fragments are not sent to the origin, so they cannot change the
+    fetched content — caching them as distinct keys is a false miss.
+    """
+    try:
+        p = urlparse(url)
+    except Exception:  # noqa: BLE001
+        return url
+    if not p.fragment:
+        return url
+    return urlunparse(p._replace(fragment=""))
+
+
+# ── Block detection ──────────────────────────────────────────────────────────
+
+
 def _detect_upstream_block(content: str) -> str | None:
     """Jina forwards upstream HTTP errors as 200-OK Markdown bodies.
 
@@ -61,29 +155,90 @@ def _detect_upstream_block(content: str) -> str | None:
         return "Cloudflare interstitial"
     if "(Note: The provided HTML" in content and len(content) < 1500:
         return "readerlm could not extract content (iframe / SPA)"
+    # Generic thin-content guard. Real article bodies almost always have
+    # at least one paragraph line >120 chars; navigation lists, paywall
+    # gates, and section-index pages don't. Avoids the model retrying
+    # path variants when Jina returns a near-empty stub.
+    if len(content) < 800:
+        longest_line = max((len(line) for line in content.splitlines()), default=0)
+        if longest_line < 120:
+            return "extracted content too thin to be an article body"
     return None
 
 
+# ── Vertex grounding redirect unwrap ────────────────────────────────────────
+
+
+async def _unwrap_vertex_redirect(url: str) -> str:
+    """Resolve a Vertex grounding-redirect URL to its destination.
+
+    Returns the original URL when the input is not a Vertex redirect or
+    when resolution fails — Jina will then receive the original URL and
+    its own error/thin-content path handles the bad result.
+    """
+    if not _is_vertex_redirect(url):
+        return url
+    try:
+        resp = await _get_client().get(
+            url, follow_redirects=False, timeout=VERTEX_UNWRAP_TIMEOUT_S
+        )
+        loc = resp.headers.get("Location") or resp.headers.get("location")
+        if loc:
+            return loc
+    except Exception:  # noqa: BLE001 — fall back to original URL on any failure
+        pass
+    return url
+
+
+# ── Fetch tools ─────────────────────────────────────────────────────────────
+
+
 async def fetch_web_content(url: str) -> dict:
-    """Read the body of a web page. REQUIRED before citing any URL.
+    """Read the body of a web page.
 
-    google_search returns ~200-char snippet previews, not evidence.
-    Dates, prices, named entities, quoted text, full article
-    arguments, comment threads, and anything below the page fold are
-    NOT in the snippet. You cannot answer "what opened or closed
-    recently", "what does the article say", "what did the reviewer
-    write", or any factual claim from snippets.
+    Returns the page text as Markdown with navigation, cookie banners,
+    and ads stripped. Tables come through as pipe-syntax tables.
 
-    Call this on every URL you intend to cite. Use
-    fetch_web_content_batch for several URLs in parallel.
-
-    Returns the page text as Markdown with navigation, cookie
-    banners, and ads stripped. Tables come through as pipe-syntax
-    tables.
+    Use this on URLs you want to read the full article body of — news
+    pieces, blog posts, forum threads, restaurant pages — when the
+    snippet from `google_search` is not enough. Use
+    `fetch_web_content_batch` for several URLs in parallel.
 
     Args:
         url: The full URL to fetch (e.g. 'https://reddit.com/r/coffee/comments/abc123').
     """
+    url = await _unwrap_vertex_redirect(url)
+    url = _strip_fragment(url)
+
+    cache_key = _cache_key(url)
+    if cache_key is not None and cache_key in _fetch_cache:
+        cached = dict(_fetch_cache[cache_key])
+        cached["cached"] = True
+        return cached
+
+    result = await _fetch_uncached(url)
+
+    # Cache every outcome — including errors — so the model doesn't
+    # refetch a URL that already returned thin content, an HTTP error,
+    # or a domain-root rejection within the same run. Caching successes
+    # only leaves the diagnosed retry loop alive.
+    if cache_key is not None:
+        _cache_put(cache_key, result)
+    return result
+
+
+async def _fetch_uncached(url: str) -> dict:
+    """Fetch logic without unwrap or cache. Always returns a dict."""
+    parsed = urlparse(url)
+    if not parsed.path or parsed.path == "/":
+        return {
+            "status": "error",
+            "error_message": (
+                f"{url} is a domain root, not an article. Search for the "
+                "specific article URL and pass that instead."
+            ),
+        }
+
     try:
         headers = {
             "Accept": "text/markdown",
@@ -129,16 +284,11 @@ async def fetch_web_content(url: str) -> dict:
 
 
 async def fetch_web_content_batch(urls: list[str]) -> dict:
-    """Read multiple URLs in parallel. REQUIRED before citing any URL.
+    """Read multiple URLs in parallel. Returns one result per URL.
 
-    Same evidence rules as fetch_web_content: google_search snippets
-    are link previews, not evidence. Every URL you intend to cite
-    must pass through this tool (or fetch_web_content). Fetching N
-    URLs in parallel takes the time of the slowest one rather than
-    the sum.
-
-    Each result is the same shape as `fetch_web_content`. Capped at
-    10 URLs per call; pick the most relevant ones.
+    Fetching N URLs in parallel takes the time of the slowest one rather
+    than the sum. Each result is the same shape as `fetch_web_content`.
+    Capped at 10 URLs per call; pick the most relevant ones.
 
     Args:
         urls: List of full URLs to fetch (max 10).
