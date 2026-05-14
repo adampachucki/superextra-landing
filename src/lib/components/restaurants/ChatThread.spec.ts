@@ -24,6 +24,7 @@ vi.mock('$lib/firebase', () => ({
 import { chatState, _testing } from '$lib/chat-state.svelte';
 import { onSnapshot } from 'firebase/firestore';
 import ChatThread from './ChatThread.svelte';
+import type { ChatSource } from '$lib/chat-types';
 
 const mockOnSnapshot = onSnapshot as unknown as Mock;
 
@@ -99,10 +100,12 @@ async function waitUntil(fn: () => boolean, timeout = 2000) {
 async function primeCompleteTurn({
 	sid = 'sid-1',
 	sourceCount = 0,
+	sources,
 	turnSummary = null
 }: {
 	sid?: string;
 	sourceCount?: number;
+	sources?: ChatSource[];
 	turnSummary?: { startedAtMs: number; finishedAtMs: number; elapsedMs: number } | null;
 } = {}) {
 	const obs = captureObservers();
@@ -118,7 +121,9 @@ async function primeCompleteTurn({
 		createdAt: { toMillis: () => 1000 },
 		completedAt: { toMillis: () => 36_000 }
 	};
-	if (sourceCount > 0) {
+	if (sources) {
+		turn.sources = sources;
+	} else if (sourceCount > 0) {
 		turn.sources = Array.from({ length: sourceCount }, (_, i) => ({
 			title: `Source ${i + 1}`,
 			url: `https://example.com/${i + 1}`
@@ -199,6 +204,44 @@ describe('ChatThread', () => {
 		expect(body).toContain('Sources (5)');
 		expect(body).toContain('Analysis activity');
 		expect(body).toContain('1s total');
+	});
+
+	it('orders collapsed sources to show portal variety first', async () => {
+		const sources: ChatSource[] = [
+			{ title: 'Portal first', url: 'https://portal.example/first' },
+			{ title: 'Portal second', url: 'https://portal.example/second' },
+			...Array.from({ length: 18 }, (_, i) => ({
+				title: `Source ${i + 1}`,
+				url: `https://domain${i + 1}.example/article`
+			}))
+		];
+		await primeCompleteTurn({ sources });
+
+		const { body } = render(ChatThread, { props: {} });
+		expect(body).toContain('Sources (20)');
+		expect(body).toContain('https://portal.example/first');
+		expect(body).toContain('https://domain18.example/article');
+		expect(body).not.toContain('https://portal.example/second');
+		expect(body).toContain('+1 more');
+	});
+
+	it('labels fetched page sources by domain', async () => {
+		const sources: ChatSource[] = [
+			{
+				title: 'Fetched article',
+				url: 'https://news.example/story',
+				domain: 'news.example',
+				provider: 'fetched_page'
+			},
+			{ title: 'A', url: 'https://a.example/story' },
+			{ title: 'B', url: 'https://b.example/story' },
+			{ title: 'C', url: 'https://c.example/story' },
+			{ title: 'D', url: 'https://d.example/story' }
+		];
+		await primeCompleteTurn({ sources });
+
+		const { body } = render(ChatThread, { props: {} });
+		expect(body).toMatch(/>\s*news\.example\s*<\/span>/);
 	});
 
 	it('renders user-facing copy for terminal backend error codes', async () => {

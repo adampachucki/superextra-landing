@@ -3,7 +3,7 @@
 	import { chatState } from '$lib/chat-state.svelte';
 	import { tts } from '$lib/tts.svelte';
 	import { splitChartSegments } from '$lib/chart-blocks';
-	import type { ChatSourceProvider, TimelineEvent } from '$lib/chat-types';
+	import type { ChatSource, ChatSourceProvider, TimelineEvent } from '$lib/chat-types';
 	import { finalAnswerReveal } from '$lib/final-answer-reveal';
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
 	import { renderMarkdown } from '$lib/markdown';
@@ -123,7 +123,7 @@
 	const SOURCES_LIMIT = 19;
 	const SOURCE_COUNT_MIN = 5;
 	const ACTIVITY_THOUGHT_MIN = 2;
-	const PROVIDER_LABELS: Record<ChatSourceProvider, string> = {
+	const PROVIDER_LABELS: Partial<Record<ChatSourceProvider, string>> = {
 		google_maps: 'Google Maps',
 		google_reviews: 'Google Reviews',
 		tripadvisor: 'TripAdvisor'
@@ -162,6 +162,44 @@
 		} catch {
 			return '';
 		}
+	}
+
+	function sourceProviderLabel(provider: ChatSourceProvider | undefined): string | undefined {
+		return provider ? PROVIDER_LABELS[provider] : undefined;
+	}
+
+	function sourceLabel(src: ChatSource, domain: string): string {
+		return sourceProviderLabel(src.provider) ?? (domain || src.title);
+	}
+
+	function sourceGroupKey(src: ChatSource): string {
+		const providerLabel = sourceProviderLabel(src.provider);
+		if (providerLabel && src.provider) return `provider:${src.provider}`;
+		const domain = sourceDomain(src.url, src.domain).toLowerCase();
+		if (domain) return `domain:${domain}`;
+		return `url:${src.url}`;
+	}
+
+	function varietyFirstSources(sources: ChatSource[]): ChatSource[] {
+		const groups: { key: string; sources: ChatSource[] }[] = [];
+		for (const source of sources) {
+			const key = sourceGroupKey(source);
+			const group = groups.find((entry) => entry.key === key);
+			if (group) {
+				group.sources.push(source);
+			} else {
+				groups.push({ key, sources: [source] });
+			}
+		}
+
+		const ordered: ChatSource[] = [];
+		for (let round = 0; ordered.length < sources.length; round += 1) {
+			for (const group of groups) {
+				const source = group.sources[round];
+				if (source) ordered.push(source);
+			}
+		}
+		return ordered;
 	}
 
 	function thoughtCount(events: TimelineEvent[] | undefined): number {
@@ -265,7 +303,8 @@
 
 					{#if msg.sources && msg.sources.length >= SOURCE_COUNT_MIN}
 						{@const showAll = expandedSources[msg.turnIndex]}
-						{@const visible = showAll ? msg.sources : msg.sources.slice(0, SOURCES_LIMIT)}
+						{@const displaySources = varietyFirstSources(msg.sources)}
+						{@const visible = showAll ? displaySources : displaySources.slice(0, SOURCES_LIMIT)}
 						<div class="mt-5 max-w-[700px]">
 							<span class="mb-2 block text-[12px] font-medium text-black/40 dark:text-white/40"
 								>Sources ({msg.sources.length})</span
@@ -273,9 +312,7 @@
 							<div class="flex flex-wrap gap-1.5">
 								{#each visible as src (`${src.url}:${src.title}`)}
 									{@const domain = sourceDomain(src.url, src.domain)}
-									{@const label = src.provider
-										? PROVIDER_LABELS[src.provider]
-										: domain || src.title}
+									{@const label = sourceLabel(src, domain)}
 									<a
 										href={src.url}
 										target="_blank"

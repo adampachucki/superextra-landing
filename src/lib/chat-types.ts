@@ -9,7 +9,7 @@
  * in any runtime.
  */
 
-export type ChatSourceProvider = 'google_maps' | 'google_reviews' | 'tripadvisor';
+export type ChatSourceProvider = 'google_maps' | 'google_reviews' | 'tripadvisor' | 'fetched_page';
 
 export interface ChatSource {
 	title: string;
