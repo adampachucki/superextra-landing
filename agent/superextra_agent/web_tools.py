@@ -65,12 +65,21 @@ def _detect_upstream_block(content: str) -> str | None:
 
 
 async def fetch_web_content(url: str) -> dict:
-    """Fetch and read a web page as clean Markdown.
+    """Read the body of a web page. REQUIRED before citing any URL.
 
-    Use this to read the full content of a page found via google_search —
-    articles, blog posts, forum threads, Reddit discussions, restaurant
-    pages. Returns the page text as Markdown with navigation, cookie
-    banners, and ads stripped. Tables come through as pipe-syntax tables.
+    google_search returns ~200-char snippet previews, not evidence.
+    Dates, prices, named entities, quoted text, full article
+    arguments, comment threads, and anything below the page fold are
+    NOT in the snippet. You cannot answer "what opened or closed
+    recently", "what does the article say", "what did the reviewer
+    write", or any factual claim from snippets.
+
+    Call this on every URL you intend to cite. Use
+    fetch_web_content_batch for several URLs in parallel.
+
+    Returns the page text as Markdown with navigation, cookie
+    banners, and ads stripped. Tables come through as pipe-syntax
+    tables.
 
     Args:
         url: The full URL to fetch (e.g. 'https://reddit.com/r/coffee/comments/abc123').
@@ -120,12 +129,16 @@ async def fetch_web_content(url: str) -> dict:
 
 
 async def fetch_web_content_batch(urls: list[str]) -> dict:
-    """Fetch multiple URLs in parallel. Returns one result per URL.
+    """Read multiple URLs in parallel. REQUIRED before citing any URL.
 
-    Use this when reading several pages from a single google_search batch —
-    fetching N URLs in parallel takes the time of the slowest one rather
-    than the sum. Each result is the same shape as `fetch_web_content`.
-    Capped at 10 URLs per call; pick the most relevant ones.
+    Same evidence rules as fetch_web_content: google_search snippets
+    are link previews, not evidence. Every URL you intend to cite
+    must pass through this tool (or fetch_web_content). Fetching N
+    URLs in parallel takes the time of the slowest one rather than
+    the sum.
+
+    Each result is the same shape as `fetch_web_content`. Capped at
+    10 URLs per call; pick the most relevant ones.
 
     Args:
         urls: List of full URLs to fetch (max 10).
