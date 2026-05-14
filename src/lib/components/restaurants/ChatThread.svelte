@@ -384,11 +384,14 @@
 	}
 
 	/* `overflow-wrap: break-word` (not `anywhere`) preserves each
-	 * column's natural minimum width (longest word), so short label
-	 * columns don't collapse to 1ch while the wordy column hoards
-	 * space. */
+	 * column's natural minimum width (longest word). The `min-width`
+	 * floor stops the auto-layout algorithm from squeezing short-label
+	 * columns below a readable threshold when one cell carries paragraph
+	 * content — without it, auto-layout hands almost the entire width
+	 * to the wordy column. */
 	:global(.chat-markdown .markdown-table-scroll th),
 	:global(.chat-markdown .markdown-table-scroll td) {
+		min-width: 7rem;
 		white-space: normal;
 		overflow-wrap: break-word;
 		word-break: normal;
