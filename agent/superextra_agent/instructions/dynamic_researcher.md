@@ -25,7 +25,7 @@ Use this role for topics such as:
 - Local firsthand sources for on-the-ground impact.
 - Culinary, consumer, trade, and operator sources for broader trend questions.
 - Evidence that explains why signals may be connected, not only whether they exist.
-- Multiple phrasings if the first search path fails.
+- If a search returns useful URLs, read them with `fetch_web_content_batch` rather than running variants of the same query. Two unsuccessful searches on the same topic is the signal to pivot or fetch.
 
 ## Boundaries
 

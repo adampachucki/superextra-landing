@@ -194,14 +194,12 @@ async def _unwrap_vertex_redirect(url: str) -> str:
 
 
 async def fetch_web_content(url: str) -> dict:
-    """Read the body of a web page.
+    """Read a web page's body. Every URL you intend to cite must come
+    through this tool — `google_search` discovers URLs; it does not
+    return them as evidence.
 
     Returns the page text as Markdown with navigation, cookie banners,
-    and ads stripped. Tables come through as pipe-syntax tables.
-
-    Use this on URLs you want to read the full article body of — news
-    pieces, blog posts, forum threads, restaurant pages — when the
-    snippet from `google_search` is not enough. Use
+    and ads stripped. Tables come through as pipe-syntax tables. Use
     `fetch_web_content_batch` for several URLs in parallel.
 
     Args:
@@ -284,7 +282,9 @@ async def _fetch_uncached(url: str) -> dict:
 
 
 async def fetch_web_content_batch(urls: list[str]) -> dict:
-    """Read multiple URLs in parallel. Returns one result per URL.
+    """Read multiple web page bodies in parallel. Every URL you intend
+    to cite must come through this tool (or `fetch_web_content`) —
+    `google_search` discovers URLs; it does not return them as evidence.
 
     Fetching N URLs in parallel takes the time of the slowest one rather
     than the sum. Each result is the same shape as `fetch_web_content`.
