@@ -1,6 +1,7 @@
 import atexit
 import math
 import re
+import unicodedata
 
 import httpx
 
@@ -16,15 +17,33 @@ from .secrets import get_secret
 
 BASE_URL = "https://serpapi.com/search.json"
 
-# Max distance (meters) between Google Places and TripAdvisor coordinates for
-# us to accept them as the same venue. Observed drift on verified matches is
-# <30m (Geranium 25.5m, Umami 21.9m); 150m gives ~5× margin while still
-# cleanly separating "different venue in the same neighborhood" (Bar Leon vs
-# Hola Tapas measured 508m). Revisit if E2E calibration shows matches
-# creeping past ~100m.
-_COORD_MATCH_RADIUS_M = 150.0
+# Reject obviously-wrong matches (different city, different chain branch).
+# SerpAPI's `address_link` coord is a Google Maps geocode of the address
+# string, not the venue's actual location, so legitimate matches can drift
+# hundreds of meters (Malika observed at 458m). Only used as a veto on
+# name-matched candidates.
+_COORD_SANITY_RADIUS_M = 5000.0
 
 _COORD_RE = re.compile(r"@([-\d.]+),([-\d.]+)")
+
+
+def _normalize_name(s: str | None) -> str:
+    if not s:
+        return ""
+    s = s.lower()
+    s = "".join(c for c in unicodedata.normalize("NFD", s) if not unicodedata.combining(c))
+    s = re.sub(r"[^a-z0-9 ]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _names_align(a: str | None, b: str | None) -> bool:
+    """One name's normalized form contains the other (substring)."""
+    a, b = _normalize_name(a), _normalize_name(b)
+    if not a or not b:
+        return False
+    short, long_ = (a, b) if len(a) <= len(b) else (b, a)
+    return short in long_
+
 
 _client: httpx.AsyncClient | None = None
 
@@ -57,9 +76,10 @@ def _get_api_key() -> str:
 def _extract_coords_from_address_link(address_link: str) -> tuple[float, float] | None:
     """Pull `(lat, lng)` out of TripAdvisor's Google Maps URL.
 
-    SerpAPI's `tripadvisor_place` response embeds the venue's coordinates in
-    `address_link` as the `@lat,lng` suffix of a Google Maps URL. This is
-    the only reliable coordinate signal the TripAdvisor engine exposes.
+    SerpAPI's `tripadvisor_place` response embeds an `@lat,lng` suffix in
+    the `address_link` Google Maps URL. The value is a Google Maps geocode
+    of the address string, not the venue's actual location, so we use it
+    only as a loose sanity veto on name-matched candidates.
     """
     if not address_link:
         return None
@@ -91,15 +111,17 @@ async def find_tripadvisor_restaurant(
 
     Searches TripAdvisor (eateries only, biased toward the requested Google
     place's coords), fetches the top candidate's detail page, and verifies
-    identity by comparing TripAdvisor coordinates against that same Google
-    place. Two SerpAPI calls per verified-profile invocation.
+    identity by name match (with a loose 5km coord-distance veto on obvious
+    wrong-city / wrong-branch matches). Two SerpAPI calls per verified
+    profile.
 
     Three return statuses:
-      - `success` — coord check passed (≤ 150 m). Full payload: rating,
-        ranking, cuisines, tripadvisor_link, sample_reviews, etc.
-      - `unverified` — search ran; top candidate's coords didn't match the
-        requested Google place. No rich fields, no link. The LLM should skip
-        TripAdvisor for this place, not retry.
+      - `success` — name match passed. Full payload: rating, ranking,
+        cuisines, tripadvisor_link, sample_reviews, etc.
+      - `unverified` — search ran; top candidate's name didn't match the
+        Google place (or coord drift exceeded the sanity radius). No rich
+        fields, no link. The LLM should skip TripAdvisor for this place,
+        not retry.
       - `error` — SerpAPI transport failure or response parse error.
 
     Args:
@@ -187,22 +209,26 @@ async def find_tripadvisor_restaurant(
 
         place_data = place_resp.json().get("place_result", {})
 
-        # Identity check: compare TripAdvisor's coordinates against the
-        # requested Google place coordinates. TripAdvisor embeds its lat/lng
-        # in the address_link as `@lat,lng`.
-        ta_coords = _extract_coords_from_address_link(place_data.get("address_link", ""))
-        if not ta_coords:
-            return {
-                "status": "unverified",
-                "error_message": "Could not verify TripAdvisor match (missing coordinates)",
-            }
-        distance_m = _haversine_meters(coords, ta_coords)
-        if distance_m > _COORD_MATCH_RADIUS_M:
+        # Identity check: name match is the primary signal. SerpAPI's
+        # `address_link` coord is geocoded from the address string and drifts
+        # hundreds of meters even for the right venue, so it's only a veto on
+        # obvious wrong-city / wrong-branch matches.
+        ta_name = place_data.get("name")
+        if not _names_align(search_name, ta_name):
             return {
                 "status": "unverified",
                 "error_message": (
-                    f"TripAdvisor top candidate is {distance_m:.0f}m from the Google place — "
-                    f"treating as a different venue"
+                    f"TripAdvisor top candidate '{ta_name}' does not match "
+                    f"the Google place name"
+                ),
+            }
+        ta_coords = _extract_coords_from_address_link(place_data.get("address_link", ""))
+        if ta_coords and _haversine_meters(coords, ta_coords) > _COORD_SANITY_RADIUS_M:
+            return {
+                "status": "unverified",
+                "error_message": (
+                    f"TripAdvisor candidate '{ta_name}' is too far from "
+                    f"the Google place — likely a different venue"
                 ),
             }
 
@@ -241,7 +267,6 @@ async def find_tripadvisor_restaurant(
                     "url": selected_link,
                     "name": place_data.get("name"),
                     "verified": True,
-                    "verified_distance_m": round(distance_m),
                 },
             )
             tool_context.state[tool_source_key("tripadvisor", google_place_id)] = {

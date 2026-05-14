@@ -46,9 +46,9 @@ SEARCH_RESPONSE = {
     ]
 }
 
-# Umami P-Berg's real-ish TripAdvisor coords. Matches TARGET_COORDS below for
-# the happy-path tests; tests that need a coord mismatch substitute a
-# different PLACE_RESPONSE or pass mismatched target coords via state.
+# Umami P-Berg's real-ish TripAdvisor coords. The address_link coord lives at
+# TARGET_COORDS so happy-path tests can assert that the sanity-veto distance
+# stays well under _COORD_SANITY_RADIUS_M (5km).
 TARGET_COORDS = (52.536, 13.421)
 TARGET_ADDRESS_LINK = (
     "https://maps.google.com/maps?saddr=&daddr=Knaackstr. 16-18, 10405 Berlin"
@@ -184,9 +184,10 @@ def _mock_response(json_data, status_code=200):
 
 class TestFindTripadvisorRestaurant:
     @pytest.mark.asyncio
-    async def test_success_when_coords_close(self):
-        """Happy path: TripAdvisor's coords match the target's coords within
-        the 150m threshold → status=success with full payload."""
+    async def test_success_when_name_matches(self):
+        """Happy path: the Google place name (Umami) is a substring of the
+        TripAdvisor candidate name (Umami P-Berg) → status=success with full
+        payload."""
         ctx = _ctx_with_place()
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
@@ -217,12 +218,11 @@ class TestFindTripadvisorRestaurant:
         assert "match_confidence" not in result
 
     @pytest.mark.asyncio
-    async def test_unverified_when_coords_far(self):
-        """Regression test for the 2026-04-24 Bar Leon bug. If the target's
-        coords (54.347, 18.658 Gdansk) are 508m from the TripAdvisor
-        candidate's coords (52.536, 13.421 Berlin — the fixture's built-in
-        Umami location), we must return `unverified` and strip every rich
-        field so no wrong-venue data leaks downstream."""
+    async def test_unverified_when_name_mismatch(self):
+        """Regression test for the 2026-04-24 Bar Leon bug. The Google place
+        is "Bar Leon" but SerpAPI returns "Umami P-Berg" at slot 0 (because
+        TripAdvisor has no Bar Leon listing). Name match fails → unverified
+        with all rich fields stripped so wrong-venue data can't leak."""
         ctx = _ctx_with_place(lat=54.347, lng=18.658, name="Bar Leon")
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
@@ -240,12 +240,68 @@ class TestFindTripadvisorRestaurant:
 
         assert result["status"] == "unverified"
         assert "error_message" in result
-        # Rich fields must be absent so downstream analysis can't use wrong-venue data.
         assert "tripadvisor_link" not in result
         assert "name" not in result
         assert "rating" not in result
-        assert "candidates" not in result
         assert "sample_reviews" not in result
+
+    @pytest.mark.asyncio
+    async def test_success_when_name_matches_and_coords_drift_within_sanity(self):
+        """Regression for the 2026-05-13 Malika bug. Names match but the
+        SerpAPI address_link coord is 458m off (Google geocoded the address
+        string, not the venue pin). Old logic rejected at 150m; new logic
+        accepts since drift < 5km sanity radius."""
+        # Place 458m away from TARGET_COORDS (lat-degree ≈ 111km, so 0.0041°
+        # ≈ 458m).
+        ctx = _ctx_with_place(
+            lat=TARGET_COORDS[0] + 0.0041,
+            lng=TARGET_COORDS[1],
+            name="Umami",
+        )
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            result = await find_tripadvisor_restaurant(
+                "Umami", "Berlin",
+                google_place_id="ChIJtarget",
+                tool_context=ctx,
+            )
+
+        assert result["status"] == "success"
+        assert result["place_id"] == "6796040"
+
+    @pytest.mark.asyncio
+    async def test_unverified_when_coord_drift_exceeds_sanity_radius(self):
+        """Sanity veto: even with a name match, a wildly distant coord
+        (>5km) means SerpAPI returned a different-city venue with the same
+        name (chain branch confusion). Reject."""
+        # 200km north of TARGET_COORDS — same name, obviously different city.
+        ctx = _ctx_with_place(
+            lat=TARGET_COORDS[0] + 1.8,
+            lng=TARGET_COORDS[1],
+            name="Umami",
+        )
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[
+            _mock_response(SEARCH_RESPONSE),
+            _mock_response(PLACE_RESPONSE),
+        ])
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            result = await find_tripadvisor_restaurant(
+                "Umami", "Berlin",
+                google_place_id="ChIJtarget",
+                tool_context=ctx,
+            )
+
+        assert result["status"] == "unverified"
+        assert "tripadvisor_link" not in result
 
     @pytest.mark.asyncio
     async def test_unverified_when_place_coords_missing(self):
@@ -269,9 +325,9 @@ class TestFindTripadvisorRestaurant:
         assert "tripadvisor_link" not in result
 
     @pytest.mark.asyncio
-    async def test_unverified_when_address_link_missing(self):
-        """Some TripAdvisor responses may omit address_link. Without coords
-        to verify, we can't accept the match."""
+    async def test_success_when_address_link_missing(self):
+        """If address_link is missing the coord veto can't run, but the name
+        match is still authoritative → accept."""
         ctx = _ctx_with_place()
         place_response_no_link = {
             "place_result": {**PLACE_RESPONSE["place_result"], "address_link": ""},
@@ -290,8 +346,8 @@ class TestFindTripadvisorRestaurant:
                 tool_context=ctx,
             )
 
-        assert result["status"] == "unverified"
-        assert "tripadvisor_link" not in result
+        assert result["status"] == "success"
+        assert result["tripadvisor_link"] == "https://www.tripadvisor.com/Restaurant_Review-umami-p-berg"
 
     @pytest.mark.asyncio
     async def test_search_uses_name_area_ssrc_and_lat_lon(self):
@@ -444,15 +500,24 @@ class TestFindTripadvisorRestaurantSourceWrite:
 
     @pytest.mark.asyncio
     async def test_writes_source_when_place_id_is_competitor(self):
+        """Source pill writes for any verified Google place, not just the
+        session's primary target."""
         ctx = _ctx_with_place(
             place_id="ChIJgeranium",
             target_place_id="ChIJnoma",
             name="Geranium",
         )
+        geranium_search = {
+            "places": [{"place_id": "55555", "title": "Geranium",
+                        "link": "https://www.tripadvisor.com/Restaurant_Review-geranium"}],
+        }
+        geranium_place = {
+            "place_result": {**PLACE_RESPONSE["place_result"], "name": "Geranium"},
+        }
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[
-            _mock_response(SEARCH_RESPONSE),
-            _mock_response(PLACE_RESPONSE),
+            _mock_response(geranium_search),
+            _mock_response(geranium_place),
         ])
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
