@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from superextra_agent.firestore_events import (
+    build_fetched_source,
     extract_sources_from_grounding,
     map_event,
     map_tool_call,
@@ -438,3 +439,39 @@ def test_extract_sources_from_grounding_dedupes_urls():
         {"title": "A", "url": "https://a.example"},
         {"title": "https://b.example", "url": "https://b.example"},
     ]
+
+
+def test_build_fetched_source_prefers_jina_title_line():
+    content = "Title: Hello World\n\nURL Source: https://example.com\n\n# Body Heading"
+    assert build_fetched_source("https://www.example.com/path", content) == {
+        "url": "https://www.example.com/path",
+        "title": "Hello World",
+        "domain": "example.com",
+        "provider": "fetched_page",
+    }
+
+
+def test_build_fetched_source_falls_back_to_first_h1():
+    content = "Some preamble\n\n# Actual Heading\n\nbody text"
+    entry = build_fetched_source("https://example.com/a", content)
+    assert entry == {
+        "url": "https://example.com/a",
+        "title": "Actual Heading",
+        "domain": "example.com",
+        "provider": "fetched_page",
+    }
+
+
+def test_build_fetched_source_falls_back_to_hostname_when_no_title():
+    entry = build_fetched_source("https://www.trojmiasto.pl/news/article", "plain body")
+    assert entry == {
+        "url": "https://www.trojmiasto.pl/news/article",
+        "title": "trojmiasto.pl",
+        "domain": "trojmiasto.pl",
+        "provider": "fetched_page",
+    }
+
+
+def test_build_fetched_source_rejects_empty_url():
+    assert build_fetched_source("", "Title: X") is None
+    assert build_fetched_source(None, "Title: X") is None

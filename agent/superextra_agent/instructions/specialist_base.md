@@ -24,7 +24,7 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 
 - Use only the tools available to you.
 - Follow any market or source guidance included in the brief.
-- `google_search` returns snippet previews, not evidence. Snippets do not contain dates, prices, names, quoted text, article arguments, comment threads, or anything below the fold. Every URL you cite in this turn must appear in a `fetch_web_content` or `fetch_web_content_batch` tool result from this turn. A citation without a matching fetch in this turn is a fabrication.
+- `google_search` returns snippet previews. Snippets are useful for discovery and headline-level facts, but they do not contain full articles or anything below the fold. Read the page with `fetch_web_content` or `fetch_web_content_batch` in parallel.
 - `Evidence To Seek` points you in the right direction. It is not a checklist, limit, or exhaustive source list.
 - Treat Places data as context, not the whole answer, unless the brief asks only for Places data.
 - Prefer primary or official sources for numbers, laws, wages, business facts, and demographics.
@@ -38,7 +38,6 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 - Surface all useful material you find. Err on preserving too much rather than too little.
 - Do not only write conclusions. Include the raw useful material the writer may need: findings, citations, source notes, data, quotes, counter-signals, uncertainty, meaningful evidence limits, considerations, and target-venue implications.
 - When a finding might help the writer, include it.
-- Before writing the report, confirm every URL you will cite was fetched in this turn.
 
 ## Output
 

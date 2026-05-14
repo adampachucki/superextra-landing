@@ -51,7 +51,12 @@ from .correlation import (
     run_id_from_context,
     turn_idx_from_context,
 )
-from .firestore_events import map_tool_call, map_tool_error, map_tool_result
+from .firestore_events import (
+    build_fetched_source,
+    map_tool_call,
+    map_tool_error,
+    map_tool_result,
+)
 from .gear_run_state import GearRunState
 from .notes import _generate_title
 
@@ -346,6 +351,37 @@ def _build_state(
     )
 
 
+def _merge_fetched_sources(
+    per: GearRunState,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    result: Any,
+) -> None:
+    """Surface successful `fetch_web_content[_batch]` URLs as run sources.
+
+    Without this hook, fetched URLs would never appear in the per-turn
+    source pills — only grounding URLs and `_tool_src_*` Places sources
+    feed `specialist_sources` today. See `firestore_events.build_fetched_source`.
+    """
+    if not isinstance(result, dict):
+        return
+    if tool_name == "fetch_web_content":
+        if result.get("status") != "success":
+            return
+        url = result.get("url") or (tool_args.get("url") if tool_args else None)
+        entry = build_fetched_source(url, result.get("content"))
+        if entry:
+            per._merge_source(entry)
+        return
+    if tool_name == "fetch_web_content_batch":
+        for item in result.get("results") or []:
+            if not isinstance(item, dict) or item.get("status") != "success":
+                continue
+            entry = build_fetched_source(item.get("url"), item.get("content"))
+            if entry:
+                per._merge_source(entry)
+
+
 # ── Plugin ───────────────────────────────────────────────────────────────────
 
 
@@ -566,6 +602,7 @@ class FirestoreProgressPlugin(BasePlugin):
             getattr(tool_context, "function_call_id", None),
         ):
             await self._observe_typed_pill(per, pill)
+        _merge_fetched_sources(per, tool.name, tool_args, result)
         return None
 
     @override

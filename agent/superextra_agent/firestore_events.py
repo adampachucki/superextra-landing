@@ -236,6 +236,42 @@ def extract_sources_from_grounding(event: Any) -> list[dict[str, Any]]:
     return out
 
 
+_JINA_TITLE_RE = re.compile(r"^Title:\s*(.+?)\s*$", re.MULTILINE)
+
+
+def build_fetched_source(url: Any, content: Any) -> dict[str, Any] | None:
+    """Source entry for a successful `fetch_web_content[_batch]` call.
+
+    Title comes from Jina Reader's leading `Title:` line when present,
+    otherwise the first markdown H1, otherwise the hostname. Mirrors
+    `extract_sources_from_grounding` so fetched URLs surface as pills.
+    """
+    if not isinstance(url, str) or not url.strip():
+        return None
+    title: str | None = None
+    if isinstance(content, str):
+        head = content[:2000]
+        match = _JINA_TITLE_RE.search(head)
+        if match:
+            title = match.group(1).strip() or None
+        if not title:
+            for line in head.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("# "):
+                    title = stripped[2:].strip() or None
+                    break
+    try:
+        domain = (urlparse(url).hostname or "").removeprefix("www.")
+    except Exception:
+        domain = ""
+    return {
+        "url": url,
+        "title": title or domain or url,
+        "domain": domain,
+        "provider": "fetched_page",
+    }
+
+
 def _map_complete(event: Any) -> dict[str, Any] | None:
     if not _is_final(event):
         return None
