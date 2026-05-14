@@ -14,12 +14,28 @@ from superextra_agent.web_tools import (
 )
 
 
+@pytest.fixture(autouse=True)
+def mock_emit_cloud_log():
+    """Silence Cloud Logging in tests — emit_cloud_log otherwise tries to
+    auth + write per-fetch. Tests that need to assert on log calls receive
+    this fixture by name and inspect `.call_args_list`.
+    """
+    with patch("superextra_agent.web_tools.emit_cloud_log") as mock:
+        yield mock
+
+
 def _mock_response(text, status_code=200, headers=None):
     resp = AsyncMock(spec=httpx.Response)
     resp.status_code = status_code
     resp.text = text
     resp.headers = headers or {}
     return resp
+
+
+def _log_kwargs(mock_emit, event="fetch_url", index=-1):
+    """Return kwargs of the Nth (default last) emit_cloud_log call for `event`."""
+    matches = [c for c in mock_emit.call_args_list if c.args[0] == event]
+    return matches[index].kwargs if matches else {}
 
 
 class TestFetchWebContent:
@@ -399,6 +415,217 @@ class TestFetchCache:
         assert second["status"] == "success"
         assert second.get("cached") is None
         assert mock_client.get.call_count == 2
+
+
+class TestFetchUrlLogging:
+    """Each fetch attempt emits one structured `fetch_url` Cloud Logging
+    entry. These tests assert the entry shape across success and error
+    paths so per-URL diagnostics stay reliable across refactors.
+    """
+
+    @pytest.mark.asyncio
+    async def test_success_logs_status_and_content_chars(self, mock_emit_cloud_log):
+        body = "# Title\n\n" + "Real paragraph that crosses the thin-content threshold easily. " * 5
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(body))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            await fetch_web_content("https://example.com/article")
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["status"] == "success"
+        assert kw["error_reason"] is None
+        assert kw["content_chars"] == len(body)
+        assert kw["url"] == "https://example.com/article"
+        assert kw["original_url"] is None
+        assert kw["cached"] is False
+        assert kw["duration_ms"] >= 0
+
+    @pytest.mark.asyncio
+    async def test_fragment_strip_does_not_set_original_url(self, mock_emit_cloud_log):
+        """original_url is reserved for vertex unwrap rewrites only. Fragment
+        stripping also changes the URL but is internal — must not leak into
+        the log as a different `original_url`.
+        """
+        body = "# Title\n\n" + "Real paragraph that crosses the thin-content threshold. " * 5
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(body))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            await fetch_web_content("https://example.com/article#section")
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["url"] == "https://example.com/article"
+        assert kw["original_url"] is None
+
+    @pytest.mark.asyncio
+    async def test_upstream_http_code_extracted_by_regex(self, mock_emit_cloud_log):
+        """Any 3-digit HTTP code Jina forwards should map to upstream_http_<code>,
+        not just the previously-enumerated ones.
+        """
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(
+            "Warning: Target URL returned error 429: Too Many Requests"
+        ))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            await fetch_web_content("https://rate-limited.example/page")
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["error_reason"] == "upstream_http_429"
+
+    @pytest.mark.asyncio
+    async def test_network_error_logs_network_error_reason(self, mock_emit_cloud_log):
+        """httpx.RequestError (non-timeout) maps to a specific tag, not the
+        catch-all `exception`.
+        """
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            await fetch_web_content("https://example.com/page")
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["error_reason"] == "network_error"
+
+    @pytest.mark.asyncio
+    async def test_http_error_logs_http_status_reason(self, mock_emit_cloud_log):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response("nope", status_code=404))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            await fetch_web_content("https://example.com/missing")
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["status"] == "error"
+        assert kw["error_reason"] == "http_404"
+
+    @pytest.mark.asyncio
+    async def test_timeout_logs_timeout_reason(self, mock_emit_cloud_log):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=httpx.TimeoutException("boom"))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            await fetch_web_content("https://example.com/slow")
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["error_reason"] == "timeout"
+
+    @pytest.mark.asyncio
+    async def test_domain_root_logs_domain_root_reason(self, mock_emit_cloud_log):
+        # Bare domain — no Jina call expected, error_reason is domain_root.
+        await fetch_web_content("https://example.com")
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["status"] == "error"
+        assert kw["error_reason"] == "domain_root"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("body,expected_reason", [
+        ("Warning: Target URL returned error 403: Forbidden\n\nMarkdown Content:\n", "upstream_http_403"),
+        ("Warning: This page maybe requiring CAPTCHA", "upstream_captcha"),
+        ("Just a moment...\n\nChecking your browser", "cloudflare_interstitial"),
+        ("Title: x\n\n(Note: The provided HTML contains an iframe and only the title was extracted)", "iframe_spa"),
+        ("\n".join(["Home", "About", "Contact", "* Login"]), "thin_content"),
+    ])
+    async def test_block_paths_log_specific_reasons(self, body, expected_reason, mock_emit_cloud_log):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(body))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            await fetch_web_content("https://blocked.example/page")
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["error_reason"] == expected_reason
+
+    @pytest.mark.asyncio
+    async def test_vertex_unwrap_success_logs_original_url(self, mock_emit_cloud_log):
+        redirect_resp = _mock_response("", status_code=302, headers={"Location": "https://trojmiasto.pl/article-n1.html"})
+        article_body = "# Article\n\n" + "Real paragraph crossing the thin-content threshold easily. " * 5
+        article_resp = _mock_response(article_body)
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[redirect_resp, article_resp])
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            await fetch_web_content(
+                "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZxyz"
+            )
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["status"] == "success"
+        assert kw["url"] == "https://trojmiasto.pl/article-n1.html"
+        assert kw["original_url"] == "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZxyz"
+
+    @pytest.mark.asyncio
+    async def test_vertex_unwrap_miss_overrides_other_error_reason(self, mock_emit_cloud_log):
+        """When unwrap fails to return a Location, the input URL is sent to
+        Jina unchanged. That fetch will produce some other error (thin
+        content, http_xxx, etc.) — but the root cause is the unwrap miss
+        and that's what we log.
+        """
+        # No Location header → unwrap returns the original URL.
+        no_loc = _mock_response("", status_code=200, headers={})
+        # Jina then returns junk that trips the iframe / SPA detector.
+        junk = _mock_response("Title: x\n\n(Note: The provided HTML contains an iframe and only the title was extracted)")
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[no_loc, junk])
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            await fetch_web_content(
+                "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZmiss"
+            )
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["status"] == "error"
+        # Root-cause tag, not the derived iframe_spa tag from the Jina body.
+        assert kw["error_reason"] == "vertex_unwrap_miss"
+
+    @pytest.mark.asyncio
+    async def test_cache_hit_logs_cached_true(self, mock_emit_cloud_log):
+        body = "# t\n\n" + "Real article paragraph crossing the thin-content threshold. " * 5
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(body))
+
+        set_fetch_run_id("run-log")
+        try:
+            with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+                await fetch_web_content("https://example.com/cache-hit")
+                await fetch_web_content("https://example.com/cache-hit")
+        finally:
+            clear_fetch_cache_for_run("run-log")
+
+        calls = [c for c in mock_emit_cloud_log.call_args_list if c.args[0] == "fetch_url"]
+        assert len(calls) == 2
+        assert calls[0].kwargs["cached"] is False
+        assert calls[1].kwargs["cached"] is True
+
+    @pytest.mark.asyncio
+    async def test_internal_error_reason_not_returned_to_caller(self, mock_emit_cloud_log):
+        """`_error_reason` is for the log only — the dict returned to the
+        model must not carry implementation tags."""
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response("nope", status_code=500))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            result = await fetch_web_content("https://example.com/server-err")
+
+        assert result["status"] == "error"
+        assert "_error_reason" not in result
+
+    @pytest.mark.asyncio
+    async def test_run_id_included_in_log(self, mock_emit_cloud_log):
+        body = "# t\n\n" + "Real article paragraph crossing the thin-content threshold. " * 5
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(body))
+
+        set_fetch_run_id("run-id-marker")
+        try:
+            with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+                await fetch_web_content("https://example.com/run-id-test")
+        finally:
+            clear_fetch_cache_for_run("run-id-marker")
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["run_id"] == "run-id-marker"
 
 
 class TestFetchWebContentBatch:

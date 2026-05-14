@@ -9,10 +9,13 @@ Markdown.
 import asyncio
 import atexit
 import contextvars
+import re
+import time
 from urllib.parse import urlparse, urlunparse
 
 import httpx
 
+from .cloud_logging import emit_cloud_log
 from .secrets import get_secret
 
 JINA_BASE = "https://r.jina.ai"
@@ -118,6 +121,47 @@ def _cache_put(key: tuple[str, str], result: dict) -> None:
     _fetch_cache[key] = result
 
 
+def _log_fetch_url(
+    *,
+    result: dict,
+    url: str,
+    original_url: str | None,
+    duration_ms: int,
+    cached: bool,
+    unwrap_miss: bool,
+) -> None:
+    """Emit one structured `fetch_url` Cloud Logging entry per fetch attempt.
+
+    One line per call (cache hit or fresh) with the canonical URL, the
+    pre-unwrap URL when vertex unwrap rewrote it, status, error_reason
+    tag, duration, cached marker, and (on success) content size in bytes.
+    """
+    status = result.get("status")
+    error_reason: str | None = None
+    content_chars: int | None = None
+
+    if status == "success":
+        content_chars = len(result.get("content", "") or "")
+    else:
+        # `unwrap_miss` dominates: when we tried to unwrap a vertex URL
+        # and got no Location, the downstream Jina call was fetching the
+        # redirect page itself and any error it produced is a derived
+        # symptom of the unwrap failure. Tag the root cause instead.
+        error_reason = "vertex_unwrap_miss" if unwrap_miss else result.get("_error_reason")
+
+    emit_cloud_log(
+        "fetch_url",
+        run_id=_fetch_run_id_var.get(),
+        url=url,
+        original_url=original_url,
+        status=status,
+        error_reason=error_reason,
+        duration_ms=duration_ms,
+        cached=cached,
+        content_chars=content_chars,
+    )
+
+
 def _strip_fragment(url: str) -> str:
     """Drop a URL fragment so `page#a` and `page#b` collapse to one key.
 
@@ -136,25 +180,29 @@ def _strip_fragment(url: str) -> str:
 # ── Block detection ──────────────────────────────────────────────────────────
 
 
-def _detect_upstream_block(content: str) -> str | None:
-    """Jina forwards upstream HTTP errors as 200-OK Markdown bodies.
+def _detect_upstream_block(content: str) -> tuple[str, str] | None:
+    """Detect upstream errors and content-extraction misses in Jina's body.
 
-    Without this check those bodies look like successful fetches with ~300
-    chars of error text, and the model treats blocked sites as having "no
-    content" instead of trying a different source. Also catches readerlm-v2
-    meta-commentary like "(Note: The provided HTML contains an iframe…)"
-    which signals the cleaner couldn't extract usable content.
+    Returns a `(human_message, reason_tag)` pair so callers get both a
+    user-facing description and a stable tag for structured logging.
+    Without this check those bodies look like successful fetches with
+    ~300 chars of error text, and the model treats blocked sites as
+    having "no content" instead of trying a different source. Also
+    catches readerlm-v2 meta-commentary like "(Note: The provided HTML
+    contains an iframe…)" which signals the cleaner couldn't extract
+    usable content.
     """
     head = content[:500]
-    for code in ("400", "401", "403", "404", "451", "500", "502", "503"):
-        if f"Target URL returned error {code}" in head:
-            return f"upstream HTTP {code}"
+    upstream = re.search(r"Target URL returned error (\d{3})", head)
+    if upstream:
+        code = upstream.group(1)
+        return f"upstream HTTP {code}", f"upstream_http_{code}"
     if "requiring CAPTCHA" in head:
-        return "upstream requires CAPTCHA"
+        return "upstream requires CAPTCHA", "upstream_captcha"
     if "Just a moment" in head and len(content) < 2000:
-        return "Cloudflare interstitial"
+        return "Cloudflare interstitial", "cloudflare_interstitial"
     if "(Note: The provided HTML" in content and len(content) < 1500:
-        return "readerlm could not extract content (iframe / SPA)"
+        return "readerlm could not extract content (iframe / SPA)", "iframe_spa"
     # Generic thin-content guard. Real article bodies almost always have
     # at least one paragraph line >120 chars; navigation lists, paywall
     # gates, and section-index pages don't. Avoids the model retrying
@@ -162,7 +210,7 @@ def _detect_upstream_block(content: str) -> str | None:
     if len(content) < 800:
         longest_line = max((len(line) for line in content.splitlines()), default=0)
         if longest_line < 120:
-            return "extracted content too thin to be an article body"
+            return "extracted content too thin to be an article body", "thin_content"
     return None
 
 
@@ -205,13 +253,30 @@ async def fetch_web_content(url: str) -> dict:
     Args:
         url: The full URL to fetch (e.g. 'https://reddit.com/r/coffee/comments/abc123').
     """
-    url = await _unwrap_vertex_redirect(url)
-    url = _strip_fragment(url)
+    original_url = url
+    started = time.monotonic()
+    was_vertex_redirect = _is_vertex_redirect(url)
+
+    unwrapped_url = await _unwrap_vertex_redirect(url)
+    unwrap_miss = was_vertex_redirect and unwrapped_url == original_url
+    vertex_rewrote = was_vertex_redirect and not unwrap_miss
+
+    url = _strip_fragment(unwrapped_url)
+    log_original = original_url if vertex_rewrote else None
 
     cache_key = _cache_key(url)
     if cache_key is not None and cache_key in _fetch_cache:
         cached = dict(_fetch_cache[cache_key])
         cached["cached"] = True
+        _log_fetch_url(
+            result=cached,
+            url=url,
+            original_url=log_original,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            cached=True,
+            unwrap_miss=unwrap_miss,
+        )
+        cached.pop("_error_reason", None)
         return cached
 
     result = await _fetch_uncached(url)
@@ -221,12 +286,27 @@ async def fetch_web_content(url: str) -> dict:
     # or a domain-root rejection within the same run. Caching successes
     # only leaves the diagnosed retry loop alive.
     if cache_key is not None:
-        _cache_put(cache_key, result)
+        _cache_put(cache_key, dict(result))
+
+    _log_fetch_url(
+        result=result,
+        url=url,
+        original_url=log_original,
+        duration_ms=int((time.monotonic() - started) * 1000),
+        cached=False,
+        unwrap_miss=unwrap_miss,
+    )
+    result.pop("_error_reason", None)
     return result
 
 
 async def _fetch_uncached(url: str) -> dict:
-    """Fetch logic without unwrap or cache. Always returns a dict."""
+    """Fetch logic without unwrap or cache. Always returns a dict.
+
+    Error returns carry a private `_error_reason` field with a stable
+    tag for structured logging. The caller is expected to log it and
+    then pop it before returning to the model.
+    """
     parsed = urlparse(url)
     if not parsed.path or parsed.path == "/":
         return {
@@ -235,6 +315,7 @@ async def _fetch_uncached(url: str) -> dict:
                 f"{url} is a domain root, not an article. Search for the "
                 "specific article URL and pass that instead."
             ),
+            "_error_reason": "domain_root",
         }
 
     try:
@@ -254,14 +335,17 @@ async def _fetch_uncached(url: str) -> dict:
             return {
                 "status": "error",
                 "error_message": f"Failed to fetch {url}: HTTP {resp.status_code}",
+                "_error_reason": f"http_{resp.status_code}",
             }
 
         content = resp.text
         block = _detect_upstream_block(content)
         if block:
+            message, reason = block
             return {
                 "status": "error",
-                "error_message": f"Could not read {url}: {block}",
+                "error_message": f"Could not read {url}: {message}",
+                "_error_reason": reason,
             }
 
         if len(content) > MAX_CONTENT_LENGTH:
@@ -276,9 +360,23 @@ async def _fetch_uncached(url: str) -> dict:
         return {
             "status": "error",
             "error_message": f"Timeout fetching {url}",
+            "_error_reason": "timeout",
+        }
+    except httpx.RequestError as e:
+        # Connect, read, network, DNS, etc. — anything httpx classifies
+        # as a request-side error short of HTTPStatusError (which we
+        # don't trigger because we don't call raise_for_status).
+        return {
+            "status": "error",
+            "error_message": f"Network error fetching {url}: {e}",
+            "_error_reason": "network_error",
         }
     except Exception as e:
-        return {"status": "error", "error_message": str(e)}
+        return {
+            "status": "error",
+            "error_message": str(e),
+            "_error_reason": "exception",
+        }
 
 
 async def fetch_web_content_batch(urls: list[str]) -> dict:
