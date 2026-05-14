@@ -130,10 +130,12 @@ def test_thought_text_strips_bare_and_backticked_tool_names():
     assert "get_restaurant_details" not in text
     assert "search_restaurants" not in text
     assert "get_tripadvisor_reviews" not in text
-    # User-facing labels appear instead
-    assert "venue lookup" in text
-    assert "Google Maps search" in text
-    assert "TripAdvisor reviews" in text
+    # Public research-language labels appear instead.
+    assert "venue profile" in text
+    assert "venue data" in text
+    assert "structured reviews" in text
+    assert "Google Maps search" not in text
+    assert "TripAdvisor reviews" not in text
 
 
 def test_thought_text_strips_specialist_tool_names_without_rewriting_common_prose():
@@ -150,10 +152,10 @@ def test_thought_text_strips_specialist_tool_names_without_rewriting_common_pros
     assert "review_analyst" not in text
     assert "dynamic_researcher_1" not in text
     assert "`operations`" not in text
-    assert "Review Analysis" in text
-    assert "Dynamic Research" in text
+    assert "review patterns" in text
+    assert "focused source check" in text
     assert "Restaurant operations" in text
-    assert "Operations is a tool label" in text
+    assert "operating signals is a tool label" in text
 
 
 def test_thought_text_strips_provider_tool_aliases():
@@ -169,8 +171,10 @@ def test_thought_text_strips_provider_tool_aliases():
     assert "google:search" not in text
     assert "default_api:page fetch" not in text
     assert "default_api:fetch_web_content" not in text
-    assert "Google search" in text
-    assert text.count("page fetch") == 2
+    assert "source search" in text
+    assert text.count("source reading") == 2
+    assert "Google search" not in text
+    assert "page fetch" not in text
 
 
 def test_grounding_search_queries_become_searching_the_web_rows():

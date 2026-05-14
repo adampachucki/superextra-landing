@@ -134,27 +134,43 @@ def _collect_thought_text(event: Any) -> str:
     return _strip_tool_names(_normalize_newlines("".join(pieces))).strip()
 
 
-# Map internal function-tool identifiers to user-facing labels. Specialist
-# AgentTool names are derived from `SPECIALISTS` below so the scrubber follows
-# the canonical specialist roster automatically.
+# Map internal function-tool identifiers to public research-language labels.
+# Specialist AgentTool names are derived from `SPECIALISTS` below so the
+# scrubber follows the canonical specialist roster automatically.
 _FUNCTION_TOOL_LABELS: dict[str, str] = {
-    "search_restaurants": "Google Maps search",
-    "find_nearby_restaurants": "nearby Google Maps lookup",
-    "get_restaurant_details": "venue lookup",
-    "get_batch_restaurant_details": "batch venue lookup",
-    "find_tripadvisor_restaurant": "TripAdvisor match",
-    "get_tripadvisor_reviews": "TripAdvisor reviews",
-    "get_google_reviews": "Google reviews",
-    "google_search": "Google search",
-    "fetch_web_content": "page fetch",
-    "fetch_web_content_batch": "batch page fetch",
+    "search_restaurants": "venue data",
+    "find_nearby_restaurants": "nearby venue data",
+    "get_restaurant_details": "venue profile",
+    "get_batch_restaurant_details": "venue profiles",
+    "find_tripadvisor_restaurant": "review source match",
+    "get_tripadvisor_reviews": "structured reviews",
+    "get_google_reviews": "structured reviews",
+    "google_search": "source search",
+    "fetch_web_content": "source reading",
+    "fetch_web_content_batch": "source reading",
 }
 _PROVIDER_TOOL_LABELS: dict[str, str] = {
-    "google:search": "Google search",
-    "default_api:page fetch": "page fetch",
+    "google:search": "source search",
+    "default_api:page fetch": "source reading",
     **{f"default_api:{name}": label for name, label in _FUNCTION_TOOL_LABELS.items()},
 }
-_SPECIALIST_TOOL_LABELS: dict[str, str] = {s.name: s.label for s in SPECIALISTS}
+_SPECIALIST_PUBLIC_LABELS: dict[str, str] = {
+    "market_landscape": "market signals",
+    "menu_pricing": "menu and pricing signals",
+    "revenue_sales": "revenue signals",
+    "guest_intelligence": "guest signals",
+    "location_traffic": "location and traffic signals",
+    "operations": "operating signals",
+    "marketing_brand": "marketing signals",
+    "review_analyst": "review patterns",
+    "dynamic_researcher_1": "focused source check",
+    "dynamic_researcher_2": "focused source check",
+    "dynamic_researcher_3": "focused source check",
+}
+_SPECIALIST_TOOL_LABELS: dict[str, str] = {
+    s.name: _SPECIALIST_PUBLIC_LABELS.get(s.name, "research angle")
+    for s in SPECIALISTS
+}
 _TOOL_LABELS: dict[str, str] = {
     **_FUNCTION_TOOL_LABELS,
     **_PROVIDER_TOOL_LABELS,

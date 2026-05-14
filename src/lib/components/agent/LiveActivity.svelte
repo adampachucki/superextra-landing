@@ -86,12 +86,23 @@
 		research_lead: 'Reasoning',
 		report_writer: 'Drafting final report',
 		continue_research: 'Continuing research',
-		follow_up: 'Following up'
+		follow_up: 'Following up',
+		market_landscape: 'Researching market signals',
+		menu_pricing: 'Researching menu and pricing',
+		revenue_sales: 'Researching revenue signals',
+		guest_intelligence: 'Researching guest signals',
+		location_traffic: 'Researching location and traffic',
+		operations: 'Researching operating signals',
+		marketing_brand: 'Researching marketing signals',
+		review_analyst: 'Analyzing review patterns',
+		dynamic_researcher_1: 'Researching focused angle',
+		dynamic_researcher_2: 'Researching focused angle',
+		dynamic_researcher_3: 'Researching focused angle'
 	};
 	function authorLabel(author: string | null | undefined): string {
 		if (!author) return 'Reasoning';
 		if (AUTHOR_LABEL[author]) return AUTHOR_LABEL[author];
-		return author.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+		return 'Researching';
 	}
 
 	const label = $derived.by<string>(() => {

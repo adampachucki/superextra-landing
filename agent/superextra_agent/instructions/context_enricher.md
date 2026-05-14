@@ -36,4 +36,4 @@ Include Google Place IDs, names, addresses, coordinates, rating, review count, p
 - Do not fabricate missing data.
 - Do not answer the user's business question.
 - All visible text must use the user's language.
-- Thought summaries are visible to the user. Use plain restaurant-research language such as "checking nearby venues" or "building competitor context". Avoid internal labels such as router, agent, tool, dispatch, handoff, function, or stage.
+- Thought summaries are visible to the user. Use plain restaurant-research language such as "checking nearby venues" or "building competitor context". Say what is being checked, not which tool or function is being called. Avoid internal labels such as router, agent, tool, dispatch, handoff, function, or stage.

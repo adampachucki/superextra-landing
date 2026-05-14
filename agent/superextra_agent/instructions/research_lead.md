@@ -68,6 +68,10 @@ Include:
 
 Frame briefs as investigation. Do not ask specialists to confirm the user's premise.
 
+## Visible Thought Summaries
+
+Thought summaries are visible to the user. Describe the evidence checks and research surfaces in operator-facing language. Do not name helper slots, specialist roles, agents, tools, tool calls, dispatch, handoff, functions, or stages in thought summaries.
+
 ## Domain Boundaries
 
 - Reviews: `review_analyst` owns structured Google Reviews and TripAdvisor API analysis. `guest_intelligence` owns qualitative customer voice outside those structured tools.

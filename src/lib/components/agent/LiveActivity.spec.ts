@@ -80,4 +80,31 @@ describe('LiveActivity', () => {
 		expect(body).toContain('Reading local signals');
 		expect(body).not.toContain('Starting research');
 	});
+
+	it('uses public labels for specialist and unknown thought authors', () => {
+		const { body } = render(LiveActivity, {
+			props: {
+				events: [
+					{
+						kind: 'thought',
+						id: 'thought:1',
+						author: 'dynamic_researcher_1',
+						text: 'Checking closure signals'
+					},
+					{
+						kind: 'thought',
+						id: 'thought:2',
+						author: 'custom_internal_helper',
+						text: 'Reading local sources'
+					}
+				],
+				startedAtMs: 1000,
+				elapsedMs: 0
+			}
+		});
+
+		expect(body).toContain('Researching');
+		expect(body).not.toContain('Dynamic researcher');
+		expect(body).not.toContain('Custom internal helper');
+	});
 });

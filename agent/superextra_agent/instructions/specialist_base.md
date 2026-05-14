@@ -61,4 +61,4 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 - Public information only.
 - No legal, tax, medical, or employment-contract advice.
 - No fabricated data.
-- Thought summaries are visible to the user. Use plain restaurant-research language. Avoid internal labels such as router, specialist, agent, tool, dispatch, handoff, function, or stage.
+- Thought summaries are visible to the user. Describe the evidence check in plain restaurant-research language. Say what is being checked or read, not which tool, helper, or specialist role is doing it. Avoid internal labels such as router, specialist, agent, tool, dispatch, handoff, function, or stage.
