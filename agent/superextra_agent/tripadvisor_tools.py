@@ -1,4 +1,3 @@
-import atexit
 import math
 import re
 import unicodedata
@@ -17,11 +16,7 @@ from .secrets import get_secret
 
 BASE_URL = "https://serpapi.com/search.json"
 
-# Reject obviously-wrong matches (different city, different chain branch).
-# SerpAPI's `address_link` coord is a Google Maps geocode of the address
-# string, not the venue's actual location, so legitimate matches can drift
-# hundreds of meters (Malika observed at 458m). Only used as a veto on
-# name-matched candidates.
+# 5km veto on chain-branch / wrong-city matches that pass the name check.
 _COORD_SANITY_RADIUS_M = 5000.0
 
 _COORD_RE = re.compile(r"@([-\d.]+),([-\d.]+)")
@@ -55,41 +50,8 @@ def _get_client() -> httpx.AsyncClient:
     return _client
 
 
-def _cleanup_client():
-    global _client
-    if _client is not None:
-        try:
-            import asyncio
-            asyncio.run(_client.aclose())
-        except RuntimeError:
-            pass
-        _client = None
-
-
-atexit.register(_cleanup_client)
-
-
 def _get_api_key() -> str:
     return get_secret("SERPAPI_API_KEY")
-
-
-def _extract_coords_from_address_link(address_link: str) -> tuple[float, float] | None:
-    """Pull `(lat, lng)` out of TripAdvisor's Google Maps URL.
-
-    SerpAPI's `tripadvisor_place` response embeds an `@lat,lng` suffix in
-    the `address_link` Google Maps URL. The value is a Google Maps geocode
-    of the address string, not the venue's actual location, so we use it
-    only as a loose sanity veto on name-matched candidates.
-    """
-    if not address_link:
-        return None
-    m = _COORD_RE.search(address_link)
-    if not m:
-        return None
-    try:
-        return float(m.group(1)), float(m.group(2))
-    except ValueError:
-        return None
 
 
 def _haversine_meters(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -222,7 +184,8 @@ async def find_tripadvisor_restaurant(
                     f"the Google place name"
                 ),
             }
-        ta_coords = _extract_coords_from_address_link(place_data.get("address_link", ""))
+        coord_match = _COORD_RE.search(place_data.get("address_link", ""))
+        ta_coords = (float(coord_match[1]), float(coord_match[2])) if coord_match else None
         if ta_coords and _haversine_meters(coords, ta_coords) > _COORD_SANITY_RADIUS_M:
             return {
                 "status": "unverified",
@@ -235,15 +198,16 @@ async def find_tripadvisor_restaurant(
         # Verified match. Build the rich payload.
         selected_link = top.get("link")
 
-        nearby = []
-        for r in place_data.get("nearby", {}).get("restaurants", []):
-            nearby.append({
+        nearby = [
+            {
                 "name": r.get("name"),
                 "place_id": r.get("place_id"),
                 "rating": r.get("rating"),
                 "reviews": r.get("reviews"),
                 "distance_km": round(r.get("distance", 0), 2),
-            })
+            }
+            for r in place_data.get("nearby", {}).get("restaurants", [])
+        ]
 
         sample_reviews = []
         for r in place_data.get("reviews_list", []):
