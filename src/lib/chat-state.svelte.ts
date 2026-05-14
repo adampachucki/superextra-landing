@@ -69,6 +69,8 @@ export interface Session {
 	placeContext: PlaceContext | null;
 	status: 'queued' | 'running' | 'complete' | 'error' | null;
 	currentRunId: string | null;
+	activeAgent: string | null;
+	activeStage: string | null;
 	lastTurnIndex: number;
 	createdAtMs: number | null;
 	updatedAtMs: number | null;
@@ -103,6 +105,44 @@ export type LoadState = 'idle' | 'loading' | 'loaded' | 'missing';
 
 /** Events listener attaches only while latest turn is in these statuses. */
 const IN_FLIGHT_STATUSES = new Set(['queued', 'running', 'pending']);
+
+const ACTIVE_AGENT_LABEL: Record<string, string> = {
+	router: 'Choosing next steps',
+	context_enricher: 'Building context',
+	research_lead: 'Planning research',
+	report_writer: 'Drafting final report',
+	continue_research: 'Continuing research',
+	follow_up: 'Following up',
+	market_landscape: 'Researching market landscape',
+	menu_pricing: 'Researching menu and pricing',
+	revenue_sales: 'Researching revenue and sales',
+	guest_intelligence: 'Researching guest signals',
+	location_traffic: 'Researching location and traffic',
+	operations: 'Researching operations',
+	marketing_brand: 'Researching marketing and brand',
+	review_analyst: 'Analyzing reviews',
+	dynamic_researcher_1: 'Researching focused angle',
+	dynamic_researcher_2: 'Researching focused angle',
+	dynamic_researcher_3: 'Researching focused angle'
+};
+
+const ACTIVE_STAGE_LABEL: Record<string, string> = {
+	routing: 'Choosing next steps',
+	building_context: 'Building context',
+	planning_research: 'Planning research',
+	writing_final_report: 'Drafting final report',
+	continuing_research: 'Continuing research',
+	specialist_research: 'Researching market signals',
+	agent_work: 'Working'
+};
+
+function activeStatusLabel(session: Session | null): string | null {
+	if (session?.status !== 'running') return null;
+	const agentLabel = session.activeAgent ? ACTIVE_AGENT_LABEL[session.activeAgent] : null;
+	if (agentLabel) return agentLabel;
+	const stageLabel = session.activeStage ? ACTIVE_STAGE_LABEL[session.activeStage] : null;
+	return stageLabel ?? null;
+}
 
 function toMillis(value: unknown): number | null {
 	if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -395,6 +435,8 @@ async function attachActiveListeners(sid: string) {
 				placeContext: (data.placeContext as PlaceContext | undefined) ?? null,
 				status: (data.status as Session['status']) ?? null,
 				currentRunId: (data.currentRunId as string | undefined) ?? null,
+				activeAgent: (data.activeAgent as string | undefined) ?? null,
+				activeStage: (data.activeStage as string | undefined) ?? null,
 				lastTurnIndex: (data.lastTurnIndex as number | undefined) ?? 0,
 				createdAtMs: toMillis(data.createdAt),
 				updatedAtMs: toMillis(data.updatedAt)
@@ -831,6 +873,9 @@ export const chatState = {
 	},
 	get liveTimeline(): TimelineEvent[] {
 		return liveTimeline;
+	},
+	get liveStatusLabel(): string | null {
+		return activeStatusLabel(activeSession);
 	},
 	get canDelete(): boolean {
 		if (!currentUid || !activeSession) return false;

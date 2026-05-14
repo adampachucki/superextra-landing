@@ -349,6 +349,7 @@
 				<LiveActivity
 					events={chatState.liveTimeline}
 					startedAtMs={chatState.currentTurnStartedAtMs}
+					statusLabel={chatState.liveStatusLabel}
 				/>
 			</div>
 		{/if}

@@ -266,6 +266,8 @@ describe('chatState (Firestore-driven)', () => {
 					placeContext: null,
 					status: 'complete',
 					currentRunId: 'run-1',
+					activeAgent: 'report_writer',
+					activeStage: 'writing_final_report',
 					lastTurnIndex: 2,
 					createdAt: { toMillis: () => 1000 },
 					updatedAt: { toMillis: () => 2000 }
@@ -276,8 +278,30 @@ describe('chatState (Firestore-driven)', () => {
 				title: 'My Chat',
 				userId: 'uid-test',
 				lastTurnIndex: 2,
+				activeAgent: 'report_writer',
+				activeStage: 'writing_final_report',
 				updatedAtMs: 2000
 			});
+		});
+
+		it('derives the live status label from active session stage fields', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.session('sid-1'));
+
+			obs.session('sid-1')!.onNext(
+				sessionSnap({
+					userId: 'uid-test',
+					participants: ['uid-test'],
+					status: 'running',
+					currentRunId: 'run-1',
+					activeAgent: 'context_enricher',
+					activeStage: 'building_context',
+					lastTurnIndex: 1
+				})
+			);
+
+			expect(chatState.liveStatusLabel).toBe('Building context');
 		});
 
 		it('reselecting tears down the prior listener and starts a new one', async () => {

@@ -7,12 +7,14 @@
 		events,
 		startedAtMs = null,
 		elapsedMs = null,
-		completed = false
+		completed = false,
+		statusLabel = null
 	}: {
 		events: TimelineEvent[];
 		startedAtMs?: number | null;
 		elapsedMs?: number | null;
 		completed?: boolean;
+		statusLabel?: string | null;
 	} = $props();
 
 	let now = $state(Date.now());
@@ -43,7 +45,8 @@
 	});
 
 	$effect(() => {
-		if (completed || events.length) return;
+		const latest = events[events.length - 1];
+		if (completed || (latest && (!isRunStartStatus(latest) || statusLabel))) return;
 		idleLabel = IDLE_LABELS[0];
 		let timer: ReturnType<typeof setTimeout>;
 		const schedule = () => {
@@ -60,6 +63,12 @@
 
 	function isStatusDetail(event: TimelineEvent): boolean {
 		return event.kind === 'detail' && event.family === 'Analysis';
+	}
+
+	function isRunStartStatus(event: TimelineEvent | undefined): boolean {
+		return (
+			event?.kind === 'detail' && event.family === 'Analysis' && event.id.startsWith('run-start:')
+		);
 	}
 
 	const FAMILY_LABEL: Record<DetailEvent['family'], string> = {
@@ -87,7 +96,8 @@
 
 	const label = $derived.by<string>(() => {
 		const latest = events[events.length - 1];
-		if (!latest) return idleLabel;
+		if (!latest) return statusLabel ?? idleLabel;
+		if (isRunStartStatus(latest)) return statusLabel ?? idleLabel;
 		if (latest.kind === 'detail') {
 			return latest.family === 'Analysis' ? latest.text : FAMILY_LABEL[latest.family];
 		}
