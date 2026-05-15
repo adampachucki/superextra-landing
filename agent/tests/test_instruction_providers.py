@@ -256,17 +256,20 @@ class TestMakeInstruction:
         result = provider(MockCtx(state={"places_context": "Target data"}))
 
         assert "## Search And Source Reading" in result
-        assert "Search, page reading, and raw fetch have different jobs" in result
-        assert "Native URL Context page reading is available during your research" in result
-        assert "`read_web_pages` is an explicit structured reader" in result
-        assert "`fetch_web_content` and `fetch_web_content_batch` are raw-Markdown fallbacks" in result
+        assert "Search and page reading have different jobs" in result
+        assert "Search snippets and search-result source pills are not the same as reading a page" in result
+        assert "If `search_and_read_public_pages` is available" in result
+        assert "If `search_web` is available" in result
+        assert "If `read_web_pages` is available" in result
+        assert "Jina Reader and return raw Markdown/page text" in result
         assert "article pages, official announcements, public reports, PDFs" in result
         assert "inspect those pages before broadening the search" in result
+        assert "prefer it over separate search/read calls" in result
         assert "read the strongest 1-3 pages during your research" in result
         assert "Iterate from what the pages say" in result
-        assert "Call `read_web_pages` when explicit extracted evidence" in result
+        assert "Use the strongest available page-reading tool" in result
         assert "After two or three searches" in result
-        assert "Grounding sources may still appear as source pills" in result
+        assert "Search and grounding sources may still appear as source pills" in result
         assert "source-pill display" in result
 
 

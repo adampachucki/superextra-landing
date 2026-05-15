@@ -59,9 +59,10 @@ def test_research_pipeline_ends_with_report_writer():
         "report_writer",
     ]
     assert research_lead.output_key == "research_coverage"
-    assert google_search in research_lead.tools
-    assert url_context in research_lead.tools
-    assert read_web_pages in research_lead.tools
+    assert google_search not in research_lead.tools
+    assert url_context not in research_lead.tools
+    assert read_web_pages not in research_lead.tools
+    assert all(getattr(tool, "agent", None) is not None for tool in research_lead.tools)
     assert report_writer.output_key == "final_report"
     assert getattr(report_writer.model, "model", None) == "gemini-3.1-pro-preview"
     assert report_writer.tools == []

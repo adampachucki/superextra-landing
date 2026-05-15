@@ -19,6 +19,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 from google.cloud import firestore
 
@@ -139,6 +140,8 @@ class GearRunState:
     def _merge_source(self, entry: Any) -> None:
         if not isinstance(entry, dict):
             return
+        if self._skip_source(entry):
+            return
         key = self._source_dedupe_key(entry)
         if not key or key in self.specialist_sources_seen:
             return
@@ -146,13 +149,27 @@ class GearRunState:
         self.specialist_sources.append(entry)
 
     @staticmethod
+    def _skip_source(entry: dict[str, Any]) -> bool:
+        url = entry.get("url")
+        if not isinstance(url, str) or not url:
+            return False
+        try:
+            parsed = urlparse(url)
+        except Exception:  # noqa: BLE001
+            return False
+        return (
+            parsed.hostname == "vertexaisearch.cloud.google.com"
+            and parsed.path.startswith("/grounding-api-redirect/")
+        )
+
+    @staticmethod
     def _source_dedupe_key(entry: dict[str, Any]) -> str | None:
         url = entry.get("url")
         if not url:
             return None
-        provider = entry.get("provider") or ""
         place_id = entry.get("place_id") or ""
-        if provider or place_id:
+        if place_id:
+            provider = entry.get("provider") or ""
             return f"{provider}\0{place_id}\0{url}"
         return str(url)
 
@@ -166,7 +183,9 @@ class GearRunState:
         seen: set[str] = set()
         merged: list[dict[str, Any]] = []
         for s in list(mapper_sources) + list(self.specialist_sources):
-            key = self._source_dedupe_key(s) if isinstance(s, dict) else None
+            if not isinstance(s, dict) or self._skip_source(s):
+                continue
+            key = self._source_dedupe_key(s)
             if not key or key in seen:
                 continue
             seen.add(key)

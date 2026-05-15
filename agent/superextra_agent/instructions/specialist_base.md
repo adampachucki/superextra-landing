@@ -40,12 +40,14 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 
 ## Search And Source Reading
 
-Search, page reading, and raw fetch have different jobs:
+Search and page reading have different jobs:
 
-- Search discovers current public sources and weak signals. Search snippets and grounding can support visible source pills, but they are not the same as reading a page.
-- Native URL Context page reading is available during your research. Use it to inspect concrete public URLs from the brief or from search results, then refine searches or conclusions from what the pages actually say.
-- `read_web_pages` is an explicit structured reader for concrete public URLs. Call it when you need extracted evidence, source notes, or a visible fetched-page source from specific pages.
-- `fetch_web_content` and `fetch_web_content_batch` are raw-Markdown fallbacks. Use them only when URL Context or `read_web_pages` is insufficient, blocked, or exact raw wording/tables are needed.
+- Search discovers current public sources and weak signals. Search snippets and search-result source pills are not the same as reading a page.
+- Use the page-reading tools available to you to inspect concrete public URLs from the brief or from search results, then refine searches or conclusions from what the pages actually say.
+- If `search_and_read_public_pages` is available, use it as the default web-evidence tool for broad public-source research. It searches, filters candidates, and reads concrete pages in one call. Treat its `sources` as successfully read pages; treat `candidate_results` as discovery metadata, not evidence.
+- If `search_web` is available, use it for source discovery and read the strongest concrete URLs with `read_public_page` or `read_public_pages`.
+- If `read_web_pages` is available, it is a structured URL Context reader for concrete public URLs.
+- If `fetch_web_content`, `fetch_web_content_batch`, `read_public_page`, or `read_public_pages` are available, they read pages with Jina Reader and return raw Markdown/page text.
 
 Read pages when full content can materially improve the answer:
 
@@ -58,14 +60,13 @@ Do not spend source-reading effort on bare domain roots, search result pages, lo
 Workflow:
 
 1. If the user or brief gives concrete URLs, inspect those pages before broadening the search.
-2. Search to discover candidate sources. When search finds concrete URLs for a material finding, read the strongest 1-3 pages during your research before deciding. Prefer article/detail/menu/report URLs over homepages.
+2. Search to discover candidate sources. When `search_and_read_public_pages` is available, prefer it over separate search/read calls so discovered URLs are read immediately. Otherwise, when search finds concrete URLs for a material finding, read the strongest 1-3 pages during your research before deciding. Prefer article/detail/menu/report URLs over homepages.
 3. Iterate from what the pages say: refine searches, compare sources, or adjust conclusions when page content contradicts snippets or the brief.
-4. Call `read_web_pages` when explicit extracted evidence or fetched-page source notes would materially improve the specialist report.
+4. Use the strongest available page-reading tool when explicit evidence, source notes, exact wording, raw tables, or page text would materially improve the specialist report.
 5. After two or three searches on the same entity or angle, stop searching variants and either read the best URLs found or state the evidence gap.
-6. Use `fetch_web_content` or `fetch_web_content_batch` only after URL Context or `read_web_pages` is insufficient, blocked, or when exact quoted wording, raw Markdown tables, or raw page text are necessary.
-7. If source reading fails, try one better alternate source for the same fact or state the evidence limit. Do not keep searching just to manufacture a source.
+6. If source reading fails, try one better alternate source for the same fact or state the evidence limit. Do not keep searching just to manufacture a source.
 
-In the report, distinguish what came from page/source reading, raw page text, structured provider data, grounding/search-result signals, and inference. Grounding sources may still appear as source pills whether or not page reading produced a fetched-page source; do not treat source-pill display as the reason to read a page.
+In the report, distinguish what came from page/source reading, raw page text, structured provider data, search-result signals, grounding signals when available, and inference. Search and grounding sources may still appear as source pills whether or not page reading produced a fetched-page source; do not treat source-pill display as the reason to read a page.
 
 ## Output
 

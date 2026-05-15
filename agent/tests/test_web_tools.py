@@ -12,6 +12,8 @@ from superextra_agent.web_tools import (
     clear_fetch_cache_for_run,
     fetch_web_content,
     fetch_web_content_batch,
+    read_public_page,
+    read_public_pages,
     read_web_pages,
     set_fetch_run_id,
 )
@@ -45,6 +47,8 @@ def test_tool_docstrings_describe_source_reading_workflow():
     read_doc = " ".join((read_web_pages.__doc__ or "").split())
     fetch_doc = " ".join((fetch_web_content.__doc__ or "").split())
     batch_doc = " ".join((fetch_web_content_batch.__doc__ or "").split())
+    read_public_doc = " ".join((read_public_page.__doc__ or "").split())
+    read_public_batch_doc = " ".join((read_public_pages.__doc__ or "").split())
 
     assert "Explicit structured reader for concrete public URLs" in read_doc
     assert "fetched-page source capture" in read_doc
@@ -53,15 +57,77 @@ def test_tool_docstrings_describe_source_reading_workflow():
     assert "Do not use this as the first read" in fetch_doc
     assert "Raw-Markdown fallback for multiple URLs" in batch_doc
     assert "prefer URL Context or `read_web_pages` first" in batch_doc
+    assert "Primary page reader for concrete URLs discovered by search tools" in read_public_doc
+    assert "Batch page reader for concrete URLs discovered by search tools" in read_public_batch_doc
 
 
 def test_source_reading_timeouts_are_short_bounded_attempts():
     assert web_tools.TIMEOUT_S == 15.0
-    assert web_tools.JINA_READERLM_TIMEOUT_S == 20.0
+    assert web_tools.JINA_READERLM_TIMEOUT_S == 8.0
     assert web_tools.URL_CONTEXT_MODEL == "gemini-3-flash-preview"
     assert web_tools.URL_CONTEXT_TIMEOUT_S == 27.0
     assert web_tools.URL_CONTEXT_HTTP_TIMEOUT_MS == 25_000
     assert web_tools.VERTEX_UNWRAP_TIMEOUT_S == 5.0
+
+
+@pytest.mark.asyncio
+async def test_read_public_page_wraps_jina_fetch_with_source():
+    with patch(
+        "superextra_agent.web_tools.fetch_web_content",
+        AsyncMock(
+            return_value={
+                "status": "success",
+                "url": "https://example.com/menu",
+                "content": "Title: Lunch Menu\n\n# Menu\n\nLunch is daily.",
+            }
+        ),
+    ):
+        result = await read_public_page("https://example.com/menu")
+
+    assert result["sources"] == [
+        {
+            "url": "https://example.com/menu",
+            "title": "Lunch Menu",
+            "domain": "example.com",
+            "provider": "fetched_page",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_read_public_pages_collects_successful_sources():
+    with patch(
+        "superextra_agent.web_tools.fetch_web_content_batch",
+        AsyncMock(
+            return_value={
+                "status": "success",
+                "results": [
+                    {
+                        "status": "success",
+                        "url": "https://example.com/a",
+                        "content": "# Page A\n\nText",
+                    },
+                    {
+                        "status": "error",
+                        "url": "https://example.com/b",
+                        "error_message": "blocked",
+                    },
+                ],
+                "success_count": 1,
+                "failed_count": 1,
+            }
+        ),
+    ):
+        result = await read_public_pages(["https://example.com/a", "https://example.com/b"])
+
+    assert result["sources"] == [
+        {
+            "url": "https://example.com/a",
+            "title": "Page A",
+            "domain": "example.com",
+            "provider": "fetched_page",
+        }
+    ]
 
 
 class TestReadWebPages:
@@ -441,6 +507,80 @@ class TestFetchWebContent:
         assert kw["fallback_reason"] == "thin_content"
 
     @pytest.mark.asyncio
+    async def test_consent_noise_uses_readerlm_fallback(self, mock_emit_cloud_log):
+        noisy = (
+            "Title: Monsun\n\n# Monsun Gdynia\n\n"
+            "Cenimy prywatność użytkowników. Wraz z naszymi 1722 partnerami używamy plików cookie.\n\n"
+            + "Navigation item. " * 200
+        )
+        clean = "# Monsun Gdynia\n\n" + "Clean listing paragraph with address and menu details. " * 40
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[_mock_response(noisy), _mock_response(clean)])
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
+             patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
+            result = await fetch_web_content("https://www.trojmiasto.pl/Monsun-o96445.html")
+
+        assert result["status"] == "success"
+        assert result["content"] == clean
+        assert mock_client.get.call_count == 2
+
+        readerlm_headers = mock_client.get.call_args_list[1].kwargs.get("headers", {})
+        assert readerlm_headers.get("X-Respond-With") == "readerlm-v2"
+        assert readerlm_headers.get("Authorization") == "Bearer test-key-123"
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["reader_mode"] == "readerlm-v2"
+        assert kw["fallback_reason"] == "consent_noise"
+        assert kw["fallback_status"] is None
+
+    @pytest.mark.asyncio
+    async def test_consent_noise_keeps_plain_when_readerlm_is_worse(self, mock_emit_cloud_log):
+        noisy = (
+            "Title: Listing\n\n# Listing\n\n"
+            "Ta strona korzysta z ciasteczek. Dalsze korzystanie ze strony oznacza, że zgadzasz się.\n\n"
+            + "Usable public listing detail. " * 80
+        )
+        thin = "Title: Listing\n\nHome\nAbout\nContact"
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[_mock_response(noisy), _mock_response(thin)])
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
+             patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
+            result = await fetch_web_content("https://example.com/listing")
+
+        assert result["status"] == "success"
+        assert result["content"] == noisy
+        assert mock_client.get.call_count == 2
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["reader_mode"] == "plain"
+        assert kw["fallback_reason"] == "consent_noise"
+        assert kw["fallback_status"] == "error"
+        assert kw["fallback_error_reason"] == "thin_content"
+
+    @pytest.mark.asyncio
+    async def test_login_gate_does_not_use_readerlm_fallback(self, mock_emit_cloud_log):
+        login = (
+            "Title: X\n\n# X\n\nDon’t miss what’s happening\n"
+            "People on X are the first to know. Log in Sign up"
+        )
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(login))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
+             patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
+            result = await fetch_web_content("https://x.com/example/status/1")
+
+        assert result["status"] == "error"
+        assert "login" in result["error_message"]
+        assert mock_client.get.call_count == 1
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["error_reason"] == "login_required"
+        assert kw["fallback_reason"] is None
+
+    @pytest.mark.asyncio
     async def test_content_truncation(self):
         long_content = "x" * (MAX_CONTENT_LENGTH + 1000)
         mock_client = AsyncMock()
@@ -712,6 +852,53 @@ class TestFetchCache:
         assert second["cached"] is True
         assert second["error_message"] == first["error_message"]
         # Jina hit exactly once — the second call is served from cache.
+        assert mock_client.get.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_deep_read_reuses_fast_cache_without_repeating_plain_fetch(self):
+        noisy = (
+            "Title: Listing\n\n# Listing\n\n"
+            "Ta strona korzysta z ciasteczek. Dalsze korzystanie ze strony oznacza, że zgadzasz się.\n\n"
+            + "Usable public listing detail. " * 80
+        )
+        clean = "# Listing\n\n" + "Clean listing paragraph with concrete details. " * 80
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[_mock_response(noisy), _mock_response(clean)])
+
+        set_fetch_run_id("run-fast-then-deep")
+        try:
+            with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
+                 patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
+                batch = await fetch_web_content_batch(["https://example.com/listing"])
+                deep = await fetch_web_content("https://example.com/listing")
+        finally:
+            clear_fetch_cache_for_run("run-fast-then-deep")
+
+        assert batch["status"] == "success"
+        assert batch["results"][0]["content"] == noisy
+        assert deep["status"] == "success"
+        assert deep["content"] == clean
+        assert mock_client.get.call_count == 2
+        assert "X-Respond-With" not in mock_client.get.call_args_list[0].kwargs["headers"]
+        assert mock_client.get.call_args_list[1].kwargs["headers"]["X-Respond-With"] == "readerlm-v2"
+
+    @pytest.mark.asyncio
+    async def test_batch_read_reuses_plain_pass_from_prior_deep_read(self):
+        body = "# Title\n\n" + "Real paragraph that crosses the thin-content threshold easily. " * 5
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(body))
+
+        set_fetch_run_id("run-deep-then-fast")
+        try:
+            with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+                deep = await fetch_web_content("https://example.com/article")
+                batch = await fetch_web_content_batch(["https://example.com/article"])
+        finally:
+            clear_fetch_cache_for_run("run-deep-then-fast")
+
+        assert deep["status"] == "success"
+        assert batch["status"] == "success"
+        assert batch["results"][0]["cached"] is True
         assert mock_client.get.call_count == 1
 
     @pytest.mark.asyncio
@@ -1032,6 +1219,27 @@ class TestFetchWebContentBatch:
         assert result["success_count"] == 0
         assert result["failed_count"] == 2
         assert [item["status"] for item in result["results"]] == ["error", "error"]
+
+    @pytest.mark.asyncio
+    async def test_batch_does_not_use_readerlm_fallback_for_noisy_success(self):
+        noisy = (
+            "Title: Listing\n\n# Listing\n\n"
+            "Cenimy prywatność użytkowników. Wraz z naszymi 1722 partnerami używamy plików cookie.\n\n"
+            + "Usable public listing detail. " * 80
+        )
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(noisy))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
+             patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
+            result = await fetch_web_content_batch(["https://example.com/listing"])
+
+        assert result["status"] == "success"
+        assert result["results"][0]["content"] == noisy
+        assert mock_client.get.call_count == 1
+        headers = mock_client.get.call_args.kwargs.get("headers", {})
+        assert "X-Respond-With" not in headers
+        assert "Authorization" not in headers
 
     @pytest.mark.asyncio
     async def test_empty_batch_errors(self):

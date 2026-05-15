@@ -290,6 +290,45 @@ def test_source_dedupe_keeps_same_url_for_distinct_provider_or_place():
     ]
 
 
+def test_source_dedupe_collapses_public_web_sources_by_url():
+    state = _make_state()
+
+    state._merge_source({
+        "url": "https://example.com/article",
+        "title": "Search result title",
+        "domain": "example.com",
+    })
+    state._merge_source({
+        "provider": "fetched_page",
+        "url": "https://example.com/article",
+        "title": "Fetched page title",
+        "domain": "example.com",
+    })
+
+    assert state.specialist_sources == [
+        {
+            "url": "https://example.com/article",
+            "title": "Search result title",
+            "domain": "example.com",
+        }
+    ]
+
+
+def test_vertex_grounding_redirect_sources_are_not_persisted():
+    state = _make_state()
+    redirect = {
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/token",
+        "title": "trojmiasto.pl",
+        "domain": "trojmiasto.pl",
+    }
+
+    state._merge_source(redirect)
+    state._capture_final({"reply": "answer", "sources": [redirect]})
+
+    assert state.specialist_sources == []
+    assert state.final_sources == []
+
+
 def test_capture_final_preserves_place_scoped_sources_with_same_url():
     state = _make_state()
     url = "https://www.google.com/maps/place/?q=place_id:ChIJtarget"

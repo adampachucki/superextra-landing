@@ -352,7 +352,7 @@ def _build_state(
     )
 
 
-def _merge_fetched_sources(
+def _merge_tool_sources(
     per: GearRunState,
     tool_name: str,
     tool_args: dict[str, Any],
@@ -366,7 +366,12 @@ def _merge_fetched_sources(
     """
     if not isinstance(result, dict):
         return
-    if tool_name == "read_web_pages":
+    if tool_name in (
+        "search_and_read_public_pages",
+        "read_web_pages",
+        "read_public_page",
+        "read_public_pages",
+    ):
         if result.get("status") != "success":
             return
         for entry in result.get("sources") or []:
@@ -614,7 +619,7 @@ class FirestoreProgressPlugin(BasePlugin):
             getattr(tool_context, "function_call_id", None),
         ):
             await self._observe_typed_pill(per, pill)
-        _merge_fetched_sources(per, tool.name, tool_args, result)
+        _merge_tool_sources(per, tool.name, tool_args, result)
         return None
 
     @override

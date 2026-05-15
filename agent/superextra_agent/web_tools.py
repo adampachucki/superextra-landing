@@ -6,9 +6,10 @@ bodies and return structured evidence plus fetched-page source entries.
 
 `fetch_web_content[_batch]` are raw-Markdown fallbacks backed by Jina Reader
 (r.jina.ai). Use them when URL Context is insufficient or blocked, or when
-exact wording, raw tables, or raw page text are needed. They try Jina's fast
-plain reader first, then fall back to `readerlm-v2` only when the first pass
-looks like thin/noisy extraction.
+exact wording, raw tables, or raw page text are needed. Single-page reads try
+Jina's fast plain reader first, then fall back to `readerlm-v2` only when the
+first pass looks like thin/noisy extraction. Batch reads use the fast plain
+reader only.
 """
 import asyncio
 import atexit
@@ -31,15 +32,16 @@ from .secrets import get_secret
 JINA_BASE = "https://r.jina.ai"
 MAX_CONTENT_LENGTH = 50_000
 TIMEOUT_S = 15.0
-JINA_READERLM_TIMEOUT_S = 20.0
+JINA_READERLM_TIMEOUT_S = 8.0
 URL_CONTEXT_MODEL = os.environ.get("URL_CONTEXT_MODEL", "gemini-3-flash-preview")
 URL_CONTEXT_TIMEOUT_S = 27.0
 URL_CONTEXT_HTTP_TIMEOUT_MS = 25_000
 MAX_URL_CONTEXT_URLS = 6
 CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 # `readerlm-v2` is auth-only and can take tens of seconds per page. We only
-# call it after the fast reader returns extraction-shaped junk; cap batch
-# fanout so a confused model can't kick off 50+ paid LM calls in one turn.
+# call it after the fast reader returns extraction-shaped junk on a deliberate
+# single-page read. Batch reads stay fast so broad source scans don't spend
+# one timeout per noisy page.
 MAX_BATCH = 10
 
 # Gemini grounding exposes article URLs as tokenized redirects on
@@ -51,7 +53,10 @@ VERTEX_REDIRECT_HOST = "vertexaisearch.cloud.google.com"
 VERTEX_REDIRECT_PATH_PREFIX = "/grounding-api-redirect/"
 VERTEX_UNWRAP_TIMEOUT_S = 5.0
 ERROR_MESSAGE_LOG_CHARS = 500
-JINA_READERLM_FALLBACK_REASONS = frozenset({"thin_content", "iframe_spa"})
+JINA_READERLM_FALLBACK_REASONS = frozenset(
+    {"thin_content", "iframe_spa", "consent_noise"}
+)
+_JINA_TITLE_RE = re.compile(r"^Title:\s*(.+?)\s*$", re.MULTILINE)
 
 
 def _is_vertex_redirect(url: str) -> bool:
@@ -105,7 +110,9 @@ atexit.register(_cleanup_client)
 _fetch_run_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "_fetch_run_id", default=None
 )
-_fetch_cache: dict[tuple[str, str], dict] = {}
+_FETCH_CACHE_FAST = "fast"
+_FETCH_CACHE_DEEP = "deep"
+_fetch_cache: dict[tuple[str, str, str], dict] = {}
 _read_pages_cache: dict[tuple[str, tuple[str, ...], str], dict] = {}
 # Bounded so that a run whose `after_run_callback` doesn't fire (ADK
 # 1.28.0 doesn't call it from a `finally`, so cancelled/aborted runs
@@ -132,12 +139,12 @@ def clear_fetch_cache_for_run(run_id: str) -> None:
         _read_pages_cache.pop(key, None)
 
 
-def _cache_key(url: str) -> tuple[str, str] | None:
+def _cache_key(url: str, mode: str) -> tuple[str, str, str] | None:
     run_id = _fetch_run_id_var.get()
-    return (run_id, url) if run_id else None
+    return (run_id, url, mode) if run_id else None
 
 
-def _cache_put(key: tuple[str, str], result: dict) -> None:
+def _cache_put(key: tuple[str, str, str], result: dict) -> None:
     while len(_fetch_cache) >= _FETCH_CACHE_MAX_SIZE:
         # Evict oldest insertion (FIFO).
         _fetch_cache.pop(next(iter(_fetch_cache)))
@@ -244,6 +251,9 @@ def _log_fetch_url(
         error_message=_error_message_excerpt(result.get("error_message")),
         reader_mode=result.get("_reader_mode"),
         fallback_reason=result.get("_fallback_reason"),
+        fallback_status=result.get("_fallback_status"),
+        fallback_reader_mode=result.get("_fallback_reader_mode"),
+        fallback_error_reason=result.get("_fallback_error_reason"),
         duration_ms=duration_ms,
         cached=cached,
         content_chars=content_chars,
@@ -265,6 +275,9 @@ def _strip_fetch_private_fields(result: dict) -> None:
     result.pop("_error_reason", None)
     result.pop("_reader_mode", None)
     result.pop("_fallback_reason", None)
+    result.pop("_fallback_status", None)
+    result.pop("_fallback_reader_mode", None)
+    result.pop("_fallback_error_reason", None)
 
 
 def _strip_fragment(url: str) -> str:
@@ -298,12 +311,18 @@ def _detect_upstream_block(content: str) -> tuple[str, str] | None:
     usable content.
     """
     head = content[:500]
+    larger_head = content[:3000]
+    lower_head = larger_head.lower()
     upstream = re.search(r"Target URL returned error (\d{3})", head)
     if upstream:
         code = upstream.group(1)
         return f"upstream HTTP {code}", f"upstream_http_{code}"
     if "requiring CAPTCHA" in head:
         return "upstream requires CAPTCHA", "upstream_captcha"
+    if _looks_like_login_gate(larger_head):
+        return "page requires login", "login_required"
+    if _looks_like_paywall(lower_head):
+        return "page is behind a paywall", "paywall"
     if "Just a moment" in head and len(content) < 2000:
         return "Cloudflare interstitial", "cloudflare_interstitial"
     if "(Note: The provided HTML" in content and len(content) < 1500:
@@ -316,6 +335,43 @@ def _detect_upstream_block(content: str) -> tuple[str, str] | None:
         longest_line = max((len(line) for line in content.splitlines()), default=0)
         if longest_line < 120:
             return "extracted content too thin to be an article body", "thin_content"
+    return None
+
+
+def _looks_like_login_gate(head: str) -> bool:
+    lower = head.lower()
+    return (
+        "don't miss what's happening" in lower
+        or "don’t miss what’s happening" in lower
+        or "explore the things you love. log into facebook" in lower
+        or ("email or mobile number" in lower and "forgot password" in lower)
+    )
+
+
+def _looks_like_paywall(head_lower: str) -> bool:
+    return (
+        "subscribe to continue reading" in head_lower
+        or "subscribe to continue" in head_lower
+        or "already a subscriber" in head_lower
+        or "this content is for subscribers" in head_lower
+    )
+
+
+def _detect_readerlm_fallback_need(content: str) -> str | None:
+    """Return a retry reason for noisy public pages that are still readable.
+
+    This is intentionally narrower than blocker detection. ReaderLM adds
+    latency and cost, so use it for extraction noise, not access failures.
+    """
+    head = content[:6000]
+    markers = (
+        "Cenimy prywatność",
+        "partnerami używamy plików cookie",
+        "Ta strona korzysta z ciasteczek",
+        "Dalsze korzystanie ze strony oznacza, że zgadzasz się",
+    )
+    if any(marker in head for marker in markers):
+        return "consent_noise"
     return None
 
 
@@ -458,6 +514,30 @@ def _source_for_read_result(item: dict[str, Any]) -> dict[str, Any] | None:
     return {
         "url": url,
         "title": title.strip(),
+        "domain": domain,
+        "provider": "fetched_page",
+    }
+
+
+def _source_for_jina_result(url: Any, content: Any) -> dict[str, Any] | None:
+    if not isinstance(url, str) or not url.strip():
+        return None
+    title: str | None = None
+    if isinstance(content, str):
+        head = content[:2000]
+        match = _JINA_TITLE_RE.search(head)
+        if match:
+            title = match.group(1).strip() or None
+        if not title:
+            for line in head.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("# "):
+                    title = stripped[2:].strip() or None
+                    break
+    domain = _domain_for_url(url)
+    return {
+        "url": url,
+        "title": title or domain or url,
         "domain": domain,
         "provider": "fetched_page",
     }
@@ -746,6 +826,10 @@ async def fetch_web_content(url: str) -> dict:
     Args:
         url: The full URL to fetch (e.g. 'https://reddit.com/r/coffee/comments/abc123').
     """
+    return await _fetch_web_content(url, allow_readerlm=True)
+
+
+async def _fetch_web_content(url: str, *, allow_readerlm: bool) -> dict:
     original_url = url
     started = time.monotonic()
     was_vertex_redirect = _is_vertex_redirect(url)
@@ -757,7 +841,8 @@ async def fetch_web_content(url: str) -> dict:
     url = _strip_fragment(unwrapped_url)
     log_original = original_url if vertex_rewrote else None
 
-    cache_key = _cache_key(url)
+    cache_mode = _FETCH_CACHE_DEEP if allow_readerlm else _FETCH_CACHE_FAST
+    cache_key = _cache_key(url, cache_mode)
     if cache_key is not None and cache_key in _fetch_cache:
         cached = dict(_fetch_cache[cache_key])
         cached["cached"] = True
@@ -772,7 +857,22 @@ async def fetch_web_content(url: str) -> dict:
         _strip_fetch_private_fields(cached)
         return cached
 
-    result = await _fetch_uncached(url)
+    cached_for_log = False
+    fast_result_for_cache: dict | None = None
+    if allow_readerlm:
+        fast_key = _cache_key(url, _FETCH_CACHE_FAST)
+        fast_cached = (
+            dict(_fetch_cache[fast_key])
+            if fast_key is not None and fast_key in _fetch_cache
+            else None
+        )
+        if fast_cached is not None:
+            result, readerlm_attempted = await _apply_readerlm_fallback(url, fast_cached)
+            cached_for_log = not readerlm_attempted
+        else:
+            result, fast_result_for_cache = await _fetch_uncached(url, allow_readerlm=True)
+    else:
+        result, _fast_result_for_cache = await _fetch_uncached(url, allow_readerlm=False)
 
     # Cache every outcome — including errors — so the model doesn't
     # refetch a URL that already returned thin content, an HTTP error,
@@ -780,20 +880,24 @@ async def fetch_web_content(url: str) -> dict:
     # only leaves the diagnosed retry loop alive.
     if cache_key is not None:
         _cache_put(cache_key, dict(result))
+    if allow_readerlm and fast_result_for_cache is not None:
+        fast_key = _cache_key(url, _FETCH_CACHE_FAST)
+        if fast_key is not None and fast_key not in _fetch_cache:
+            _cache_put(fast_key, dict(fast_result_for_cache))
 
     _log_fetch_url(
         result=result,
         url=url,
         original_url=log_original,
         duration_ms=int((time.monotonic() - started) * 1000),
-        cached=False,
+        cached=cached_for_log,
         unwrap_miss=unwrap_miss,
     )
     _strip_fetch_private_fields(result)
     return result
 
 
-async def _fetch_uncached(url: str) -> dict:
+async def _fetch_uncached(url: str, *, allow_readerlm: bool) -> tuple[dict, dict | None]:
     """Fetch logic without unwrap or cache. Always returns a dict.
 
     Error returns carry a private `_error_reason` field with a stable
@@ -802,22 +906,44 @@ async def _fetch_uncached(url: str) -> dict:
     """
     parsed = urlparse(url)
     if not parsed.path or parsed.path == "/":
-        return {
+        result = {
             "status": "error",
+            "url": url,
             "error_message": (
                 f"{url} is a domain root, not an article. Search for the "
                 "specific article URL and pass that instead."
             ),
             "_error_reason": "domain_root",
         }
+        return result, result
 
     plain = await _fetch_jina_reader(url, mode="plain")
+    if not allow_readerlm:
+        return plain, plain
+
+    plain_for_fast_cache = dict(plain)
+    result, _readerlm_attempted = await _apply_readerlm_fallback(url, plain)
+    return result, plain_for_fast_cache
+
+
+async def _apply_readerlm_fallback(url: str, plain: dict) -> tuple[dict, bool]:
     if plain.get("status") == "success":
-        return plain
+        fallback_reason = _detect_readerlm_fallback_need(plain.get("content", "") or "")
+        if fallback_reason not in JINA_READERLM_FALLBACK_REASONS:
+            return plain, False
+        readerlm = await _fetch_jina_reader(url, mode="readerlm-v2")
+        if _readerlm_result_is_better(readerlm):
+            readerlm["_fallback_reason"] = fallback_reason
+            return readerlm, True
+        plain["_fallback_reason"] = fallback_reason
+        plain["_fallback_status"] = readerlm.get("status")
+        plain["_fallback_reader_mode"] = readerlm.get("_reader_mode")
+        plain["_fallback_error_reason"] = readerlm.get("_error_reason")
+        return plain, True
 
     fallback_reason = plain.get("_error_reason")
     if fallback_reason not in JINA_READERLM_FALLBACK_REASONS:
-        return plain
+        return plain, False
 
     readerlm = await _fetch_jina_reader(url, mode="readerlm-v2")
     readerlm["_fallback_reason"] = fallback_reason
@@ -826,7 +952,17 @@ async def _fetch_uncached(url: str) -> dict:
             f"{readerlm.get('error_message', f'Could not read {url}')} "
             f"(after fast Reader returned {_fallback_reason_label(fallback_reason)})"
         )
-    return readerlm
+    return readerlm, True
+
+
+def _readerlm_result_is_better(result: dict) -> bool:
+    if result.get("status") != "success":
+        return False
+    content = result.get("content")
+    if not isinstance(content, str) or len(content.strip()) < 1000:
+        return False
+    longest_line = max((len(line.strip()) for line in content.splitlines()), default=0)
+    return longest_line >= 120 or len(content) >= 3000
 
 
 def _fallback_reason_label(reason: Any) -> str:
@@ -834,6 +970,8 @@ def _fallback_reason_label(reason: Any) -> str:
         return "thin content"
     if reason == "iframe_spa":
         return "iframe/SPA-only extraction"
+    if reason == "consent_noise":
+        return "consent/banner-heavy extraction"
     return "unusable content"
 
 
@@ -856,6 +994,7 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
         if resp.status_code != 200:
             return {
                 "status": "error",
+                "url": url,
                 "error_message": f"Failed to fetch {url}: HTTP {resp.status_code}",
                 "_error_reason": f"http_{resp.status_code}",
                 "_reader_mode": mode,
@@ -867,6 +1006,7 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
             message, reason = block
             return {
                 "status": "error",
+                "url": url,
                 "error_message": f"Could not read {url}: {message}",
                 "_error_reason": reason,
                 "_reader_mode": mode,
@@ -884,6 +1024,7 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
     except httpx.TimeoutException:
         return {
             "status": "error",
+            "url": url,
             "error_message": f"Timeout fetching {url}",
             "_error_reason": "timeout",
             "_reader_mode": mode,
@@ -894,6 +1035,7 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
         # don't trigger because we don't call raise_for_status).
         return {
             "status": "error",
+            "url": url,
             "error_message": f"Network error fetching {url}: {e}",
             "_error_reason": "network_error",
             "_reader_mode": mode,
@@ -901,6 +1043,7 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
     except Exception as e:
         return {
             "status": "error",
+            "url": url,
             "error_message": str(e),
             "_error_reason": "exception",
             "_reader_mode": mode,
@@ -934,7 +1077,7 @@ async def fetch_web_content_batch(urls: list[str]) -> dict:
                 "Pick the most relevant ones or split into multiple calls."
             ),
         }
-    results = await asyncio.gather(*(fetch_web_content(u) for u in urls))
+    results = await asyncio.gather(*(_fetch_web_content(u, allow_readerlm=False) for u in urls))
     success_count = sum(
         1 for item in results if isinstance(item, dict) and item.get("status") == "success"
     )
@@ -953,3 +1096,49 @@ async def fetch_web_content_batch(urls: list[str]) -> dict:
         "success_count": success_count,
         "failed_count": failed_count,
     }
+
+
+async def read_public_page(url: str) -> dict:
+    """Read one concrete public URL with Jina Reader.
+
+    Primary page reader for concrete URLs discovered by search tools, supplied
+    in the brief, or found in source text. Returns clean Markdown content and a
+    pill-ready fetched-page source on success. Do not pass search result pages,
+    bare domain roots, private/login-only URLs, or app-only/social-group URLs.
+
+    Args:
+        url: Full public http(s) URL to read.
+    """
+    result = await fetch_web_content(url)
+    if result.get("status") == "success":
+        source = _source_for_jina_result(result.get("url"), result.get("content"))
+        if source:
+            result["sources"] = [source]
+    return result
+
+
+async def read_public_pages(urls: list[str]) -> dict:
+    """Read multiple concrete public URLs with Jina Reader in parallel.
+
+    Batch page reader for concrete URLs discovered by search tools, supplied in
+    the brief, or found in source text. Each successful result includes clean
+    Markdown content; the response includes pill-ready fetched-page sources for
+    successful reads. Capped at 10 URLs.
+
+    Args:
+        urls: Full public http(s) URLs to read, max 10.
+    """
+    result = await fetch_web_content_batch(urls)
+    if result.get("status") == "success":
+        sources = [
+            source
+            for source in (
+                _source_for_jina_result(item.get("url"), item.get("content"))
+                for item in result.get("results") or []
+                if isinstance(item, dict) and item.get("status") == "success"
+            )
+            if source is not None
+        ]
+        if sources:
+            result["sources"] = sources
+    return result

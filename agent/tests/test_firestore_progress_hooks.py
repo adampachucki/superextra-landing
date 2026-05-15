@@ -144,6 +144,27 @@ async def test_before_tool_google_search_writes_search_pill():
 
 
 @pytest.mark.asyncio
+async def test_before_tool_search_web_writes_search_pill():
+    plugin, state = _make_plugin_state()
+
+    await plugin.before_tool_callback(
+        tool=_tool("search_web"),
+        tool_args={"query": "pizza Gdynia"},
+        tool_context=_tool_context(call_id="call-search"),
+    )
+
+    state.timeline_writer.write_timeline.assert_awaited_once_with(
+        {
+            "kind": "detail",
+            "id": "tool:call:call-search:search_web",
+            "group": "search",
+            "family": "Searching the web",
+            "text": "pizza Gdynia",
+        }
+    )
+
+
+@pytest.mark.asyncio
 async def test_tool_error_fetch_web_content_writes_warning():
     plugin, state = _make_plugin_state()
 
@@ -178,6 +199,65 @@ async def test_after_tool_read_web_pages_merges_sources():
     await plugin.after_tool_callback(
         tool=_tool("read_web_pages"),
         tool_args={"urls": ["https://example.com/menu"]},
+        tool_context=_tool_context(call_id="call-read"),
+        result={"status": "success", "sources": [source]},
+    )
+
+    assert state.specialist_sources == [source]
+
+
+@pytest.mark.asyncio
+async def test_after_tool_search_web_does_not_merge_discovery_sources():
+    plugin, state = _make_plugin_state()
+    source = {
+        "url": "https://example.com/article",
+        "title": "Article",
+        "domain": "example.com",
+    }
+
+    await plugin.after_tool_callback(
+        tool=_tool("search_web"),
+        tool_args={"query": "pizza Gdynia"},
+        tool_context=_tool_context(call_id="call-search"),
+        result={"status": "success", "sources": [source]},
+    )
+
+    assert state.specialist_sources == []
+
+
+@pytest.mark.asyncio
+async def test_after_tool_search_and_read_merges_fetched_sources():
+    plugin, state = _make_plugin_state()
+    source = {
+        "url": "https://example.com/article",
+        "title": "Article",
+        "domain": "example.com",
+        "provider": "fetched_page",
+    }
+
+    await plugin.after_tool_callback(
+        tool=_tool("search_and_read_public_pages"),
+        tool_args={"query": "pizza Gdynia"},
+        tool_context=_tool_context(call_id="call-search-read"),
+        result={"status": "success", "sources": [source]},
+    )
+
+    assert state.specialist_sources == [source]
+
+
+@pytest.mark.asyncio
+async def test_after_tool_read_public_page_merges_sources():
+    plugin, state = _make_plugin_state()
+    source = {
+        "url": "https://example.com/menu",
+        "title": "Menu",
+        "domain": "example.com",
+        "provider": "fetched_page",
+    }
+
+    await plugin.after_tool_callback(
+        tool=_tool("read_public_page"),
+        tool_args={"url": "https://example.com/menu"},
         tool_context=_tool_context(call_id="call-read"),
         result={"status": "success", "sources": [source]},
     )

@@ -16,7 +16,14 @@ from .specialist_catalog import (
     SPECIALISTS,
 )
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
-from .web_tools import fetch_web_content, fetch_web_content_batch, read_web_pages
+from .search_tools import search_and_read_public_pages
+from .web_tools import (
+    fetch_web_content,
+    fetch_web_content_batch,
+    read_public_page,
+    read_public_pages,
+    read_web_pages,
+)
 
 _dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
 INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
@@ -101,12 +108,17 @@ SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 
 
 _SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
-_WEB_RESEARCH_TOOLS = [
+_LEGACY_WEB_RESEARCH_TOOLS = [
     google_search,
     url_context,
     read_web_pages,
     fetch_web_content,
     fetch_web_content_batch,
+]
+_WEB_RESEARCH_TOOLS = [
+    search_and_read_public_pages,
+    read_public_page,
+    read_public_pages,
 ]
 
 
@@ -195,9 +207,14 @@ def _make_specialist(
 # `thinking="high" | "medium"`; we map to the actual config at build time.
 _THINKING_CONFIGS = {"high": THINKING_CONFIG, "medium": MEDIUM_THINKING_CONFIG}
 
-# Per-specialist tool overrides. Everything not listed here uses the default
-# `_WEB_RESEARCH_TOOLS` set.
-_SPECIALIST_TOOLS: dict[str, list] = {
+# Per-specialist tool overrides for first-turn research reports. Everything not
+# listed here uses the default `_WEB_RESEARCH_TOOLS` set.
+_INITIAL_SPECIALIST_TOOLS: dict[str, list] = {
+    "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
+}
+
+# Continuation helpers intentionally keep the pre-pilot web research surface.
+_CONTINUATION_SPECIALIST_TOOLS: dict[str, list] = {
     "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
 }
 
@@ -206,7 +223,7 @@ ALL_SPECIALISTS = [
         s.name,
         s.description,
         s.output_key,
-        tools=_SPECIALIST_TOOLS.get(s.name),
+        tools=_INITIAL_SPECIALIST_TOOLS.get(s.name),
         instruction_name=s.instruction_name,
         thinking_config=_THINKING_CONFIGS[s.thinking],
     )
@@ -218,7 +235,7 @@ CONTINUATION_SPECIALISTS = [
         s.name,
         s.description,
         None,
-        tools=_SPECIALIST_TOOLS.get(s.name),
+        tools=_CONTINUATION_SPECIALIST_TOOLS.get(s.name, _LEGACY_WEB_RESEARCH_TOOLS),
         instruction_name=s.instruction_name,
         thinking_config=_THINKING_CONFIGS[s.thinking],
     )
