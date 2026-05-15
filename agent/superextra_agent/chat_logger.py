@@ -167,6 +167,29 @@ def _request_tool_names(llm_request: LlmRequest) -> list[str]:
     return names
 
 
+def _request_tool_config_summary(llm_request: LlmRequest) -> dict[str, Any]:
+    config = getattr(llm_request, "config", None)
+    tool_config = getattr(config, "tool_config", None)
+    if tool_config is None:
+        return {}
+
+    retrieval_config = getattr(tool_config, "retrieval_config", None)
+    lat_lng = getattr(retrieval_config, "lat_lng", None)
+    function_calling_config = getattr(tool_config, "function_calling_config", None)
+    mode = getattr(function_calling_config, "mode", None)
+
+    summary: dict[str, Any] = {
+        "include_server_side_tool_invocations": getattr(
+            tool_config, "include_server_side_tool_invocations", None
+        ),
+        "has_retrieval_config": retrieval_config is not None,
+        "has_retrieval_geo_bias": lat_lng is not None,
+    }
+    if mode is not None:
+        summary["function_calling_mode"] = str(mode)
+    return {k: v for k, v in summary.items() if v is not None}
+
+
 def _usage_token_summary(usage: Any) -> dict[str, Any]:
     return {
         "prompt": getattr(usage, "prompt_token_count", None),
@@ -217,6 +240,8 @@ def _cloud_payload(entry: dict[str, Any]) -> dict[str, Any]:
         "state_delta_keys",
         "part_types",
         "result_summary",
+        "server_side_tool_part_count",
+        "server_side_tool_types",
     }
     payload = {k: v for k, v in entry.items() if k in allowed and v is not None}
 
@@ -224,6 +249,17 @@ def _cloud_payload(entry: dict[str, Any]) -> dict[str, Any]:
         tools = entry.get("tools") or []
         payload["tool_def_count"] = len(tools) if isinstance(tools, list) else 0
         payload["tool_defs"] = tools[:30] if isinstance(tools, list) else []
+
+    tool_config = entry.get("tool_config")
+    if isinstance(tool_config, dict):
+        for key in (
+            "include_server_side_tool_invocations",
+            "has_retrieval_config",
+            "has_retrieval_geo_bias",
+            "function_calling_mode",
+        ):
+            if key in tool_config:
+                payload[key] = tool_config[key]
 
     if "function_calls" in entry:
         calls = entry.get("function_calls") or []
@@ -394,6 +430,7 @@ class ChatLoggerPlugin(BasePlugin):
                 "model": llm_request.model,
                 "content_count": len(llm_request.contents),
                 "tools": _request_tool_names(llm_request),
+                "tool_config": _request_tool_config_summary(llm_request),
             },
         )
         return None
@@ -442,20 +479,37 @@ class ChatLoggerPlugin(BasePlugin):
         # log text preview (first 500 chars), function calls (with args), and part types
         if llm_response.content and llm_response.content.parts:
             part_types: list[str] = []
+            server_side_tool_types: list[str] = []
             for part in llm_response.content.parts:
-                if part.text:
+                if getattr(part, "text", None):
                     entry["text_preview"] = part.text[:500]
                     part_types.append(
                         "thought" if getattr(part, "thought", False) else "text"
                     )
-                if part.function_call:
+                function_call = getattr(part, "function_call", None)
+                if function_call:
                     fc_entry: dict[str, Any] = {
-                        "name": part.function_call.name,
-                        "args": _safe(part.function_call.args),
+                        "name": function_call.name,
+                        "args": _safe(function_call.args),
                     }
                     entry.setdefault("function_calls", []).append(fc_entry)
                     part_types.append("function_call")
+                tool_call = getattr(part, "tool_call", None)
+                if tool_call:
+                    part_types.append("tool_call")
+                    tool_type = getattr(tool_call, "tool_type", None)
+                    if tool_type is not None:
+                        server_side_tool_types.append(str(tool_type))
+                tool_response = getattr(part, "tool_response", None)
+                if tool_response:
+                    part_types.append("tool_response")
+                    tool_type = getattr(tool_response, "tool_type", None)
+                    if tool_type is not None:
+                        server_side_tool_types.append(str(tool_type))
             entry["part_types"] = part_types
+            if server_side_tool_types:
+                entry["server_side_tool_part_count"] = len(server_side_tool_types)
+                entry["server_side_tool_types"] = server_side_tool_types[:30]
 
         self._write(correlation, entry)
         return None

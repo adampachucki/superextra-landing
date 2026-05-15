@@ -128,6 +128,11 @@ async def test_model_request_logs_native_built_in_tools(tmp_path, monkeypatch):
         model="gemini-test",
         contents=[],
         config=SimpleNamespace(
+            tool_config=SimpleNamespace(
+                include_server_side_tool_invocations=True,
+                retrieval_config=SimpleNamespace(lat_lng=SimpleNamespace()),
+                function_calling_config=SimpleNamespace(mode="AUTO"),
+            ),
             tools=[
                 SimpleNamespace(
                     google_search=SimpleNamespace(),
@@ -148,10 +153,18 @@ async def test_model_request_logs_native_built_in_tools(tmp_path, monkeypatch):
         "read_web_pages",
         "fetch_web_content",
     ]
+    assert entry["tool_config"] == {
+        "include_server_side_tool_invocations": True,
+        "has_retrieval_config": True,
+        "has_retrieval_geo_bias": True,
+        "function_calling_mode": "AUTO",
+    }
 
     model_request = next(fields for event, fields in cloud_logs if event == "model_request")
     assert model_request["tool_defs"] == entry["tools"]
     assert model_request["tool_def_count"] == 4
+    assert model_request["include_server_side_tool_invocations"] is True
+    assert model_request["has_retrieval_geo_bias"] is True
 
 
 @pytest.mark.asyncio
@@ -193,6 +206,12 @@ async def test_model_response_cloud_log_is_metadata_rich_without_payloads(
                 ),
                 SimpleNamespace(
                     text=None,
+                    function_call=None,
+                    tool_call=SimpleNamespace(tool_type="GOOGLE_SEARCH", id="tool-1"),
+                    tool_response=SimpleNamespace(tool_type="GOOGLE_SEARCH", id="tool-1"),
+                ),
+                SimpleNamespace(
+                    text=None,
                     function_call=SimpleNamespace(
                         name="lookup_source",
                         args={"url": "https://example.com/source"},
@@ -221,6 +240,8 @@ async def test_model_response_cloud_log_is_metadata_rich_without_payloads(
     assert logged["thought_tokens"] == 7
     assert logged["tool_use_prompt_tokens"] == 33
     assert logged["server_side_tool_use"] is True
+    assert logged["server_side_tool_part_count"] == 2
+    assert logged["server_side_tool_types"] == ["GOOGLE_SEARCH", "GOOGLE_SEARCH"]
     assert logged["traffic_type"] == "ON_DEMAND"
     assert logged["text_preview_chars"] == len(
         "Detailed final report with venue-specific implications."
