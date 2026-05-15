@@ -57,8 +57,10 @@ def test_tool_docstrings_describe_source_reading_workflow():
 
 def test_source_reading_timeouts_are_short_bounded_attempts():
     assert web_tools.TIMEOUT_S == 15.0
-    assert web_tools.URL_CONTEXT_TIMEOUT_S == 15.0
-    assert web_tools.URL_CONTEXT_HTTP_TIMEOUT_MS == 12_000
+    assert web_tools.JINA_READERLM_TIMEOUT_S == 20.0
+    assert web_tools.URL_CONTEXT_MODEL == "gemini-3-flash-preview"
+    assert web_tools.URL_CONTEXT_TIMEOUT_S == 30.0
+    assert web_tools.URL_CONTEXT_HTTP_TIMEOUT_MS == 25_000
     assert web_tools.VERTEX_UNWRAP_TIMEOUT_S == 5.0
 
 
@@ -175,6 +177,27 @@ class TestReadWebPages:
             clear_fetch_cache_for_run("run-read-cache")
 
         assert first.get("cached") is None
+        assert second["cached"] is True
+        assert read_sync.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_failed_read_cache_reused_across_goals(self):
+        set_fetch_run_id("run-read-error-cache")
+        try:
+            with patch(
+                "superextra_agent.web_tools._read_web_pages_sync",
+                side_effect=RuntimeError("boom"),
+            ) as read_sync:
+                first = await read_web_pages(["https://example.com/menu"], "lead goal")
+                second = await read_web_pages(
+                    ["https://example.com/menu"],
+                    "specialist follow-up goal",
+                )
+        finally:
+            clear_fetch_cache_for_run("run-read-error-cache")
+
+        assert first["status"] == "error"
+        assert second["status"] == "error"
         assert second["cached"] is True
         assert read_sync.call_count == 1
 
@@ -387,24 +410,35 @@ class TestFetchWebContent:
 
         call_args = mock_client.get.call_args
         assert call_args[0][0] == "https://r.jina.ai/https://example.com/article"
-        # readerlm-v2 is the central behavior — every fetch must request it.
+        # Fast plain Reader is the normal path; readerlm-v2 is only a fallback
+        # for thin/noisy extraction.
         headers = call_args.kwargs.get("headers", {})
-        assert headers.get("X-Respond-With") == "readerlm-v2"
-        assert headers.get("Authorization", "").startswith("Bearer ")
+        assert headers.get("Accept") == "text/markdown"
+        assert "X-Respond-With" not in headers
+        assert "Authorization" not in headers
 
     @pytest.mark.asyncio
-    async def test_fetch_with_api_key(self):
+    async def test_readerlm_fallback_uses_api_key(self, mock_emit_cloud_log):
+        thin = "\n".join(["Home", "About", "Contact"])
+        rich = "# Title\n\n" + "Paragraph content. " * 20
         mock_client = AsyncMock()
-        mock_client.get = AsyncMock(
-            return_value=_mock_response("# Title\n\n" + "Paragraph content. " * 20)
-        )
+        mock_client.get = AsyncMock(side_effect=[_mock_response(thin), _mock_response(rich)])
 
         with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
              patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
-            await fetch_web_content("https://example.com/page")
+            result = await fetch_web_content("https://example.com/page")
 
-        headers = mock_client.get.call_args.kwargs.get("headers", {})
-        assert headers.get("Authorization") == "Bearer test-key-123"
+        assert result["status"] == "success"
+        assert mock_client.get.call_count == 2
+        plain_headers = mock_client.get.call_args_list[0].kwargs.get("headers", {})
+        assert "X-Respond-With" not in plain_headers
+        readerlm_headers = mock_client.get.call_args_list[1].kwargs.get("headers", {})
+        assert readerlm_headers.get("X-Respond-With") == "readerlm-v2"
+        assert readerlm_headers.get("Authorization") == "Bearer test-key-123"
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["reader_mode"] == "readerlm-v2"
+        assert kw["fallback_reason"] == "thin_content"
 
     @pytest.mark.asyncio
     async def test_content_truncation(self):
@@ -602,7 +636,7 @@ class TestFetchWebContent:
         article_body = "Title: x\n\n(Note: The provided HTML contains an iframe and only the title was extracted)"
         article_resp = _mock_response(article_body)
         mock_client = AsyncMock()
-        mock_client.get = AsyncMock(side_effect=[no_loc, article_resp])
+        mock_client.get = AsyncMock(side_effect=[no_loc, article_resp, article_resp])
 
         with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
             result = await fetch_web_content(
@@ -767,6 +801,7 @@ class TestFetchUrlLogging:
         kw = _log_kwargs(mock_emit_cloud_log)
         assert kw["status"] == "success"
         assert kw["error_reason"] is None
+        assert kw["reader_mode"] == "plain"
         assert kw["content_chars"] == len(body)
         assert kw["url"] == "https://example.com/article"
         assert kw["original_url"] is None
