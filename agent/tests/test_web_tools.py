@@ -59,8 +59,8 @@ def test_source_reading_timeouts_are_short_bounded_attempts():
     assert web_tools.TIMEOUT_S == 15.0
     assert web_tools.JINA_READERLM_TIMEOUT_S == 20.0
     assert web_tools.URL_CONTEXT_MODEL == "gemini-3-flash-preview"
-    assert web_tools.URL_CONTEXT_TIMEOUT_S == 15.0
-    assert web_tools.URL_CONTEXT_HTTP_TIMEOUT_MS == 12_000
+    assert web_tools.URL_CONTEXT_TIMEOUT_S == 27.0
+    assert web_tools.URL_CONTEXT_HTTP_TIMEOUT_MS == 25_000
     assert web_tools.VERTEX_UNWRAP_TIMEOUT_S == 5.0
 
 

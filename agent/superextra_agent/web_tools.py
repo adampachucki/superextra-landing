@@ -33,8 +33,8 @@ MAX_CONTENT_LENGTH = 50_000
 TIMEOUT_S = 15.0
 JINA_READERLM_TIMEOUT_S = 20.0
 URL_CONTEXT_MODEL = os.environ.get("URL_CONTEXT_MODEL", "gemini-3-flash-preview")
-URL_CONTEXT_TIMEOUT_S = 15.0
-URL_CONTEXT_HTTP_TIMEOUT_MS = 12_000
+URL_CONTEXT_TIMEOUT_S = 27.0
+URL_CONTEXT_HTTP_TIMEOUT_MS = 25_000
 MAX_URL_CONTEXT_URLS = 6
 CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 # `readerlm-v2` is auth-only and can take tens of seconds per page. We only
