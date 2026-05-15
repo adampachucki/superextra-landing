@@ -250,6 +250,23 @@ class TestMakeInstruction:
         assert "`Writer Material` section" in result
         assert "implications for the target venue" in result
 
+    def test_specialists_have_source_reading_workflow(self):
+        provider = _make_instruction("market_landscape")
+
+        result = provider(MockCtx(state={"places_context": "Target data"}))
+
+        assert "## Search And Source Reading" in result
+        assert "Search, page reading, and raw fetch have different jobs" in result
+        assert "`read_web_pages` is the default way to read public URLs" in result
+        assert "`fetch_web_content` and `fetch_web_content_batch` are raw-Markdown fallbacks" in result
+        assert "article pages, official announcements, public reports, PDFs" in result
+        assert "call `read_web_pages` on those URLs first" in result
+        assert "Do not start with `fetch_web_content_batch`" in result
+        assert "read the strongest 1-3 pages with `read_web_pages`" in result
+        assert "After two or three searches" in result
+        assert "Grounding sources may still appear as source pills" in result
+        assert "source-pill display" in result
+
 
 class TestContinueResearchInstruction:
     def test_injects_prior_report(self):

@@ -282,7 +282,12 @@ def test_compaction_event_emits_no_timeline_rows():
 def test_multi_tool_call_emits_multiple_detail_rows_in_order():
     rows = [
         map_tool_call("google_search", {"query": "best burgers berlin"}, {}, "call-1"),
-        map_tool_call("fetch_web_content", {"url": "https://example.com/menu"}, {}, "call-2"),
+        map_tool_call(
+            "read_web_pages",
+            {"urls": ["https://example.com/menu", "https://example.com/about"]},
+            {},
+            "call-2",
+        ),
         map_tool_call("find_tripadvisor_restaurant", {"name": "Goldies", "area": "Berlin"}, {}, "call-3"),
     ]
     assert [row["family"] for row in rows] == [

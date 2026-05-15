@@ -166,6 +166,26 @@ async def test_tool_error_fetch_web_content_writes_warning():
 
 
 @pytest.mark.asyncio
+async def test_after_tool_read_web_pages_merges_sources():
+    plugin, state = _make_plugin_state()
+    source = {
+        "url": "https://example.com/menu",
+        "title": "Menu",
+        "domain": "example.com",
+        "provider": "fetched_page",
+    }
+
+    await plugin.after_tool_callback(
+        tool=_tool("read_web_pages"),
+        tool_args={"urls": ["https://example.com/menu"]},
+        tool_context=_tool_context(call_id="call-read"),
+        result={"status": "success", "sources": [source]},
+    )
+
+    assert state.specialist_sources == [source]
+
+
+@pytest.mark.asyncio
 async def test_nested_tool_context_routes_by_run_id():
     plugin, state = _make_plugin_state()
 

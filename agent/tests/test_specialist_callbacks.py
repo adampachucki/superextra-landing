@@ -1,7 +1,14 @@
 """Tests for specialist construction callbacks in specialists.py."""
 
+from google.adk.tools import google_search
+
 from superextra_agent.specialists import ALL_SPECIALISTS
 from superextra_agent.agent import _skip_enricher_if_cached
+from superextra_agent.web_tools import (
+    fetch_web_content,
+    fetch_web_content_batch,
+    read_web_pages,
+)
 
 
 class FakeCallbackContext:
@@ -17,6 +24,16 @@ def test_specialists_accept_agenttool_request_context():
     for specialist in ALL_SPECIALISTS:
         assert specialist.include_contents == "default"
         assert specialist.before_agent_callback is None
+
+
+def test_web_research_specialists_have_search_and_page_reading_tools():
+    for specialist in ALL_SPECIALISTS:
+        if specialist.name == "review_analyst":
+            continue
+        assert google_search in specialist.tools
+        assert read_web_pages in specialist.tools
+        assert fetch_web_content in specialist.tools
+        assert fetch_web_content_batch in specialist.tools
 
 
 def test_skip_enricher_returns_cached_context():

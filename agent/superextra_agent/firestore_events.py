@@ -146,6 +146,7 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "get_tripadvisor_reviews": "structured reviews",
     "get_google_reviews": "structured reviews",
     "google_search": "source search",
+    "read_web_pages": "source reading",
     "fetch_web_content": "source reading",
     "fetch_web_content_batch": "source reading",
 }
@@ -331,8 +332,14 @@ def map_tool_call(
         if query:
             return _detail(row_id, "search", "Searching the web", query)
         return None
-    if name == "fetch_web_content":
+    if name in ("read_web_pages", "fetch_web_content"):
         url = str(args.get("url") or "").strip()
+        urls = args.get("urls") or []
+        if isinstance(urls, list) and urls:
+            label = ", ".join(_short_url(str(u)) for u in urls[:3])
+            if len(urls) > 3:
+                label += f" (+{len(urls) - 3} more)"
+            return _detail(row_id, "source", "Public sources", label)
         if url:
             return _detail(row_id, "source", "Public sources", _short_url(url))
         return None
@@ -461,7 +468,7 @@ def map_tool_result(
             ]
         return []
 
-    if name == "fetch_web_content" and status == "error":
+    if name in ("read_web_pages", "fetch_web_content") and status == "error":
         return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
 
     if name == "fetch_web_content_batch":

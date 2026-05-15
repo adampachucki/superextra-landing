@@ -358,13 +358,19 @@ def _merge_fetched_sources(
     tool_args: dict[str, Any],
     result: Any,
 ) -> None:
-    """Surface successful `fetch_web_content[_batch]` URLs as run sources.
+    """Surface successful page-reading tool URLs as run sources.
 
     Without this hook, fetched URLs would never appear in the per-turn
     source pills — only grounding URLs and `_tool_src_*` Places sources
     feed `specialist_sources` today. See `firestore_events.build_fetched_source`.
     """
     if not isinstance(result, dict):
+        return
+    if tool_name == "read_web_pages":
+        if result.get("status") != "success":
+            return
+        for entry in result.get("sources") or []:
+            per._merge_source(entry)
         return
     if tool_name == "fetch_web_content":
         if result.get("status") != "success":

@@ -1,8 +1,10 @@
 """Tests for web content fetching tools in web_tools.py."""
 
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
 import httpx
 import pytest
-from unittest.mock import AsyncMock, patch
 
 from superextra_agent import web_tools
 from superextra_agent.web_tools import (
@@ -10,6 +12,7 @@ from superextra_agent.web_tools import (
     clear_fetch_cache_for_run,
     fetch_web_content,
     fetch_web_content_batch,
+    read_web_pages,
     set_fetch_run_id,
 )
 
@@ -36,6 +39,324 @@ def _log_kwargs(mock_emit, event="fetch_url", index=-1):
     """Return kwargs of the Nth (default last) emit_cloud_log call for `event`."""
     matches = [c for c in mock_emit.call_args_list if c.args[0] == event]
     return matches[index].kwargs if matches else {}
+
+
+def test_tool_docstrings_describe_source_reading_workflow():
+    read_doc = " ".join((read_web_pages.__doc__ or "").split())
+    fetch_doc = " ".join((fetch_web_content.__doc__ or "").split())
+    batch_doc = " ".join((fetch_web_content_batch.__doc__ or "").split())
+
+    assert "Default first tool for reading concrete public URLs" in read_doc
+    assert "Use this before `fetch_web_content`" in read_doc
+    assert "Raw-Markdown fallback, not the default page reader" in fetch_doc
+    assert "Do not use this as the first read" in fetch_doc
+    assert "Raw-Markdown fallback for multiple URLs" in batch_doc
+    assert "prefer `read_web_pages` first" in batch_doc
+
+
+class TestReadWebPages:
+    def test_url_context_client_uses_cloud_platform_scoped_credentials(self, monkeypatch):
+        web_tools._url_context_client = None
+        credentials = object()
+        client = object()
+        monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "project-a")
+        monkeypatch.delenv("GOOGLE_CLOUD_QUOTA_PROJECT", raising=False)
+
+        try:
+            with patch(
+                "superextra_agent.web_tools.google_auth_default",
+                return_value=(credentials, "project-from-auth"),
+            ) as auth_default, patch(
+                "superextra_agent.web_tools.Client",
+                return_value=client,
+            ) as client_ctor:
+                result = web_tools._get_url_context_client()
+        finally:
+            web_tools._url_context_client = None
+
+        assert result is client
+        auth_default.assert_called_once_with(
+            scopes=[web_tools.CLOUD_PLATFORM_SCOPE],
+            quota_project_id="project-a",
+        )
+        kwargs = client_ctor.call_args.kwargs
+        assert kwargs["credentials"] is credentials
+        assert kwargs["project"] == "project-a"
+        assert kwargs["location"] == "global"
+
+    @pytest.mark.asyncio
+    async def test_reads_pages_with_url_context(self, mock_emit_cloud_log):
+        expected = {
+            "status": "success",
+            "model": "gemini-3.1-pro-preview",
+            "urls": ["https://example.com/menu"],
+            "retrieved": [
+                {
+                    "retrieved_url": "https://example.com/menu",
+                    "retrieval_status": "URL_RETRIEVAL_STATUS_SUCCESS",
+                }
+            ],
+            "results": [
+                {
+                    "status": "success",
+                    "url": "https://example.com/menu",
+                    "retrieved_url": "https://example.com/menu",
+                    "title": "Menu",
+                    "evidence_summary": "Lunch is served daily.",
+                    "specific_facts": ["Lunch daily"],
+                    "supporting_details": [],
+                    "limits": "",
+                }
+            ],
+            "sources": [
+                {
+                    "url": "https://example.com/menu",
+                    "title": "Menu",
+                    "domain": "example.com",
+                    "provider": "fetched_page",
+                }
+            ],
+        }
+
+        with patch(
+            "superextra_agent.web_tools._read_web_pages_sync",
+            return_value=expected,
+        ) as read_sync:
+            result = await read_web_pages(
+                ["https://example.com/menu#lunch"],
+                evidence_goal="Extract menu evidence",
+            )
+
+        assert result == expected
+        read_sync.assert_called_once_with(
+            ["https://example.com/menu"],
+            "Extract menu evidence",
+        )
+        kw = _log_kwargs(mock_emit_cloud_log, event="read_web_pages")
+        assert kw["status"] == "success"
+        assert kw["url_count"] == 1
+        assert kw["retrieved_count"] == 1
+        assert kw["cached"] is False
+
+    @pytest.mark.asyncio
+    async def test_rejects_invalid_urls(self):
+        result = await read_web_pages(["file:///etc/passwd"])
+
+        assert result["status"] == "error"
+        assert "valid http(s)" in result["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_caches_same_run_reads(self):
+        expected = {
+            "status": "success",
+            "model": "gemini-3.1-pro-preview",
+            "urls": ["https://example.com/menu"],
+            "results": [],
+            "sources": [{"url": "https://example.com/menu", "title": "Menu"}],
+        }
+
+        set_fetch_run_id("run-read-cache")
+        try:
+            with patch(
+                "superextra_agent.web_tools._read_web_pages_sync",
+                return_value=expected,
+            ) as read_sync:
+                first = await read_web_pages(["https://example.com/menu"], "menu")
+                second = await read_web_pages(["https://example.com/menu"], "menu")
+        finally:
+            clear_fetch_cache_for_run("run-read-cache")
+
+        assert first.get("cached") is None
+        assert second["cached"] is True
+        assert read_sync.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_exception_returns_error_without_private_reason(self):
+        with patch(
+            "superextra_agent.web_tools._read_web_pages_sync",
+            side_effect=RuntimeError("boom"),
+        ):
+            result = await read_web_pages(["https://example.com/menu"])
+
+        assert result["status"] == "error"
+        assert "URL Context read failed" in result["error_message"]
+        assert "_error_reason" not in result
+
+    @pytest.mark.asyncio
+    async def test_strips_private_usage_metadata_after_logging(self, mock_emit_cloud_log):
+        expected = {
+            "status": "success",
+            "model": "gemini-3.1-pro-preview",
+            "urls": ["https://example.com/menu"],
+            "results": [],
+            "sources": [{"url": "https://example.com/menu", "title": "Menu"}],
+            "_usage_metadata": {
+                "prompt_token_count": 12,
+                "tool_use_prompt_token_count": 8,
+                "total_token_count": 20,
+            },
+        }
+
+        with patch(
+            "superextra_agent.web_tools._read_web_pages_sync",
+            return_value=expected,
+        ):
+            result = await read_web_pages(["https://example.com/menu"])
+
+        assert "_usage_metadata" not in result
+        kw = _log_kwargs(mock_emit_cloud_log, event="read_web_pages")
+        assert kw["prompt_token_count"] == 12
+        assert kw["tool_use_prompt_token_count"] == 8
+        assert kw["total_token_count"] == 20
+
+    def test_url_context_sync_parses_model_response(self):
+        response = SimpleNamespace(
+            text=(
+                '{"results":[{"url":"https://example.com/menu",'
+                '"retrieved_url":"https://example.com/menu",'
+                '"title":"Menu","evidence_summary":"Lunch is daily.",'
+                '"specific_facts":["Lunch daily"],"supporting_details":[],'
+                '"limits":""}],"overall_limits":""}'
+            ),
+            candidates=[
+                SimpleNamespace(
+                    url_context_metadata=SimpleNamespace(
+                        url_metadata=[
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/menu",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            )
+                        ]
+                    )
+                )
+            ],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/menu"],
+                "menu facts",
+            )
+
+        assert result["status"] == "success"
+        assert result["results"][0]["retrieval_status"].endswith("SUCCESS")
+        assert result["sources"] == [
+            {
+                "url": "https://example.com/menu",
+                "title": "Menu",
+                "domain": "example.com",
+                "provider": "fetched_page",
+            }
+        ]
+
+    def test_url_context_sync_keeps_only_successful_partial_sources(self):
+        response = SimpleNamespace(
+            text=(
+                '{"results":['
+                '{"url":"https://example.com/menu","retrieved_url":"https://example.com/menu",'
+                '"title":"Menu","evidence_summary":"Lunch is daily.",'
+                '"specific_facts":["Lunch daily"],"supporting_details":[],"limits":""},'
+                '{"url":"https://example.com/private","retrieved_url":"https://example.com/private",'
+                '"title":"Private","evidence_summary":"","specific_facts":[],'
+                '"supporting_details":[],"limits":"Could not retrieve."}'
+                '],"overall_limits":"One URL could not be retrieved."}'
+            ),
+            candidates=[
+                SimpleNamespace(
+                    url_context_metadata=SimpleNamespace(
+                        url_metadata=[
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/menu",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            ),
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/private",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_UNSAFE",
+                            ),
+                        ]
+                    )
+                )
+            ],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/menu", "https://example.com/private"],
+                "menu facts",
+            )
+
+        assert result["status"] == "success"
+        assert [item["status"] for item in result["results"]] == ["success", "error"]
+        assert result["sources"] == [
+            {
+                "url": "https://example.com/menu",
+                "title": "Menu",
+                "domain": "example.com",
+                "provider": "fetched_page",
+            }
+        ]
+
+    def test_url_context_sync_rejects_failed_retrieval_status(self):
+        response = SimpleNamespace(
+            text=(
+                '{"results":[{"url":"https://example.com/private",'
+                '"retrieved_url":"https://example.com/private",'
+                '"title":"Private","evidence_summary":"No access.",'
+                '"specific_facts":[],"supporting_details":[],'
+                '"limits":"Could not retrieve."}],"overall_limits":""}'
+            ),
+            candidates=[
+                SimpleNamespace(
+                    url_context_metadata=SimpleNamespace(
+                        url_metadata=[
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/private",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_UNSAFE",
+                            )
+                        ]
+                    )
+                )
+            ],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/private"],
+                "owner facts",
+            )
+
+        assert result["status"] == "error"
+        assert result["retrieved"][0]["retrieval_status"].endswith("UNSAFE")
+        assert result["results"][0]["status"] == "error"
+        assert "sources" not in result
+
+    def test_url_context_sync_requires_retrieval_metadata_for_sources(self):
+        response = SimpleNamespace(
+            text="plain model answer, no URL Context metadata",
+            candidates=[],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/menu"],
+                "menu facts",
+            )
+
+        assert result["status"] == "error"
+        assert result["retrieved"] == []
+        assert "sources" not in result
 
 
 class TestFetchWebContent:

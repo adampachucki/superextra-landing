@@ -16,7 +16,7 @@ from .specialist_catalog import (
     SPECIALISTS,
 )
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
-from .web_tools import fetch_web_content, fetch_web_content_batch
+from .web_tools import fetch_web_content, fetch_web_content_batch, read_web_pages
 
 _dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
 INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
@@ -173,7 +173,8 @@ def _make_specialist(
         model=SPECIALIST_GEMINI,
         description=description,
         instruction=_make_instruction(instruction_name or name),
-        tools=tools or [google_search, fetch_web_content, fetch_web_content_batch],
+        tools=tools
+        or [google_search, read_web_pages, fetch_web_content, fetch_web_content_batch],
         output_key=output_key,
         include_contents="default",
         generate_content_config=thinking_config if thinking_config is not None else THINKING_CONFIG,
@@ -189,7 +190,7 @@ def _make_specialist(
 _THINKING_CONFIGS = {"high": THINKING_CONFIG, "medium": MEDIUM_THINKING_CONFIG}
 
 # Per-specialist tool overrides. Everything not listed here uses the default
-# `[google_search, fetch_web_content, fetch_web_content_batch]` set.
+# `[google_search, read_web_pages, fetch_web_content, fetch_web_content_batch]` set.
 _SPECIALIST_TOOLS: dict[str, list] = {
     "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
 }
