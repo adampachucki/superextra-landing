@@ -1,6 +1,6 @@
 """Tests for specialist construction callbacks in specialists.py."""
 
-from google.adk.tools import google_search
+from google.adk.tools import google_search, url_context
 
 from superextra_agent.specialists import ALL_SPECIALISTS
 from superextra_agent.agent import _skip_enricher_if_cached
@@ -31,6 +31,7 @@ def test_web_research_specialists_have_search_and_page_reading_tools():
         if specialist.name == "review_analyst":
             continue
         assert google_search in specialist.tools
+        assert url_context in specialist.tools
         assert read_web_pages in specialist.tools
         assert fetch_web_content in specialist.tools
         assert fetch_web_content_batch in specialist.tools

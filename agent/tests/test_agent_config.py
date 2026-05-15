@@ -1,6 +1,6 @@
 """Tests for top-level agent configuration."""
 
-from google.adk.tools import google_search
+from google.adk.tools import google_search, url_context
 
 from superextra_agent.agent import (
     continue_research,
@@ -24,6 +24,7 @@ def test_continue_research_uses_tool_compatible_model_config():
     assert continue_research.model is MODEL_GEMINI
     assert continue_research.generate_content_config is MEDIUM_THINKING_CONFIG
     assert google_search not in continue_research.tools
+    assert url_context in continue_research.tools
     assert read_web_pages in continue_research.tools
     assert fetch_web_content in continue_research.tools
     assert any(
@@ -59,6 +60,7 @@ def test_research_pipeline_ends_with_report_writer():
     ]
     assert research_lead.output_key == "research_coverage"
     assert google_search in research_lead.tools
+    assert url_context in research_lead.tools
     assert read_web_pages in research_lead.tools
     assert report_writer.output_key == "final_report"
     assert getattr(report_writer.model, "model", None) == "gemini-3.1-pro-preview"

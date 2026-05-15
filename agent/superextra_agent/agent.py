@@ -4,7 +4,7 @@ from pathlib import Path
 from google.adk.agents import LlmAgent
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.apps import App
-from google.adk.tools import google_search
+from google.adk.tools import google_search, url_context
 from google.adk.tools.agent_tool import AgentTool
 from google.genai import types
 
@@ -222,6 +222,7 @@ continue_research = LlmAgent(
         "context, observable focused helpers, and bounded specialist deepening."
     ),
     tools=[
+        url_context,
         read_web_pages,
         fetch_web_content,
         fetch_web_content_batch,
@@ -269,6 +270,7 @@ research_lead = LlmAgent(
     description="Plans research, calls specialist agents as tools, and records research coverage.",
     tools=[
         google_search,
+        url_context,
         read_web_pages,
         fetch_web_content,
         fetch_web_content_batch,

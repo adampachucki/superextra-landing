@@ -257,12 +257,14 @@ class TestMakeInstruction:
 
         assert "## Search And Source Reading" in result
         assert "Search, page reading, and raw fetch have different jobs" in result
-        assert "`read_web_pages` is the default way to read public URLs" in result
+        assert "Native URL Context page reading is available during your research" in result
+        assert "`read_web_pages` is an explicit structured reader" in result
         assert "`fetch_web_content` and `fetch_web_content_batch` are raw-Markdown fallbacks" in result
         assert "article pages, official announcements, public reports, PDFs" in result
-        assert "call `read_web_pages` on those URLs first" in result
-        assert "Do not start with `fetch_web_content_batch`" in result
-        assert "read the strongest 1-3 pages with `read_web_pages`" in result
+        assert "inspect those pages before broadening the search" in result
+        assert "read the strongest 1-3 pages during your research" in result
+        assert "Iterate from what the pages say" in result
+        assert "Call `read_web_pages` when explicit extracted evidence" in result
         assert "After two or three searches" in result
         assert "Grounding sources may still appear as source pills" in result
         assert "source-pill display" in result

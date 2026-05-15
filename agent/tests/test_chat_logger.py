@@ -109,6 +109,52 @@ async def test_agenttool_child_model_callbacks_write_to_parent_session_log(
 
 
 @pytest.mark.asyncio
+async def test_model_request_logs_native_built_in_tools(tmp_path, monkeypatch):
+    monkeypatch.setattr(chat_logger, "LOGS_DIR", tmp_path)
+    cloud_logs: list[tuple[str, dict]] = []
+
+    def _emit(event: str, **fields):
+        cloud_logs.append((event, fields))
+
+    monkeypatch.setattr(chat_logger, "emit_cloud_log", _emit)
+    plugin = ChatLoggerPlugin()
+
+    ctx = SimpleNamespace(
+        invocation_id="inv-parent",
+        agent_name="market_landscape",
+        session=SimpleNamespace(id="se-parent", state={"runId": "run-1", "turnIdx": 1}),
+    )
+    llm_request = SimpleNamespace(
+        model="gemini-test",
+        contents=[],
+        config=SimpleNamespace(
+            tools=[
+                SimpleNamespace(
+                    google_search=SimpleNamespace(),
+                    url_context=SimpleNamespace(),
+                    function_declarations=[SimpleNamespace(name="read_web_pages")],
+                )
+            ]
+        ),
+        tools_dict={"read_web_pages": object(), "fetch_web_content": object()},
+    )
+
+    await plugin.before_model_callback(callback_context=ctx, llm_request=llm_request)
+
+    entry = _log_entries(next(tmp_path.glob("*_se-parent.jsonl")))[0]
+    assert entry["tools"] == [
+        "google_search",
+        "url_context",
+        "read_web_pages",
+        "fetch_web_content",
+    ]
+
+    model_request = next(fields for event, fields in cloud_logs if event == "model_request")
+    assert model_request["tool_defs"] == entry["tools"]
+    assert model_request["tool_def_count"] == 4
+
+
+@pytest.mark.asyncio
 async def test_model_response_cloud_log_is_metadata_rich_without_payloads(
     tmp_path, monkeypatch
 ):

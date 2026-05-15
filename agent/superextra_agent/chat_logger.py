@@ -127,6 +127,46 @@ def _summarize_tool_result(result: Any) -> dict[str, Any]:
     return summary
 
 
+def _add_seen_name(names: list[str], seen: set[str], name: Any) -> None:
+    if not isinstance(name, str) or not name or name in seen:
+        return
+    seen.add(name)
+    names.append(name)
+
+
+def _request_tool_names(llm_request: LlmRequest) -> list[str]:
+    """Return both built-in Gemini tools and callable function tools.
+
+    `tools_dict` only contains locally executable function tools. Native
+    Gemini tools such as Google Search and URL Context live in
+    `llm_request.config.tools`, so logging only `tools_dict` hides the tools
+    that matter most for search/page-reading behavior.
+    """
+    names: list[str] = []
+    seen: set[str] = set()
+
+    config = getattr(llm_request, "config", None)
+    for tool in getattr(config, "tools", None) or []:
+        for builtin in (
+            "google_search",
+            "google_search_retrieval",
+            "url_context",
+            "code_execution",
+            "google_maps",
+            "enterprise_web_search",
+            "vertex_ai_search",
+        ):
+            if getattr(tool, builtin, None) is not None:
+                _add_seen_name(names, seen, builtin)
+        for declaration in getattr(tool, "function_declarations", None) or []:
+            _add_seen_name(names, seen, getattr(declaration, "name", None))
+
+    for name in getattr(llm_request, "tools_dict", {}) or {}:
+        _add_seen_name(names, seen, name)
+
+    return names
+
+
 def _truncate(text: Any, limit: int = 500) -> str | None:
     if text is None:
         return None
@@ -337,9 +377,7 @@ class ChatLoggerPlugin(BasePlugin):
                 "event": "model_request",
                 "model": llm_request.model,
                 "content_count": len(llm_request.contents),
-                "tools": list(llm_request.tools_dict.keys())
-                if llm_request.tools_dict
-                else [],
+                "tools": _request_tool_names(llm_request),
             },
         )
         return None

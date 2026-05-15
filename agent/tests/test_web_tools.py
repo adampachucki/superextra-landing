@@ -46,12 +46,13 @@ def test_tool_docstrings_describe_source_reading_workflow():
     fetch_doc = " ".join((fetch_web_content.__doc__ or "").split())
     batch_doc = " ".join((fetch_web_content_batch.__doc__ or "").split())
 
-    assert "Default first tool for reading concrete public URLs" in read_doc
-    assert "Use this before `fetch_web_content`" in read_doc
-    assert "Raw-Markdown fallback, not the default page reader" in fetch_doc
+    assert "Explicit structured reader for concrete public URLs" in read_doc
+    assert "fetched-page source capture" in read_doc
+    assert "Prefer this before raw Markdown fallback tools" in read_doc
+    assert "Raw-Markdown fallback, not the normal page reader" in fetch_doc
     assert "Do not use this as the first read" in fetch_doc
     assert "Raw-Markdown fallback for multiple URLs" in batch_doc
-    assert "prefer `read_web_pages` first" in batch_doc
+    assert "prefer URL Context or `read_web_pages` first" in batch_doc
 
 
 class TestReadWebPages:

@@ -6,7 +6,7 @@ from typing import Any
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_response import LlmResponse
-from google.adk.tools import google_search
+from google.adk.tools import google_search, url_context
 from google.genai import Client, types
 
 from .apify_tools import get_google_reviews
@@ -101,6 +101,13 @@ SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 
 
 _SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
+_WEB_RESEARCH_TOOLS = [
+    google_search,
+    url_context,
+    read_web_pages,
+    fetch_web_content,
+    fetch_web_content_batch,
+]
 
 
 def _make_instruction(name: str):
@@ -173,8 +180,7 @@ def _make_specialist(
         model=SPECIALIST_GEMINI,
         description=description,
         instruction=_make_instruction(instruction_name or name),
-        tools=tools
-        or [google_search, read_web_pages, fetch_web_content, fetch_web_content_batch],
+        tools=tools or _WEB_RESEARCH_TOOLS,
         output_key=output_key,
         include_contents="default",
         generate_content_config=thinking_config if thinking_config is not None else THINKING_CONFIG,
@@ -190,7 +196,7 @@ def _make_specialist(
 _THINKING_CONFIGS = {"high": THINKING_CONFIG, "medium": MEDIUM_THINKING_CONFIG}
 
 # Per-specialist tool overrides. Everything not listed here uses the default
-# `[google_search, read_web_pages, fetch_web_content, fetch_web_content_batch]` set.
+# `_WEB_RESEARCH_TOOLS` set.
 _SPECIALIST_TOOLS: dict[str, list] = {
     "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
 }

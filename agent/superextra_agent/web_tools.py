@@ -1,8 +1,8 @@
 """Web page reading tools.
 
-`read_web_pages` is the default reader for concrete public URLs. It uses
-Vertex Gemini URL Context through a direct model call to read page/PDF bodies
-and return structured evidence plus fetched-page source entries.
+`read_web_pages` is the explicit structured reader for concrete public URLs.
+It uses Vertex Gemini URL Context through a direct model call to read page/PDF
+bodies and return structured evidence plus fetched-page source entries.
 
 `fetch_web_content[_batch]` are raw-Markdown fallbacks backed by Jina Reader
 (r.jina.ai). Use them when URL Context is insufficient or blocked, or when
@@ -574,15 +574,16 @@ def _read_web_pages_sync(urls: list[str], evidence_goal: str) -> dict:
 async def read_web_pages(urls: list[str], evidence_goal: str = "") -> dict:
     """Read public pages with Vertex Gemini URL Context and extract evidence.
 
-    Default first tool for reading concrete public URLs from the user, brief,
+    Explicit structured reader for concrete public URLs from the user, brief,
     restaurant context, or search results. Pass 1-6 article, listing, menu,
     report, PDF, registry, local press, forum thread, or restaurant detail
-    URLs plus a short evidence goal. Use this before `fetch_web_content` or
-    `fetch_web_content_batch`.
+    URLs plus a short evidence goal. Use when extracted evidence, source
+    notes, or fetched-page source capture would materially improve the report.
 
-    This is for semantic extraction and source understanding. Use raw
-    Markdown fallback tools instead when exact quoted wording, raw tables, or
-    raw page text are required.
+    This is for semantic extraction and source understanding. Prefer this
+    before raw Markdown fallback tools when URL Context reading needs an
+    explicit result. Use raw Markdown fallback tools instead when exact quoted
+    wording, raw tables, or raw page text are required.
 
     Args:
         urls: Public http(s) URLs to read, max 6.
@@ -678,12 +679,12 @@ async def fetch_web_content(url: str) -> dict:
     Returns the page text as Markdown with navigation, cookie banners,
     and ads stripped. Tables come through as pipe-syntax tables.
 
-    Raw-Markdown fallback, not the default page reader. Use only after
-    `read_web_pages` is insufficient or blocked, or when exact quoted wording,
-    raw tables, or raw page text are necessary. Do not use this as the first
-    read for user-provided URLs or concrete search-result URLs. Do not pass
-    bare domain roots or search result pages. Source pills may still come from
-    grounding; this tool is for reading raw page bodies.
+    Raw-Markdown fallback, not the normal page reader. Use only after URL
+    Context or `read_web_pages` is insufficient or blocked, or when exact
+    quoted wording, raw tables, or raw page text are necessary. Do not use this
+    as the first read for user-provided URLs or concrete search-result URLs.
+    Do not pass bare domain roots or search result pages. Source pills may
+    still come from grounding; this tool is for reading raw page bodies.
 
     Args:
         url: The full URL to fetch (e.g. 'https://reddit.com/r/coffee/comments/abc123').
@@ -822,11 +823,11 @@ async def fetch_web_content_batch(urls: list[str]) -> dict:
     Capped at 10 URLs per call; pick the most relevant concrete article,
     listing, menu, registry, report, forum thread, or detail URLs.
 
-    Raw-Markdown fallback for multiple URLs, not the default page reader. Do
+    Raw-Markdown fallback for multiple URLs, not the normal page reader. Do
     not use this as the first read for user-provided URLs or concrete
-    search-result URLs; prefer `read_web_pages` first. Use only after URL
-    Context is insufficient or blocked, or when exact quoted wording, raw
-    tables, or raw page text are necessary.
+    search-result URLs; prefer URL Context or `read_web_pages` first. Use
+    only after URL Context is insufficient or blocked, or when exact quoted
+    wording, raw tables, or raw page text are necessary.
 
     Args:
         urls: List of full URLs to fetch (max 10).
