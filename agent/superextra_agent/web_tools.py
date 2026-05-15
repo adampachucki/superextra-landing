@@ -34,10 +34,10 @@ from .secrets import get_secret
 
 JINA_BASE = "https://r.jina.ai"
 MAX_CONTENT_LENGTH = 50_000
-TIMEOUT_S = 40.0
+TIMEOUT_S = 15.0
 URL_CONTEXT_MODEL = os.environ.get("URL_CONTEXT_MODEL", "gemini-3.1-pro-preview")
-URL_CONTEXT_TIMEOUT_S = 40.0
-URL_CONTEXT_HTTP_TIMEOUT_MS = 35_000
+URL_CONTEXT_TIMEOUT_S = 15.0
+URL_CONTEXT_HTTP_TIMEOUT_MS = 12_000
 MAX_URL_CONTEXT_URLS = 6
 CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 # `readerlm-v2` is auth-only and commonly tens of seconds per page; cap
@@ -52,7 +52,8 @@ MAX_BATCH = 10
 # resolve the redirect to the real URL before sending it to Jina.
 VERTEX_REDIRECT_HOST = "vertexaisearch.cloud.google.com"
 VERTEX_REDIRECT_PATH_PREFIX = "/grounding-api-redirect/"
-VERTEX_UNWRAP_TIMEOUT_S = 10.0
+VERTEX_UNWRAP_TIMEOUT_S = 5.0
+ERROR_MESSAGE_LOG_CHARS = 500
 
 
 def _is_vertex_redirect(url: str) -> bool:
@@ -226,10 +227,22 @@ def _log_fetch_url(
         original_url=original_url,
         status=status,
         error_reason=error_reason,
+        error_message=_error_message_excerpt(result.get("error_message")),
         duration_ms=duration_ms,
         cached=cached,
         content_chars=content_chars,
     )
+
+
+def _error_message_excerpt(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = re.sub(r"\s+", " ", value).strip()
+    if not text:
+        return None
+    if len(text) <= ERROR_MESSAGE_LOG_CHARS:
+        return text
+    return text[: ERROR_MESSAGE_LOG_CHARS - 1].rstrip() + "…"
 
 
 def _strip_fragment(url: str) -> str:
@@ -657,6 +670,7 @@ async def read_web_pages(urls: list[str], evidence_goal: str = "") -> dict:
         run_id=_fetch_run_id_var.get(),
         status=result.get("status"),
         error_reason=result.get("_error_reason"),
+        error_message=_error_message_excerpt(result.get("error_message")),
         url_count=len(cleaned),
         retrieved_count=len(result.get("sources") or []),
         duration_ms=int((time.monotonic() - started) * 1000),
@@ -843,4 +857,21 @@ async def fetch_web_content_batch(urls: list[str]) -> dict:
             ),
         }
     results = await asyncio.gather(*(fetch_web_content(u) for u in urls))
-    return {"status": "success", "results": results}
+    success_count = sum(
+        1 for item in results if isinstance(item, dict) and item.get("status") == "success"
+    )
+    failed_count = len(results) - success_count
+    if success_count == 0:
+        return {
+            "status": "error",
+            "error_message": f"All {len(results)} sources failed to fetch",
+            "results": results,
+            "success_count": success_count,
+            "failed_count": failed_count,
+        }
+    return {
+        "status": "success",
+        "results": results,
+        "success_count": success_count,
+        "failed_count": failed_count,
+    }

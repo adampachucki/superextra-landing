@@ -308,6 +308,23 @@ def test_google_maps_response_uses_place_name():
     assert rows[0]["text"] == "Profile for Umami Berlin"
 
 
+def test_failed_fetch_batch_warning_preserves_failure_count():
+    rows = map_tool_result(
+        "fetch_web_content_batch",
+        {
+            "status": "error",
+            "results": [
+                {"status": "error", "error_message": "Timeout fetching https://a.example/x"},
+                {"status": "error", "error_message": "Timeout fetching https://b.example/y"},
+            ],
+        },
+        {},
+        "call-1",
+    )
+
+    assert rows[0]["text"] == "2/2 sources failed"
+
+
 def test_tripadvisor_unverified_becomes_warning():
     """Unverified status (coord check failed or no coords available) renders
     as a timeline warning row. On unverified the tool strips `name`, so the

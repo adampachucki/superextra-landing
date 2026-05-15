@@ -472,8 +472,6 @@ def map_tool_result(
         return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
 
     if name == "fetch_web_content_batch":
-        if status == "error":
-            return [_detail(row_id, "warning", "Warnings", "Batch source fetch failed")]
         results = response.get("results") if isinstance(response, dict) else None
         if isinstance(results, list):
             failed = sum(1 for r in results if isinstance(r, dict) and r.get("status") == "error")
@@ -486,6 +484,8 @@ def map_tool_result(
                         f"{failed}/{len(results)} sources failed",
                     )
                 ]
+        if status == "error":
+            return [_detail(row_id, "warning", "Warnings", "Batch source fetch failed")]
 
     return []
 

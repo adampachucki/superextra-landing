@@ -55,6 +55,13 @@ def test_tool_docstrings_describe_source_reading_workflow():
     assert "prefer URL Context or `read_web_pages` first" in batch_doc
 
 
+def test_source_reading_timeouts_are_short_bounded_attempts():
+    assert web_tools.TIMEOUT_S == 15.0
+    assert web_tools.URL_CONTEXT_TIMEOUT_S == 15.0
+    assert web_tools.URL_CONTEXT_HTTP_TIMEOUT_MS == 12_000
+    assert web_tools.VERTEX_UNWRAP_TIMEOUT_S == 5.0
+
+
 class TestReadWebPages:
     def test_url_context_client_uses_cloud_platform_scoped_credentials(self, monkeypatch):
         web_tools._url_context_client = None
@@ -172,7 +179,7 @@ class TestReadWebPages:
         assert read_sync.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_exception_returns_error_without_private_reason(self):
+    async def test_exception_returns_error_without_private_reason(self, mock_emit_cloud_log):
         with patch(
             "superextra_agent.web_tools._read_web_pages_sync",
             side_effect=RuntimeError("boom"),
@@ -182,6 +189,9 @@ class TestReadWebPages:
         assert result["status"] == "error"
         assert "URL Context read failed" in result["error_message"]
         assert "_error_reason" not in result
+        kw = _log_kwargs(mock_emit_cloud_log, event="read_web_pages")
+        assert kw["error_reason"] == "exception"
+        assert kw["error_message"] == "URL Context read failed: boom"
 
     @pytest.mark.asyncio
     async def test_strips_private_usage_metadata_after_logging(self, mock_emit_cloud_log):
@@ -832,6 +842,7 @@ class TestFetchUrlLogging:
 
         kw = _log_kwargs(mock_emit_cloud_log)
         assert kw["error_reason"] == "timeout"
+        assert kw["error_message"] == "Timeout fetching https://example.com/slow"
 
     @pytest.mark.asyncio
     async def test_domain_root_logs_domain_root_reason(self, mock_emit_cloud_log):
@@ -967,6 +978,25 @@ class TestFetchWebContentBatch:
         assert result["status"] == "success"
         assert len(result["results"]) == 3
         assert all(r["status"] == "success" for r in result["results"])
+        assert result["success_count"] == 3
+        assert result["failed_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_all_failed_batch_returns_error_status(self):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response("missing", status_code=404))
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            result = await fetch_web_content_batch([
+                "https://a.example/x",
+                "https://b.example/y",
+            ])
+
+        assert result["status"] == "error"
+        assert result["error_message"] == "All 2 sources failed to fetch"
+        assert result["success_count"] == 0
+        assert result["failed_count"] == 2
+        assert [item["status"] for item in result["results"]] == ["error", "error"]
 
     @pytest.mark.asyncio
     async def test_empty_batch_errors(self):
