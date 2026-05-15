@@ -97,6 +97,15 @@ async function waitUntil(fn: () => boolean, timeout = 2000) {
 	}
 }
 
+function expectInOrder(body: string, values: string[]) {
+	let cursor = -1;
+	for (const value of values) {
+		const next = body.indexOf(value);
+		expect(next, value).toBeGreaterThan(cursor);
+		cursor = next;
+	}
+}
+
 async function primeCompleteTurn({
 	sid = 'sid-1',
 	sourceCount = 0,
@@ -223,6 +232,34 @@ describe('ChatThread', () => {
 		expect(body).toContain('https://domain18.example/article');
 		expect(body).not.toContain('https://portal.example/second');
 		expect(body).toContain('+1 more');
+	});
+
+	it('stable-shuffles repeated source families after the first variety pass', async () => {
+		const sources: ChatSource[] = [
+			{ title: 'A1', url: 'https://a.example/1' },
+			{ title: 'A2', url: 'https://a.example/2' },
+			{ title: 'A3', url: 'https://a.example/3' },
+			{ title: 'B1', url: 'https://b.example/1' },
+			{ title: 'B2', url: 'https://b.example/2' },
+			{ title: 'B3', url: 'https://b.example/3' },
+			{ title: 'C1', url: 'https://c.example/1' },
+			{ title: 'C2', url: 'https://c.example/2' },
+			{ title: 'C3', url: 'https://c.example/3' }
+		];
+		await primeCompleteTurn({ sources });
+
+		const { body } = render(ChatThread, { props: {} });
+		expectInOrder(body, [
+			'https://a.example/1',
+			'https://b.example/1',
+			'https://c.example/1',
+			'https://b.example/2',
+			'https://c.example/2',
+			'https://b.example/3',
+			'https://c.example/3',
+			'https://a.example/2',
+			'https://a.example/3'
+		]);
 	});
 
 	it('labels fetched page sources by domain', async () => {

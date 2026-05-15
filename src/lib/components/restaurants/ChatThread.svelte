@@ -180,7 +180,17 @@
 		return `url:${src.url}`;
 	}
 
-	function varietyFirstSources(sources: ChatSource[]): ChatSource[] {
+	function sourceRank(src: ChatSource, seed: number): number {
+		let hash = 2166136261;
+		const value = `${seed}:${src.url}:${src.title}`;
+		for (let i = 0; i < value.length; i += 1) {
+			hash ^= value.charCodeAt(i);
+			hash = Math.imul(hash, 16777619);
+		}
+		return hash >>> 0;
+	}
+
+	function varietyFirstSources(sources: ChatSource[], seed: number): ChatSource[] {
 		const groups: { key: string; sources: ChatSource[] }[] = [];
 		for (const source of sources) {
 			const key = sourceGroupKey(source);
@@ -192,14 +202,10 @@
 			}
 		}
 
-		const ordered: ChatSource[] = [];
-		for (let round = 0; ordered.length < sources.length; round += 1) {
-			for (const group of groups) {
-				const source = group.sources[round];
-				if (source) ordered.push(source);
-			}
-		}
-		return ordered;
+		const first = groups.flatMap((group) => group.sources.slice(0, 1));
+		const rest = groups.flatMap((group) => group.sources.slice(1));
+		rest.sort((a, b) => sourceRank(a, seed) - sourceRank(b, seed));
+		return [...first, ...rest];
 	}
 
 	function thoughtCount(events: TimelineEvent[] | undefined): number {
@@ -303,7 +309,7 @@
 
 					{#if msg.sources && msg.sources.length >= SOURCE_COUNT_MIN}
 						{@const showAll = expandedSources[msg.turnIndex]}
-						{@const displaySources = varietyFirstSources(msg.sources)}
+						{@const displaySources = varietyFirstSources(msg.sources, msg.turnIndex)}
 						{@const visible = showAll ? displaySources : displaySources.slice(0, SOURCES_LIMIT)}
 						<div class="mt-5 max-w-[700px]">
 							<span class="mb-2 block text-[12px] font-medium text-black/40 dark:text-white/40"
