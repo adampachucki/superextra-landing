@@ -31,18 +31,16 @@ def test_specialists_accept_agenttool_request_context():
 
 def test_web_research_specialists_have_search_and_page_reading_tools():
     for specialist in ALL_SPECIALISTS:
-        if specialist.name == "review_analyst":
+        if specialist.name in ("review_analyst", "dynamic_researcher_1"):
             continue
-        assert specialist.tools == [search_and_read_public_pages, read_public_page, read_public_pages]
-        assert search_web not in specialist.tools
-        assert google_search not in specialist.tools
-        assert url_context not in specialist.tools
-        assert read_web_pages not in specialist.tools
-        assert fetch_web_content not in specialist.tools
-        assert fetch_web_content_batch not in specialist.tools
+        assert google_search in specialist.tools
+        assert url_context in specialist.tools
+        assert read_web_pages in specialist.tools
+        assert fetch_web_content in specialist.tools
+        assert fetch_web_content_batch in specialist.tools
 
 
-def test_initial_dynamic_researcher_uses_serpapi_and_jina_only():
+def test_pilot_dynamic_researcher_uses_serpapi_and_jina_only():
     pilot = next(agent for agent in ALL_SPECIALISTS if agent.name == "dynamic_researcher_1")
 
     assert pilot.tools == [search_and_read_public_pages, read_public_page, read_public_pages]

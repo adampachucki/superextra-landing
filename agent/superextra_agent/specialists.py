@@ -108,14 +108,14 @@ SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 
 
 _SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
-_LEGACY_WEB_RESEARCH_TOOLS = [
+_WEB_RESEARCH_TOOLS = [
     google_search,
     url_context,
     read_web_pages,
     fetch_web_content,
     fetch_web_content_batch,
 ]
-_WEB_RESEARCH_TOOLS = [
+_PILOT_WEB_RESEARCH_TOOLS = [
     search_and_read_public_pages,
     read_public_page,
     read_public_pages,
@@ -210,6 +210,7 @@ _THINKING_CONFIGS = {"high": THINKING_CONFIG, "medium": MEDIUM_THINKING_CONFIG}
 # Per-specialist tool overrides for first-turn research reports. Everything not
 # listed here uses the default `_WEB_RESEARCH_TOOLS` set.
 _INITIAL_SPECIALIST_TOOLS: dict[str, list] = {
+    "dynamic_researcher_1": _PILOT_WEB_RESEARCH_TOOLS,
     "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
 }
 
@@ -235,7 +236,7 @@ CONTINUATION_SPECIALISTS = [
         s.name,
         s.description,
         None,
-        tools=_CONTINUATION_SPECIALIST_TOOLS.get(s.name, _LEGACY_WEB_RESEARCH_TOOLS),
+        tools=_CONTINUATION_SPECIALIST_TOOLS.get(s.name),
         instruction_name=s.instruction_name,
         thinking_config=_THINKING_CONFIGS[s.thinking],
     )
