@@ -178,7 +178,11 @@ async def test_model_response_cloud_log_is_metadata_rich_without_payloads(
         usage_metadata=SimpleNamespace(
             prompt_token_count=100,
             candidates_token_count=40,
+            thoughts_token_count=7,
+            tool_use_prompt_token_count=33,
+            cached_content_token_count=None,
             total_token_count=140,
+            traffic_type="ON_DEMAND",
         ),
         finish_reason="STOP",
         content=SimpleNamespace(
@@ -206,7 +210,18 @@ async def test_model_response_cloud_log_is_metadata_rich_without_payloads(
     assert logged["adk_session_id"] == "se-parent"
     assert logged["run_id"] == "run-1"
     assert logged["turn_idx"] == 1
-    assert logged["tokens"] == {"prompt": 100, "candidates": 40, "total": 140}
+    assert logged["tokens"] == {
+        "prompt": 100,
+        "candidates": 40,
+        "thoughts": 7,
+        "tool_use_prompt": 33,
+        "cached_content": None,
+        "total": 140,
+    }
+    assert logged["thought_tokens"] == 7
+    assert logged["tool_use_prompt_tokens"] == 33
+    assert logged["server_side_tool_use"] is True
+    assert logged["traffic_type"] == "ON_DEMAND"
     assert logged["text_preview_chars"] == len(
         "Detailed final report with venue-specific implications."
     )

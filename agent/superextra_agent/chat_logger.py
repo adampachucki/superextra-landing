@@ -167,6 +167,17 @@ def _request_tool_names(llm_request: LlmRequest) -> list[str]:
     return names
 
 
+def _usage_token_summary(usage: Any) -> dict[str, Any]:
+    return {
+        "prompt": getattr(usage, "prompt_token_count", None),
+        "candidates": getattr(usage, "candidates_token_count", None),
+        "thoughts": getattr(usage, "thoughts_token_count", None),
+        "tool_use_prompt": getattr(usage, "tool_use_prompt_token_count", None),
+        "cached_content": getattr(usage, "cached_content_token_count", None),
+        "total": getattr(usage, "total_token_count", None),
+    }
+
+
 def _truncate(text: Any, limit: int = 500) -> str | None:
     if text is None:
         return None
@@ -192,6 +203,11 @@ def _cloud_payload(entry: dict[str, Any]) -> dict[str, Any]:
         "duration_s",
         "content_count",
         "tokens",
+        "thought_tokens",
+        "tool_use_prompt_tokens",
+        "cached_content_tokens",
+        "server_side_tool_use",
+        "traffic_type",
         "finish_reason",
         "error_code",
         "error_type",
@@ -402,11 +418,22 @@ class ChatLoggerPlugin(BasePlugin):
             entry["error_message"] = llm_response.error_message
 
         if llm_response.usage_metadata:
-            entry["tokens"] = {
-                "prompt": llm_response.usage_metadata.prompt_token_count,
-                "candidates": llm_response.usage_metadata.candidates_token_count,
-                "total": llm_response.usage_metadata.total_token_count,
-            }
+            usage = llm_response.usage_metadata
+            entry["tokens"] = _usage_token_summary(usage)
+            entry["thought_tokens"] = getattr(usage, "thoughts_token_count", None)
+            entry["tool_use_prompt_tokens"] = getattr(
+                usage, "tool_use_prompt_token_count", None
+            )
+            entry["cached_content_tokens"] = getattr(
+                usage, "cached_content_token_count", None
+            )
+            entry["server_side_tool_use"] = (
+                entry["tool_use_prompt_tokens"] is not None
+                and entry["tool_use_prompt_tokens"] > 0
+            )
+            traffic_type = getattr(usage, "traffic_type", None)
+            if traffic_type is not None:
+                entry["traffic_type"] = str(traffic_type)
 
         fr = getattr(llm_response, "finish_reason", None)
         if fr is not None:
