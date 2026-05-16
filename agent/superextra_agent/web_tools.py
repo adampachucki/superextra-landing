@@ -28,6 +28,7 @@ from google.genai import Client, types
 
 from .cloud_logging import emit_cloud_log
 from .secrets import get_secret
+from .specialist_catalog import SPECIALIST_RESULT_KEYS
 
 JINA_BASE = "https://r.jina.ai"
 MAX_CONTENT_LENGTH = 50_000
@@ -43,6 +44,9 @@ CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 # single-page read. Batch reads stay fast so broad source scans don't spend
 # one timeout per noisy page.
 MAX_BATCH = 10
+ADJUDICATOR_READ_CONCURRENCY = 15
+ADJUDICATOR_READ_STATE_KEY = "temp:evidence_adjudicator_read_urls"
+ADJUDICATOR_READ_RESULT_STATE_KEY = "temp:evidence_adjudicator_read_result"
 
 # Gemini grounding exposes article URLs as tokenized redirects on
 # `https://vertexaisearch.cloud.google.com/grounding-api-redirect/...`.
@@ -56,7 +60,15 @@ ERROR_MESSAGE_LOG_CHARS = 500
 JINA_READERLM_FALLBACK_REASONS = frozenset(
     {"thin_content", "iframe_spa", "consent_noise"}
 )
+JINA_PROXY_FALLBACK_REASONS = frozenset(
+    {"upstream_http_403", "upstream_captcha", "cloudflare_interstitial"}
+)
 _JINA_TITLE_RE = re.compile(r"^Title:\s*(.+?)\s*$", re.MULTILINE)
+_VALIDATION_PACKET_HEADING_RE = re.compile(
+    r"(?im)^#{1,6}\s+(?:\*\*)?Validation Packet\s*:?(?:\*\*)?\s*:?\s*$"
+)
+_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
+_ADJUDICATOR_RETURN_LIST_LIMIT = 20
 
 
 def _is_vertex_redirect(url: str) -> bool:
@@ -88,6 +100,16 @@ def _get_client() -> httpx.AsyncClient:
     return _client
 
 
+def _jina_reader_headers(mode: str) -> dict[str, str]:
+    headers = {
+        "Accept": "text/markdown",
+        "Authorization": f"Bearer {get_secret('JINA_API_KEY')}",
+    }
+    if mode == "readerlm-v2":
+        headers["X-Respond-With"] = "readerlm-v2"
+    return headers
+
+
 def _cleanup_client():
     global _client
     if _client is not None:
@@ -111,7 +133,11 @@ _fetch_run_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "_fetch_run_id", default=None
 )
 _FETCH_CACHE_FAST = "fast"
+_FETCH_CACHE_FAST_ALLOW_ROOT = "fast_allow_root"
+_FETCH_CACHE_FAST_PROXY = "fast_proxy"
+_FETCH_CACHE_FAST_PROXY_ALLOW_ROOT = "fast_proxy_allow_root"
 _FETCH_CACHE_DEEP = "deep"
+_FETCH_CACHE_DEEP_ALLOW_ROOT = "deep_allow_root"
 _fetch_cache: dict[tuple[str, str, str], dict] = {}
 _read_pages_cache: dict[tuple[str, tuple[str, ...], str], dict] = {}
 # Bounded so that a run whose `after_run_callback` doesn't fire (ADK
@@ -295,6 +321,219 @@ def _strip_fragment(url: str) -> str:
     return urlunparse(p._replace(fragment=""))
 
 
+def _is_domain_root_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return not parsed.path or parsed.path == "/"
+
+
+def _append_limited(items: list[str], value: str) -> None:
+    if len(items) < _ADJUDICATOR_RETURN_LIST_LIMIT:
+        items.append(value)
+
+
+def _canonical_adjudicator_candidate_url(raw: Any) -> str | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    url = _strip_fragment(raw.strip())
+    return url if _is_http_url(url) else None
+
+
+def _iter_validation_packet_objects(text: str) -> list[dict[str, Any]]:
+    packets: list[dict[str, Any]] = []
+    matches = list(_VALIDATION_PACKET_HEADING_RE.finditer(text))
+    for i, match in enumerate(matches):
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        section = text[start:end]
+        fence = _FENCED_JSON_RE.search(section)
+        candidate = fence.group(1) if fence else section
+        parsed = _json_object_from_text(candidate)
+        if parsed is not None:
+            packets.append(parsed)
+    return packets
+
+
+def collect_adjudicator_packet_claims(state: Any) -> list[dict[str, Any]]:
+    """Return claim metadata from specialist validation packets in state."""
+    if state is None:
+        return []
+
+    claims: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for key, label in SPECIALIST_RESULT_KEYS.items():
+        value = state.get(key)
+        if not value or value == "Agent did not produce output.":
+            continue
+        if not isinstance(value, str):
+            value = str(value)
+        for packet in _iter_validation_packet_objects(value):
+            for claim in packet.get("claims_for_validation") or []:
+                if not isinstance(claim, dict):
+                    continue
+                text = str(claim.get("claim") or "").strip()
+                if not text:
+                    continue
+                claim_id = str(claim.get("id") or "").strip()
+                dedupe_key = (claim_id, text)
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+                source_urls = [
+                    url
+                    for url in (
+                        _canonical_adjudicator_candidate_url(raw)
+                        for raw in claim.get("source_urls") or []
+                    )
+                    if url
+                ]
+                provider_refs = [
+                    str(ref).strip()
+                    for ref in claim.get("provider_refs") or []
+                    if str(ref).strip()
+                ]
+                claims.append(
+                    {
+                        "id": claim_id,
+                        "claim": text,
+                        "specialists": [key],
+                        "specialist_label": label,
+                        "source_urls": source_urls,
+                        "provider_refs": provider_refs,
+                    }
+                )
+    return claims
+
+
+def _append_unique_adjudicator_url(
+    queue: list[str], seen: set[str], raw: Any
+) -> None:
+    url = _canonical_adjudicator_candidate_url(raw)
+    if not url or url in seen:
+        return
+    seen.add(url)
+    queue.append(url)
+
+
+def _iter_adjudicator_packet_urls(state: Any) -> list[str]:
+    if state is None:
+        return []
+
+    urls: list[str] = []
+    seen: set[str] = set()
+    for key in SPECIALIST_RESULT_KEYS:
+        value = state.get(key)
+        if not value or value == "Agent did not produce output.":
+            continue
+        if not isinstance(value, str):
+            value = str(value)
+        for packet in _iter_validation_packet_objects(value):
+            for source in packet.get("candidate_sources") or []:
+                if not isinstance(source, dict):
+                    continue
+                _append_unique_adjudicator_url(urls, seen, source.get("url"))
+            for claim in packet.get("claims_for_validation") or []:
+                if not isinstance(claim, dict):
+                    continue
+                for raw_url in claim.get("source_urls") or []:
+                    _append_unique_adjudicator_url(urls, seen, raw_url)
+    return urls
+
+
+def _compact_adjudicator_read_result(output: dict[str, Any]) -> dict[str, Any]:
+    failed_sources: list[dict[str, str]] = []
+    for item in output.get("results") or []:
+        if not isinstance(item, dict) or item.get("status") == "success":
+            continue
+        url = item.get("url")
+        if not isinstance(url, str) or not url:
+            continue
+        reason = item.get("error_message") or item.get("status") or "read failed"
+        failed_sources.append({"url": url, "reason": str(reason)})
+
+    return {
+        "status": output.get("status"),
+        "requested_count": output.get("requested_count", 0),
+        "attempted_count": output.get("attempted_count", 0),
+        "successful_count": output.get("success_count", 0),
+        "failed_count": output.get("failed_count", 0),
+        "sources": [
+            {
+                "url": source.get("url"),
+                "title": source.get("title"),
+                "domain": source.get("domain"),
+                "provider": source.get("provider"),
+            }
+            for source in output.get("sources") or []
+            if isinstance(source, dict) and source.get("url")
+        ],
+        "failed_sources": failed_sources,
+        "skipped_urls": output.get("skipped_urls", []),
+        "rejected_urls": output.get("rejected_urls", []),
+        "invalid_urls": output.get("invalid_urls", []),
+        "error_message": output.get("error_message"),
+    }
+
+
+def _merge_compact_adjudicator_read_results(
+    existing: dict[str, Any], current: dict[str, Any]
+) -> dict[str, Any]:
+    def merged_count(key: str) -> int:
+        return int(existing.get(key) or 0) + int(current.get(key) or 0)
+
+    def merged_dicts(key: str) -> list[dict[str, Any]]:
+        merged: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for item in [*(existing.get(key) or []), *(current.get(key) or [])]:
+            if not isinstance(item, dict):
+                continue
+            url = item.get("url")
+            if not isinstance(url, str) or not url or url in seen:
+                continue
+            seen.add(url)
+            merged.append(item)
+        return merged
+
+    def merged_strings(key: str) -> list[str]:
+        merged: list[str] = []
+        seen: set[str] = set()
+        for item in [*(existing.get(key) or []), *(current.get(key) or [])]:
+            if not isinstance(item, str) or not item or item in seen:
+                continue
+            seen.add(item)
+            _append_limited(merged, item)
+        return merged
+
+    if current.get("status") == "success" and int(current.get("attempted_count") or 0) == 0:
+        status = existing.get("status") or current.get("status")
+    else:
+        status = current.get("status") or existing.get("status")
+    if existing.get("status") == "success" and current.get("status") == "error":
+        status = "partial"
+
+    return {
+        "status": status,
+        "requested_count": merged_count("requested_count"),
+        "attempted_count": merged_count("attempted_count"),
+        "successful_count": merged_count("successful_count"),
+        "failed_count": merged_count("failed_count"),
+        "sources": merged_dicts("sources"),
+        "failed_sources": merged_dicts("failed_sources"),
+        "skipped_urls": merged_strings("skipped_urls"),
+        "rejected_urls": merged_strings("rejected_urls"),
+        "invalid_urls": merged_strings("invalid_urls"),
+        "error_message": current.get("error_message") or existing.get("error_message"),
+    }
+
+
+def _store_adjudicator_read_result(state: Any, output: dict[str, Any]) -> None:
+    if state is not None:
+        current = _compact_adjudicator_read_result(output)
+        existing = state.get(ADJUDICATOR_READ_RESULT_STATE_KEY)
+        if isinstance(existing, dict):
+            current = _merge_compact_adjudicator_read_results(existing, current)
+        state[ADJUDICATOR_READ_RESULT_STATE_KEY] = current
+
+
 # ── Block detection ──────────────────────────────────────────────────────────
 
 
@@ -321,6 +560,8 @@ def _detect_upstream_block(content: str) -> tuple[str, str] | None:
         return "upstream requires CAPTCHA", "upstream_captcha"
     if _looks_like_login_gate(larger_head):
         return "page requires login", "login_required"
+    if _looks_like_adblock_gate(lower_head):
+        return "page is blocked by an adblock wall", "adblock_wall"
     if _looks_like_paywall(lower_head):
         return "page is behind a paywall", "paywall"
     if "Just a moment" in head and len(content) < 2000:
@@ -354,6 +595,15 @@ def _looks_like_paywall(head_lower: str) -> bool:
         or "subscribe to continue" in head_lower
         or "already a subscriber" in head_lower
         or "this content is for subscribers" in head_lower
+    )
+
+
+def _looks_like_adblock_gate(head_lower: str) -> bool:
+    return (
+        "wyłącz adblocka" in head_lower
+        or "wylacz adblocka" in head_lower
+        or "disable adblock" in head_lower
+        or "ad blocker" in head_lower
     )
 
 
@@ -546,12 +796,17 @@ def _source_for_jina_result(url: Any, content: Any) -> dict[str, Any] | None:
 def _normalize_read_result_item(raw: Any, fallback_url: str | None) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
-    url = raw.get("url") if isinstance(raw.get("url"), str) else fallback_url
+    raw_url = raw.get("url")
+    raw_url_text = raw_url.strip() if isinstance(raw_url, str) else ""
+    url_from_fallback = not raw_url_text
+    url = raw_url_text or fallback_url
     if not isinstance(url, str) or not url.strip():
         return None
+    url = url.strip()
     retrieved_url = raw.get("retrieved_url")
-    if not isinstance(retrieved_url, str) or not retrieved_url.strip():
-        retrieved_url = url
+    retrieved_url_text = retrieved_url.strip() if isinstance(retrieved_url, str) else ""
+    retrieved_url_from_fallback = not retrieved_url_text
+    retrieved_url = retrieved_url_text or url
     title = raw.get("title")
     summary = raw.get("evidence_summary")
     facts = raw.get("specific_facts")
@@ -559,8 +814,8 @@ def _normalize_read_result_item(raw: Any, fallback_url: str | None) -> dict[str,
     limits = raw.get("limits")
     return {
         "status": "success",
-        "url": url.strip(),
-        "retrieved_url": retrieved_url.strip(),
+        "url": url,
+        "retrieved_url": retrieved_url,
         "title": title.strip() if isinstance(title, str) and title.strip() else "",
         "evidence_summary": summary.strip() if isinstance(summary, str) else "",
         "specific_facts": facts if isinstance(facts, list) else [],
@@ -568,6 +823,8 @@ def _normalize_read_result_item(raw: Any, fallback_url: str | None) -> dict[str,
         if isinstance(supporting_details, list)
         else [],
         "limits": limits.strip() if isinstance(limits, str) else "",
+        "_url_from_fallback": url_from_fallback,
+        "_retrieved_url_from_fallback": retrieved_url_from_fallback,
     }
 
 
@@ -622,14 +879,16 @@ def _read_web_pages_sync(urls: list[str], evidence_goal: str) -> dict:
         results = [
             {
                 "status": "success",
-                "url": urls[0],
-                "retrieved_url": successful_metadata[0]["retrieved_url"],
-                "title": _domain_for_url(successful_metadata[0]["retrieved_url"]),
+                "url": item["retrieved_url"],
+                "retrieved_url": item["retrieved_url"],
+                "title": _domain_for_url(item["retrieved_url"]),
                 "evidence_summary": text,
                 "specific_facts": [],
                 "supporting_details": [],
                 "limits": "The model did not return per-URL structured results.",
             }
+            for item in successful_metadata
+            if item.get("retrieved_url")
         ]
 
     status_by_url = {
@@ -641,13 +900,34 @@ def _read_web_pages_sync(urls: list[str], evidence_goal: str) -> dict:
         lookup_urls = [
             item.get("retrieved_url", ""),
             item.get("url", ""),
-            urls[i] if i < len(urls) else "",
         ]
-        retrieval_status = next((status_by_url[u] for u in lookup_urls if u in status_by_url), "")
-        if retrieval_status:
-            item["retrieval_status"] = retrieval_status
-            if not _is_successful_retrieval_status(retrieval_status):
-                item["status"] = "error"
+        metadata_match = next((u for u in lookup_urls if u in status_by_url), "")
+        requested_url = urls[i] if i < len(urls) else ""
+        can_use_positional_metadata = item.get("_retrieved_url_from_fallback") and (
+            item.get("_url_from_fallback") or item.get("url") == requested_url
+        )
+        if (
+            not metadata_match
+            and can_use_positional_metadata
+            and i < len(metadata)
+        ):
+            metadata_url = metadata[i].get("retrieved_url")
+            if isinstance(metadata_url, str) and metadata_url:
+                metadata_match = metadata_url
+        if not metadata_match:
+            item["status"] = "error"
+            item["retrieval_status"] = ""
+            item["limits"] = "URL Context did not report retrieval metadata for this URL."
+            item.pop("_url_from_fallback", None)
+            item.pop("_retrieved_url_from_fallback", None)
+            continue
+        retrieval_status = status_by_url.get(metadata_match, "")
+        item["retrieved_url"] = metadata_match
+        item["retrieval_status"] = retrieval_status
+        if not _is_successful_retrieval_status(retrieval_status):
+            item["status"] = "error"
+        item.pop("_url_from_fallback", None)
+        item.pop("_retrieved_url_from_fallback", None)
 
     sources = [
         source
@@ -686,7 +966,9 @@ def _read_web_pages_sync(urls: list[str], evidence_goal: str) -> dict:
 # ── Fetch tools ─────────────────────────────────────────────────────────────
 
 
-async def read_web_pages(urls: list[str], evidence_goal: str = "") -> dict:
+async def read_web_pages(
+    urls: list[str], evidence_goal: str = "", tool_context=None
+) -> dict:
     """Read public pages with Vertex Gemini URL Context and extract evidence.
 
     Explicit structured reader for concrete public URLs from the user, brief,
@@ -829,7 +1111,13 @@ async def fetch_web_content(url: str) -> dict:
     return await _fetch_web_content(url, allow_readerlm=True)
 
 
-async def _fetch_web_content(url: str, *, allow_readerlm: bool) -> dict:
+async def _fetch_web_content(
+    url: str,
+    *,
+    allow_readerlm: bool,
+    allow_domain_root: bool = False,
+    allow_proxy_fallback: bool = False,
+) -> dict:
     original_url = url
     started = time.monotonic()
     was_vertex_redirect = _is_vertex_redirect(url)
@@ -841,7 +1129,25 @@ async def _fetch_web_content(url: str, *, allow_readerlm: bool) -> dict:
     url = _strip_fragment(unwrapped_url)
     log_original = original_url if vertex_rewrote else None
 
-    cache_mode = _FETCH_CACHE_DEEP if allow_readerlm else _FETCH_CACHE_FAST
+    domain_root_allowed = allow_domain_root and _is_domain_root_url(url)
+    if allow_proxy_fallback and not allow_readerlm:
+        cache_mode = (
+            _FETCH_CACHE_FAST_PROXY_ALLOW_ROOT
+            if domain_root_allowed
+            else _FETCH_CACHE_FAST_PROXY
+        )
+    elif allow_readerlm:
+        cache_mode = (
+            _FETCH_CACHE_DEEP_ALLOW_ROOT
+            if domain_root_allowed
+            else _FETCH_CACHE_DEEP
+        )
+    else:
+        cache_mode = (
+            _FETCH_CACHE_FAST_ALLOW_ROOT
+            if domain_root_allowed
+            else _FETCH_CACHE_FAST
+        )
     cache_key = _cache_key(url, cache_mode)
     if cache_key is not None and cache_key in _fetch_cache:
         cached = dict(_fetch_cache[cache_key])
@@ -870,9 +1176,15 @@ async def _fetch_web_content(url: str, *, allow_readerlm: bool) -> dict:
             result, readerlm_attempted = await _apply_readerlm_fallback(url, fast_cached)
             cached_for_log = not readerlm_attempted
         else:
-            result, fast_result_for_cache = await _fetch_uncached(url, allow_readerlm=True)
+            result, fast_result_for_cache = await _fetch_uncached(
+                url, allow_readerlm=True, allow_domain_root=allow_domain_root
+            )
     else:
-        result, _fast_result_for_cache = await _fetch_uncached(url, allow_readerlm=False)
+        result, _fast_result_for_cache = await _fetch_uncached(
+            url, allow_readerlm=False, allow_domain_root=allow_domain_root
+        )
+        if allow_proxy_fallback:
+            result, _proxy_attempted = await _apply_jina_proxy_fallback(url, result)
 
     # Cache every outcome — including errors — so the model doesn't
     # refetch a URL that already returned thin content, an HTTP error,
@@ -897,15 +1209,16 @@ async def _fetch_web_content(url: str, *, allow_readerlm: bool) -> dict:
     return result
 
 
-async def _fetch_uncached(url: str, *, allow_readerlm: bool) -> tuple[dict, dict | None]:
+async def _fetch_uncached(
+    url: str, *, allow_readerlm: bool, allow_domain_root: bool = False
+) -> tuple[dict, dict | None]:
     """Fetch logic without unwrap or cache. Always returns a dict.
 
     Error returns carry a private `_error_reason` field with a stable
     tag for structured logging. The caller is expected to log it and
     then pop it before returning to the model.
     """
-    parsed = urlparse(url)
-    if not parsed.path or parsed.path == "/":
+    if _is_domain_root_url(url) and not allow_domain_root:
         result = {
             "status": "error",
             "url": url,
@@ -975,13 +1288,31 @@ def _fallback_reason_label(reason: Any) -> str:
     return "unusable content"
 
 
-async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
+async def _apply_jina_proxy_fallback(url: str, result: dict) -> tuple[dict, bool]:
+    fallback_reason = result.get("_error_reason")
+    if fallback_reason not in JINA_PROXY_FALLBACK_REASONS:
+        return result, False
+
+    proxied = await _fetch_jina_reader(url, mode="plain", proxy=True)
+    if proxied.get("status") == "success":
+        proxied["_fallback_reason"] = fallback_reason
+        return proxied, True
+
+    result["_fallback_reason"] = fallback_reason
+    result["_fallback_status"] = proxied.get("status")
+    result["_fallback_reader_mode"] = proxied.get("_reader_mode")
+    result["_fallback_error_reason"] = proxied.get("_error_reason")
+    return result, True
+
+
+async def _fetch_jina_reader(url: str, *, mode: str, proxy: bool = False) -> dict:
     try:
-        headers = {"Accept": "text/markdown"}
+        headers = _jina_reader_headers(mode)
+        reader_mode = f"{mode}_proxy" if proxy else mode
+        if proxy:
+            headers["X-Proxy"] = "auto"
         timeout = TIMEOUT_S
         if mode == "readerlm-v2":
-            headers["X-Respond-With"] = "readerlm-v2"
-            headers["Authorization"] = f"Bearer {get_secret('JINA_API_KEY')}"
             timeout = JINA_READERLM_TIMEOUT_S
 
         resp = await _get_client().get(
@@ -992,12 +1323,23 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
         )
 
         if resp.status_code != 200:
+            if resp.status_code == 402:
+                return {
+                    "status": "error",
+                    "url": url,
+                    "error_message": (
+                        "Jina Reader account balance is insufficient; recharge "
+                        "JINA_API_KEY before running source reads"
+                    ),
+                    "_error_reason": "jina_billing",
+                    "_reader_mode": reader_mode,
+                }
             return {
                 "status": "error",
                 "url": url,
                 "error_message": f"Failed to fetch {url}: HTTP {resp.status_code}",
                 "_error_reason": f"http_{resp.status_code}",
-                "_reader_mode": mode,
+                "_reader_mode": reader_mode,
             }
 
         content = resp.text
@@ -1009,7 +1351,7 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
                 "url": url,
                 "error_message": f"Could not read {url}: {message}",
                 "_error_reason": reason,
-                "_reader_mode": mode,
+                "_reader_mode": reader_mode,
             }
 
         if len(content) > MAX_CONTENT_LENGTH:
@@ -1019,7 +1361,7 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
             "status": "success",
             "url": url,
             "content": content,
-            "_reader_mode": mode,
+            "_reader_mode": reader_mode,
         }
     except httpx.TimeoutException:
         return {
@@ -1027,7 +1369,7 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
             "url": url,
             "error_message": f"Timeout fetching {url}",
             "_error_reason": "timeout",
-            "_reader_mode": mode,
+            "_reader_mode": f"{mode}_proxy" if proxy else mode,
         }
     except httpx.RequestError as e:
         # Connect, read, network, DNS, etc. — anything httpx classifies
@@ -1038,7 +1380,7 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
             "url": url,
             "error_message": f"Network error fetching {url}: {e}",
             "_error_reason": "network_error",
-            "_reader_mode": mode,
+            "_reader_mode": f"{mode}_proxy" if proxy else mode,
         }
     except Exception as e:
         return {
@@ -1046,7 +1388,7 @@ async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
             "url": url,
             "error_message": str(e),
             "_error_reason": "exception",
-            "_reader_mode": mode,
+            "_reader_mode": f"{mode}_proxy" if proxy else mode,
         }
 
 
@@ -1142,3 +1484,155 @@ async def read_public_pages(urls: list[str]) -> dict:
         if sources:
             result["sources"] = sources
     return result
+
+
+async def _read_adjudicator_pages(urls: list[str]) -> dict:
+    """Read the adjudicator queue with bounded parallelism."""
+    semaphore = asyncio.Semaphore(ADJUDICATOR_READ_CONCURRENCY)
+
+    async def read(url: str) -> dict:
+        async with semaphore:
+            return await _fetch_web_content(
+                url,
+                allow_readerlm=False,
+                allow_domain_root=True,
+                allow_proxy_fallback=True,
+            )
+
+    results = await asyncio.gather(
+        *(read(url) for url in urls)
+    )
+    success_count = sum(
+        1 for item in results if isinstance(item, dict) and item.get("status") == "success"
+    )
+    failed_count = len(results) - success_count
+    sources = [
+        source
+        for source in (
+            _source_for_jina_result(item.get("url"), item.get("content"))
+            for item in results
+            if isinstance(item, dict) and item.get("status") == "success"
+        )
+        if source is not None
+    ]
+    output = {
+        "status": "success" if success_count else "error",
+        "results": results,
+        "success_count": success_count,
+        "failed_count": failed_count,
+    }
+    if sources:
+        output["sources"] = sources
+    if not success_count:
+        output["error_message"] = f"All {len(results)} sources failed to fetch"
+    return output
+
+
+async def read_adjudicator_sources(urls: list[str], tool_context=None) -> dict:
+    """Read the Evidence Adjudicator's source queue with Jina Reader.
+
+    Use only for concrete public URLs supplied in specialist validation packets.
+    This is not a search tool and does not accept broad discovery tasks. The
+    tool records attempted URLs in temporary run state so repeated calls do not
+    reread the same page. A read success means page text was fetched; whether
+    that text supports the claim is decided in the evidence memo.
+
+    Args:
+        urls: Concrete http(s) URLs to verify.
+    """
+    state = getattr(tool_context, "state", None) if tool_context else None
+
+    if not isinstance(urls, list):
+        output = {"status": "error", "error_message": "urls must be a list"}
+        _store_adjudicator_read_result(state, output)
+        return output
+
+    if state is None:
+        return {
+            "status": "error",
+            "requested_count": len(urls),
+            "valid_url_count": 0,
+            "attempted_count": 0,
+            "skipped_urls": [],
+            "skipped_count": 0,
+            "rejected_urls": [],
+            "rejected_count": 0,
+            "invalid_urls": [],
+            "invalid_count": 0,
+            "error_message": "Validation packet state is required to read adjudicator sources",
+        }
+
+    existing = state.get(ADJUDICATOR_READ_STATE_KEY, []) if state is not None else []
+    already_read = [u for u in existing if isinstance(u, str)] if isinstance(existing, list) else []
+    allowed_urls = set(_iter_adjudicator_packet_urls(state))
+    seen = set(already_read)
+    to_read: list[str] = []
+    request_seen: set[str] = set()
+    skipped_urls: list[str] = []
+    rejected_urls: list[str] = []
+    invalid_urls: list[str] = []
+    skipped_count = 0
+    rejected_count = 0
+    invalid_count = 0
+
+    for raw in urls:
+        url = _canonical_adjudicator_candidate_url(raw)
+        if url is None:
+            invalid_count += 1
+            if isinstance(raw, str) and raw.strip():
+                _append_limited(invalid_urls, raw.strip())
+            continue
+        if url not in allowed_urls:
+            rejected_count += 1
+            _append_limited(rejected_urls, url)
+            continue
+        if url in request_seen or url in seen:
+            skipped_count += 1
+            _append_limited(skipped_urls, url)
+            continue
+        request_seen.add(url)
+        to_read.append(url)
+
+    if not to_read:
+        status = (
+            "success"
+            if skipped_count and not invalid_count and not rejected_count
+            else "error"
+        )
+        output = {
+            "status": status,
+            "requested_count": len(urls),
+            "valid_url_count": len(request_seen),
+            "attempted_count": 0,
+            "skipped_urls": skipped_urls,
+            "skipped_count": skipped_count,
+            "rejected_urls": rejected_urls,
+            "rejected_count": rejected_count,
+            "invalid_urls": invalid_urls,
+            "invalid_count": invalid_count,
+        }
+        if status == "error":
+            output["error_message"] = "No valid new adjudicator URLs to read"
+        _store_adjudicator_read_result(state, output)
+        return output
+
+    if state is not None:
+        state[ADJUDICATOR_READ_STATE_KEY] = already_read + to_read
+
+    result = await _read_adjudicator_pages(to_read)
+    output = dict(result)
+    output.update(
+        {
+            "requested_count": len(urls),
+            "valid_url_count": len(request_seen),
+            "attempted_count": len(to_read),
+            "skipped_urls": skipped_urls,
+            "skipped_count": skipped_count,
+            "rejected_urls": rejected_urls,
+            "rejected_count": rejected_count,
+            "invalid_urls": invalid_urls,
+            "invalid_count": invalid_count,
+        }
+    )
+    _store_adjudicator_read_result(state, output)
+    return output

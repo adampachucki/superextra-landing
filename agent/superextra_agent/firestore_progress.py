@@ -59,7 +59,10 @@ from .firestore_events import (
 )
 from .gear_run_state import GearRunState
 from .notes import _generate_title
-from .web_tools import clear_fetch_cache_for_run, set_fetch_run_id
+from .web_tools import (
+    clear_fetch_cache_for_run,
+    set_fetch_run_id,
+)
 
 log = logging.getLogger(__name__)
 
@@ -361,13 +364,17 @@ def _merge_tool_sources(
     """Surface successful page-reading tool URLs as run sources.
 
     Without this hook, fetched URLs would never appear in the per-turn
-    source pills — only grounding URLs and `_tool_src_*` Places sources
-    feed `specialist_sources` today. See `firestore_events.build_fetched_source`.
+    source pills. Grounding chunks are discovery context; final source
+    authority comes from fetched pages and `_tool_src_*` provider sources.
+    Adjudicator reads are not merged directly because read success is not claim
+    support; successful read URLs only gate later `evidence_memo` sources.
     """
     if not isinstance(result, dict):
         return
+    if tool_name == "read_adjudicator_sources":
+        per.record_adjudicator_read_result(result)
+        return
     if tool_name in (
-        "search_and_read_public_pages",
         "read_web_pages",
         "read_public_page",
         "read_public_pages",
@@ -446,6 +453,8 @@ class FirestoreProgressPlugin(BasePlugin):
     def _stage_for_agent(self, agent_name: str | None) -> str:
         if agent_name == "report_writer":
             return "writing_final_report"
+        if agent_name == "evidence_adjudicator":
+            return "checking_evidence"
         if agent_name == "research_lead":
             return "planning_research"
         if agent_name == "context_enricher":
@@ -671,7 +680,9 @@ class FirestoreProgressPlugin(BasePlugin):
             # Partial ADK events are useful only for early thought text. Tool
             # rows are emitted by typed tool callbacks, and terminal/source
             # state should come from the final aggregated event.
-            timeline_events = [ev for ev in timeline_events if ev.get("kind") == "thought"]
+            timeline_events = [
+                ev for ev in timeline_events if ev.get("kind") == "thought"
+            ]
             if timeline_events:
                 per.partial_thought_pending = True
         elif per.partial_thought_pending:

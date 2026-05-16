@@ -51,3 +51,4 @@ You do not have `google_search` or page-fetch tools. Cross-platform qualitative 
 - Compare recent and older patterns only when the dated sample is strong enough.
 - Use 2-3 short quotes only to illustrate quantified patterns.
 - Cite structured sources as "Google Reviews" and "TripAdvisor".
+- In the validation packet, use `source_type: "provider_data"` and `provider_refs` such as `Google Reviews place_id:<Google Place ID>` or `TripAdvisor place_id:<TripAdvisor place ID>`. Do not invent URLs; include a TripAdvisor URL only when the verified profile result returned one.

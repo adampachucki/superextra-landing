@@ -6,7 +6,7 @@ from typing import Any
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_response import LlmResponse
-from google.adk.tools import google_search, url_context
+from google.adk.tools import google_search
 from google.genai import Client, types
 
 from .apify_tools import get_google_reviews
@@ -16,14 +16,7 @@ from .specialist_catalog import (
     SPECIALISTS,
 )
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
-from .search_tools import search_and_read_public_pages
-from .web_tools import (
-    fetch_web_content,
-    fetch_web_content_batch,
-    read_public_page,
-    read_public_pages,
-    read_web_pages,
-)
+from .web_tools import read_web_pages
 
 _dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
 INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
@@ -110,15 +103,7 @@ SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 _SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
 _WEB_RESEARCH_TOOLS = [
     google_search,
-    url_context,
     read_web_pages,
-    fetch_web_content,
-    fetch_web_content_batch,
-]
-_PILOT_WEB_RESEARCH_TOOLS = [
-    search_and_read_public_pages,
-    read_public_page,
-    read_public_pages,
 ]
 
 
@@ -210,11 +195,10 @@ _THINKING_CONFIGS = {"high": THINKING_CONFIG, "medium": MEDIUM_THINKING_CONFIG}
 # Per-specialist tool overrides for first-turn research reports. Everything not
 # listed here uses the default `_WEB_RESEARCH_TOOLS` set.
 _INITIAL_SPECIALIST_TOOLS: dict[str, list] = {
-    "dynamic_researcher_1": _PILOT_WEB_RESEARCH_TOOLS,
     "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
 }
 
-# Continuation helpers intentionally keep the pre-pilot web research surface.
+# Continuation helpers use the same native web research surface by default.
 _CONTINUATION_SPECIALIST_TOOLS: dict[str, list] = {
     "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
 }

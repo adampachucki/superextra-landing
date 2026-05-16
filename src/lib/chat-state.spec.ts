@@ -304,6 +304,26 @@ describe('chatState (Firestore-driven)', () => {
 			expect(chatState.liveStatusLabel).toBe('Building context');
 		});
 
+		it('labels the evidence checking stage', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.session('sid-1'));
+
+			obs.session('sid-1')!.onNext(
+				sessionSnap({
+					userId: 'uid-test',
+					participants: ['uid-test'],
+					status: 'running',
+					currentRunId: 'run-1',
+					activeAgent: 'evidence_adjudicator',
+					activeStage: 'checking_evidence',
+					lastTurnIndex: 1
+				})
+			);
+
+			expect(chatState.liveStatusLabel).toBe('Checking evidence');
+		});
+
 		it('reselecting tears down the prior listener and starts a new one', async () => {
 			const obs = captureObservers();
 			chatState.selectSession('sid-1');

@@ -88,6 +88,7 @@ def _fake_event(
 _AWAIT_FREE_METHODS = (
     "observe_event",
     "_merge_source",
+    "_merge_evidence_memo_sources",
     "_capture_final",
 )
 
@@ -217,7 +218,7 @@ async def test_stop_heartbeat_handles_already_finished():
 # ── observe_event / _capture_final ───────────────────────────────────────────
 
 
-def test_capture_final_dedupes_specialist_and_mapper_sources():
+def test_capture_final_uses_only_verified_tool_and_provider_sources():
     state = _make_state()
     state.specialist_sources = [
         {"url": "https://a", "title": "A"},
@@ -234,11 +235,9 @@ def test_capture_final_dedupes_specialist_and_mapper_sources():
         }
     )
     urls = [s["url"] for s in state.final_sources]
-    assert urls == ["https://a", "https://c", "https://b"]
-    # Mapper-side title wins (first-seen, since mapper sources come first
-    # in the dedup loop).
+    assert urls == ["https://a", "https://b"]
     titles = {s["url"]: s["title"] for s in state.final_sources}
-    assert titles["https://a"] == "A (mapper)"
+    assert titles["https://a"] == "A"
 
 
 def test_observe_event_returns_timeline_list():
@@ -259,6 +258,72 @@ def test_observe_event_drains_tool_source_state_delta():
     state.observe_event(_fake_event(state_delta={"_tool_src_google_maps_abc": source}))
 
     assert state.specialist_sources == [source]
+
+
+def test_observe_event_merges_adjudicated_evidence_memo_sources():
+    state = _make_state()
+    state.record_adjudicator_read_result(
+        {
+            "sources": [
+                {"url": "https://example.com/confirmed"},
+                {"url": "https://example.com/contradicted"},
+            ]
+        }
+    )
+    memo = """
+```json
+{
+  "confirmed_claims": [
+    {
+      "evidence": [
+        {
+          "url": "https://example.com/confirmed",
+          "title": "Confirmed",
+          "domain": "example.com"
+        }
+      ]
+    }
+  ],
+  "contradicted_claims": [
+    {
+      "contradicting_evidence": [
+        {
+          "url": "https://example.com/contradicted",
+          "title": "Contradicted",
+          "domain": "example.com"
+        }
+      ]
+    }
+  ],
+  "verified_sources": [
+    {
+      "url": "https://example.com/confirmed",
+      "title": "Duplicate confirmed",
+      "domain": "example.com",
+      "supports_claim_ids": ["claim-1"]
+    },
+    {
+      "url": "https://example.com/read-only",
+      "title": "Read only",
+      "domain": "example.com",
+      "supports_claim_ids": []
+    }
+  ]
+}
+```
+"""
+
+    state.observe_event(_fake_event(state_delta={"evidence_memo": memo}))
+    state._capture_final({"reply": "answer"})
+
+    assert [s["url"] for s in state.specialist_sources] == [
+        "https://example.com/confirmed",
+        "https://example.com/contradicted",
+    ]
+    assert [s["url"] for s in state.final_sources] == [
+        "https://example.com/confirmed",
+        "https://example.com/contradicted",
+    ]
 
 
 def test_source_dedupe_keeps_same_url_for_distinct_provider_or_place():
@@ -327,6 +392,29 @@ def test_vertex_grounding_redirect_sources_are_not_persisted():
 
     assert state.specialist_sources == []
     assert state.final_sources == []
+
+
+def test_evidence_memo_sources_require_successful_adjudicator_read():
+    state = _make_state()
+    state.record_adjudicator_read_result(
+        {"sources": [{"url": "https://example.com/read"}]}
+    )
+    memo = {
+        "confirmed_claims": [
+            {
+                "evidence": [
+                    {"url": "https://example.com/read", "title": "Read"},
+                    {"url": "https://example.com/unread", "title": "Unread"},
+                ]
+            }
+        ],
+        "contradicted_claims": [],
+        "verified_sources": [],
+    }
+
+    state.observe_event(_fake_event(state_delta={"evidence_memo": memo}))
+
+    assert [s["url"] for s in state.specialist_sources] == ["https://example.com/read"]
 
 
 def test_capture_final_preserves_place_scoped_sources_with_same_url():

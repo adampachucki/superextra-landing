@@ -84,6 +84,7 @@
 		router: 'Choosing next steps',
 		context_enricher: 'Looking up the venue',
 		research_lead: 'Reasoning',
+		evidence_adjudicator: 'Checking evidence',
 		report_writer: 'Drafting final report',
 		continue_research: 'Continuing research',
 		follow_up: 'Following up',
@@ -119,6 +120,7 @@
 		'router',
 		'context_enricher',
 		'research_lead',
+		'evidence_adjudicator',
 		'report_writer',
 		'continue_research',
 		'follow_up'

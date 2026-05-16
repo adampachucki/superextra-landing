@@ -15,7 +15,9 @@ its own internal lock for Firestore writes.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -29,6 +31,7 @@ from .place_state import TOOL_SOURCE_PREFIX
 from .timeline import TimelineWriter, TurnSummaryBuilder
 
 log = logging.getLogger(__name__)
+_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
 
 
 @dataclass
@@ -54,6 +57,7 @@ class GearRunState:
     final_sources: list[dict[str, Any]] = field(default_factory=list)
     specialist_sources: list[dict[str, Any]] = field(default_factory=list)
     specialist_sources_seen: set[str] = field(default_factory=set)
+    adjudicator_read_success_urls: set[str] = field(default_factory=set)
     mapping_state: dict[str, Any] = field(default_factory=lambda: {"place_names": {}})
     title_task: asyncio.Task[Any] | None = None
     partial_thought_pending: bool = False
@@ -105,10 +109,6 @@ class GearRunState:
                 continue
             events_to_write.append(ev)
 
-        # Drain grounding_sources from the mapper.
-        for entry in mapped.get("grounding_sources") or []:
-            self._merge_source(entry)
-
         # Drain bounded `_tool_src_*` keys from the event state_delta. Tools key
         # them by provider/place so parallel provider calls for different places
         # survive without accumulating one state key per invocation.
@@ -117,6 +117,8 @@ class GearRunState:
             for key, value in sd.items():
                 if key.startswith(TOOL_SOURCE_PREFIX):
                     self._merge_source(value)
+                elif key == "evidence_memo":
+                    self._merge_evidence_memo_sources(value)
 
         # Capture final reply + sources on first `complete` event.
         if mapped.get("complete") is not None and self.final_reply is None:
@@ -148,6 +150,87 @@ class GearRunState:
         self.specialist_sources_seen.add(key)
         self.specialist_sources.append(entry)
 
+    def _merge_evidence_memo_sources(self, value: Any) -> None:
+        memo = self._parse_json_object(value)
+        if memo is None:
+            return
+
+        for claim in memo.get("confirmed_claims") or []:
+            if not isinstance(claim, dict):
+                continue
+            for source in claim.get("evidence") or []:
+                self._merge_adjudicated_source(source)
+
+        for claim in memo.get("contradicted_claims") or []:
+            if not isinstance(claim, dict):
+                continue
+            for source in claim.get("contradicting_evidence") or []:
+                self._merge_adjudicated_source(source)
+
+        for source in memo.get("verified_sources") or []:
+            if not isinstance(source, dict) or not source.get("supports_claim_ids"):
+                continue
+            self._merge_adjudicated_source(source)
+
+    def record_adjudicator_read_result(self, result: Any) -> None:
+        if not isinstance(result, dict):
+            return
+        for source in result.get("sources") or []:
+            if not isinstance(source, dict):
+                continue
+            normalized = self._normal_source_url(source.get("url"))
+            if normalized:
+                self.adjudicator_read_success_urls.add(normalized)
+
+    def _merge_adjudicated_source(self, source: Any) -> None:
+        if not isinstance(source, dict):
+            return
+        normalized = self._normal_source_url(source.get("url"))
+        if not normalized or normalized not in self.adjudicator_read_success_urls:
+            return
+        entry = dict(source)
+        entry["url"] = normalized
+        self._merge_source(entry)
+
+    @staticmethod
+    def _parse_json_object(value: Any) -> dict[str, Any] | None:
+        if isinstance(value, dict):
+            return value
+        if not isinstance(value, str):
+            return None
+        text = value.strip()
+        match = _FENCED_JSON_RE.search(text)
+        if match:
+            text = match.group(1).strip()
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+
+    @staticmethod
+    def _normal_source_url(value: Any) -> str | None:
+        if not isinstance(value, str):
+            return None
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            parsed = urlparse(text)
+        except Exception:  # noqa: BLE001
+            return None
+        if not parsed.scheme or not parsed.netloc:
+            return None
+        return (
+            parsed._replace(
+                scheme=parsed.scheme.lower(),
+                netloc=parsed.netloc.lower(),
+                fragment="",
+            )
+            .geturl()
+            .rstrip("/")
+        )
+
     @staticmethod
     def _skip_source(entry: dict[str, Any]) -> bool:
         url = entry.get("url")
@@ -178,11 +261,12 @@ class GearRunState:
         if not isinstance(reply, str):
             return
         self.final_reply = reply
-        mapper_sources = complete.get("sources") or []
-        # Dedup across mapper-extracted + specialist-accumulated.
+        # Final drawer sources come only from provider/tool-verified sources
+        # accumulated during the run. Native grounding chunks remain discovery
+        # context; they are not final source authority.
         seen: set[str] = set()
         merged: list[dict[str, Any]] = []
-        for s in list(mapper_sources) + list(self.specialist_sources):
+        for s in self.specialist_sources:
             if not isinstance(s, dict) or self._skip_source(s):
                 continue
             key = self._source_dedupe_key(s)

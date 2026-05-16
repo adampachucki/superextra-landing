@@ -9,12 +9,13 @@ Router -> research_pipeline
            |-- Context Enricher
            |-- Research Lead
            |   `-- Specialists through AgentTool
+           |-- Evidence Adjudicator
            `-- Report Writer
 
 Router -> continue_research
 ```
 
-The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief and surface as much useful writer material as possible. The Report Writer reads Places context and full specialist reports directly, without a lead-authored brief, and writes the final report. Continue Research answers from the existing report, specialist notes, Places context, direct venue/known-URL checks, and bounded non-durable specialist deepening. Source discovery belongs in focused helpers, not direct continuation-agent search. Broad new reports should become new research sessions instead of being merged into the old thread.
+The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief and surface as much useful writer material as possible. The Evidence Adjudicator reads specialist validation packets, attempts the concrete packet URLs with the bounded-concurrency Jina reader, and writes `evidence_memo`. The Report Writer reads Places context, specialist reports, and `evidence_memo`, without a lead-authored brief, and writes the final report. Continue Research answers from the existing report, specialist notes, Places context, direct venue/known-URL checks, and bounded non-durable specialist deepening. Source discovery belongs in focused helpers, not direct continuation-agent search. Broad new reports should become new research sessions instead of being merged into the old thread.
 
 ## State Keys
 
@@ -24,6 +25,7 @@ The router routes. The context enricher builds Google Places context. The Resear
 - `_target_place_id`, `_target_lat`, `_target_lng`: legacy target metadata and current geo-bias input written by Places tools.
 - Specialist result keys such as `market_result`, `pricing_result`, `review_result`, `dynamic_result_1`, `dynamic_result_2`, and `dynamic_result_3`: specialist outputs.
 - `research_coverage`: Research Lead coverage note for audit, debugging, and future loop checks. The Report Writer does not read it.
+- `evidence_memo`: Evidence Adjudicator output for confirmed, contradicted, unsupported, and unresolved claims plus verified/unread source notes.
 - `final_report`: final Report Writer report.
 - `continue_research_reply`: final continuation answer, separate from the original report.
 - `continuation_notes`: compact same-session continuation memory written by the continuation agent's `after_agent_callback`.
@@ -37,8 +39,9 @@ Continuation specialist helpers do not write specialist result keys. This keeps 
 | Routing and clarification | `router.md` |
 | Places lookup and competitor context | `context_enricher.md` |
 | Research planning, specialist dispatch, task-specific research depth, sufficiency, and research coverage | `research_lead.md` |
-| Final report synthesis, report shape, charts, and user-facing depth | `report_writer.md` |
-| Universal specialist behavior and substantial evidence report shape | `specialist_base.md` |
+| Evidence validation, conflict handling, verified source authority, and claim status | `evidence_adjudicator.md` |
+| Final report synthesis, report shape, charts, user-facing depth, and non-display of validation metadata | `report_writer.md` |
+| Universal specialist behavior, validation packet, and substantial evidence report shape | `specialist_base.md` |
 | Market source families | `market_source_profiles.md` |
 | Specialist-specific source surface and boundaries | Specialist body files |
 | Hard tool limits, retries, errors, and caps | Tool code |
@@ -61,7 +64,7 @@ Put each rule in one place. If the same instruction seems needed in three prompt
 
 Specialist instructions use two prompt layers:
 
-1. `specialist_base.md`: universal specialist contract and substantial evidence report shape.
+1. `specialist_base.md`: universal specialist contract, validation packet, and substantial evidence report shape.
 2. `{specialist_name}.md`: domain-specific scope, evidence, boundaries, and narrow output notes.
 
 `specialists.py` composes the base and body. It injects:
@@ -104,7 +107,7 @@ The Lead should use at least two non-dynamic specialists for every research repo
 
 The Lead should ask specialists for the causes, mechanisms, counter-signals, and evidence tests that matter for the specific task. Do not hardcode domain-specific depth checklists in specialist body files unless a tool or domain boundary requires it.
 
-The Lead does not summarize findings or draft report sections. Its research coverage note is internal and must not guide the final report. The Report Writer reads Places context and specialist reports directly, carries forward every reader-relevant item from each specialist's `Writer Material`, makes concrete findings and insights visible in a format that fits the evidence, connects evidence across reports without merging away detail, adds grounded implications for the target venue when known, and writes the user-facing answer. It should translate material access limits into plain research caveats, not expose raw tool or fetch errors.
+The Lead does not summarize findings or draft report sections. Its research coverage note is internal and must not guide the final report. The Evidence Adjudicator validates specialist claim/source packets and owns confirmed, contradicted, unsupported, and unresolved claim status. The Report Writer reads Places context, specialist reports, and `evidence_memo` directly, carries forward every reader-relevant item from each specialist's `Writer Material`, makes concrete findings and insights visible in a format that fits the evidence, connects evidence across reports without merging away detail, adds grounded implications for the target venue when known, and writes the user-facing answer. It should translate material access limits into plain research caveats, not expose raw tool or fetch errors.
 
 ## Market Source Profiles
 
@@ -122,6 +125,7 @@ Use prompts for:
 - when to use a source family;
 - how to state uncertainty;
 - specialist evidence report shape;
+- claim/source validation packet;
 - task-specific research depth;
 - final report shape;
 - specialist boundaries.
@@ -144,7 +148,8 @@ Runtime templates use Python `str.format()`.
 Files with runtime variables:
 
 - `research_lead.md`: `{places_context}`, `{market_source_profiles}`.
-- `report_writer.md`: `{places_context}`, `{specialist_reports}`.
+- `evidence_adjudicator.md`: `{places_context}`, `{known_places_context}`, `{specialist_reports}`.
+- `report_writer.md`: `{places_context}`, `{specialist_reports}`, `{evidence_memo}`.
 - `continue_research.md`: `{final_report}`, `{specialist_reports}`, `{research_coverage}`, `{continuation_notes}`, `{places_context}`, `{known_places_context}`.
 - `specialist_base.md`: `{role_title}`, `{places_context}`, `{known_places_context}`, `{specialist_body}`.
 
@@ -180,7 +185,6 @@ Chart JSON in `report_writer.md` must keep doubled braces so `.format()` leaves 
 
 Keep these out of the prompt revamp unless the stream is explicitly opened:
 
-- claim-level citation plumbing;
 - website fetching improvements;
 - review fetch budget enforcement;
 - active-session target changes beyond continuation-scope source checks;

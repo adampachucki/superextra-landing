@@ -8,10 +8,17 @@ import pytest
 
 from superextra_agent import web_tools
 from superextra_agent.web_tools import (
+    ADJUDICATOR_READ_CONCURRENCY,
+    ADJUDICATOR_READ_RESULT_STATE_KEY,
+    ADJUDICATOR_READ_STATE_KEY,
+    MAX_BATCH,
     MAX_CONTENT_LENGTH,
+    _read_adjudicator_pages,
     clear_fetch_cache_for_run,
+    collect_adjudicator_packet_claims,
     fetch_web_content,
     fetch_web_content_batch,
+    read_adjudicator_sources,
     read_public_page,
     read_public_pages,
     read_web_pages,
@@ -43,12 +50,50 @@ def _log_kwargs(mock_emit, event="fetch_url", index=-1):
     return matches[index].kwargs if matches else {}
 
 
+def _validation_packet_for_urls(urls: list[str]) -> str:
+    sources = ",".join(f'{{"url":"{url}","priority":"high"}}' for url in urls)
+    source_urls = ",".join(f'"{url}"' for url in urls)
+    return (
+        "Finding.\n\n"
+        "### Validation Packet\n\n"
+        "```json\n"
+        "{"
+        f'"claims_for_validation":[{{"id":"claim-1","claim":"Claim","source_urls":[{source_urls}]}}],'
+        f'"candidate_sources":[{sources}]'
+        "}\n"
+        "```"
+    )
+
+
+def _state_with_packet_urls(urls: list[str]) -> dict:
+    return {"market_result": _validation_packet_for_urls(urls)}
+
+
+@pytest.mark.parametrize(
+    "heading",
+    [
+        "### **Validation Packet**",
+        "### Validation Packet:",
+        "### **Validation Packet:**",
+    ],
+)
+def test_collect_adjudicator_packet_claims_accepts_packet_heading_variants(heading):
+    packet = _validation_packet_for_urls(["https://example.com/source"]).replace(
+        "### Validation Packet", heading
+    )
+
+    claims = collect_adjudicator_packet_claims({"market_result": packet})
+
+    assert claims[0]["source_urls"] == ["https://example.com/source"]
+
+
 def test_tool_docstrings_describe_source_reading_workflow():
     read_doc = " ".join((read_web_pages.__doc__ or "").split())
     fetch_doc = " ".join((fetch_web_content.__doc__ or "").split())
     batch_doc = " ".join((fetch_web_content_batch.__doc__ or "").split())
     read_public_doc = " ".join((read_public_page.__doc__ or "").split())
     read_public_batch_doc = " ".join((read_public_pages.__doc__ or "").split())
+    adjudicator_doc = " ".join((read_adjudicator_sources.__doc__ or "").split())
 
     assert "Explicit structured reader for concrete public URLs" in read_doc
     assert "fetched-page source capture" in read_doc
@@ -59,6 +104,8 @@ def test_tool_docstrings_describe_source_reading_workflow():
     assert "prefer URL Context or `read_web_pages` first" in batch_doc
     assert "Primary page reader for concrete URLs discovered by search tools" in read_public_doc
     assert "Batch page reader for concrete URLs discovered by search tools" in read_public_batch_doc
+    assert "Evidence Adjudicator's source queue" in adjudicator_doc
+    assert "not a search tool" in adjudicator_doc
 
 
 def test_source_reading_timeouts_are_short_bounded_attempts():
@@ -128,6 +175,425 @@ async def test_read_public_pages_collects_successful_sources():
             "provider": "fetched_page",
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_pages_reads_above_public_batch_cap():
+    urls = [f"https://example.com/{i}" for i in range(MAX_BATCH + 2)]
+
+    async def fetch(
+        url,
+        *,
+        allow_readerlm,
+        allow_domain_root=False,
+        allow_proxy_fallback=False,
+    ):
+        return {
+            "status": "success",
+            "url": url,
+            "content": f"Title: {url.rsplit('/', 1)[-1]}\n\nText",
+        }
+
+    with patch("superextra_agent.web_tools._fetch_web_content", fetch):
+        result = await _read_adjudicator_pages(urls)
+
+    assert result["status"] == "success"
+    assert result["success_count"] == len(urls)
+    assert result["failed_count"] == 0
+    assert [item["url"] for item in result["results"]] == urls
+    assert [source["url"] for source in result["sources"]] == urls
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_pages_allows_restaurant_homepage_roots():
+    url = "https://restaurant.example/"
+
+    async def fetch(
+        url,
+        *,
+        allow_readerlm,
+        allow_domain_root=False,
+        allow_proxy_fallback=False,
+    ):
+        assert allow_domain_root is True
+        assert allow_proxy_fallback is True
+        return {
+            "status": "success",
+            "url": url,
+            "content": "Title: Restaurant\n\nMenu item " * 80,
+        }
+
+    with patch("superextra_agent.web_tools._fetch_web_content", fetch):
+        result = await _read_adjudicator_pages([url])
+
+    assert result["status"] == "success"
+    assert result["success_count"] == 1
+    assert result["sources"][0]["url"] == url
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_sources_attempts_all_eligible_urls():
+    urls = [f"https://example.com/{i}" for i in range(ADJUDICATOR_READ_CONCURRENCY + 2)]
+    tool_context = SimpleNamespace(state=_state_with_packet_urls(urls))
+    read_result = {
+        "status": "success",
+        "results": [
+            {"status": "success", "url": url, "content": "# Source\n\nText"}
+            for url in urls
+        ],
+        "sources": [
+            {
+                "url": url,
+                "title": "Source",
+                "domain": "example.com",
+                "provider": "fetched_page",
+            }
+            for url in urls
+        ],
+        "success_count": len(urls),
+        "failed_count": 0,
+    }
+
+    with patch(
+        "superextra_agent.web_tools._read_adjudicator_pages",
+        AsyncMock(return_value=read_result),
+    ) as read_pages:
+        result = await read_adjudicator_sources(urls, tool_context=tool_context)
+
+    read_pages.assert_awaited_once_with(urls)
+    assert result["status"] == "success"
+    assert result["attempted_count"] == len(urls)
+    assert result["skipped_urls"] == []
+    assert tool_context.state[ADJUDICATOR_READ_STATE_KEY] == urls
+    assert tool_context.state[ADJUDICATOR_READ_RESULT_STATE_KEY] == {
+        "status": "success",
+        "requested_count": len(urls),
+        "attempted_count": len(urls),
+        "successful_count": len(urls),
+        "failed_count": 0,
+        "sources": read_result["sources"],
+        "failed_sources": [],
+        "skipped_urls": [],
+        "rejected_urls": [],
+        "invalid_urls": [],
+        "error_message": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_sources_reports_invalid_input():
+    tool_context = SimpleNamespace(state={})
+
+    with patch("superextra_agent.web_tools._read_adjudicator_pages", AsyncMock()) as read_pages:
+        result = await read_adjudicator_sources(
+            ["not-a-url", "ftp://example.com/file"], tool_context=tool_context
+        )
+
+    read_pages.assert_not_awaited()
+    assert result["status"] == "error"
+    assert result["attempted_count"] == 0
+    assert result["invalid_count"] == 2
+    assert result["error_message"] == "No valid new adjudicator URLs to read"
+
+
+def test_collect_adjudicator_packet_claims_extracts_specialist_claims():
+    state = {
+        "market_result": (
+            "Finding.\n\n"
+            "### Validation Packet\n\n"
+            "```json\n"
+            "{"
+            '"claims_for_validation":['
+            '{"id":"claim-1","claim":"Target opened in May 2026",'
+            '"source_urls":["https://example.com/open#details"],'
+            '"provider_refs":["Google Places: target"]}'
+            "],"
+            '"candidate_sources":[{"url":"https://example.com/open"}]'
+            "}\n"
+            "```"
+        )
+    }
+
+    claims = collect_adjudicator_packet_claims(state)
+
+    assert claims == [
+        {
+            "id": "claim-1",
+            "claim": "Target opened in May 2026",
+            "specialists": ["market_result"],
+            "specialist_label": "Market Landscape",
+            "source_urls": ["https://example.com/open"],
+            "provider_refs": ["Google Places: target"],
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_sources_does_not_unwrap_during_queue_filtering():
+    urls = [
+        f"https://vertexaisearch.cloud.google.com/grounding-api-redirect/{i}"
+        for i in range(ADJUDICATOR_READ_CONCURRENCY + 2)
+    ]
+    tool_context = SimpleNamespace(state=_state_with_packet_urls(urls))
+
+    with patch(
+        "superextra_agent.web_tools._read_adjudicator_pages",
+        AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
+    ) as read_pages, patch(
+        "superextra_agent.web_tools._unwrap_vertex_redirect",
+        AsyncMock(side_effect=AssertionError("wrapper should not unwrap over-limit URLs")),
+    ) as unwrap:
+        result = await read_adjudicator_sources(urls, tool_context=tool_context)
+
+    read_pages.assert_awaited_once_with(urls)
+    unwrap.assert_not_awaited()
+    assert result["attempted_count"] == len(urls)
+    assert result["skipped_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_sources_reads_only_packet_urls():
+    allowed = "https://example.com/allowed"
+    extra = "https://example.com/not-in-packet"
+    tool_context = SimpleNamespace(state=_state_with_packet_urls([allowed]))
+
+    with patch(
+        "superextra_agent.web_tools._read_adjudicator_pages",
+        AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
+    ) as read_pages:
+        result = await read_adjudicator_sources(
+            [extra, allowed], tool_context=tool_context
+        )
+
+    read_pages.assert_awaited_once_with([allowed])
+    assert result["status"] == "success"
+    assert result["attempted_count"] == 1
+    assert result["rejected_count"] == 1
+    assert result["rejected_urls"] == [extra]
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_sources_keeps_read_success_for_title_mismatch():
+    url = "https://example.com/expected-article"
+    packet = (
+        "Finding.\n\n"
+        "### Validation Packet\n\n"
+        "```json\n"
+        "{"
+        '"claims_for_validation":[{"id":"claim-1","claim":"Claim","source_urls":["https://example.com/expected-article"]}],'
+        '"candidate_sources":[{"url":"https://example.com/expected-article","title":"Expected Restaurant Closure"}]'
+        "}\n"
+        "```"
+    )
+    tool_context = SimpleNamespace(
+        state={"market_result": packet}
+    )
+
+    with patch(
+        "superextra_agent.web_tools._read_adjudicator_pages",
+        AsyncMock(
+            return_value={
+                "status": "success",
+                "results": [
+                    {
+                        "status": "success",
+                        "url": url,
+                        "content": "Title: Unrelated Election Deadlines\n\nText",
+                    }
+                ],
+                "sources": [
+                    {
+                        "url": url,
+                        "title": "Unrelated Election Deadlines",
+                        "domain": "example.com",
+                        "provider": "fetched_page",
+                    }
+                ],
+                "success_count": 1,
+                "failed_count": 0,
+            }
+        ),
+    ):
+        result = await read_adjudicator_sources([url], tool_context=tool_context)
+
+    assert result["status"] == "success"
+    assert result["success_count"] == 1
+    assert result["failed_count"] == 0
+    assert result["sources"] == [
+        {
+            "url": url,
+            "title": "Unrelated Election Deadlines",
+            "domain": "example.com",
+            "provider": "fetched_page",
+        }
+    ]
+    compact = tool_context.state[ADJUDICATOR_READ_RESULT_STATE_KEY]
+    assert compact["successful_count"] == 1
+    assert compact["sources"][0]["url"] == url
+    assert compact["failed_sources"] == []
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_sources_keeps_read_success_for_slug_title_mismatch():
+    url = "https://example.com/Trojmiasto-zegna-kolejne-restauracje-i-kawiarnie-n202753.html"
+    packet = (
+        "Finding.\n\n"
+        "### Validation Packet\n\n"
+        "```json\n"
+        "{"
+        '"claims_for_validation":[{"id":"claim-1","claim":"Claim","source_urls":["'
+        + url
+        + '"]}],'
+        '"candidate_sources":[]'
+        "}\n"
+        "```"
+    )
+    tool_context = SimpleNamespace(
+        state={"market_result": packet}
+    )
+
+    with patch(
+        "superextra_agent.web_tools._read_adjudicator_pages",
+        AsyncMock(
+            return_value={
+                "status": "success",
+                "results": [
+                    {
+                        "status": "success",
+                        "url": url,
+                        "content": "Title: Wody Polskie przenoszą się do Trytona\n\nText",
+                    }
+                ],
+                "sources": [
+                    {
+                        "url": url,
+                        "title": "Wody Polskie przenoszą się do Trytona",
+                        "domain": "example.com",
+                        "provider": "fetched_page",
+                    }
+                ],
+                "success_count": 1,
+                "failed_count": 0,
+            }
+        ),
+    ):
+        result = await read_adjudicator_sources([url], tool_context=tool_context)
+
+    assert result["status"] == "success"
+    assert result["success_count"] == 1
+    assert result["failed_count"] == 0
+    assert result["sources"] == [
+        {
+            "url": url,
+            "title": "Wody Polskie przenoszą się do Trytona",
+            "domain": "example.com",
+            "provider": "fetched_page",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_sources_requires_packet_state():
+    with patch("superextra_agent.web_tools._read_adjudicator_pages", AsyncMock()) as read_pages:
+        result = await read_adjudicator_sources(["https://example.com/arbitrary"])
+
+    read_pages.assert_not_awaited()
+    assert result["status"] == "error"
+    assert result["attempted_count"] == 0
+    assert result["error_message"] == (
+        "Validation packet state is required to read adjudicator sources"
+    )
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_sources_dedupes_across_followup_calls():
+    tool_context = SimpleNamespace(
+        state=_state_with_packet_urls(
+            [
+                "https://example.com/a",
+                "https://example.com/new",
+            ]
+        )
+    )
+    first_urls = ["https://example.com/a", "https://example.com/new"]
+
+    with patch(
+        "superextra_agent.web_tools._read_adjudicator_pages",
+        AsyncMock(
+            return_value={
+                "status": "success",
+                "results": [
+                    {
+                        "status": "success",
+                        "url": "https://example.com/a",
+                        "content": "# A\n\nText",
+                    },
+                    {
+                        "status": "success",
+                        "url": "https://example.com/new",
+                        "content": "# New\n\nText",
+                    }
+                ],
+                "sources": [
+                    {
+                        "url": "https://example.com/a",
+                        "title": "A",
+                        "domain": "example.com",
+                        "provider": "fetched_page",
+                    },
+                    {
+                        "url": "https://example.com/new",
+                        "title": "New",
+                        "domain": "example.com",
+                        "provider": "fetched_page",
+                    }
+                ],
+                "success_count": 2,
+                "failed_count": 0,
+            }
+        ),
+    ) as read_pages:
+        first = await read_adjudicator_sources(first_urls, tool_context=tool_context)
+
+    read_pages.assert_awaited_once_with(["https://example.com/a", "https://example.com/new"])
+    assert first["attempted_count"] == 2
+
+    with patch("superextra_agent.web_tools._read_adjudicator_pages", AsyncMock()) as read_pages:
+        second = await read_adjudicator_sources(
+            ["https://example.com/a", "https://example.com/new"],
+            tool_context=tool_context,
+        )
+
+    read_pages.assert_not_awaited()
+    assert second["status"] == "success"
+    assert second["attempted_count"] == 0
+    assert second["skipped_urls"] == ["https://example.com/a", "https://example.com/new"]
+    assert tool_context.state[ADJUDICATOR_READ_RESULT_STATE_KEY] == {
+        "status": "success",
+        "requested_count": 4,
+        "attempted_count": 2,
+        "successful_count": 2,
+        "failed_count": 0,
+        "sources": [
+            {
+                "url": "https://example.com/a",
+                "title": "A",
+                "domain": "example.com",
+                "provider": "fetched_page",
+            },
+            {
+                "url": "https://example.com/new",
+                "title": "New",
+                "domain": "example.com",
+                "provider": "fetched_page",
+            },
+        ],
+        "failed_sources": [],
+        "skipped_urls": ["https://example.com/a", "https://example.com/new"],
+        "rejected_urls": [],
+        "invalid_urls": [],
+        "error_message": None,
+    }
 
 
 class TestReadWebPages:
@@ -352,6 +818,250 @@ class TestReadWebPages:
             }
         ]
 
+    def test_url_context_sync_uses_metadata_url_over_model_returned_url(self):
+        response = SimpleNamespace(
+            text=(
+                '{"results":[{"url":"https://example.com/menu",'
+                '"retrieved_url":"https://fabricated.example/page",'
+                '"title":"Fabricated","evidence_summary":"Lunch is daily.",'
+                '"specific_facts":["Lunch daily"],"supporting_details":[],'
+                '"limits":""}],"overall_limits":""}'
+            ),
+            candidates=[
+                SimpleNamespace(
+                    url_context_metadata=SimpleNamespace(
+                        url_metadata=[
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/menu",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            )
+                        ]
+                    )
+                )
+            ],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/menu"],
+                "menu facts",
+            )
+
+        assert result["status"] == "success"
+        assert result["sources"] == [
+            {
+                "url": "https://example.com/menu",
+                "title": "Fabricated",
+                "domain": "example.com",
+                "provider": "fetched_page",
+            }
+        ]
+        assert result["results"][0]["retrieved_url"] == "https://example.com/menu"
+
+    def test_url_context_sync_rejects_explicit_model_url_without_metadata_match(self):
+        response = SimpleNamespace(
+            text=(
+                '{"results":['
+                '{"url":"https://fabricated.example/page",'
+                '"retrieved_url":"https://fabricated.example/page",'
+                '"title":"Fabricated","evidence_summary":"Fake",'
+                '"specific_facts":["Fake"],"supporting_details":[],"limits":""},'
+                '{"url":"https://example.com/a","retrieved_url":"https://example.com/a",'
+                '"title":"A","evidence_summary":"A summary",'
+                '"specific_facts":["A fact"],"supporting_details":[],"limits":""}'
+                '],"overall_limits":""}'
+            ),
+            candidates=[
+                SimpleNamespace(
+                    url_context_metadata=SimpleNamespace(
+                        url_metadata=[
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/b",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            ),
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/a",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            ),
+                        ]
+                    )
+                )
+            ],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/a", "https://example.com/b"],
+                "menu facts",
+            )
+
+        assert result["status"] == "success"
+        assert result["results"][0]["status"] == "error"
+        assert result["results"][0]["retrieval_status"] == ""
+        assert "_url_from_fallback" not in result["results"][0]
+        assert result["sources"] == [
+            {
+                "url": "https://example.com/a",
+                "title": "A",
+                "domain": "example.com",
+                "provider": "fetched_page",
+            }
+        ]
+
+    def test_url_context_sync_allows_positional_metadata_when_model_omits_url(self):
+        response = SimpleNamespace(
+            text=(
+                '{"results":[{"title":"Menu","evidence_summary":"Lunch is daily.",'
+                '"specific_facts":["Lunch daily"],"supporting_details":[],"limits":""}],'
+                '"overall_limits":""}'
+            ),
+            candidates=[
+                SimpleNamespace(
+                    url_context_metadata=SimpleNamespace(
+                        url_metadata=[
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/menu",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            )
+                        ]
+                    )
+                )
+            ],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/menu"],
+                "menu facts",
+            )
+
+        assert result["status"] == "success"
+        assert result["results"][0]["retrieved_url"] == "https://example.com/menu"
+        assert "_url_from_fallback" not in result["results"][0]
+
+    def test_url_context_sync_allows_positional_metadata_when_model_returns_empty_url(self):
+        response = SimpleNamespace(
+            text=(
+                '{"results":['
+                '{"url":"","retrieved_url":"","title":"A","evidence_summary":"A summary",'
+                '"specific_facts":[],"supporting_details":[],"limits":""},'
+                '{"url":"","retrieved_url":"","title":"B","evidence_summary":"B summary",'
+                '"specific_facts":[],"supporting_details":[],"limits":""}'
+                '],"overall_limits":""}'
+            ),
+            candidates=[
+                SimpleNamespace(
+                    url_context_metadata=SimpleNamespace(
+                        url_metadata=[
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/a",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            ),
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/b",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            ),
+                        ]
+                    )
+                )
+            ],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/a", "https://example.com/b"],
+                "menu facts",
+            )
+
+        assert result["status"] == "success"
+        assert [source["url"] for source in result["sources"]] == [
+            "https://example.com/a",
+            "https://example.com/b",
+        ]
+
+    def test_url_context_sync_uses_positional_metadata_when_retrieved_url_empty(self):
+        response = SimpleNamespace(
+            text=(
+                '{"results":[{"url":"https://example.com/a","retrieved_url":"",'
+                '"title":"A","evidence_summary":"A summary",'
+                '"specific_facts":[],"supporting_details":[],"limits":""}],'
+                '"overall_limits":""}'
+            ),
+            candidates=[
+                SimpleNamespace(
+                    url_context_metadata=SimpleNamespace(
+                        url_metadata=[
+                            SimpleNamespace(
+                                retrieved_url="https://cdn.example.com/a",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            )
+                        ]
+                    )
+                )
+            ],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/a"],
+                "menu facts",
+            )
+
+        assert result["status"] == "success"
+        assert result["results"][0]["retrieved_url"] == "https://cdn.example.com/a"
+        assert result["sources"][0]["url"] == "https://cdn.example.com/a"
+
+    def test_url_context_sync_unstructured_fallback_keeps_all_successful_metadata(self):
+        response = SimpleNamespace(
+            text="Unstructured combined evidence text.",
+            candidates=[
+                SimpleNamespace(
+                    url_context_metadata=SimpleNamespace(
+                        url_metadata=[
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/a",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            ),
+                            SimpleNamespace(
+                                retrieved_url="https://example.com/b",
+                                url_retrieval_status="URL_RETRIEVAL_STATUS_SUCCESS",
+                            ),
+                        ]
+                    )
+                )
+            ],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/a", "https://example.com/b"],
+                "menu facts",
+            )
+
+        assert result["status"] == "success"
+        assert [source["url"] for source in result["sources"]] == [
+            "https://example.com/a",
+            "https://example.com/b",
+        ]
+
     def test_url_context_sync_keeps_only_successful_partial_sources(self):
         response = SimpleNamespace(
             text=(
@@ -458,6 +1168,31 @@ class TestReadWebPages:
         assert result["retrieved"] == []
         assert "sources" not in result
 
+    def test_url_context_sync_rejects_structured_result_without_metadata(self):
+        response = SimpleNamespace(
+            text=(
+                '{"results":[{"url":"https://example.com/menu",'
+                '"retrieved_url":"https://example.com/menu",'
+                '"title":"Menu","evidence_summary":"Lunch is daily.",'
+                '"specific_facts":["Lunch daily"],"supporting_details":[],'
+                '"limits":""}],"overall_limits":""}'
+            ),
+            candidates=[],
+        )
+        client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **_kwargs: response)
+        )
+
+        with patch("superextra_agent.web_tools._get_url_context_client", return_value=client):
+            result = web_tools._read_web_pages_sync(
+                ["https://example.com/menu"],
+                "menu facts",
+            )
+
+        assert result["status"] == "error"
+        assert result["results"][0]["status"] == "error"
+        assert "sources" not in result
+
 
 class TestFetchWebContent:
     @pytest.mark.asyncio
@@ -481,7 +1216,7 @@ class TestFetchWebContent:
         headers = call_args.kwargs.get("headers", {})
         assert headers.get("Accept") == "text/markdown"
         assert "X-Respond-With" not in headers
-        assert "Authorization" not in headers
+        assert headers.get("Authorization") == "Bearer test-key"
 
     @pytest.mark.asyncio
     async def test_readerlm_fallback_uses_api_key(self, mock_emit_cloud_log):
@@ -498,6 +1233,7 @@ class TestFetchWebContent:
         assert mock_client.get.call_count == 2
         plain_headers = mock_client.get.call_args_list[0].kwargs.get("headers", {})
         assert "X-Respond-With" not in plain_headers
+        assert plain_headers.get("Authorization") == "Bearer test-key-123"
         readerlm_headers = mock_client.get.call_args_list[1].kwargs.get("headers", {})
         assert readerlm_headers.get("X-Respond-With") == "readerlm-v2"
         assert readerlm_headers.get("Authorization") == "Bearer test-key-123"
@@ -605,6 +1341,22 @@ class TestFetchWebContent:
         assert "404" in result["error_message"]
 
     @pytest.mark.asyncio
+    async def test_jina_billing_error_is_specific(self):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(
+            return_value=_mock_response(
+                "InsufficientBalanceError: Account balance not enough to run this query",
+                status_code=402,
+            )
+        )
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client):
+            result = await fetch_web_content("https://example.com/page")
+
+        assert result["status"] == "error"
+        assert "account balance is insufficient" in result["error_message"]
+
+    @pytest.mark.asyncio
     async def test_timeout_returns_error(self):
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
@@ -621,6 +1373,7 @@ class TestFetchWebContent:
         ("Warning: Target URL returned error 451: Unavailable", "HTTP 451"),
         ("Warning: This page maybe requiring CAPTCHA", "CAPTCHA"),
         ("Just a moment...\n\nChecking your browser", "Cloudflare"),
+        ("Wyłącz AdBlocka/uBlocka, aby czytać artykuły", "adblock"),
         ("Title: x\n\n(Note: The provided HTML contains an iframe and only the title was extracted)", "iframe / SPA"),
     ])
     async def test_jina_forwarded_blocks_become_errors(self, body, expected):
@@ -633,6 +1386,73 @@ class TestFetchWebContent:
 
         assert result["status"] == "error"
         assert expected in result["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_public_fetch_does_not_proxy_fallback_for_upstream_403(self):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(
+            return_value=_mock_response(
+                "Warning: Target URL returned error 403: Forbidden\n\nMarkdown Content:\n"
+            )
+        )
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
+             patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
+            result = await fetch_web_content("https://blocked.example/page")
+
+        assert result["status"] == "error"
+        assert mock_client.get.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_adjudicator_reader_uses_proxy_fallback_for_upstream_403(
+        self, mock_emit_cloud_log
+    ):
+        blocked = "Warning: Target URL returned error 403: Forbidden\n\nMarkdown Content:\n"
+        content = "# Menu\n\n" + "Chinese Wok menu and delivery details. " * 30
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(
+            side_effect=[_mock_response(blocked), _mock_response(content)]
+        )
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
+             patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
+            result = await _read_adjudicator_pages(
+                ["https://www.pyszne.pl/menu/chinese-wok"]
+            )
+
+        assert result["status"] == "success"
+        assert result["success_count"] == 1
+        assert mock_client.get.call_count == 2
+        proxy_headers = mock_client.get.call_args_list[1].kwargs.get("headers", {})
+        assert proxy_headers["X-Proxy"] == "auto"
+        assert proxy_headers["Authorization"] == "Bearer test-key-123"
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["reader_mode"] == "plain_proxy"
+        assert kw["fallback_reason"] == "upstream_http_403"
+
+    @pytest.mark.asyncio
+    async def test_adjudicator_proxy_fallback_keeps_original_error_when_blocked(
+        self, mock_emit_cloud_log
+    ):
+        blocked = "Warning: Target URL returned error 403: Forbidden\n\nMarkdown Content:\n"
+        still_blocked = "Just a moment...\n\nChecking your browser"
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(
+            side_effect=[_mock_response(blocked), _mock_response(still_blocked)]
+        )
+
+        with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
+             patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
+            result = await _read_adjudicator_pages(["https://blocked.example/page"])
+
+        assert result["status"] == "error"
+        assert result["results"][0]["error_message"].endswith("upstream HTTP 403")
+
+        kw = _log_kwargs(mock_emit_cloud_log)
+        assert kw["reader_mode"] == "plain"
+        assert kw["fallback_reason"] == "upstream_http_403"
+        assert kw["fallback_error_reason"] == "cloudflare_interstitial"
 
     @pytest.mark.asyncio
     async def test_thin_content_becomes_error(self):
@@ -1079,6 +1899,7 @@ class TestFetchUrlLogging:
         ("Warning: Target URL returned error 403: Forbidden\n\nMarkdown Content:\n", "upstream_http_403"),
         ("Warning: This page maybe requiring CAPTCHA", "upstream_captcha"),
         ("Just a moment...\n\nChecking your browser", "cloudflare_interstitial"),
+        ("Wyłącz AdBlocka/uBlocka, aby czytać artykuły", "adblock_wall"),
         ("Title: x\n\n(Note: The provided HTML contains an iframe and only the title was extracted)", "iframe_spa"),
         ("\n".join(["Home", "About", "Contact", "* Login"]), "thin_content"),
     ])
@@ -1239,7 +2060,7 @@ class TestFetchWebContentBatch:
         assert mock_client.get.call_count == 1
         headers = mock_client.get.call_args.kwargs.get("headers", {})
         assert "X-Respond-With" not in headers
-        assert "Authorization" not in headers
+        assert headers.get("Authorization") == "Bearer test-key-123"
 
     @pytest.mark.asyncio
     async def test_empty_batch_errors(self):

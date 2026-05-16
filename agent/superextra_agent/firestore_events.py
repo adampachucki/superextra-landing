@@ -146,9 +146,8 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "get_tripadvisor_reviews": "structured reviews",
     "get_google_reviews": "structured reviews",
     "google_search": "source search",
-    "search_web": "source search",
-    "search_and_read_public_pages": "source search and reading",
     "read_web_pages": "source reading",
+    "read_adjudicator_sources": "source reading",
     "fetch_web_content": "source reading",
     "fetch_web_content_batch": "source reading",
     "read_public_page": "source reading",
@@ -331,7 +330,7 @@ def map_tool_call(
     call_id: str | None,
 ) -> dict[str, Any] | None:
     row_id = _tool_row_id(call_id=call_id, phase="call", name=name)
-    if name in ("google_search", "search_web", "search_and_read_public_pages"):
+    if name == "google_search":
         query = _normalize_space(str(args.get("query") or "")).strip()
         if query:
             return _detail(row_id, "search", "Searching the web", query)
@@ -347,7 +346,7 @@ def map_tool_call(
         if url:
             return _detail(row_id, "source", "Public sources", _short_url(url))
         return None
-    if name in ("fetch_web_content_batch", "read_public_pages"):
+    if name in ("fetch_web_content_batch", "read_public_pages", "read_adjudicator_sources"):
         urls = args.get("urls") or []
         if isinstance(urls, list) and urls:
             label = ", ".join(_short_url(str(u)) for u in urls[:3])
@@ -472,28 +471,10 @@ def map_tool_result(
             ]
         return []
 
-    if name == "search_web" and status == "error":
-        return [_detail(row_id, "warning", "Warnings", "Search failed")]
-
-    if name == "search_and_read_public_pages":
-        failed = int(response.get("failed_read_count") or 0)
-        attempted = int(response.get("attempted_read_count") or 0)
-        if failed and attempted:
-            return [
-                _detail(
-                    row_id,
-                    "warning",
-                    "Warnings",
-                    f"{failed}/{attempted} sources failed",
-                )
-            ]
-        if status == "error":
-            return [_detail(row_id, "warning", "Warnings", "Search or source reading failed")]
-
     if name in ("read_web_pages", "fetch_web_content", "read_public_page") and status == "error":
         return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
 
-    if name in ("fetch_web_content_batch", "read_public_pages"):
+    if name in ("fetch_web_content_batch", "read_public_pages", "read_adjudicator_sources"):
         results = response.get("results") if isinstance(response, dict) else None
         if isinstance(results, list):
             failed = sum(1 for r in results if isinstance(r, dict) and r.get("status") == "error")

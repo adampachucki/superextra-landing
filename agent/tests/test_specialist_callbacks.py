@@ -1,23 +1,20 @@
 """Tests for specialist construction callbacks in specialists.py."""
 
-from google.adk.tools import google_search, url_context
+from google.adk.tools import google_search
 
-from superextra_agent.search_tools import search_and_read_public_pages, search_web
 from superextra_agent.specialists import ALL_SPECIALISTS, CONTINUATION_SPECIALISTS
 from superextra_agent.agent import _skip_enricher_if_cached
-from superextra_agent.web_tools import (
-    fetch_web_content,
-    fetch_web_content_batch,
-    read_public_page,
-    read_public_pages,
-    read_web_pages,
-)
+from superextra_agent.web_tools import read_web_pages
 
 
 class FakeCallbackContext:
     """Minimal callback_context with state dict."""
     def __init__(self, state=None):
         self.state = state or {}
+
+
+def _tool_names(tools):
+    return [getattr(tool, "name", getattr(tool, "__name__", "")) for tool in tools]
 
 
 def test_specialists_accept_agenttool_request_context():
@@ -29,41 +26,33 @@ def test_specialists_accept_agenttool_request_context():
         assert specialist.before_agent_callback is None
 
 
-def test_web_research_specialists_have_search_and_page_reading_tools():
+def test_web_research_specialists_use_search_and_explicit_reader():
     for specialist in ALL_SPECIALISTS:
-        if specialist.name in ("review_analyst", "dynamic_researcher_1"):
+        if specialist.name == "review_analyst":
             continue
-        assert google_search in specialist.tools
-        assert url_context in specialist.tools
-        assert read_web_pages in specialist.tools
-        assert fetch_web_content in specialist.tools
-        assert fetch_web_content_batch in specialist.tools
+        assert specialist.tools == [google_search, read_web_pages]
 
 
-def test_pilot_dynamic_researcher_uses_serpapi_and_jina_only():
-    pilot = next(agent for agent in ALL_SPECIALISTS if agent.name == "dynamic_researcher_1")
+def test_first_turn_specialists_do_not_expose_raw_fetch_tools():
+    forbidden = {
+        "search_web",
+        "search_and_read_public_pages",
+        "fetch_web_content",
+        "fetch_web_content_batch",
+        "read_public_page",
+        "read_public_pages",
+    }
 
-    assert pilot.tools == [search_and_read_public_pages, read_public_page, read_public_pages]
-    assert search_and_read_public_pages in pilot.tools
-    assert search_web not in pilot.tools
-    assert google_search not in pilot.tools
-    assert url_context not in pilot.tools
-    assert read_web_pages not in pilot.tools
-    assert fetch_web_content not in pilot.tools
-    assert fetch_web_content_batch not in pilot.tools
+    for specialist in ALL_SPECIALISTS:
+        assert forbidden.isdisjoint(_tool_names(specialist.tools))
 
 
-def test_continuation_dynamic_researcher_keeps_existing_web_surface():
+def test_continuation_dynamic_researcher_uses_search_and_explicit_reader():
     continuation = next(
         agent for agent in CONTINUATION_SPECIALISTS if agent.name == "dynamic_researcher_1"
     )
 
-    assert google_search in continuation.tools
-    assert url_context in continuation.tools
-    assert read_web_pages in continuation.tools
-    assert fetch_web_content in continuation.tools
-    assert fetch_web_content_batch in continuation.tools
-    assert search_web not in continuation.tools
+    assert continuation.tools == [google_search, read_web_pages]
 
 
 def test_skip_enricher_returns_cached_context():

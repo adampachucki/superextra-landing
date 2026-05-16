@@ -282,13 +282,6 @@ def test_compaction_event_emits_no_timeline_rows():
 def test_multi_tool_call_emits_multiple_detail_rows_in_order():
     rows = [
         map_tool_call("google_search", {"query": "best burgers berlin"}, {}, "call-1"),
-        map_tool_call("search_web", {"query": "best burgers berlin"}, {}, "call-serp"),
-        map_tool_call(
-            "search_and_read_public_pages",
-            {"query": "best burgers berlin"},
-            {},
-            "call-serp-read",
-        ),
         map_tool_call(
             "read_web_pages",
             {"urls": ["https://example.com/menu", "https://example.com/about"]},
@@ -301,19 +294,22 @@ def test_multi_tool_call_emits_multiple_detail_rows_in_order():
             {},
             "call-jina",
         ),
+        map_tool_call(
+            "read_adjudicator_sources",
+            {"urls": ["https://example.com/source"]},
+            {},
+            "call-adjudicator",
+        ),
         map_tool_call("find_tripadvisor_restaurant", {"name": "Goldies", "area": "Berlin"}, {}, "call-3"),
     ]
     assert [row["family"] for row in rows] == [
         "Searching the web",
-        "Searching the web",
-        "Searching the web",
+        "Public sources",
         "Public sources",
         "Public sources",
         "TripAdvisor",
     ]
     assert rows[0]["text"] == "best burgers berlin"
-    assert rows[1]["text"] == "best burgers berlin"
-    assert rows[2]["text"] == "best burgers berlin"
 
 
 def test_google_maps_response_uses_place_name():
@@ -343,46 +339,21 @@ def test_failed_fetch_batch_warning_preserves_failure_count():
     assert rows[0]["text"] == "2/2 sources failed"
 
 
-def test_failed_search_web_becomes_warning():
+def test_failed_adjudicator_source_batch_warning_preserves_failure_count():
     rows = map_tool_result(
-        "search_web",
-        {"status": "error", "error_message": "SerpAPI unavailable"},
-        {},
-        "call-search",
-    )
-
-    assert rows == [
-        {
-            "kind": "detail",
-            "id": "tool:response:call-search:search_web",
-            "group": "warning",
-            "family": "Warnings",
-            "text": "Search failed",
-        }
-    ]
-
-
-def test_search_and_read_failed_reads_preserve_failure_count():
-    rows = map_tool_result(
-        "search_and_read_public_pages",
+        "read_adjudicator_sources",
         {
             "status": "success",
-            "attempted_read_count": 10,
-            "failed_read_count": 4,
+            "results": [
+                {"status": "success", "url": "https://example.com/a", "content": "ok"},
+                {"status": "error", "url": "https://example.com/b"},
+            ],
         },
         {},
-        "call-search-read",
+        "call-1",
     )
 
-    assert rows == [
-        {
-            "kind": "detail",
-            "id": "tool:response:call-search-read:search_and_read_public_pages",
-            "group": "warning",
-            "family": "Warnings",
-            "text": "4/10 sources failed",
-        }
-    ]
+    assert rows[0]["text"] == "1/2 sources failed"
 
 
 def test_tripadvisor_unverified_becomes_warning():

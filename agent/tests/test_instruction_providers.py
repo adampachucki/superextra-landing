@@ -1,16 +1,23 @@
 """Tests for instruction provider functions in agent.py."""
 
+import json
+
+import pytest
 from google.genai import types
 
 from superextra_agent.agent import (
     _CONTINUATION_NOTES_KEY,
     _continue_research_instruction,
+    _evidence_adjudicator_instruction,
+    _format_specialist_reports,
     _record_continuation_notes,
+    _record_evidence_adjudicator_fallback,
     _report_writer_instruction,
     _research_lead_instruction,
     _router_instruction,
 )
 from superextra_agent.specialists import _make_instruction
+from superextra_agent.web_tools import ADJUDICATOR_READ_RESULT_STATE_KEY
 
 
 class MockCtx:
@@ -109,11 +116,12 @@ class TestResearchLeadInstruction:
 
 
 class TestReportWriterInstruction:
-    def test_injects_places_context_and_specialist_reports_only(self):
+    def test_injects_places_context_specialist_reports_and_evidence_memo(self):
         ctx = MockCtx(state={
             "places_context": "Restaurant XYZ data",
             "writer_brief": "Focus on demand and pricing links.",
             "research_coverage": "Lead thinks demand is most important.",
+            "evidence_memo": "Confirmed weekday demand; pricing claim unresolved.",
             "market_result": "Market demand is weekday-heavy.",
             "pricing_result": "Average entree price is 21 USD.",
         })
@@ -123,10 +131,13 @@ class TestReportWriterInstruction:
         assert "Restaurant XYZ data" in result
         assert "Focus on demand and pricing links." not in result
         assert "Lead thinks demand is most important." not in result
+        assert "Confirmed weekday demand; pricing claim unresolved." in result
         assert "Market demand is weekday-heavy." in result
         assert "Average entree price is 21 USD." in result
         assert "### Market Landscape" in result
         assert "### Menu & Pricing" in result
+        assert "Evidence Memo as the source of truth for claim status" in result
+        assert "Do not cite unread pages as evidence" in result
 
     def test_defaults_when_state_empty(self):
         ctx = MockCtx(state={})
@@ -135,6 +146,41 @@ class TestReportWriterInstruction:
 
         assert "No restaurant data available." in result
         assert "No specialist reports available." in result
+        assert "No adjudicated evidence memo available." in result
+
+    def test_failed_closed_memo_withholds_specialist_claims_from_writer(self):
+        ctx = MockCtx(
+            state={
+                "places_context": "Google Places rating: 4.5",
+                "evidence_memo": json.dumps(
+                    {
+                        "adjudication_status": "failed_closed",
+                        "confirmed_claims": [],
+                        "contradicted_claims": [],
+                        "unsupported_claims": [],
+                        "unresolved_claims": [
+                            {
+                                "id": "claim-1",
+                                "claim": "Unverified noodle trend claim",
+                                "reason": "not adjudicated",
+                            }
+                        ],
+                        "verified_sources": [],
+                        "unread_sources": [],
+                        "read_summary": {"attempted_url_count": 3},
+                    }
+                ),
+                "market_result": "Raw specialist says Unverified noodle trend claim.",
+            }
+        )
+
+        result = _report_writer_instruction(ctx)
+
+        assert "Google Places rating: 4.5" in result
+        assert "Specialist reports are withheld" in result
+        assert "withheld_unresolved_claim_count" in result
+        assert "Unverified noodle trend claim" not in result
+        assert "Raw specialist says" not in result
 
     def test_handles_curly_braces_in_injected_material(self):
         ctx = MockCtx(state={
@@ -168,6 +214,8 @@ class TestReportWriterInstruction:
         assert "Do not rely on any lead-authored summary" in result
         assert "Err on the side of a long, detailed report" in result
         assert "especially its `Writer Material` section, as must-carry research material" in result
+        assert "Do not reproduce packet JSON" in result
+        assert "memo JSON" in result
         assert "Do not compress findings to fit an assumed length" in result
         assert "Do not show raw access failures" in result
         assert "Translate material access limits into plain research caveats" in result
@@ -192,6 +240,296 @@ class TestReportWriterInstruction:
         assert "Filmor has a visible launch signal" in result
         assert "Brassica has weak closure evidence" in result
 
+    def test_strips_specialist_validation_packets_from_writer_input(self):
+        ctx = MockCtx(state={
+            "market_result": (
+                "Market finding.\n\n"
+                "## Writer Material\n\n"
+                "- Preserve this caveat.\n\n"
+                "### Validation Packet:\n\n"
+                "```json\n"
+                '{"claims_for_validation":[],"candidate_sources":[]}\n'
+                "```"
+            )
+        })
+
+        result = _report_writer_instruction(ctx)
+
+        assert "Market finding" in result
+        assert "Preserve this caveat" in result
+        assert "claims_for_validation" not in result
+        assert "candidate_sources" not in result
+
+    def test_specialist_formatter_can_preserve_validation_packets_for_adjudicator(self):
+        state = {
+            "market_result": (
+                "Market finding.\n\n"
+                "### **Validation Packet:**\n\n"
+                "```json\n"
+                '{"claims_for_validation":[]}\n'
+                "```"
+            )
+        }
+
+        result = _format_specialist_reports(state, include_validation_packets=True)
+
+        assert "Market finding" in result
+        assert "claims_for_validation" in result
+
+
+class TestEvidenceAdjudicatorInstruction:
+    def test_injects_full_specialist_packets(self):
+        ctx = MockCtx(state={
+            "places_context": "Restaurant XYZ data",
+            "places_by_id": {
+                "ChIJtarget": {
+                    "google_place_id": "ChIJtarget",
+                    "name": "Target",
+                    "lat": 54.0,
+                    "lng": 18.0,
+                }
+            },
+            "market_result": (
+                "Market finding.\n\n"
+                "### Validation Packet\n\n"
+                "```json\n"
+                "{"
+                '"claims_for_validation":[{"id":"market-1","claim":"Target opened in 2025"}],'
+                '"candidate_sources":[{"url":"https://example.com/opening","priority":"high"}]'
+                "}\n"
+                "```"
+            ),
+        })
+
+        result = _evidence_adjudicator_instruction(ctx)
+
+        assert "Restaurant XYZ data" in result
+        assert "Google Place ID: ChIJtarget" in result
+        assert "claims_for_validation" in result
+        assert "candidate_sources" in result
+        assert "https://example.com/opening" in result
+        assert "Use only the bounded source reader" in result
+        assert "Do not use search" in result
+        assert "read_summary" in result
+        assert '```json\n{' in result
+
+    def test_defaults_when_state_empty(self):
+        result = _evidence_adjudicator_instruction(MockCtx(state={}))
+
+        assert "No restaurant data available." in result
+        assert "No structured place registry available." in result
+        assert "No specialist reports available." in result
+
+    def test_preserves_braces_in_specialist_material(self):
+        result = _evidence_adjudicator_instruction(
+            MockCtx(state={"market_result": "Source note: `{city: 'Warsaw'}`"})
+        )
+
+        assert "{city: 'Warsaw'}" in result
+
+
+class TestEvidenceAdjudicatorFallback:
+    def test_does_not_overwrite_existing_memo(self):
+        existing = {
+            "confirmed_claims": [],
+            "contradicted_claims": [],
+            "unsupported_claims": [],
+            "unresolved_claims": [],
+            "read_summary": {},
+        }
+        ctx = MockCallbackCtx(state={"evidence_memo": json.dumps(existing)})
+
+        _record_evidence_adjudicator_fallback(callback_context=ctx)
+
+        assert json.loads(ctx.state["evidence_memo"]) == existing
+
+    def test_overwrites_memo_missing_packet_claims(self):
+        incomplete = {
+            "confirmed_claims": [],
+            "contradicted_claims": [],
+            "unsupported_claims": [],
+            "unresolved_claims": [],
+            "read_summary": {},
+        }
+        ctx = MockCallbackCtx(
+            state={
+                "evidence_memo": json.dumps(incomplete),
+                "market_result": (
+                    "Finding.\n\n"
+                    "### Validation Packet\n\n"
+                    "```json\n"
+                    "{"
+                    '"claims_for_validation":['
+                    '{"id":"claim-1","claim":"Target opened in May 2026",'
+                    '"source_urls":["https://example.com/open"]}'
+                    "],"
+                    '"candidate_sources":[{"url":"https://example.com/open"}]'
+                    "}\n"
+                    "```"
+                ),
+            }
+        )
+
+        _record_evidence_adjudicator_fallback(callback_context=ctx)
+
+        memo = json.loads(ctx.state["evidence_memo"])
+        assert memo["adjudication_status"] == "failed_closed"
+        assert memo["unresolved_claims"][0]["id"] == "claim-1"
+
+    def test_duplicate_packet_claim_ids_still_require_each_claim_text(self):
+        incomplete = {
+            "confirmed_claims": [{"id": "claim-1", "claim": "Claim A"}],
+            "contradicted_claims": [],
+            "unsupported_claims": [],
+            "unresolved_claims": [],
+            "read_summary": {},
+        }
+        ctx = MockCallbackCtx(
+            state={
+                "evidence_memo": json.dumps(incomplete),
+                "market_result": (
+                    "Finding.\n\n"
+                    "### Validation Packet\n\n"
+                    "```json\n"
+                    "{"
+                    '"claims_for_validation":['
+                    '{"id":"claim-1","claim":"Claim A",'
+                    '"source_urls":["https://example.com/a"]},'
+                    '{"id":"claim-1","claim":"Claim B",'
+                    '"source_urls":["https://example.com/b"]}'
+                    "],"
+                    '"candidate_sources":['
+                    '{"url":"https://example.com/a"},'
+                    '{"url":"https://example.com/b"}'
+                    "]}"
+                    "\n```"
+                ),
+            }
+        )
+
+        _record_evidence_adjudicator_fallback(callback_context=ctx)
+
+        memo = json.loads(ctx.state["evidence_memo"])
+        assert memo["adjudication_status"] == "failed_closed"
+        assert [claim["claim"] for claim in memo["unresolved_claims"]] == [
+            "Claim A",
+            "Claim B",
+        ]
+
+    def test_overwrites_non_structured_memo(self):
+        ctx = MockCallbackCtx(
+            state={
+                "evidence_memo": "Research unavailable: ValueError",
+                "market_result": (
+                    "Finding.\n\n"
+                    "### Validation Packet\n\n"
+                    "```json\n"
+                    "{"
+                    '"claims_for_validation":['
+                    '{"id":"claim-1","claim":"Target opened in May 2026",'
+                    '"source_urls":["https://example.com/open"]}'
+                    "],"
+                    '"candidate_sources":[{"url":"https://example.com/open"}]'
+                    "}\n"
+                    "```"
+                ),
+            }
+        )
+
+        _record_evidence_adjudicator_fallback(callback_context=ctx)
+
+        memo = json.loads(ctx.state["evidence_memo"])
+        assert memo["adjudication_status"] == "failed_closed"
+        assert memo["unresolved_claims"][0]["claim"] == "Target opened in May 2026"
+
+    def test_records_fail_closed_memo_from_packets_and_read_result(self):
+        ctx = MockCallbackCtx(
+            state={
+                "market_result": (
+                    "Finding.\n\n"
+                    "### Validation Packet\n\n"
+                    "```json\n"
+                    "{"
+                    '"claims_for_validation":['
+                    '{"id":"claim-1","claim":"Target opened in May 2026",'
+                    '"source_urls":["https://example.com/open"],'
+                    '"provider_refs":["Google Places: target"]}'
+                    "],"
+                    '"candidate_sources":[{"url":"https://example.com/open"}]'
+                    "}\n"
+                    "```"
+                ),
+                ADJUDICATOR_READ_RESULT_STATE_KEY: {
+                    "requested_count": 2,
+                    "attempted_count": 2,
+                    "successful_count": 1,
+                    "failed_count": 1,
+                    "sources": [
+                        {
+                            "url": "https://example.com/open",
+                            "title": "Opening",
+                            "domain": "example.com",
+                            "provider": "fetched_page",
+                        }
+                    ],
+                    "failed_sources": [
+                        {"url": "https://example.com/closed", "reason": "HTTP 404"}
+                    ],
+                    "skipped_urls": ["https://example.com/skipped"],
+                    "invalid_urls": [],
+                },
+            }
+        )
+
+        _record_evidence_adjudicator_fallback(callback_context=ctx)
+
+        memo = json.loads(ctx.state["evidence_memo"])
+        assert memo["adjudication_status"] == "failed_closed"
+        assert memo["confirmed_claims"] == []
+        assert memo["unresolved_claims"] == [
+            {
+                "id": "claim-1",
+                "claim": "Target opened in May 2026",
+                "reason": (
+                    "The evidence adjudicator did not produce a claim-status "
+                    "memo, so this specialist claim must be treated as "
+                    "unresolved. Source reads may have been attempted, but no "
+                    "adjudicated support was recorded for this claim. Provider "
+                    "references were present, but no adjudicated provider "
+                    "confirmation was recorded for this claim."
+                ),
+            }
+        ]
+        assert memo["verified_sources"] == [
+            {
+                "url": "https://example.com/open",
+                "title": "Opening",
+                "domain": "example.com",
+                "supports_claim_ids": [],
+                "limits": (
+                    "Fetched by the bounded reader, but no adjudicated claim "
+                    "support was recorded."
+                ),
+            }
+        ]
+        assert memo["unread_sources"] == [
+            {"url": "https://example.com/closed", "reason": "HTTP 404"},
+            {
+                "url": "https://example.com/skipped",
+                "reason": "duplicate or already read in this adjudication run",
+            },
+        ]
+        assert memo["read_summary"] == {
+            "requested_url_count": 2,
+            "attempted_url_count": 2,
+            "successful_url_count": 1,
+            "failed_url_count": 1,
+            "notes": (
+                "The adjudicator failed closed because no claim-status memo "
+                "was persisted."
+            ),
+        }
+
 
 class TestMakeInstruction:
     def test_returns_provider_that_injects_places_context(self):
@@ -213,9 +551,8 @@ class TestMakeInstruction:
 
     def test_review_analyst_disclaims_web_fetch_tools(self):
         """review_analyst is structured-tools only (TripAdvisor + Google
-        Reviews APIs). The universal specialist base mentions fetch_web_content,
-        so the body file must explicitly disclaim it to avoid confusing the
-        specialist into trying to call tools it doesn't have."""
+        Reviews APIs). The body file explicitly disclaims web research tools
+        to keep it inside the provider-only boundary."""
         provider = _make_instruction("review_analyst")
 
         ctx = MockCtx(
@@ -237,6 +574,9 @@ class TestMakeInstruction:
         assert "ChIJtarget" in result
         assert "Target Google Place ID" not in result
         assert "For each requested place" in result
+        assert 'source_type: "provider_data"' in result
+        assert "`provider_refs`" in result
+        assert "Do not invent URLs" in result
 
     def test_specialists_surface_writer_material(self):
         provider = _make_instruction("market_landscape")
@@ -248,6 +588,7 @@ class TestMakeInstruction:
         assert "Do not include raw tool errors" in result
         assert "meaningful evidence limits" in result
         assert "`Writer Material` section" in result
+        assert "`Validation Packet` section" in result
         assert "implications for the target venue" in result
 
     def test_specialists_have_source_reading_workflow(self):
@@ -258,19 +599,38 @@ class TestMakeInstruction:
         assert "## Search And Source Reading" in result
         assert "Search and page reading have different jobs" in result
         assert "Search snippets and search-result source pills are not the same as reading a page" in result
-        assert "If `search_and_read_public_pages` is available" in result
-        assert "If `search_web` is available" in result
-        assert "If `read_web_pages` is available" in result
-        assert "Jina Reader and return raw Markdown/page text" in result
+        assert "Use `google_search` for source discovery" in result
+        assert "Use `read_web_pages` to inspect concrete public URLs" in result
+        assert "Treat search snippets and grounding snippets as discovery context" in result
+        assert "Treat page reads as evidence" in result
+        assert "search_and_read_public_pages" not in result
+        assert "search_web" not in result
+        assert "fetch_web_content" not in result
+        assert "Jina Reader" not in result
         assert "article pages, official announcements, public reports, PDFs" in result
         assert "inspect those pages before broadening the search" in result
-        assert "prefer it over separate search/read calls" in result
         assert "read the strongest 1-3 pages during your research" in result
         assert "Iterate from what the pages say" in result
-        assert "Use the strongest available page-reading tool" in result
+        assert "Use `read_web_pages`" in result
         assert "After two or three searches" in result
         assert "Search and grounding sources may still appear as source pills" in result
-        assert "source-pill display" in result
+        assert "proof that a page was read" in result
+        assert "Do not reconstruct, shorten, normalize across subdomains" in result
+
+    def test_specialists_require_validation_packet(self):
+        provider = _make_instruction("market_landscape")
+
+        result = provider(MockCtx(state={"places_context": "Target data"}))
+
+        assert "### Validation Packet" in result
+        assert "claims_for_validation" in result
+        assert "candidate_sources" in result
+        assert "provider_refs" in result
+        assert "provider_ref" in result
+        assert "supports_claim_ids" in result
+        assert "do not invent URLs" in result
+        assert '```json\n{' in result
+        assert '"claim_type": "venue_fact | price | opening_closure | trend | review_signal | estimate | other"' in result
 
 
 class TestContinueResearchInstruction:
@@ -325,6 +685,24 @@ class TestContinueResearchInstruction:
 
         assert "color={0: 'red'}" in result
         assert "{braces}" in result
+
+    def test_strips_specialist_validation_packets_from_continuation_input(self):
+        ctx = MockCtx(state={
+            "final_report": "Existing report",
+            "market_result": (
+                "Market finding.\n\n"
+                "### Validation Packet\n\n"
+                "```json\n"
+                '{"claims_for_validation":[],"candidate_sources":[]}\n'
+                "```"
+            ),
+        })
+
+        result = _continue_research_instruction(ctx)
+
+        assert "Market finding" in result
+        assert "claims_for_validation" not in result
+        assert "candidate_sources" not in result
 
     def test_broad_new_work_boundary_is_explicit(self):
         result = _continue_research_instruction(MockCtx(state={"final_report": "Existing report"}))

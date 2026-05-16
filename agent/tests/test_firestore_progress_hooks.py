@@ -91,6 +91,30 @@ async def test_before_model_writes_active_stage(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_before_model_writes_evidence_stage(monkeypatch):
+    plugin, _state = _make_plugin_state()
+    updates: list[dict] = []
+
+    async def _fenced(_fs, _state, update):
+        updates.append(update)
+
+    monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
+    monkeypatch.setattr(firestore_progress, "emit_cloud_log", lambda *_args, **_kwargs: None)
+
+    await plugin.before_model_callback(
+        callback_context=SimpleNamespace(
+            invocation_id="inv-parent",
+            agent_name="evidence_adjudicator",
+            session=SimpleNamespace(id="se-sid-test", state={"runId": "run-test"}),
+        ),
+        llm_request=SimpleNamespace(model="gemini-3.1-pro-preview-customtools"),
+    )
+
+    assert updates[0]["activeAgent"] == "evidence_adjudicator"
+    assert updates[0]["activeStage"] == "checking_evidence"
+
+
+@pytest.mark.asyncio
 async def test_after_run_finalize_logs_use_shared_correlation(monkeypatch):
     plugin, state = _make_plugin_state()
     state.final_reply = "Final answer"
@@ -144,27 +168,6 @@ async def test_before_tool_google_search_writes_search_pill():
 
 
 @pytest.mark.asyncio
-async def test_before_tool_search_web_writes_search_pill():
-    plugin, state = _make_plugin_state()
-
-    await plugin.before_tool_callback(
-        tool=_tool("search_web"),
-        tool_args={"query": "pizza Gdynia"},
-        tool_context=_tool_context(call_id="call-search"),
-    )
-
-    state.timeline_writer.write_timeline.assert_awaited_once_with(
-        {
-            "kind": "detail",
-            "id": "tool:call:call-search:search_web",
-            "group": "search",
-            "family": "Searching the web",
-            "text": "pizza Gdynia",
-        }
-    )
-
-
-@pytest.mark.asyncio
 async def test_tool_error_fetch_web_content_writes_warning():
     plugin, state = _make_plugin_state()
 
@@ -207,45 +210,6 @@ async def test_after_tool_read_web_pages_merges_sources():
 
 
 @pytest.mark.asyncio
-async def test_after_tool_search_web_does_not_merge_discovery_sources():
-    plugin, state = _make_plugin_state()
-    source = {
-        "url": "https://example.com/article",
-        "title": "Article",
-        "domain": "example.com",
-    }
-
-    await plugin.after_tool_callback(
-        tool=_tool("search_web"),
-        tool_args={"query": "pizza Gdynia"},
-        tool_context=_tool_context(call_id="call-search"),
-        result={"status": "success", "sources": [source]},
-    )
-
-    assert state.specialist_sources == []
-
-
-@pytest.mark.asyncio
-async def test_after_tool_search_and_read_merges_fetched_sources():
-    plugin, state = _make_plugin_state()
-    source = {
-        "url": "https://example.com/article",
-        "title": "Article",
-        "domain": "example.com",
-        "provider": "fetched_page",
-    }
-
-    await plugin.after_tool_callback(
-        tool=_tool("search_and_read_public_pages"),
-        tool_args={"query": "pizza Gdynia"},
-        tool_context=_tool_context(call_id="call-search-read"),
-        result={"status": "success", "sources": [source]},
-    )
-
-    assert state.specialist_sources == [source]
-
-
-@pytest.mark.asyncio
 async def test_after_tool_read_public_page_merges_sources():
     plugin, state = _make_plugin_state()
     source = {
@@ -263,6 +227,27 @@ async def test_after_tool_read_public_page_merges_sources():
     )
 
     assert state.specialist_sources == [source]
+
+
+@pytest.mark.asyncio
+async def test_after_tool_read_adjudicator_sources_does_not_merge_raw_sources():
+    plugin, state = _make_plugin_state()
+    source = {
+        "url": "https://example.com/source",
+        "title": "Source",
+        "domain": "example.com",
+        "provider": "fetched_page",
+    }
+
+    await plugin.after_tool_callback(
+        tool=_tool("read_adjudicator_sources"),
+        tool_args={"urls": ["https://example.com/source"]},
+        tool_context=_tool_context(call_id="call-read"),
+        result={"status": "success", "sources": [source]},
+    )
+
+    assert state.specialist_sources == []
+    assert state.adjudicator_read_success_urls == {"https://example.com/source"}
 
 
 @pytest.mark.asyncio
