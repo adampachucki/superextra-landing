@@ -18,25 +18,20 @@ The customer expects deep research, not a compressed summary. Write the most use
 
 {specialist_reports}
 
-### Evidence Memo
-
-{evidence_memo}
-
 ## Process
 
-- Treat the specialist reports as the main research material. Treat the Evidence Memo as claim-status and source-quality metadata, not as a replacement for the specialist reports.
-- If the Evidence Memo has `adjudication_status: "failed_closed"` or otherwise says adjudication failed, continue using the specialist reports, but do not present failed adjudication as verification. Phrase public-web material that was not confirmed by the memo or by structured provider data as a source-limited signal, and put the adjudication limit in evidence limits when it affects confidence.
+- Treat the specialist reports as the research material.
+- Treat each specialist's `Evidence Notes` and `Writer Material` as the source-quality guide for that evidence surface.
+- Page content that a specialist read is stronger evidence than a search snippet.
+- Structured provider data is evidence for the facts that provider directly returned.
+- Search or grounding-only signals are weaker context. Use them only with clear caveats, and do not present them as if the page was read.
 - Use the user's question, restaurant context, and specialist reports to determine scope and response language.
 - Do not rely on any lead-authored summary, outline, ranking, or emphasis.
-- Prefer confirmed claims from the Evidence Memo when the same claim appears in multiple places.
-- Do not state unsupported, contradicted, or unresolved specialist claims as facts.
-- Do not use unsupported, contradicted, or unresolved claims as findings, implications, trend statements, or recommendation premises.
-- Mention unsupported or unresolved claims only in evidence limits or as explicitly unverified signals when the uncertainty itself matters to the answer.
-- If the Evidence Memo says a URL failed, returned unrelated content, was unread, or was not selected, do not use the specialist's summary of that URL as support.
 - Err on the side of a long, detailed report when the evidence is rich.
 - Preserve every distinct finding, insight, data point, caveat, source limit, and implication connected to the question or restaurant context.
 - Treat each specialist report, especially its `Writer Material` section, as must-carry research material. Every reader-relevant item there should be visible in the final report unless it is an exact duplicate or clearly outside the question.
-- Specialist validation packets and the Evidence Memo are internal claim/source metadata. Do not reproduce packet JSON, memo JSON, field names, or source queues in the user-facing report.
+- Do not reproduce internal evidence-note scaffolding, raw source queues, or tool outputs in the user-facing report.
+- Do not state a specialist claim as fact when the specialist marked it as snippet-only, unread, weak, stale, blocked, contradicted, or inferred unless that uncertainty is visible in the sentence.
 - Do not compress findings to fit an assumed length. Let report length expand with the evidence.
 - Carry forward concrete entities, numbers, dates, prices, sample sizes, quotes, ranges, source limits, counter-signals, mechanisms, useful examples, and benchmarks.
 - Connect signals across reports. One evidence surface may explain, challenge, or sharpen another.
@@ -75,7 +70,7 @@ Before finalizing, check that every specialist report has visible representation
 - Use clear section headings that fit the evidence.
 - Where useful, pair interpretation with the observed facts, likely driver or mechanism, why that explanation fits, counter-signals, implication, and important uncertainty.
 - Use tables when they make comparisons easier to read.
-- Cite specific claims inline. Use only sources present in the supplied material. Prefer sources verified in the Evidence Memo. Cite Google Places as "Google Places" when using Places data.
+- Cite specific claims inline. Use only sources present in the supplied material. Cite Google Places as "Google Places" when using Places data.
 - Do not cite unread pages as evidence.
 - Explain conflicts between sources when they matter.
 - End with meaningful evidence limits and 2-4 suggested follow-up research prompts only after all findings are covered.

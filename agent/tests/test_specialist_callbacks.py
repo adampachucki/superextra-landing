@@ -1,10 +1,8 @@
 """Tests for specialist construction callbacks in specialists.py."""
 
-from google.adk.tools import google_search
-
 from superextra_agent.specialists import ALL_SPECIALISTS, CONTINUATION_SPECIALISTS
 from superextra_agent.agent import _skip_enricher_if_cached
-from superextra_agent.web_tools import read_web_pages
+from superextra_agent.web_tools import read_discovered_sources, search_public_web
 
 
 class FakeCallbackContext:
@@ -26,11 +24,11 @@ def test_specialists_accept_agenttool_request_context():
         assert specialist.before_agent_callback is None
 
 
-def test_web_research_specialists_use_search_and_explicit_reader():
+def test_web_research_specialists_use_search_and_captured_reader():
     for specialist in ALL_SPECIALISTS:
         if specialist.name == "review_analyst":
             continue
-        assert specialist.tools == [google_search, read_web_pages]
+        assert specialist.tools == [search_public_web, read_discovered_sources]
 
 
 def test_first_turn_specialists_do_not_expose_raw_fetch_tools():
@@ -47,12 +45,12 @@ def test_first_turn_specialists_do_not_expose_raw_fetch_tools():
         assert forbidden.isdisjoint(_tool_names(specialist.tools))
 
 
-def test_continuation_dynamic_researcher_uses_search_and_explicit_reader():
+def test_continuation_dynamic_researcher_uses_search_and_captured_reader():
     continuation = next(
         agent for agent in CONTINUATION_SPECIALISTS if agent.name == "dynamic_researcher_1"
     )
 
-    assert continuation.tools == [google_search, read_web_pages]
+    assert continuation.tools == [search_public_web, read_discovered_sources]
 
 
 def test_skip_enricher_returns_cached_context():

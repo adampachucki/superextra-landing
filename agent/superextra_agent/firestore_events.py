@@ -97,7 +97,9 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
             )
         )
 
-    mapping["grounding_sources"] = extract_sources_from_grounding(event)
+    mapping["grounding_sources"] = (
+        extract_sources_from_grounding(event) + extract_sources_from_search_tool(event)
+    )
 
     if author in ("router", "report_writer", "continue_research", "follow_up"):
         complete = _map_complete(event)
@@ -137,8 +139,9 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "get_tripadvisor_reviews": "structured reviews",
     "get_google_reviews": "structured reviews",
     "google_search": "source search",
+    "search_public_web": "source search",
+    "read_discovered_sources": "source reading",
     "read_web_pages": "source reading",
-    "read_adjudicator_sources": "source reading",
     "fetch_web_content": "source reading",
     "fetch_web_content_batch": "source reading",
     "read_public_page": "source reading",
@@ -247,40 +250,33 @@ def extract_sources_from_grounding(event: Any) -> list[dict[str, Any]]:
     return out
 
 
-_JINA_TITLE_RE = re.compile(r"^Title:\s*(.+?)\s*$", re.MULTILINE)
-
-
-def build_fetched_source(url: Any, content: Any) -> dict[str, Any] | None:
-    """Source entry for a successful `fetch_web_content[_batch]` call.
-
-    Title comes from Jina Reader's leading `Title:` line when present,
-    otherwise the first markdown H1, otherwise the hostname. Mirrors
-    `extract_sources_from_grounding` so fetched URLs surface as pills.
-    """
-    if not isinstance(url, str) or not url.strip():
-        return None
-    title: str | None = None
-    if isinstance(content, str):
-        head = content[:2000]
-        match = _JINA_TITLE_RE.search(head)
-        if match:
-            title = match.group(1).strip() or None
-        if not title:
-            for line in head.splitlines():
-                stripped = line.strip()
-                if stripped.startswith("# "):
-                    title = stripped[2:].strip() or None
-                    break
-    try:
-        domain = (urlparse(url).hostname or "").removeprefix("www.")
-    except Exception:
-        domain = ""
-    return {
-        "url": url,
-        "title": title or domain or url,
-        "domain": domain,
-        "provider": "fetched_page",
-    }
+def extract_sources_from_search_tool(event: Any) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for part in _iter_parts(event):
+        fr = _get(part, "function_response")
+        if not fr or _get(fr, "name") != "search_public_web":
+            continue
+        response = _get(fr, "response")
+        if not isinstance(response, dict):
+            continue
+        for source in response.get("sources") or []:
+            if not isinstance(source, dict):
+                continue
+            url = source.get("url")
+            if not isinstance(url, str) or not url or url in seen:
+                continue
+            seen.add(url)
+            entry = {
+                "title": source.get("title") or url,
+                "url": url,
+                "provider": source.get("provider") or "public_search",
+            }
+            domain = source.get("domain")
+            if domain:
+                entry["domain"] = domain
+            out.append(entry)
+    return out
 
 
 def _map_complete(event: Any) -> dict[str, Any] | None:
@@ -326,6 +322,11 @@ def map_tool_call(
         if query:
             return _detail(row_id, "search", "Searching the web", query)
         return None
+    if name == "search_public_web":
+        query = _normalize_space(str(args.get("query") or "")).strip()
+        if query:
+            return _detail(row_id, "search", "Searching the web", query)
+        return _detail(row_id, "search", "Searching the web", "Public web")
     if name in ("read_web_pages", "fetch_web_content", "read_public_page"):
         url = str(args.get("url") or "").strip()
         urls = args.get("urls") or []
@@ -337,13 +338,19 @@ def map_tool_call(
         if url:
             return _detail(row_id, "source", "Public sources", _short_url(url))
         return None
-    if name in ("fetch_web_content_batch", "read_public_pages", "read_adjudicator_sources"):
+    if name in (
+        "fetch_web_content_batch",
+        "read_public_pages",
+        "read_discovered_sources",
+    ):
         urls = args.get("urls") or []
         if isinstance(urls, list) and urls:
             label = ", ".join(_short_url(str(u)) for u in urls[:3])
             if len(urls) > 3:
                 label += f" (+{len(urls) - 3} more)"
             return _detail(row_id, "source", "Public sources", label)
+        if name == "read_discovered_sources":
+            return _detail(row_id, "source", "Public sources", "Captured source queue")
         return None
     if name == "search_restaurants":
         query = _normalize_space(str(args.get("query") or "")).strip()
@@ -408,6 +415,14 @@ def map_tool_result(
             return [_detail(row_id, "platform", "Google Maps", f"{len(results)} {label}")]
         return []
 
+    if name == "search_public_web":
+        if status == "success":
+            count = int(response.get("result_count") or 0)
+            return [_detail(row_id, "search", "Searching the web", f"{count} source results")]
+        if status == "error":
+            return [_detail(row_id, "warning", "Warnings", "Source search failed")]
+        return []
+
     if name == "find_tripadvisor_restaurant":
         display_name = str(response.get("name") or "").strip() or str(
             response.get("title") or ""
@@ -465,7 +480,11 @@ def map_tool_result(
     if name in ("read_web_pages", "fetch_web_content", "read_public_page") and status == "error":
         return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
 
-    if name in ("fetch_web_content_batch", "read_public_pages", "read_adjudicator_sources"):
+    if name in (
+        "fetch_web_content_batch",
+        "read_public_pages",
+        "read_discovered_sources",
+    ):
         results = response.get("results") if isinstance(response, dict) else None
         if isinstance(results, list):
             failed = sum(1 for r in results if isinstance(r, dict) and r.get("status") == "error")

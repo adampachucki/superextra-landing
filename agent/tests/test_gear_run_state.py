@@ -97,7 +97,6 @@ def _fake_event(
 _AWAIT_FREE_METHODS = (
     "observe_event",
     "_merge_source",
-    "_merge_evidence_memo_sources",
     "_capture_final",
 )
 
@@ -296,70 +295,78 @@ def test_observe_event_merges_grounding_sources_into_drawer_candidates():
     assert state.final_sources == [{**drawer_source, "provider": "grounding"}]
 
 
-def test_observe_event_merges_adjudicated_evidence_memo_sources():
+def test_observe_event_records_grounding_reader_candidates_by_author(monkeypatch):
     state = _make_state()
-    state.record_adjudicator_read_result(
-        {
-            "sources": [
-                {"url": "https://example.com/confirmed"},
-                {"url": "https://example.com/contradicted"},
-            ]
-        }
+    calls = []
+
+    def record(run_id, sources, *, agent_name=None):
+        calls.append((run_id, sources, agent_name))
+
+    monkeypatch.setattr(gear_run_state, "record_source_candidates", record)
+
+    state.observe_event(
+        _fake_event(
+            grounding_chunks=[
+                {
+                    "uri": "https://example.com/grounded",
+                    "title": "Grounded",
+                    "domain": "example.com",
+                }
+            ],
+            author="market_landscape",
+        )
     )
-    memo = """
-```json
-{
-  "confirmed_claims": [
-    {
-      "evidence": [
-        {
-          "url": "https://example.com/confirmed",
-          "title": "Confirmed",
-          "domain": "example.com"
-        }
-      ]
-    }
-  ],
-  "contradicted_claims": [
-    {
-      "contradicting_evidence": [
-        {
-          "url": "https://example.com/contradicted",
-          "title": "Contradicted",
-          "domain": "example.com"
-        }
-      ]
-    }
-  ],
-  "verified_sources": [
-    {
-      "url": "https://example.com/confirmed",
-      "title": "Duplicate confirmed",
-      "domain": "example.com",
-      "supports_claim_ids": ["claim-1"]
-    },
-    {
-      "url": "https://example.com/read-only",
-      "title": "Read only",
-      "domain": "example.com",
-      "supports_claim_ids": []
-    }
-  ]
-}
-```
-"""
 
-    state.observe_event(_fake_event(state_delta={"evidence_memo": memo}))
-    state._capture_final({"reply": "answer"})
+    assert calls == [
+        (
+            "run-test",
+            [
+                {
+                    "url": "https://example.com/grounded",
+                    "title": "Grounded",
+                    "domain": "example.com",
+                    "provider": "grounding",
+                }
+            ],
+            "market_landscape",
+        )
+    ]
 
-    assert [s["url"] for s in state.specialist_sources] == [
-        "https://example.com/confirmed",
-        "https://example.com/contradicted",
+
+def test_observe_event_records_search_tool_candidates_as_one_batch(monkeypatch):
+    state = _make_state()
+    calls = []
+    sources = [
+        {
+            "url": "https://example.com/a",
+            "title": "A",
+            "domain": "example.com",
+            "provider": "public_search",
+        },
+        {
+            "url": "https://example.com/b",
+            "title": "B",
+            "domain": "example.com",
+            "provider": "public_search",
+        },
     ]
-    assert [s["url"] for s in state.final_sources] == [
-        "https://example.com/confirmed",
-        "https://example.com/contradicted",
-    ]
+
+    def record(run_id, sources, *, agent_name=None):
+        calls.append((run_id, sources, agent_name))
+
+    monkeypatch.setattr(gear_run_state, "record_source_candidates", record)
+
+    state.observe_event(
+        _fake_event(
+            function_responses=[
+                ("search_public_web", {"status": "success", "sources": sources})
+            ],
+            author="market_landscape",
+        )
+    )
+
+    assert calls == [("run-test", sources, "market_landscape")]
+    assert state.specialist_sources == sources
 
 
 def test_source_dedupe_keeps_same_url_for_distinct_provider_or_place():
@@ -391,7 +398,7 @@ def test_source_dedupe_keeps_same_url_for_distinct_provider_or_place():
     ]
 
 
-def test_source_dedupe_collapses_public_web_sources_by_url():
+def test_source_dedupe_collapses_same_url_sources_by_url():
     state = _make_state()
 
     state._merge_source({
@@ -400,7 +407,6 @@ def test_source_dedupe_collapses_public_web_sources_by_url():
         "domain": "example.com",
     })
     state._merge_source({
-        "provider": "fetched_page",
         "url": "https://example.com/article",
         "title": "Fetched page title",
         "domain": "example.com",
@@ -428,29 +434,6 @@ def test_vertex_grounding_redirect_sources_are_persisted():
 
     assert state.specialist_sources == [redirect]
     assert state.final_sources == [redirect]
-
-
-def test_evidence_memo_sources_require_successful_adjudicator_read():
-    state = _make_state()
-    state.record_adjudicator_read_result(
-        {"sources": [{"url": "https://example.com/read"}]}
-    )
-    memo = {
-        "confirmed_claims": [
-            {
-                "evidence": [
-                    {"url": "https://example.com/read", "title": "Read"},
-                    {"url": "https://example.com/unread", "title": "Unread"},
-                ]
-            }
-        ],
-        "contradicted_claims": [],
-        "verified_sources": [],
-    }
-
-    state.observe_event(_fake_event(state_delta={"evidence_memo": memo}))
-
-    assert [s["url"] for s in state.specialist_sources] == ["https://example.com/read"]
 
 
 def test_capture_final_preserves_place_scoped_sources_with_same_url():

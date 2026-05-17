@@ -52,7 +52,6 @@ from .correlation import (
     turn_idx_from_context,
 )
 from .firestore_events import (
-    build_fetched_source,
     map_tool_call,
     map_tool_error,
     map_tool_result,
@@ -355,53 +354,6 @@ def _build_state(
     )
 
 
-def _merge_tool_sources(
-    per: GearRunState,
-    tool_name: str,
-    tool_args: dict[str, Any],
-    result: Any,
-) -> None:
-    """Surface successful page-reading tool URLs as run sources.
-
-    Without this hook, fetched URLs would never appear in the per-turn
-    source pills or same-run adjudicator source queue. Grounding chunks,
-    fetched pages, and `_tool_src_*` provider sources all remain visible in
-    the drawer; adjudication decides claim support separately.
-    Adjudicator reads are not merged directly because read success is not claim
-    support; successful read URLs only gate later `evidence_memo` sources.
-    """
-    if not isinstance(result, dict):
-        return
-    if tool_name == "read_adjudicator_sources":
-        per.record_adjudicator_read_result(result)
-        return
-    if tool_name in (
-        "read_web_pages",
-        "read_public_page",
-        "read_public_pages",
-    ):
-        if result.get("status") != "success":
-            return
-        for entry in result.get("sources") or []:
-            per._merge_source(entry, reader_candidate=True)
-        return
-    if tool_name == "fetch_web_content":
-        if result.get("status") != "success":
-            return
-        url = result.get("url") or (tool_args.get("url") if tool_args else None)
-        entry = build_fetched_source(url, result.get("content"))
-        if entry:
-            per._merge_source(entry, reader_candidate=True)
-        return
-    if tool_name == "fetch_web_content_batch":
-        for item in result.get("results") or []:
-            if not isinstance(item, dict) or item.get("status") != "success":
-                continue
-            entry = build_fetched_source(item.get("url"), item.get("content"))
-            if entry:
-                per._merge_source(entry, reader_candidate=True)
-
-
 # ── Plugin ───────────────────────────────────────────────────────────────────
 
 
@@ -454,8 +406,6 @@ class FirestoreProgressPlugin(BasePlugin):
     def _stage_for_agent(self, agent_name: str | None) -> str:
         if agent_name == "report_writer":
             return "writing_final_report"
-        if agent_name == "evidence_adjudicator":
-            return "checking_evidence"
         if agent_name == "research_lead":
             return "planning_research"
         if agent_name == "context_enricher":
@@ -629,7 +579,6 @@ class FirestoreProgressPlugin(BasePlugin):
             getattr(tool_context, "function_call_id", None),
         ):
             await self._observe_typed_pill(per, pill)
-        _merge_tool_sources(per, tool.name, tool_args, result)
         return None
 
     @override

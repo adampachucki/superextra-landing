@@ -4,8 +4,8 @@ from types import SimpleNamespace
 from typing import Any
 
 from superextra_agent.firestore_events import (
-    build_fetched_source,
     extract_sources_from_grounding,
+    extract_sources_from_search_tool,
     map_event,
     map_tool_call,
     map_tool_result,
@@ -228,6 +228,27 @@ def test_non_durable_specialist_grounding_sources_are_captured():
     ]
 
 
+def test_public_search_tool_sources_are_captured_as_search_sources():
+    source = {
+        "url": "https://example.com/article",
+        "title": "Article",
+        "domain": "example.com",
+    }
+    ev = _event(
+        author="market_landscape",
+        function_responses=[
+            (
+                "search_public_web",
+                {"status": "success", "sources": [source]},
+            )
+        ],
+    )
+
+    expected = [{**source, "provider": "public_search"}]
+    assert extract_sources_from_search_tool(ev) == expected
+    assert map_event(ev, {})["grounding_sources"] == expected
+
+
 def test_research_lead_grounding_sources_are_captured():
     ev = _event(
         author="research_lead",
@@ -307,6 +328,7 @@ def test_compaction_event_emits_no_timeline_rows():
 def test_multi_tool_call_emits_multiple_detail_rows_in_order():
     rows = [
         map_tool_call("google_search", {"query": "best burgers berlin"}, {}, "call-1"),
+        map_tool_call("search_public_web", {"query": "new cafes gdynia"}, {}, "call-search"),
         map_tool_call(
             "read_web_pages",
             {"urls": ["https://example.com/menu", "https://example.com/about"]},
@@ -319,22 +341,17 @@ def test_multi_tool_call_emits_multiple_detail_rows_in_order():
             {},
             "call-jina",
         ),
-        map_tool_call(
-            "read_adjudicator_sources",
-            {"urls": ["https://example.com/source"]},
-            {},
-            "call-adjudicator",
-        ),
         map_tool_call("find_tripadvisor_restaurant", {"name": "Goldies", "area": "Berlin"}, {}, "call-3"),
     ]
     assert [row["family"] for row in rows] == [
         "Searching the web",
-        "Public sources",
+        "Searching the web",
         "Public sources",
         "Public sources",
         "TripAdvisor",
     ]
     assert rows[0]["text"] == "best burgers berlin"
+    assert rows[1]["text"] == "new cafes gdynia"
 
 
 def test_google_maps_response_uses_place_name():
@@ -364,9 +381,9 @@ def test_failed_fetch_batch_warning_preserves_failure_count():
     assert rows[0]["text"] == "2/2 sources failed"
 
 
-def test_failed_adjudicator_source_batch_warning_preserves_failure_count():
+def test_failed_discovered_source_batch_warning_preserves_failure_count():
     rows = map_tool_result(
-        "read_adjudicator_sources",
+        "read_discovered_sources",
         {
             "status": "success",
             "results": [
@@ -521,39 +538,3 @@ def test_extract_sources_from_grounding_dedupes_urls():
         {"title": "A", "url": "https://a.example"},
         {"title": "https://b.example", "url": "https://b.example"},
     ]
-
-
-def test_build_fetched_source_prefers_jina_title_line():
-    content = "Title: Hello World\n\nURL Source: https://example.com\n\n# Body Heading"
-    assert build_fetched_source("https://www.example.com/path", content) == {
-        "url": "https://www.example.com/path",
-        "title": "Hello World",
-        "domain": "example.com",
-        "provider": "fetched_page",
-    }
-
-
-def test_build_fetched_source_falls_back_to_first_h1():
-    content = "Some preamble\n\n# Actual Heading\n\nbody text"
-    entry = build_fetched_source("https://example.com/a", content)
-    assert entry == {
-        "url": "https://example.com/a",
-        "title": "Actual Heading",
-        "domain": "example.com",
-        "provider": "fetched_page",
-    }
-
-
-def test_build_fetched_source_falls_back_to_hostname_when_no_title():
-    entry = build_fetched_source("https://www.trojmiasto.pl/news/article", "plain body")
-    assert entry == {
-        "url": "https://www.trojmiasto.pl/news/article",
-        "title": "trojmiasto.pl",
-        "domain": "trojmiasto.pl",
-        "provider": "fetched_page",
-    }
-
-
-def test_build_fetched_source_rejects_empty_url():
-    assert build_fetched_source("", "Title: X") is None
-    assert build_fetched_source(None, "Title: X") is None

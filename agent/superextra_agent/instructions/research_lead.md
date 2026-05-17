@@ -90,7 +90,8 @@ Before the research coverage notes, ask:
 - If the user made a factual premise, did the evidence support it, contradict it, or leave it untested?
 - Did the research cover the evidence surfaces that would materially change the answer?
 - Did at least two non-dynamic specialists cover distinct evidence surfaces before dynamic deepening?
-- Are important claims backed by sources from this turn, with estimates labeled?
+- Did specialists read material public pages when page content could change the answer?
+- Are important claims backed by read page content, structured provider data, or clearly labeled search/grounding-only signals, with estimates labeled?
 - What is directly observed, what is inferred, and which driver best explains the pattern?
 - What counter-signal, conflict, or alternative explanation could change the conclusion?
 - What named entity, date, location, number, claim, or source conflict needs verification?

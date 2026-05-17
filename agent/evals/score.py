@@ -369,7 +369,7 @@ async def _score_file(path: Path, no_judge: bool, venue_own: dict[str, set[str]]
         if url and url not in seen:
             seen.add(url)
             p1_entries.append({"url": url, "domain": p.get("domain") or _domain_of(url)})
-    # Final evidence set: drawer_sources carry verified fetched/provider domains.
+    # Final drawer set: grounding/search provenance plus provider sources.
     final_entries = [
         {"url": s.get("url"), "domain": s.get("domain")}
         for s in (run.get("drawer_sources") or []) if s.get("url")

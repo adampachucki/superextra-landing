@@ -15,13 +15,10 @@ its own internal lock for Firestore writes.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import urlparse
 
 from google.cloud import firestore
 
@@ -29,10 +26,9 @@ from .firestore_events import map_event
 from .notes import TITLE_TIMEOUT_S
 from .place_state import TOOL_SOURCE_PREFIX
 from .timeline import TimelineWriter, TurnSummaryBuilder
-from .web_tools import record_adjudicator_source_candidates
+from .web_tools import record_source_candidates
 
 log = logging.getLogger(__name__)
-_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
 
 
 @dataclass
@@ -58,7 +54,6 @@ class GearRunState:
     final_sources: list[dict[str, Any]] = field(default_factory=list)
     specialist_sources: list[dict[str, Any]] = field(default_factory=list)
     specialist_sources_seen: set[str] = field(default_factory=set)
-    adjudicator_read_success_urls: set[str] = field(default_factory=set)
     mapping_state: dict[str, Any] = field(default_factory=lambda: {"place_names": {}})
     title_task: asyncio.Task[Any] | None = None
     partial_thought_pending: bool = False
@@ -118,13 +113,21 @@ class GearRunState:
             for key, value in sd.items():
                 if key.startswith(TOOL_SOURCE_PREFIX):
                     self._merge_source(value)
-                elif key == "evidence_memo":
-                    self._merge_evidence_memo_sources(value)
 
+        mapped_sources: list[dict[str, Any]] = []
         for source in mapped.get("grounding_sources") or []:
             entry = dict(source)
             entry.setdefault("provider", "grounding")
-            self._merge_source(entry, reader_candidate=True)
+            mapped_sources.append(entry)
+
+        if mapped_sources:
+            record_source_candidates(
+                self.run_id,
+                mapped_sources,
+                agent_name=event.author,
+            )
+            for entry in mapped_sources:
+                self._merge_source(entry)
 
         # Capture final reply + sources on first `complete` event.
         if mapped.get("complete") is not None and self.final_reply is None:
@@ -145,97 +148,17 @@ class GearRunState:
         self.timeline_builder.record_timeline_event(event)
         return await self.timeline_writer.write_timeline(event)
 
-    def _merge_source(self, entry: Any, *, reader_candidate: bool = False) -> None:
+    def _merge_source(
+        self,
+        entry: Any,
+    ) -> None:
         if not isinstance(entry, dict):
             return
-        if reader_candidate:
-            record_adjudicator_source_candidates(self.run_id, [entry])
         key = self._source_dedupe_key(entry)
         if not key or key in self.specialist_sources_seen:
             return
         self.specialist_sources_seen.add(key)
         self.specialist_sources.append(entry)
-
-    def _merge_evidence_memo_sources(self, value: Any) -> None:
-        memo = self._parse_json_object(value)
-        if memo is None:
-            return
-
-        for claim in memo.get("confirmed_claims") or []:
-            if not isinstance(claim, dict):
-                continue
-            for source in claim.get("evidence") or []:
-                self._merge_adjudicated_source(source)
-
-        for claim in memo.get("contradicted_claims") or []:
-            if not isinstance(claim, dict):
-                continue
-            for source in claim.get("contradicting_evidence") or []:
-                self._merge_adjudicated_source(source)
-
-        for source in memo.get("verified_sources") or []:
-            if not isinstance(source, dict) or not source.get("supports_claim_ids"):
-                continue
-            self._merge_adjudicated_source(source)
-
-    def record_adjudicator_read_result(self, result: Any) -> None:
-        if not isinstance(result, dict):
-            return
-        for source in result.get("sources") or []:
-            if not isinstance(source, dict):
-                continue
-            normalized = self._normal_source_url(source.get("url"))
-            if normalized:
-                self.adjudicator_read_success_urls.add(normalized)
-
-    def _merge_adjudicated_source(self, source: Any) -> None:
-        if not isinstance(source, dict):
-            return
-        normalized = self._normal_source_url(source.get("url"))
-        if not normalized or normalized not in self.adjudicator_read_success_urls:
-            return
-        entry = dict(source)
-        entry["url"] = normalized
-        self._merge_source(entry)
-
-    @staticmethod
-    def _parse_json_object(value: Any) -> dict[str, Any] | None:
-        if isinstance(value, dict):
-            return value
-        if not isinstance(value, str):
-            return None
-        text = value.strip()
-        match = _FENCED_JSON_RE.search(text)
-        if match:
-            text = match.group(1).strip()
-        try:
-            parsed = json.loads(text)
-        except json.JSONDecodeError:
-            return None
-        return parsed if isinstance(parsed, dict) else None
-
-    @staticmethod
-    def _normal_source_url(value: Any) -> str | None:
-        if not isinstance(value, str):
-            return None
-        text = value.strip()
-        if not text:
-            return None
-        try:
-            parsed = urlparse(text)
-        except Exception:  # noqa: BLE001
-            return None
-        if not parsed.scheme or not parsed.netloc:
-            return None
-        return (
-            parsed._replace(
-                scheme=parsed.scheme.lower(),
-                netloc=parsed.netloc.lower(),
-                fragment="",
-            )
-            .geturl()
-            .rstrip("/")
-        )
 
     @staticmethod
     def _source_dedupe_key(entry: dict[str, Any]) -> str | None:
@@ -257,10 +180,11 @@ class GearRunState:
             if isinstance(source, dict):
                 entry = dict(source)
                 entry.setdefault("provider", "grounding")
-                self._merge_source(entry, reader_candidate=True)
+                self._merge_source(entry)
 
-        # Final drawer sources are the discovered grounding/search sources plus
-        # fetched/provider sources accumulated during the run.
+        # Final drawer sources are discovered grounding/search sources plus
+        # provider sources accumulated during the run. Page reads remain tool
+        # evidence for specialists, not separate source-drawer pills.
         seen: set[str] = set()
         merged: list[dict[str, Any]] = []
         for s in self.specialist_sources:

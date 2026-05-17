@@ -267,8 +267,7 @@ describe('ChatThread', () => {
 			{
 				title: 'Fetched article',
 				url: 'https://news.example/story',
-				domain: 'news.example',
-				provider: 'fetched_page'
+				domain: 'news.example'
 			},
 			{ title: 'A', url: 'https://a.example/story' },
 			{ title: 'B', url: 'https://b.example/story' },

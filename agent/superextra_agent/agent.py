@@ -1,4 +1,3 @@
-import json
 import os
 import re
 from pathlib import Path
@@ -33,12 +32,8 @@ from .specialists import (
     _on_tool_error,
 )
 from .web_tools import (
-    ADJUDICATOR_READ_RESULT_STATE_KEY,
-    collect_adjudicator_packet_claims,
     fetch_web_content,
     fetch_web_content_batch,
-    format_adjudicator_source_candidates,
-    read_adjudicator_sources,
     read_web_pages,
 )
 
@@ -55,9 +50,6 @@ INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).pare
 
 _RESEARCH_LEAD_TEMPLATE = (INSTRUCTIONS_DIR / "research_lead.md").read_text()
 _MARKET_SOURCE_PROFILES = (INSTRUCTIONS_DIR / "market_source_profiles.md").read_text()
-_EVIDENCE_ADJUDICATOR_TEMPLATE = (
-    INSTRUCTIONS_DIR / "evidence_adjudicator.md"
-).read_text()
 _REPORT_WRITER_TEMPLATE = (INSTRUCTIONS_DIR / "report_writer.md").read_text()
 
 
@@ -129,20 +121,10 @@ _MAX_CONTINUATION_NOTE_QUESTION_CHARS = 500
 _VALIDATION_PACKET_HEADING_RE = re.compile(
     r"(?im)^#{1,6}\s+(?:\*\*)?Validation Packet\s*:?(?:\*\*)?\s*:?\s*$"
 )
-_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
-_EVIDENCE_MEMO_REQUIRED_KEYS = frozenset(
-    {
-        "confirmed_claims",
-        "contradicted_claims",
-        "unsupported_claims",
-        "unresolved_claims",
-        "read_summary",
-    }
-)
 
 
-def _strip_validation_packet(report: str) -> str:
-    """Remove internal specialist validation metadata from writer-facing text."""
+def _strip_legacy_validation_packet(report: str) -> str:
+    """Remove legacy specialist validation metadata from writer-facing text."""
     match = _VALIDATION_PACKET_HEADING_RE.search(report)
     if not match:
         return report
@@ -152,7 +134,6 @@ def _strip_validation_packet(report: str) -> str:
 def _format_specialist_reports(
     state,
     default="No specialist notes available.",
-    include_validation_packets=False,
 ):
     """Format specialist outputs stored in session state."""
     sections = []
@@ -160,8 +141,7 @@ def _format_specialist_reports(
         value = state.get(key)
         if value and value != "Agent did not produce output.":
             value = str(value)
-            if not include_validation_packets:
-                value = _strip_validation_packet(value)
+            value = _strip_legacy_validation_packet(value)
             if value.strip():
                 sections.append(f"### {label}\n\n{value}")
     if not sections:
@@ -222,179 +202,6 @@ def _record_continuation_notes(*, callback_context):
     return None
 
 
-def _claim_identity(value) -> str | None:
-    if not isinstance(value, dict):
-        return None
-    claim_id = str(value.get("id") or "").strip()
-    claim_text = str(value.get("claim") or "").strip()
-    if claim_id and claim_text:
-        return f"id:{claim_id}\0claim:{claim_text}"
-    if claim_id:
-        return f"id:{claim_id}"
-    return f"claim:{claim_text}" if claim_text else None
-
-
-def _adjudicated_claim_identities(memo: dict) -> set[str]:
-    identities: set[str] = set()
-    for key in (
-        "confirmed_claims",
-        "contradicted_claims",
-        "unsupported_claims",
-        "unresolved_claims",
-    ):
-        for claim in memo.get(key) or []:
-            identity = _claim_identity(claim)
-            if identity:
-                identities.add(identity)
-    return identities
-
-
-def _has_structured_evidence_memo(value, state=None) -> bool:
-    parsed = _parse_evidence_memo(value)
-    if not isinstance(parsed, dict) or not _EVIDENCE_MEMO_REQUIRED_KEYS.issubset(parsed):
-        return False
-    if state is None:
-        return True
-    required_claims = {
-        identity
-        for claim in collect_adjudicator_packet_claims(state)
-        if (identity := _claim_identity(claim))
-    }
-    if not required_claims:
-        return True
-    return required_claims.issubset(_adjudicated_claim_identities(parsed))
-
-
-def _parse_evidence_memo(value):
-    if not isinstance(value, str) or not value.strip():
-        return None
-    match = _FENCED_JSON_RE.search(value)
-    candidate = match.group(1) if match else value.strip()
-    try:
-        return json.loads(candidate)
-    except json.JSONDecodeError:
-        return None
-
-
-def _format_evidence_memo_for_writer(value):
-    parsed = _parse_evidence_memo(value)
-    if not isinstance(parsed, dict) or parsed.get("adjudication_status") != "failed_closed":
-        return value
-
-    redacted = {
-        "adjudication_status": "failed_closed",
-        "confirmed_claims": [],
-        "contradicted_claims": [],
-        "unsupported_claims": [],
-        "unresolved_claims": [],
-        "verified_sources": [],
-        "unread_sources": parsed.get("unread_sources", []),
-        "read_summary": parsed.get("read_summary", {}),
-        "withheld_unresolved_claim_count": len(parsed.get("unresolved_claims") or []),
-        "notes": (
-            "Adjudication failed closed. Unresolved claim text was redacted "
-            "from this memo, so the memo provides no verified support. Use "
-            "specialist reports only under source-limited failed-adjudication "
-            "rules."
-        ),
-    }
-    return json.dumps(redacted, ensure_ascii=False, indent=2)
-
-
-def _record_evidence_adjudicator_fallback(*, callback_context):
-    """Fail closed if the adjudicator reads sources but produces no memo."""
-    existing = callback_context.state.get("evidence_memo")
-    if _has_structured_evidence_memo(existing, callback_context.state):
-        return None
-
-    read_result = callback_context.state.get(ADJUDICATOR_READ_RESULT_STATE_KEY)
-    if not isinstance(read_result, dict):
-        read_result = {}
-
-    unresolved_claims = []
-    for claim in collect_adjudicator_packet_claims(callback_context.state):
-        reason_parts = [
-            "The evidence adjudicator did not produce a claim-status memo, "
-            "so this specialist claim must be treated as unresolved."
-        ]
-        if claim.get("source_urls"):
-            reason_parts.append(
-                "Packet source URLs are not read authority; no captured-source "
-                "read produced adjudicated support for this claim."
-            )
-        if claim.get("provider_refs"):
-            reason_parts.append(
-                "Provider references were present, but no adjudicated provider "
-                "confirmation was recorded for this claim."
-            )
-        unresolved_claims.append(
-            {
-                "id": claim.get("id") or "",
-                "claim": claim.get("claim") or "",
-                "reason": " ".join(reason_parts),
-            }
-        )
-
-    unread_sources = []
-    for item in read_result.get("failed_sources") or []:
-        if isinstance(item, dict) and item.get("url"):
-            unread_sources.append(
-                {
-                    "url": item["url"],
-                    "reason": str(item.get("reason") or "read failed"),
-                }
-            )
-    for key, reason in (
-        ("skipped_urls", "duplicate or already read in this adjudication run"),
-        ("rejected_urls", "not present in same-run source capture"),
-        ("invalid_urls", "invalid URL"),
-    ):
-        for url in read_result.get(key) or []:
-            if isinstance(url, str) and url:
-                unread_sources.append({"url": url, "reason": reason})
-
-    verified_sources = []
-    for source in read_result.get("sources") or []:
-        if not isinstance(source, dict) or not source.get("url"):
-            continue
-        verified_sources.append(
-            {
-                "url": source.get("url"),
-                "title": source.get("title") or "",
-                "domain": source.get("domain") or "",
-                "supports_claim_ids": [],
-                "limits": (
-                    "Fetched by the bounded reader, but no adjudicated "
-                    "claim support was recorded."
-                ),
-            }
-        )
-
-    fallback_memo = {
-        "adjudication_status": "failed_closed",
-        "confirmed_claims": [],
-        "contradicted_claims": [],
-        "unsupported_claims": [],
-        "unresolved_claims": unresolved_claims,
-        "verified_sources": verified_sources,
-        "unread_sources": unread_sources,
-        "read_summary": {
-            "requested_url_count": read_result.get("requested_count", 0),
-            "attempted_url_count": read_result.get("attempted_count", 0),
-            "successful_url_count": read_result.get("successful_count", 0),
-            "failed_url_count": read_result.get("failed_count", 0),
-            "notes": (
-                "The adjudicator failed closed because no claim-status memo "
-                "was persisted."
-            ),
-        },
-    }
-    callback_context.state["evidence_memo"] = json.dumps(
-        fallback_memo, ensure_ascii=False, indent=2
-    )
-    return None
-
-
 def _continue_research_instruction(ctx):
     """Inject prior report, specialist notes, and context into continuation instructions.
 
@@ -418,33 +225,14 @@ def _continue_research_instruction(ctx):
 
 def _report_writer_instruction(ctx):
     """Inject the full research material into the final report writer."""
-    evidence_memo = ctx.state.get(
-        "evidence_memo", "No adjudicated evidence memo available."
-    )
     values = {
         "places_context": ctx.state.get("places_context", "No restaurant data available."),
         "specialist_reports": _format_specialist_reports(
             ctx.state,
             default="No specialist reports available.",
         ),
-        "evidence_memo": _format_evidence_memo_for_writer(evidence_memo),
     }
     return _REPORT_WRITER_TEMPLATE.format(**values)
-
-
-def _evidence_adjudicator_instruction(ctx):
-    """Inject specialist validation packets into the evidence adjudicator."""
-    values = {
-        "places_context": ctx.state.get("places_context", "No restaurant data available."),
-        "known_places_context": format_known_places_context(ctx.state),
-        "captured_source_urls": format_adjudicator_source_candidates(),
-        "specialist_reports": _format_specialist_reports(
-            ctx.state,
-            default="No specialist reports available.",
-            include_validation_packets=True,
-        ),
-    }
-    return _EVIDENCE_ADJUDICATOR_TEMPLATE.format(**values)
 
 
 continue_research = LlmAgent(
@@ -510,19 +298,6 @@ research_lead = LlmAgent(
     before_model_callback=_inject_geo_bias,
 )
 
-evidence_adjudicator = LlmAgent(
-    name="evidence_adjudicator",
-    model=SPECIALIST_GEMINI,
-    instruction=_evidence_adjudicator_instruction,
-    description="Validates specialist claim/source packets with a bounded source reader.",
-    tools=[read_adjudicator_sources],
-    output_key="evidence_memo",
-    generate_content_config=MEDIUM_THINKING_CONFIG,
-    after_agent_callback=_record_evidence_adjudicator_fallback,
-    on_model_error_callback=_on_model_error,
-    on_tool_error_callback=_on_tool_error,
-)
-
 report_writer = LlmAgent(
     name="report_writer",
     model=MODEL_GEMINI,
@@ -536,8 +311,8 @@ report_writer = LlmAgent(
 
 research_pipeline = SequentialAgent(
     name="research_pipeline",
-    sub_agents=[_make_enricher(), research_lead, evidence_adjudicator, report_writer],
-    description="Enriches context, researches, validates evidence, then writes the report.",
+    sub_agents=[_make_enricher(), research_lead, report_writer],
+    description="Enriches context, researches, then writes the report.",
 )
 
 # --- Router (root agent) ---

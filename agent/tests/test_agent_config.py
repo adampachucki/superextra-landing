@@ -5,12 +5,10 @@ from google.adk.tools import google_search
 from superextra_agent.agent import (
     app,
     continue_research,
-    evidence_adjudicator,
     report_writer,
     research_lead,
     research_pipeline,
     _record_continuation_notes,
-    _record_evidence_adjudicator_fallback,
 )
 from superextra_agent.chat_logger import ChatLoggerPlugin
 from superextra_agent.firestore_progress import FirestoreProgressPlugin
@@ -23,8 +21,9 @@ from superextra_agent.specialists import (
 )
 from superextra_agent.web_tools import (
     fetch_web_content,
-    read_adjudicator_sources,
+    read_discovered_sources,
     read_web_pages,
+    search_public_web,
 )
 
 
@@ -64,11 +63,24 @@ def test_continuation_specialists_are_all_non_durable():
     assert all(agent.output_key is None for agent in CONTINUATION_SPECIALISTS)
 
 
-def test_research_pipeline_validates_evidence_before_report_writer():
+def test_web_research_specialists_can_read_captured_sources():
+    web_specialists = [
+        tool.agent
+        for tool in research_lead.tools
+        if getattr(tool, "agent", None)
+        and getattr(tool.agent, "name", "") != "review_analyst"
+    ]
+
+    assert web_specialists
+    assert all(search_public_web in agent.tools for agent in web_specialists)
+    assert all(read_discovered_sources in agent.tools for agent in web_specialists)
+    assert all(read_web_pages not in agent.tools for agent in web_specialists)
+
+
+def test_research_pipeline_sends_specialist_reports_directly_to_writer():
     assert [agent.name for agent in research_pipeline.sub_agents] == [
         "context_enricher",
         "research_lead",
-        "evidence_adjudicator",
         "report_writer",
     ]
     assert research_lead.output_key == "research_coverage"
@@ -78,15 +90,6 @@ def test_research_pipeline_validates_evidence_before_report_writer():
     assert "fetch_web_content" not in _tool_names(research_lead.tools)
     assert "fetch_web_content_batch" not in _tool_names(research_lead.tools)
     assert "search_and_read_public_pages" not in _tool_names(research_lead.tools)
-    assert evidence_adjudicator.output_key == "evidence_memo"
-    assert evidence_adjudicator.tools == [read_adjudicator_sources]
-    assert evidence_adjudicator.after_agent_callback is _record_evidence_adjudicator_fallback
-    assert "google_search" not in _tool_names(evidence_adjudicator.tools)
-    assert "url_context" not in _tool_names(evidence_adjudicator.tools)
-    assert "read_web_pages" not in _tool_names(evidence_adjudicator.tools)
-    assert "fetch_web_content" not in _tool_names(evidence_adjudicator.tools)
-    assert "fetch_web_content_batch" not in _tool_names(evidence_adjudicator.tools)
-    assert "search_and_read_public_pages" not in _tool_names(evidence_adjudicator.tools)
     assert report_writer.output_key == "final_report"
     assert getattr(report_writer.model, "model", None) == "gemini-3.1-pro-preview"
     assert report_writer.tools == []

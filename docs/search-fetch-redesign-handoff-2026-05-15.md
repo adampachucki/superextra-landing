@@ -2,7 +2,7 @@
 
 Date: 2026-05-15
 
-> Superseded: use `docs/evidence-adjudicator-architecture-2026-05-15.md` for
+> Superseded: use `docs/specialist-source-reading-architecture-2026-05-17.md` for
 > the current target architecture. This document is historical context for the
 > SerpAPI/Jina pilot and should not be implemented as the active direction.
 

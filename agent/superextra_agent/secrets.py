@@ -4,8 +4,8 @@ Vertex AI Agent Engine reserves env-var space, so the agent can't get
 secrets through env vars at runtime. The Reasoning Engine SA
 (`service-907466498524@gcp-sa-aiplatform-re...`) has
 `secretmanager.secretAccessor` granted, so this module reads
-`APIFY_TOKEN`, `GOOGLE_PLACES_API_KEY`, `SERPAPI_API_KEY` from Secret
-Manager when the env var is missing.
+`APIFY_TOKEN`, `GOOGLE_PLACES_API_KEY`, `SERPAPI_API_KEY`, and
+`JINA_API_KEY` from Secret Manager when the env var is missing.
 
 Local dev and CI use env vars (from `agent/.env` or GHA secrets); the
 env-first ordering means dev iterates without touching Secret Manager.

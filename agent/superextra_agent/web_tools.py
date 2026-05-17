@@ -2,7 +2,15 @@
 
 `read_web_pages` is the explicit structured reader for concrete public URLs.
 It uses Vertex Gemini URL Context through a direct model call to read page/PDF
-bodies and return structured evidence plus fetched-page source entries.
+bodies and return structured evidence plus public web source entries.
+
+`search_public_web` is the specialist search tool. It returns exact public
+result URLs and records them as same-run source candidates.
+
+`read_discovered_sources` is the specialist reader for material public URLs
+found during research. It can read concrete URLs passed by the specialist, or
+same-run source URLs captured from that specialist's own search/tool results.
+It uses the Jina-based page reader path.
 
 `fetch_web_content[_batch]` are raw-Markdown fallbacks backed by Jina Reader
 (r.jina.ai). Use them when URL Context is insufficient or blocked, or when
@@ -28,8 +36,6 @@ from google.genai import Client, types
 
 from .cloud_logging import emit_cloud_log
 from .secrets import get_secret
-from .specialist_catalog import SPECIALIST_RESULT_KEYS
-
 JINA_BASE = "https://r.jina.ai"
 MAX_CONTENT_LENGTH = 50_000
 TIMEOUT_S = 15.0
@@ -44,9 +50,11 @@ CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 # single-page read. Batch reads stay fast so broad source scans don't spend
 # one timeout per noisy page.
 MAX_BATCH = 10
-ADJUDICATOR_READ_CONCURRENCY = 15
-ADJUDICATOR_READ_STATE_KEY = "temp:evidence_adjudicator_read_urls"
-ADJUDICATOR_READ_RESULT_STATE_KEY = "temp:evidence_adjudicator_read_result"
+CAPTURED_SOURCE_READ_CONCURRENCY = 15
+SPECIALIST_DISCOVERED_READ_LIMIT = 6
+SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
+SERPAPI_SEARCH_TIMEOUT_S = 15.0
+PUBLIC_SEARCH_RESULT_LIMIT = 8
 
 # Gemini grounding exposes article URLs as tokenized redirects on
 # `https://vertexaisearch.cloud.google.com/grounding-api-redirect/...`.
@@ -64,11 +72,7 @@ JINA_PROXY_FALLBACK_REASONS = frozenset(
     {"upstream_http_403", "upstream_captcha", "cloudflare_interstitial"}
 )
 _JINA_TITLE_RE = re.compile(r"^Title:\s*(.+?)\s*$", re.MULTILINE)
-_VALIDATION_PACKET_HEADING_RE = re.compile(
-    r"(?im)^#{1,6}\s+(?:\*\*)?Validation Packet\s*:?(?:\*\*)?\s*:?\s*$"
-)
-_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
-_ADJUDICATOR_RETURN_LIST_LIMIT = 20
+_SOURCE_RETURN_LIST_LIMIT = 20
 
 
 def _is_vertex_redirect(url: str) -> bool:
@@ -140,7 +144,9 @@ _FETCH_CACHE_DEEP = "deep"
 _FETCH_CACHE_DEEP_ALLOW_ROOT = "deep_allow_root"
 _fetch_cache: dict[tuple[str, str, str], dict] = {}
 _read_pages_cache: dict[tuple[str, tuple[str, ...], str], dict] = {}
-_adjudicator_source_candidates_by_run_id: dict[str, list[str]] = {}
+_source_candidates_by_run_and_agent: dict[tuple[str, str], list[str]] = {}
+_latest_source_candidates_by_run_and_agent: dict[tuple[str, str], list[str]] = {}
+_source_read_urls_by_run_and_agent: dict[tuple[str, str], list[str]] = {}
 # Bounded so that a run whose `after_run_callback` doesn't fire (ADK
 # 1.28.0 doesn't call it from a `finally`, so cancelled/aborted runs
 # can skip cleanup) cannot grow the cache forever. FIFO eviction by
@@ -164,7 +170,12 @@ def clear_fetch_cache_for_run(run_id: str) -> None:
         _fetch_cache.pop(key, None)
     for key in [k for k in _read_pages_cache if k[0] == run_id]:
         _read_pages_cache.pop(key, None)
-    _adjudicator_source_candidates_by_run_id.pop(run_id, None)
+    for key in [k for k in _source_candidates_by_run_and_agent if k[0] == run_id]:
+        _source_candidates_by_run_and_agent.pop(key, None)
+    for key in [k for k in _latest_source_candidates_by_run_and_agent if k[0] == run_id]:
+        _latest_source_candidates_by_run_and_agent.pop(key, None)
+    for key in [k for k in _source_read_urls_by_run_and_agent if k[0] == run_id]:
+        _source_read_urls_by_run_and_agent.pop(key, None)
 
 
 def _cache_key(url: str, mode: str) -> tuple[str, str, str] | None:
@@ -329,226 +340,76 @@ def _is_domain_root_url(url: str) -> bool:
 
 
 def _append_limited(items: list[str], value: str) -> None:
-    if len(items) < _ADJUDICATOR_RETURN_LIST_LIMIT:
+    if len(items) < _SOURCE_RETURN_LIST_LIMIT:
         items.append(value)
 
 
-def _canonical_adjudicator_candidate_url(raw: Any) -> str | None:
+def _canonical_source_url(raw: Any) -> str | None:
     if not isinstance(raw, str) or not raw.strip():
         return None
     url = _strip_fragment(raw.strip())
     return url if _is_http_url(url) else None
 
 
-def record_adjudicator_source_candidates(run_id: str | None, sources: list[Any]) -> None:
-    """Remember same-run discovered web URLs for adjudicator reading."""
-    if not run_id:
-        return
-    queue = _adjudicator_source_candidates_by_run_id.setdefault(run_id, [])
-    seen = set(queue)
+def _canonical_source_candidates(sources: list[Any]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
     for source in sources:
         raw = source.get("url") if isinstance(source, dict) else source
-        url = _canonical_adjudicator_candidate_url(raw)
+        url = _canonical_source_url(raw)
         if not url or url in seen:
+            continue
+        seen.add(url)
+        out.append(url)
+    return out
+
+
+def _append_source_candidates(queue: list[str], candidates: list[str]) -> None:
+    seen = set(queue)
+    for url in candidates:
+        if url in seen:
             continue
         seen.add(url)
         queue.append(url)
 
 
-def _iter_adjudicator_discovered_urls() -> list[str]:
+def record_source_candidates(
+    run_id: str | None,
+    sources: list[Any],
+    *,
+    agent_name: str | None = None,
+) -> None:
+    """Remember same-run discovered web URLs for captured-source reading."""
+    if not run_id or not agent_name:
+        return
+    candidates = _canonical_source_candidates(sources)
+    if not candidates:
+        return
+    agent_queue = _source_candidates_by_run_and_agent.setdefault(
+        (run_id, agent_name), []
+    )
+    _latest_source_candidates_by_run_and_agent[(run_id, agent_name)] = candidates
+    _append_source_candidates(agent_queue, candidates)
+
+
+def _iter_agent_discovered_urls(agent_name: str | None) -> list[str]:
     run_id = _fetch_run_id_var.get()
-    if not run_id:
+    if not run_id or not agent_name:
         return []
-    return list(_adjudicator_source_candidates_by_run_id.get(run_id, []))
+    return list(_source_candidates_by_run_and_agent.get((run_id, agent_name), []))
 
 
-def format_adjudicator_source_candidates() -> str:
-    urls = _iter_adjudicator_discovered_urls()
-    if not urls:
-        return "No same-run grounding or fetched web sources captured."
-    return "\n".join(f"- {url}" for url in urls)
-
-
-def _iter_validation_packet_objects(text: str) -> list[dict[str, Any]]:
-    packets: list[dict[str, Any]] = []
-    matches = list(_VALIDATION_PACKET_HEADING_RE.finditer(text))
-    for i, match in enumerate(matches):
-        start = match.end()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        section = text[start:end]
-        fence = _FENCED_JSON_RE.search(section)
-        candidate = fence.group(1) if fence else section
-        parsed = _json_object_from_text(candidate)
-        if parsed is not None:
-            packets.append(parsed)
-    return packets
-
-
-def collect_adjudicator_packet_claims(state: Any) -> list[dict[str, Any]]:
-    """Return claim metadata from specialist validation packets in state."""
-    if state is None:
+def _iter_agent_discovered_urls_latest_first(agent_name: str | None) -> list[str]:
+    run_id = _fetch_run_id_var.get()
+    if not run_id or not agent_name:
         return []
-
-    claims: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
-    for key, label in SPECIALIST_RESULT_KEYS.items():
-        value = state.get(key)
-        if not value or value == "Agent did not produce output.":
-            continue
-        if not isinstance(value, str):
-            value = str(value)
-        for packet in _iter_validation_packet_objects(value):
-            for claim in packet.get("claims_for_validation") or []:
-                if not isinstance(claim, dict):
-                    continue
-                text = str(claim.get("claim") or "").strip()
-                if not text:
-                    continue
-                claim_id = str(claim.get("id") or "").strip()
-                dedupe_key = (claim_id, text)
-                if dedupe_key in seen:
-                    continue
-                seen.add(dedupe_key)
-                source_urls = [
-                    url
-                    for url in (
-                        _canonical_adjudicator_candidate_url(raw)
-                        for raw in claim.get("source_urls") or []
-                    )
-                    if url
-                ]
-                provider_refs = [
-                    str(ref).strip()
-                    for ref in claim.get("provider_refs") or []
-                    if str(ref).strip()
-                ]
-                claims.append(
-                    {
-                        "id": claim_id,
-                        "claim": text,
-                        "specialists": [key],
-                        "specialist_label": label,
-                        "source_urls": source_urls,
-                        "provider_refs": provider_refs,
-                    }
-                )
-    return claims
-
-
-def _iter_adjudicator_allowed_urls() -> list[str]:
-    urls: list[str] = []
-    seen: set[str] = set()
-    for url in _iter_adjudicator_discovered_urls():
-        if url in seen:
-            continue
-        seen.add(url)
-        urls.append(url)
-    return urls
-
-
-def _compact_adjudicator_read_result(output: dict[str, Any]) -> dict[str, Any]:
-    failed_sources: list[dict[str, str]] = []
-    for item in output.get("results") or []:
-        if not isinstance(item, dict) or item.get("status") == "success":
-            continue
-        url = item.get("url")
-        if not isinstance(url, str) or not url:
-            continue
-        reason = item.get("error_message") or item.get("status") or "read failed"
-        failed_sources.append({"url": url, "reason": str(reason)})
-
-    return {
-        "status": output.get("status"),
-        "requested_count": output.get("requested_count", 0),
-        "attempted_count": output.get("attempted_count", 0),
-        "successful_count": output.get("success_count", 0),
-        "failed_count": output.get("failed_count", 0),
-        "sources": [
-            {
-                "url": source.get("url"),
-                "title": source.get("title"),
-                "domain": source.get("domain"),
-                "provider": source.get("provider"),
-            }
-            for source in output.get("sources") or []
-            if isinstance(source, dict) and source.get("url")
-        ],
-        "failed_sources": failed_sources,
-        "skipped_urls": output.get("skipped_urls", []),
-        "skipped_count": output.get("skipped_count", 0),
-        "auto_appended_urls": output.get("auto_appended_urls", []),
-        "auto_appended_count": output.get("auto_appended_count", 0),
-        "rejected_urls": output.get("rejected_urls", []),
-        "rejected_count": output.get("rejected_count", 0),
-        "invalid_urls": output.get("invalid_urls", []),
-        "invalid_count": output.get("invalid_count", 0),
-        "error_message": output.get("error_message"),
-    }
-
-
-def _merge_compact_adjudicator_read_results(
-    existing: dict[str, Any], current: dict[str, Any]
-) -> dict[str, Any]:
-    def merged_count(key: str) -> int:
-        return int(existing.get(key) or 0) + int(current.get(key) or 0)
-
-    def merged_dicts(key: str) -> list[dict[str, Any]]:
-        merged: list[dict[str, Any]] = []
-        seen: set[str] = set()
-        for item in [*(existing.get(key) or []), *(current.get(key) or [])]:
-            if not isinstance(item, dict):
-                continue
-            url = item.get("url")
-            if not isinstance(url, str) or not url or url in seen:
-                continue
-            seen.add(url)
-            merged.append(item)
-        return merged
-
-    def merged_strings(key: str) -> list[str]:
-        merged: list[str] = []
-        seen: set[str] = set()
-        for item in [*(existing.get(key) or []), *(current.get(key) or [])]:
-            if not isinstance(item, str) or not item or item in seen:
-                continue
-            seen.add(item)
-            _append_limited(merged, item)
-        return merged
-
-    if current.get("status") == "success" and int(current.get("attempted_count") or 0) == 0:
-        status = existing.get("status") or current.get("status")
-    else:
-        status = current.get("status") or existing.get("status")
-    if existing.get("status") == "success" and current.get("status") == "error":
-        status = "partial"
-
-    return {
-        "status": status,
-        "requested_count": merged_count("requested_count"),
-        "attempted_count": merged_count("attempted_count"),
-        "successful_count": merged_count("successful_count"),
-        "failed_count": merged_count("failed_count"),
-        "sources": merged_dicts("sources"),
-        "failed_sources": merged_dicts("failed_sources"),
-        "skipped_urls": merged_strings("skipped_urls"),
-        "skipped_count": merged_count("skipped_count"),
-        "auto_appended_urls": merged_strings("auto_appended_urls"),
-        "auto_appended_count": merged_count("auto_appended_count"),
-        "rejected_urls": merged_strings("rejected_urls"),
-        "rejected_count": merged_count("rejected_count"),
-        "invalid_urls": merged_strings("invalid_urls"),
-        "invalid_count": merged_count("invalid_count"),
-        "error_message": current.get("error_message") or existing.get("error_message"),
-    }
-
-
-def _store_adjudicator_read_result(state: Any, output: dict[str, Any]) -> None:
-    if state is not None:
-        current = _compact_adjudicator_read_result(output)
-        existing = state.get(ADJUDICATOR_READ_RESULT_STATE_KEY)
-        if isinstance(existing, dict):
-            current = _merge_compact_adjudicator_read_results(existing, current)
-        state[ADJUDICATOR_READ_RESULT_STATE_KEY] = current
+    all_urls = _source_candidates_by_run_and_agent.get((run_id, agent_name), [])
+    latest_urls = _latest_source_candidates_by_run_and_agent.get((run_id, agent_name), [])
+    if not latest_urls:
+        return list(all_urls)
+    latest = [url for url in latest_urls if url in all_urls]
+    latest_seen = set(latest)
+    return latest + [url for url in all_urls if url not in latest_seen]
 
 
 # ── Block detection ──────────────────────────────────────────────────────────
@@ -769,6 +630,28 @@ def _domain_for_url(url: str) -> str:
         return ""
 
 
+def _search_source_entry(item: dict[str, Any]) -> dict[str, Any] | None:
+    url = _canonical_source_url(item.get("link"))
+    if not url:
+        return None
+    title = item.get("title")
+    if not isinstance(title, str) or not title.strip():
+        title = _domain_for_url(url) or url
+    source: dict[str, Any] = {
+        "title": title.strip(),
+        "url": url,
+        "domain": _domain_for_url(url),
+        "provider": "public_search",
+    }
+    snippet = item.get("snippet")
+    if isinstance(snippet, str) and snippet.strip():
+        source["snippet"] = snippet.strip()
+    position = item.get("position")
+    if isinstance(position, int):
+        source["position"] = position
+    return source
+
+
 def _source_for_read_result(item: dict[str, Any]) -> dict[str, Any] | None:
     url = item.get("retrieved_url") or item.get("url")
     if not isinstance(url, str) or not url.strip():
@@ -782,7 +665,6 @@ def _source_for_read_result(item: dict[str, Any]) -> dict[str, Any] | None:
         "url": url,
         "title": title.strip(),
         "domain": domain,
-        "provider": "fetched_page",
     }
 
 
@@ -806,7 +688,6 @@ def _source_for_jina_result(url: Any, content: Any) -> dict[str, Any] | None:
         "url": url,
         "title": title or domain or url,
         "domain": domain,
-        "provider": "fetched_page",
     }
 
 
@@ -989,10 +870,11 @@ async def read_web_pages(
     """Read public pages with Vertex Gemini URL Context and extract evidence.
 
     Explicit structured reader for concrete public URLs from the user, brief,
-    restaurant context, or search results. Pass 1-6 article, listing, menu,
+    restaurant context, or other known exact source metadata. Pass 1-6
+    article, listing, menu,
     report, PDF, registry, local press, forum thread, or restaurant detail
     URLs plus a short evidence goal. Use when extracted evidence, source
-    notes, or fetched-page source capture would materially improve the report.
+    notes, or public web source capture would materially improve the report.
 
     This is for semantic extraction and source understanding. Prefer this
     before raw Markdown fallback tools when URL Context reading needs an
@@ -1462,7 +1344,7 @@ async def read_public_page(url: str) -> dict:
 
     Primary page reader for concrete URLs discovered by search tools, supplied
     in the brief, or found in source text. Returns clean Markdown content and a
-    pill-ready fetched-page source on success. Do not pass search result pages,
+    source entry on success. Do not pass search result pages,
     bare domain roots, private/login-only URLs, or app-only/social-group URLs.
 
     Args:
@@ -1481,8 +1363,8 @@ async def read_public_pages(urls: list[str]) -> dict:
 
     Batch page reader for concrete URLs discovered by search tools, supplied in
     the brief, or found in source text. Each successful result includes clean
-    Markdown content; the response includes pill-ready fetched-page sources for
-    successful reads. Capped at 10 URLs.
+    Markdown content; the response includes source entries for successful
+    reads. Capped at 10 URLs.
 
     Args:
         urls: Full public http(s) URLs to read, max 10.
@@ -1503,9 +1385,93 @@ async def read_public_pages(urls: list[str]) -> dict:
     return result
 
 
-async def _read_adjudicator_pages(urls: list[str]) -> dict:
-    """Read the adjudicator queue with bounded parallelism."""
-    semaphore = asyncio.Semaphore(ADJUDICATOR_READ_CONCURRENCY)
+async def search_public_web(
+    query: str,
+    max_results: int = 6,
+    tool_context=None,
+) -> dict:
+    """Search public web results and return exact source URLs.
+
+    Use this to discover material public pages before `read_discovered_sources`.
+    The returned result URLs are recorded for this specialist, so a follow-up
+    `read_discovered_sources([])` reads the strongest discovered URLs without
+    hand-copying them.
+
+    Args:
+        query: Search query, including location/date terms when relevant.
+        max_results: Number of organic results to return, capped at 8.
+    """
+    if not isinstance(query, str) or not query.strip():
+        return {"status": "error", "error_message": "query is required"}
+    try:
+        limit = int(max_results)
+    except (TypeError, ValueError):
+        limit = 6
+    limit = max(1, min(limit, PUBLIC_SEARCH_RESULT_LIMIT))
+
+    params = {
+        "engine": "google",
+        "q": query.strip(),
+        "num": str(limit),
+        "api_key": get_secret("SERPAPI_API_KEY"),
+    }
+    try:
+        response = await _get_client().get(
+            SERPAPI_SEARCH_URL,
+            params=params,
+            timeout=SERPAPI_SEARCH_TIMEOUT_S,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except httpx.TimeoutException:
+        return {"status": "error", "error_message": "Search timed out"}
+    except httpx.HTTPStatusError as e:
+        return {
+            "status": "error",
+            "error_message": f"Search failed: HTTP {e.response.status_code}",
+        }
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "error_message": f"Search failed: {e}"}
+
+    organic = payload.get("organic_results")
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    if isinstance(organic, list):
+        for raw in organic:
+            if not isinstance(raw, dict):
+                continue
+            source = _search_source_entry(raw)
+            if not source:
+                continue
+            url = source["url"]
+            if url in seen:
+                continue
+            seen.add(url)
+            results.append(source)
+            if len(results) >= limit:
+                break
+
+    run_id = _fetch_run_id_var.get()
+    agent_name = getattr(tool_context, "agent_name", None) if tool_context else None
+    if isinstance(run_id, str) and isinstance(agent_name, str):
+        record_source_candidates(run_id, results, agent_name=agent_name)
+
+    status = "success" if results else "error"
+    output = {
+        "status": status,
+        "query": query.strip(),
+        "results": results,
+        "result_count": len(results),
+        "sources": results,
+    }
+    if not results:
+        output["error_message"] = "Search returned no public result URLs"
+    return output
+
+
+async def _read_captured_pages(urls: list[str]) -> dict:
+    """Read captured source URLs with bounded parallelism."""
+    semaphore = asyncio.Semaphore(CAPTURED_SOURCE_READ_CONCURRENCY)
 
     async def read(url: str) -> dict:
         async with semaphore:
@@ -1547,126 +1513,123 @@ async def _read_adjudicator_pages(urls: list[str]) -> dict:
     return output
 
 
-async def read_adjudicator_sources(urls: list[str], tool_context=None) -> dict:
-    """Read the Evidence Adjudicator's source queue with Jina Reader.
+async def read_discovered_sources(urls: list[str], tool_context=None) -> dict:
+    """Read this specialist's same-run discovered web sources with Jina Reader.
 
-    Use only for concrete public URLs captured as same-run grounding/fetched
-    web sources. Specialist packet URLs are not read authority. This is not a
-    search tool and does not accept broad discovery tasks. The tool records
-    attempted URLs in temporary run state so repeated calls do not reread the
-    same page. A read success means page text was fetched; whether that text
-    supports the claim is decided in the evidence memo.
+    Use after `search_public_web` has discovered material source results. Pass
+    concrete public URLs to read them directly, or pass an empty list to read
+    the strongest same-run grounding/source URLs captured for this specialist.
+    Capped at 6 new URLs per call.
 
     Args:
-        urls: Concrete http(s) URLs to verify.
+        urls: Public http(s) URLs to read, or [] to read captured discovered sources.
     """
-    state = getattr(tool_context, "state", None) if tool_context else None
-
     if not isinstance(urls, list):
-        output = {"status": "error", "error_message": "urls must be a list"}
-        _store_adjudicator_read_result(state, output)
-        return output
+        return {"status": "error", "error_message": "urls must be a list"}
 
-    if state is None:
+    run_id = _fetch_run_id_var.get()
+    agent_name = getattr(tool_context, "agent_name", None) if tool_context else None
+    if not run_id or not isinstance(agent_name, str) or not agent_name:
         return {
             "status": "error",
             "requested_count": len(urls),
-            "valid_url_count": 0,
             "attempted_count": 0,
-            "skipped_urls": [],
-            "skipped_count": 0,
-            "rejected_urls": [],
-            "rejected_count": 0,
-            "invalid_urls": [],
-            "invalid_count": 0,
-            "error_message": "Run state is required to read adjudicator sources",
+            "error_message": "Run and specialist context are required to read discovered sources",
         }
 
-    existing = state.get(ADJUDICATOR_READ_STATE_KEY, []) if state is not None else []
-    already_read = [u for u in existing if isinstance(u, str)] if isinstance(existing, list) else []
-    allowed_urls = _iter_adjudicator_allowed_urls()
-    allowed_url_set = set(allowed_urls)
+    discovered_urls = _iter_agent_discovered_urls(agent_name)
+    allowed_urls = (
+        _iter_agent_discovered_urls_latest_first(agent_name)
+        if not urls
+        else discovered_urls
+    )
+    read_key = (run_id, agent_name)
+    already_read = _source_read_urls_by_run_and_agent.setdefault(read_key, [])
     seen = set(already_read)
+
     to_read: list[str] = []
     request_seen: set[str] = set()
     skipped_urls: list[str] = []
     auto_appended_urls: list[str] = []
     rejected_urls: list[str] = []
     invalid_urls: list[str] = []
+    omitted_urls: list[str] = []
     skipped_count = 0
     auto_appended_count = 0
     rejected_count = 0
     invalid_count = 0
+    omitted_count = 0
+    accepted_request_count = 0
+
+    def append_candidate(url: str, *, auto_appended: bool = False) -> None:
+        nonlocal auto_appended_count, omitted_count
+        if len(to_read) >= SPECIALIST_DISCOVERED_READ_LIMIT:
+            omitted_count += 1
+            _append_limited(omitted_urls, url)
+            return
+        to_read.append(url)
+        if auto_appended:
+            auto_appended_count += 1
+            _append_limited(auto_appended_urls, url)
 
     for raw in urls:
-        url = _canonical_adjudicator_candidate_url(raw)
+        url = _canonical_source_url(raw)
         if url is None:
             invalid_count += 1
             if isinstance(raw, str) and raw.strip():
                 _append_limited(invalid_urls, raw.strip())
-            continue
-        if url not in allowed_url_set:
-            rejected_count += 1
-            _append_limited(rejected_urls, url)
             continue
         if url in request_seen or url in seen:
             skipped_count += 1
             _append_limited(skipped_urls, url)
             continue
         request_seen.add(url)
-        to_read.append(url)
+        accepted_request_count += 1
+        append_candidate(url)
 
-    for url in allowed_urls:
-        if url in request_seen or url in seen:
-            continue
-        auto_appended_count += 1
-        _append_limited(auto_appended_urls, url)
-        to_read.append(url)
+    if not urls:
+        for url in allowed_urls:
+            if url in request_seen or url in seen:
+                continue
+            request_seen.add(url)
+            append_candidate(url, auto_appended=True)
+
+    base = {
+        "requested_count": len(urls),
+        "valid_url_count": accepted_request_count,
+        "available_count": len(discovered_urls),
+        "attempted_count": len(to_read),
+        "skipped_urls": skipped_urls,
+        "skipped_count": skipped_count,
+        "auto_appended_urls": auto_appended_urls,
+        "auto_appended_count": auto_appended_count,
+        "rejected_urls": rejected_urls,
+        "rejected_count": rejected_count,
+        "invalid_urls": invalid_urls,
+        "invalid_count": invalid_count,
+        "omitted_urls": omitted_urls,
+        "omitted_count": omitted_count,
+    }
 
     if not to_read:
-        status = (
-            "success"
-            if skipped_count and not invalid_count and not rejected_count
-            else "error"
-        )
-        output = {
-            "status": status,
-            "requested_count": len(urls),
-            "valid_url_count": len(request_seen),
-            "attempted_count": 0,
-            "skipped_urls": skipped_urls,
-            "skipped_count": skipped_count,
-            "auto_appended_urls": auto_appended_urls,
-            "auto_appended_count": auto_appended_count,
-            "rejected_urls": rejected_urls,
-            "rejected_count": rejected_count,
-            "invalid_urls": invalid_urls,
-            "invalid_count": invalid_count,
-        }
-        if status == "error":
-            output["error_message"] = "No valid new adjudicator URLs to read"
-        _store_adjudicator_read_result(state, output)
+        no_captured_sources = not urls and not discovered_urls and not invalid_count
+        status = "success" if (
+            no_captured_sources
+            or (skipped_count and not invalid_count and not rejected_count)
+        ) else "error"
+        output = {"status": status, **base}
+        if no_captured_sources:
+            output["message"] = (
+                "No captured discovered source URLs are available for this specialist. "
+                "Search first or pass exact public URLs; do not retry the empty call "
+                "until new sources are discovered."
+            )
+        elif status == "error":
+            output["error_message"] = "No valid new discovered source URLs to read"
         return output
 
-    if state is not None:
-        state[ADJUDICATOR_READ_STATE_KEY] = already_read + to_read
-
-    result = await _read_adjudicator_pages(to_read)
+    _source_read_urls_by_run_and_agent[read_key] = already_read + to_read
+    result = await _read_captured_pages(to_read)
     output = dict(result)
-    output.update(
-        {
-            "requested_count": len(urls),
-            "valid_url_count": len(request_seen),
-            "attempted_count": len(to_read),
-            "skipped_urls": skipped_urls,
-            "skipped_count": skipped_count,
-            "auto_appended_urls": auto_appended_urls,
-            "auto_appended_count": auto_appended_count,
-            "rejected_urls": rejected_urls,
-            "rejected_count": rejected_count,
-            "invalid_urls": invalid_urls,
-            "invalid_count": invalid_count,
-        }
-    )
-    _store_adjudicator_read_result(state, output)
+    output.update(base)
     return output

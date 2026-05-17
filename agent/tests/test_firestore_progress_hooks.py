@@ -91,30 +91,6 @@ async def test_before_model_writes_active_stage(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_before_model_writes_evidence_stage(monkeypatch):
-    plugin, _state = _make_plugin_state()
-    updates: list[dict] = []
-
-    async def _fenced(_fs, _state, update):
-        updates.append(update)
-
-    monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
-    monkeypatch.setattr(firestore_progress, "emit_cloud_log", lambda *_args, **_kwargs: None)
-
-    await plugin.before_model_callback(
-        callback_context=SimpleNamespace(
-            invocation_id="inv-parent",
-            agent_name="evidence_adjudicator",
-            session=SimpleNamespace(id="se-sid-test", state={"runId": "run-test"}),
-        ),
-        llm_request=SimpleNamespace(model="gemini-3.1-pro-preview-customtools"),
-    )
-
-    assert updates[0]["activeAgent"] == "evidence_adjudicator"
-    assert updates[0]["activeStage"] == "checking_evidence"
-
-
-@pytest.mark.asyncio
 async def test_after_run_finalize_logs_use_shared_correlation(monkeypatch):
     plugin, state = _make_plugin_state()
     state.final_reply = "Final answer"
@@ -190,64 +166,89 @@ async def test_tool_error_fetch_web_content_writes_warning():
 
 
 @pytest.mark.asyncio
-async def test_after_tool_read_web_pages_merges_sources():
+@pytest.mark.parametrize(
+    ("tool_name", "tool_args", "result"),
+    [
+        (
+            "read_web_pages",
+            {"urls": ["https://example.com/menu"]},
+            {
+                "status": "success",
+                "sources": [
+                    {
+                        "url": "https://example.com/menu",
+                        "title": "Menu",
+                        "domain": "example.com",
+                    }
+                ],
+            },
+        ),
+        (
+            "read_discovered_sources",
+            {"urls": []},
+            {
+                "status": "success",
+                "sources": [
+                    {
+                        "url": "https://example.com/grounded",
+                        "title": "Grounded",
+                        "domain": "example.com",
+                    }
+                ],
+            },
+        ),
+        (
+            "read_public_page",
+            {"url": "https://example.com/menu"},
+            {
+                "status": "success",
+                "sources": [
+                    {
+                        "url": "https://example.com/menu",
+                        "title": "Menu",
+                        "domain": "example.com",
+                    }
+                ],
+            },
+        ),
+        (
+            "fetch_web_content",
+            {"url": "https://example.com/menu"},
+            {
+                "status": "success",
+                "url": "https://example.com/menu",
+                "content": "Title: Menu\n\nBody",
+            },
+        ),
+        (
+            "fetch_web_content_batch",
+            {"urls": ["https://example.com/menu"]},
+            {
+                "status": "success",
+                "results": [
+                    {
+                        "status": "success",
+                        "url": "https://example.com/menu",
+                        "content": "Title: Menu\n\nBody",
+                    }
+                ],
+            },
+        ),
+    ],
+)
+async def test_after_tool_page_reads_do_not_merge_source_pills(
+    tool_name, tool_args, result
+):
     plugin, state = _make_plugin_state()
-    source = {
-        "url": "https://example.com/menu",
-        "title": "Menu",
-        "domain": "example.com",
-        "provider": "fetched_page",
-    }
 
     await plugin.after_tool_callback(
-        tool=_tool("read_web_pages"),
-        tool_args={"urls": ["https://example.com/menu"]},
+        tool=_tool(tool_name),
+        tool_args=tool_args,
         tool_context=_tool_context(call_id="call-read"),
-        result={"status": "success", "sources": [source]},
-    )
-
-    assert state.specialist_sources == [source]
-
-
-@pytest.mark.asyncio
-async def test_after_tool_read_public_page_merges_sources():
-    plugin, state = _make_plugin_state()
-    source = {
-        "url": "https://example.com/menu",
-        "title": "Menu",
-        "domain": "example.com",
-        "provider": "fetched_page",
-    }
-
-    await plugin.after_tool_callback(
-        tool=_tool("read_public_page"),
-        tool_args={"url": "https://example.com/menu"},
-        tool_context=_tool_context(call_id="call-read"),
-        result={"status": "success", "sources": [source]},
-    )
-
-    assert state.specialist_sources == [source]
-
-
-@pytest.mark.asyncio
-async def test_after_tool_read_adjudicator_sources_does_not_merge_raw_sources():
-    plugin, state = _make_plugin_state()
-    source = {
-        "url": "https://example.com/source",
-        "title": "Source",
-        "domain": "example.com",
-        "provider": "fetched_page",
-    }
-
-    await plugin.after_tool_callback(
-        tool=_tool("read_adjudicator_sources"),
-        tool_args={"urls": ["https://example.com/source"]},
-        tool_context=_tool_context(call_id="call-read"),
-        result={"status": "success", "sources": [source]},
+        result=result,
     )
 
     assert state.specialist_sources == []
-    assert state.adjudicator_read_success_urls == {"https://example.com/source"}
 
 
 @pytest.mark.asyncio

@@ -6,7 +6,6 @@ from typing import Any
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_response import LlmResponse
-from google.adk.tools import google_search
 from google.genai import Client, types
 
 from .apify_tools import get_google_reviews
@@ -16,7 +15,7 @@ from .specialist_catalog import (
     SPECIALISTS,
 )
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
-from .web_tools import read_web_pages
+from .web_tools import read_discovered_sources, search_public_web
 
 _dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
 INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
@@ -102,8 +101,8 @@ SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 
 _SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
 _WEB_RESEARCH_TOOLS = [
-    google_search,
-    read_web_pages,
+    search_public_web,
+    read_discovered_sources,
 ]
 
 
@@ -130,7 +129,7 @@ def _make_instruction(name: str):
 
 
 def _inject_geo_bias(*, callback_context, llm_request):
-    """Bias google_search results toward the target restaurant's location."""
+    """Bias native Google Search results when a specialist uses that surface."""
     lat = callback_context.state.get("_target_lat")
     lng = callback_context.state.get("_target_lng")
     if not lat or not lng:
