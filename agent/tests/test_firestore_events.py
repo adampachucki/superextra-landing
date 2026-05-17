@@ -228,6 +228,31 @@ def test_non_durable_specialist_grounding_sources_are_captured():
     ]
 
 
+def test_research_lead_grounding_sources_are_captured():
+    ev = _event(
+        author="research_lead",
+        state_delta={"research_coverage": "Coverage notes"},
+        grounding_chunks=[
+            {
+                "uri": "https://example.com/lead-source",
+                "title": "Lead source",
+                "domain": "example.com",
+            }
+        ],
+    )
+
+    mapped = map_event(ev, {})
+
+    assert mapped["grounding_sources"] == [
+        {
+            "url": "https://example.com/lead-source",
+            "title": "Lead source",
+            "domain": "example.com",
+        }
+    ]
+    assert mapped["complete"] is None
+
+
 def test_event_without_grounding_emits_no_search_rows():
     ev = _event(author="research_lead", texts=["plain text"])
     rows = map_event(ev, {})["timeline_events"]

@@ -29,6 +29,7 @@ from .firestore_events import map_event
 from .notes import TITLE_TIMEOUT_S
 from .place_state import TOOL_SOURCE_PREFIX
 from .timeline import TimelineWriter, TurnSummaryBuilder
+from .web_tools import record_adjudicator_source_candidates
 
 log = logging.getLogger(__name__)
 _FENCED_JSON_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
@@ -120,6 +121,11 @@ class GearRunState:
                 elif key == "evidence_memo":
                     self._merge_evidence_memo_sources(value)
 
+        for source in mapped.get("grounding_sources") or []:
+            entry = dict(source)
+            entry.setdefault("provider", "grounding")
+            self._merge_source(entry, reader_candidate=True)
+
         # Capture final reply + sources on first `complete` event.
         if mapped.get("complete") is not None and self.final_reply is None:
             self._capture_final(mapped["complete"])
@@ -139,11 +145,11 @@ class GearRunState:
         self.timeline_builder.record_timeline_event(event)
         return await self.timeline_writer.write_timeline(event)
 
-    def _merge_source(self, entry: Any) -> None:
+    def _merge_source(self, entry: Any, *, reader_candidate: bool = False) -> None:
         if not isinstance(entry, dict):
             return
-        if self._skip_source(entry):
-            return
+        if reader_candidate:
+            record_adjudicator_source_candidates(self.run_id, [entry])
         key = self._source_dedupe_key(entry)
         if not key or key in self.specialist_sources_seen:
             return
@@ -232,20 +238,6 @@ class GearRunState:
         )
 
     @staticmethod
-    def _skip_source(entry: dict[str, Any]) -> bool:
-        url = entry.get("url")
-        if not isinstance(url, str) or not url:
-            return False
-        try:
-            parsed = urlparse(url)
-        except Exception:  # noqa: BLE001
-            return False
-        return (
-            parsed.hostname == "vertexaisearch.cloud.google.com"
-            and parsed.path.startswith("/grounding-api-redirect/")
-        )
-
-    @staticmethod
     def _source_dedupe_key(entry: dict[str, Any]) -> str | None:
         url = entry.get("url")
         if not url:
@@ -261,13 +253,18 @@ class GearRunState:
         if not isinstance(reply, str):
             return
         self.final_reply = reply
-        # Final drawer sources come only from provider/tool-verified sources
-        # accumulated during the run. Native grounding chunks remain discovery
-        # context; they are not final source authority.
+        for source in complete.get("sources") or []:
+            if isinstance(source, dict):
+                entry = dict(source)
+                entry.setdefault("provider", "grounding")
+                self._merge_source(entry, reader_candidate=True)
+
+        # Final drawer sources are the discovered grounding/search sources plus
+        # fetched/provider sources accumulated during the run.
         seen: set[str] = set()
         merged: list[dict[str, Any]] = []
         for s in self.specialist_sources:
-            if not isinstance(s, dict) or self._skip_source(s):
+            if not isinstance(s, dict):
                 continue
             key = self._source_dedupe_key(s)
             if not key or key in seen:

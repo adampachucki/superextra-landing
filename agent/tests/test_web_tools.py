@@ -232,9 +232,38 @@ async def test_read_adjudicator_pages_allows_restaurant_homepage_roots():
 
 
 @pytest.mark.asyncio
+async def test_read_adjudicator_pages_preserves_requested_url_after_unwrap():
+    requested = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc"
+    resolved = "https://example.com/article"
+
+    async def fetch(
+        url,
+        *,
+        allow_readerlm,
+        allow_domain_root=False,
+        allow_proxy_fallback=False,
+    ):
+        return {
+            "status": "success",
+            "url": resolved,
+            "content": "Title: Article\n\nText",
+        }
+
+    with patch("superextra_agent.web_tools._fetch_web_content", fetch):
+        result = await _read_adjudicator_pages([requested])
+
+    assert result["results"][0]["url"] == resolved
+    assert result["results"][0]["requested_url"] == requested
+    assert result["sources"][0]["url"] == resolved
+
+
+@pytest.mark.asyncio
 async def test_read_adjudicator_sources_attempts_all_eligible_urls():
     urls = [f"https://example.com/{i}" for i in range(ADJUDICATOR_READ_CONCURRENCY + 2)]
+    run_id = "run-captured-eligible"
     tool_context = SimpleNamespace(state=_state_with_packet_urls(urls))
+    set_fetch_run_id(run_id)
+    web_tools.record_adjudicator_source_candidates(run_id, urls)
     read_result = {
         "status": "success",
         "results": [
@@ -258,7 +287,10 @@ async def test_read_adjudicator_sources_attempts_all_eligible_urls():
         "superextra_agent.web_tools._read_adjudicator_pages",
         AsyncMock(return_value=read_result),
     ) as read_pages:
-        result = await read_adjudicator_sources(urls, tool_context=tool_context)
+        try:
+            result = await read_adjudicator_sources(urls, tool_context=tool_context)
+        finally:
+            clear_fetch_cache_for_run(run_id)
 
     read_pages.assert_awaited_once_with(urls)
     assert result["status"] == "success"
@@ -274,8 +306,13 @@ async def test_read_adjudicator_sources_attempts_all_eligible_urls():
         "sources": read_result["sources"],
         "failed_sources": [],
         "skipped_urls": [],
+        "skipped_count": 0,
+        "auto_appended_urls": [],
+        "auto_appended_count": 0,
         "rejected_urls": [],
+        "rejected_count": 0,
         "invalid_urls": [],
+        "invalid_count": 0,
         "error_message": None,
     }
 
@@ -334,16 +371,22 @@ async def test_read_adjudicator_sources_does_not_unwrap_during_queue_filtering()
         f"https://vertexaisearch.cloud.google.com/grounding-api-redirect/{i}"
         for i in range(ADJUDICATOR_READ_CONCURRENCY + 2)
     ]
+    run_id = "run-captured-redirects"
     tool_context = SimpleNamespace(state=_state_with_packet_urls(urls))
+    set_fetch_run_id(run_id)
+    web_tools.record_adjudicator_source_candidates(run_id, urls)
 
-    with patch(
-        "superextra_agent.web_tools._read_adjudicator_pages",
-        AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
-    ) as read_pages, patch(
-        "superextra_agent.web_tools._unwrap_vertex_redirect",
-        AsyncMock(side_effect=AssertionError("wrapper should not unwrap over-limit URLs")),
-    ) as unwrap:
-        result = await read_adjudicator_sources(urls, tool_context=tool_context)
+    try:
+        with patch(
+            "superextra_agent.web_tools._read_adjudicator_pages",
+            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
+        ) as read_pages, patch(
+            "superextra_agent.web_tools._unwrap_vertex_redirect",
+            AsyncMock(side_effect=AssertionError("wrapper should not unwrap over-limit URLs")),
+        ) as unwrap:
+            result = await read_adjudicator_sources(urls, tool_context=tool_context)
+    finally:
+        clear_fetch_cache_for_run(run_id)
 
     read_pages.assert_awaited_once_with(urls)
     unwrap.assert_not_awaited()
@@ -352,18 +395,24 @@ async def test_read_adjudicator_sources_does_not_unwrap_during_queue_filtering()
 
 
 @pytest.mark.asyncio
-async def test_read_adjudicator_sources_reads_only_packet_urls():
+async def test_read_adjudicator_sources_rejects_unknown_urls():
     allowed = "https://example.com/allowed"
-    extra = "https://example.com/not-in-packet"
-    tool_context = SimpleNamespace(state=_state_with_packet_urls([allowed]))
+    extra = "https://example.com/packet-only"
+    run_id = "run-reject-packet-only"
+    tool_context = SimpleNamespace(state=_state_with_packet_urls([allowed, extra]))
+    set_fetch_run_id(run_id)
+    web_tools.record_adjudicator_source_candidates(run_id, [allowed])
 
-    with patch(
-        "superextra_agent.web_tools._read_adjudicator_pages",
-        AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
-    ) as read_pages:
-        result = await read_adjudicator_sources(
-            [extra, allowed], tool_context=tool_context
-        )
+    try:
+        with patch(
+            "superextra_agent.web_tools._read_adjudicator_pages",
+            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
+        ) as read_pages:
+            result = await read_adjudicator_sources(
+                [extra, allowed], tool_context=tool_context
+            )
+    finally:
+        clear_fetch_cache_for_run(run_id)
 
     read_pages.assert_awaited_once_with([allowed])
     assert result["status"] == "success"
@@ -373,8 +422,70 @@ async def test_read_adjudicator_sources_reads_only_packet_urls():
 
 
 @pytest.mark.asyncio
+async def test_read_adjudicator_sources_ignores_packet_urls_and_appends_captured_urls():
+    run_id = "run-auto-append"
+    packet_url = "https://example.com/requested"
+    omitted_packet_url = "https://example.com/omitted-packet"
+    grounding_url = "https://example.com/grounded"
+    tool_context = SimpleNamespace(
+        state=_state_with_packet_urls([packet_url, omitted_packet_url])
+    )
+    set_fetch_run_id(run_id)
+    web_tools.record_adjudicator_source_candidates(
+        run_id,
+        [{"url": grounding_url, "title": "Grounded"}],
+    )
+
+    try:
+        with patch(
+            "superextra_agent.web_tools._read_adjudicator_pages",
+            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
+        ) as read_pages:
+            result = await read_adjudicator_sources(
+                [packet_url], tool_context=tool_context
+            )
+    finally:
+        clear_fetch_cache_for_run(run_id)
+
+    read_pages.assert_awaited_once_with([grounding_url])
+    assert result["attempted_count"] == 1
+    assert result["rejected_urls"] == [packet_url]
+    assert result["auto_appended_urls"] == [grounding_url]
+    assert tool_context.state[ADJUDICATOR_READ_STATE_KEY] == [
+        grounding_url,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_read_adjudicator_sources_can_read_allowed_queue_from_empty_request():
+    run_id = "run-empty-request"
+    packet_url = "https://example.com/packet"
+    grounding_url = "https://example.com/grounding"
+    tool_context = SimpleNamespace(state=_state_with_packet_urls([packet_url]))
+    set_fetch_run_id(run_id)
+    web_tools.record_adjudicator_source_candidates(run_id, [grounding_url])
+
+    try:
+        with patch(
+            "superextra_agent.web_tools._read_adjudicator_pages",
+            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
+        ) as read_pages:
+            result = await read_adjudicator_sources([], tool_context=tool_context)
+    finally:
+        clear_fetch_cache_for_run(run_id)
+
+    read_pages.assert_awaited_once_with([grounding_url])
+    assert result["status"] == "success"
+    assert result["requested_count"] == 0
+    assert result["attempted_count"] == 1
+    assert result["valid_url_count"] == 0
+    assert result["auto_appended_urls"] == [grounding_url]
+
+
+@pytest.mark.asyncio
 async def test_read_adjudicator_sources_keeps_read_success_for_title_mismatch():
     url = "https://example.com/expected-article"
+    run_id = "run-title-mismatch"
     packet = (
         "Finding.\n\n"
         "### Validation Packet\n\n"
@@ -388,33 +499,38 @@ async def test_read_adjudicator_sources_keeps_read_success_for_title_mismatch():
     tool_context = SimpleNamespace(
         state={"market_result": packet}
     )
+    set_fetch_run_id(run_id)
+    web_tools.record_adjudicator_source_candidates(run_id, [url])
 
-    with patch(
-        "superextra_agent.web_tools._read_adjudicator_pages",
-        AsyncMock(
-            return_value={
-                "status": "success",
-                "results": [
-                    {
-                        "status": "success",
-                        "url": url,
-                        "content": "Title: Unrelated Election Deadlines\n\nText",
-                    }
-                ],
-                "sources": [
-                    {
-                        "url": url,
-                        "title": "Unrelated Election Deadlines",
-                        "domain": "example.com",
-                        "provider": "fetched_page",
-                    }
-                ],
-                "success_count": 1,
-                "failed_count": 0,
-            }
-        ),
-    ):
-        result = await read_adjudicator_sources([url], tool_context=tool_context)
+    try:
+        with patch(
+            "superextra_agent.web_tools._read_adjudicator_pages",
+            AsyncMock(
+                return_value={
+                    "status": "success",
+                    "results": [
+                        {
+                            "status": "success",
+                            "url": url,
+                            "content": "Title: Unrelated Election Deadlines\n\nText",
+                        }
+                    ],
+                    "sources": [
+                        {
+                            "url": url,
+                            "title": "Unrelated Election Deadlines",
+                            "domain": "example.com",
+                            "provider": "fetched_page",
+                        }
+                    ],
+                    "success_count": 1,
+                    "failed_count": 0,
+                }
+            ),
+        ):
+            result = await read_adjudicator_sources([url], tool_context=tool_context)
+    finally:
+        clear_fetch_cache_for_run(run_id)
 
     assert result["status"] == "success"
     assert result["success_count"] == 1
@@ -436,6 +552,7 @@ async def test_read_adjudicator_sources_keeps_read_success_for_title_mismatch():
 @pytest.mark.asyncio
 async def test_read_adjudicator_sources_keeps_read_success_for_slug_title_mismatch():
     url = "https://example.com/Trojmiasto-zegna-kolejne-restauracje-i-kawiarnie-n202753.html"
+    run_id = "run-slug-title-mismatch"
     packet = (
         "Finding.\n\n"
         "### Validation Packet\n\n"
@@ -451,33 +568,38 @@ async def test_read_adjudicator_sources_keeps_read_success_for_slug_title_mismat
     tool_context = SimpleNamespace(
         state={"market_result": packet}
     )
+    set_fetch_run_id(run_id)
+    web_tools.record_adjudicator_source_candidates(run_id, [url])
 
-    with patch(
-        "superextra_agent.web_tools._read_adjudicator_pages",
-        AsyncMock(
-            return_value={
-                "status": "success",
-                "results": [
-                    {
-                        "status": "success",
-                        "url": url,
-                        "content": "Title: Wody Polskie przenoszą się do Trytona\n\nText",
-                    }
-                ],
-                "sources": [
-                    {
-                        "url": url,
-                        "title": "Wody Polskie przenoszą się do Trytona",
-                        "domain": "example.com",
-                        "provider": "fetched_page",
-                    }
-                ],
-                "success_count": 1,
-                "failed_count": 0,
-            }
-        ),
-    ):
-        result = await read_adjudicator_sources([url], tool_context=tool_context)
+    try:
+        with patch(
+            "superextra_agent.web_tools._read_adjudicator_pages",
+            AsyncMock(
+                return_value={
+                    "status": "success",
+                    "results": [
+                        {
+                            "status": "success",
+                            "url": url,
+                            "content": "Title: Wody Polskie przenoszą się do Trytona\n\nText",
+                        }
+                    ],
+                    "sources": [
+                        {
+                            "url": url,
+                            "title": "Wody Polskie przenoszą się do Trytona",
+                            "domain": "example.com",
+                            "provider": "fetched_page",
+                        }
+                    ],
+                    "success_count": 1,
+                    "failed_count": 0,
+                }
+            ),
+        ):
+            result = await read_adjudicator_sources([url], tool_context=tool_context)
+    finally:
+        clear_fetch_cache_for_run(run_id)
 
     assert result["status"] == "success"
     assert result["success_count"] == 1
@@ -500,13 +622,12 @@ async def test_read_adjudicator_sources_requires_packet_state():
     read_pages.assert_not_awaited()
     assert result["status"] == "error"
     assert result["attempted_count"] == 0
-    assert result["error_message"] == (
-        "Validation packet state is required to read adjudicator sources"
-    )
+    assert result["error_message"] == "Run state is required to read adjudicator sources"
 
 
 @pytest.mark.asyncio
 async def test_read_adjudicator_sources_dedupes_across_followup_calls():
+    run_id = "run-dedupe-captured"
     tool_context = SimpleNamespace(
         state=_state_with_packet_urls(
             [
@@ -516,53 +637,58 @@ async def test_read_adjudicator_sources_dedupes_across_followup_calls():
         )
     )
     first_urls = ["https://example.com/a", "https://example.com/new"]
+    set_fetch_run_id(run_id)
+    web_tools.record_adjudicator_source_candidates(run_id, first_urls)
 
-    with patch(
-        "superextra_agent.web_tools._read_adjudicator_pages",
-        AsyncMock(
-            return_value={
-                "status": "success",
-                "results": [
-                    {
-                        "status": "success",
-                        "url": "https://example.com/a",
-                        "content": "# A\n\nText",
-                    },
-                    {
-                        "status": "success",
-                        "url": "https://example.com/new",
-                        "content": "# New\n\nText",
-                    }
-                ],
-                "sources": [
-                    {
-                        "url": "https://example.com/a",
-                        "title": "A",
-                        "domain": "example.com",
-                        "provider": "fetched_page",
-                    },
-                    {
-                        "url": "https://example.com/new",
-                        "title": "New",
-                        "domain": "example.com",
-                        "provider": "fetched_page",
-                    }
-                ],
-                "success_count": 2,
-                "failed_count": 0,
-            }
-        ),
-    ) as read_pages:
-        first = await read_adjudicator_sources(first_urls, tool_context=tool_context)
+    try:
+        with patch(
+            "superextra_agent.web_tools._read_adjudicator_pages",
+            AsyncMock(
+                return_value={
+                    "status": "success",
+                    "results": [
+                        {
+                            "status": "success",
+                            "url": "https://example.com/a",
+                            "content": "# A\n\nText",
+                        },
+                        {
+                            "status": "success",
+                            "url": "https://example.com/new",
+                            "content": "# New\n\nText",
+                        }
+                    ],
+                    "sources": [
+                        {
+                            "url": "https://example.com/a",
+                            "title": "A",
+                            "domain": "example.com",
+                            "provider": "fetched_page",
+                        },
+                        {
+                            "url": "https://example.com/new",
+                            "title": "New",
+                            "domain": "example.com",
+                            "provider": "fetched_page",
+                        }
+                    ],
+                    "success_count": 2,
+                    "failed_count": 0,
+                }
+            ),
+        ) as read_pages:
+            first = await read_adjudicator_sources(first_urls, tool_context=tool_context)
 
-    read_pages.assert_awaited_once_with(["https://example.com/a", "https://example.com/new"])
-    assert first["attempted_count"] == 2
+        read_pages.assert_awaited_once_with(["https://example.com/a", "https://example.com/new"])
+        assert first["attempted_count"] == 2
 
-    with patch("superextra_agent.web_tools._read_adjudicator_pages", AsyncMock()) as read_pages:
-        second = await read_adjudicator_sources(
-            ["https://example.com/a", "https://example.com/new"],
-            tool_context=tool_context,
-        )
+        with patch("superextra_agent.web_tools._read_adjudicator_pages", AsyncMock()) as read_pages:
+            second = await read_adjudicator_sources(
+                ["https://example.com/a", "https://example.com/new"],
+                tool_context=tool_context,
+            )
+    finally:
+        clear_fetch_cache_for_run(run_id)
 
     read_pages.assert_not_awaited()
     assert second["status"] == "success"
@@ -590,8 +716,13 @@ async def test_read_adjudicator_sources_dedupes_across_followup_calls():
         ],
         "failed_sources": [],
         "skipped_urls": ["https://example.com/a", "https://example.com/new"],
+        "skipped_count": 2,
+        "auto_appended_urls": [],
+        "auto_appended_count": 0,
         "rejected_urls": [],
+        "rejected_count": 0,
         "invalid_urls": [],
+        "invalid_count": 0,
         "error_message": None,
     }
 

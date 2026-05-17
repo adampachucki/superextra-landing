@@ -88,7 +88,16 @@ def test_parse_run_captures_evidence_memo_and_verified_sources():
     assert "confirmed_claims" in parsed["evidence_memo"]
     assert parsed["fetched_urls"] == ["https://example.com/source"]
     assert parsed["grounding_entries"][0]["url"] == "https://search.example/snippet"
-    assert parsed["drawer_sources"] == [{**source, "kind": "fetched"}]
+    assert parsed["drawer_sources"] == [
+        {
+            "url": "https://search.example/snippet",
+            "domain": "search.example",
+            "title": "Snippet source",
+            "provider": "grounding",
+            "kind": "grounding",
+        },
+        {**source, "kind": "fetched"},
+    ]
 
 
 def test_parse_run_excludes_unadjudicated_read_sources_from_drawer():
@@ -166,22 +175,30 @@ def test_parse_run_skips_adjudicated_provider_sources_without_url():
     assert parsed["drawer_sources"] == []
 
 
-def test_parse_run_filters_vertex_redirect_drawer_sources_like_runtime():
+def test_parse_run_keeps_grounding_redirect_drawer_sources_like_runtime():
     parsed = parse_run(
         [
             _event(
-                state_delta={
-                    "evidence_memo": (
-                        '{"confirmed_claims":[{"evidence":[{"url":'
-                        '"https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc",'
-                        '"title":"Redirect"}]}]}'
-                    )
-                },
+                grounding_chunks=[
+                    {
+                        "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc",
+                        "title": "Redirect",
+                        "domain": "example.com",
+                    }
+                ],
             )
         ]
     )
 
-    assert parsed["drawer_sources"] == []
+    assert parsed["drawer_sources"] == [
+        {
+            "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc",
+            "domain": "example.com",
+            "title": "Redirect",
+            "provider": "grounding",
+            "kind": "grounding",
+        }
+    ]
 
 
 def test_parse_run_keeps_place_scoped_provider_sources_with_same_url():
@@ -283,6 +300,13 @@ def test_parse_run_builds_source_funnel_from_dynamic_packets():
                     )
                 ],
                 state_delta={"evidence_memo": memo},
+                grounding_chunks=[
+                    {
+                        "uri": "https://example.com/source",
+                        "title": "Source",
+                        "domain": "example.com",
+                    }
+                ],
             ),
         ]
     )
@@ -303,7 +327,16 @@ def test_parse_run_builds_source_funnel_from_dynamic_packets():
         "packet_urls_attempted_by_reader_count": 1,
         "reader_attempted_urls_not_in_packets": [],
         "packet_urls_not_attempted": ["https://example.com/other"],
-        "grounding_entry_url_count": 0,
+        "grounding_entry_url_count": 1,
+        "grounding_urls_passed_to_reader_count": 1,
+        "grounding_urls_attempted_by_reader_count": 1,
+        "grounding_urls_not_attempted": [],
+        "captured_source_url_count": 1,
+        "captured_urls_passed_to_reader_count": 1,
+        "captured_urls_attempted_by_reader_count": 1,
+        "captured_urls_not_attempted": [],
+        "reader_attempted_urls_not_in_packets_or_captured": [],
+        "reader_auto_appended_url_count": 0,
         "reader_attempted_url_count": 1,
         "reader_attempted_unique_url_count": 1,
         "reader_successful_url_count": 1,
@@ -317,6 +350,7 @@ def test_parse_run_builds_source_funnel_from_dynamic_packets():
         "reader_successful_urls": ["https://example.com/source"],
         "reader_failed_sources": [],
         "reader_failure_reason_counts": {},
+        "reader_auto_appended_urls": [],
         "reader_returned_source_urls": ["https://example.com/source"],
         "verified_supporting_urls": ["https://example.com/source"],
         "read_verified_supporting_urls": ["https://example.com/source"],
@@ -333,6 +367,136 @@ def test_parse_run_builds_source_funnel_from_dynamic_packets():
             }
         ],
     }
+
+
+def test_parse_run_counts_fetched_source_capture_as_reader_allowed():
+    url = "https://example.com/fetched"
+    parsed = parse_run(
+        [
+            _event(
+                function_responses=[
+                    (
+                        "read_web_pages",
+                        {
+                            "status": "success",
+                            "sources": [
+                                {
+                                    "url": url,
+                                    "title": "Fetched",
+                                    "domain": "example.com",
+                                    "provider": "fetched_page",
+                                }
+                            ],
+                        },
+                    )
+                ],
+            ),
+            _event(
+                function_responses=[
+                    (
+                        "read_adjudicator_sources",
+                        {
+                            "status": "success",
+                            "results": [{"status": "success", "url": url}],
+                            "sources": [{"url": url}],
+                            "auto_appended_urls": [url],
+                            "attempted_count": 1,
+                            "success_count": 1,
+                            "failed_count": 0,
+                        },
+                    )
+                ],
+            ),
+        ]
+    )
+
+    funnel = parsed["source_funnel"]
+    assert funnel["captured_source_url_count"] == 1
+    assert funnel["captured_urls_attempted_by_reader_count"] == 1
+    assert funnel["captured_urls_not_attempted"] == []
+    assert funnel["reader_attempted_urls_not_in_packets"] == [url]
+    assert funnel["reader_attempted_urls_not_in_packets_or_captured"] == []
+    assert funnel["reader_auto_appended_urls"] == [url]
+
+
+def test_parse_run_uses_requested_url_for_reader_attempt_funnel():
+    requested = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc"
+    resolved = "https://example.com/article"
+
+    parsed = parse_run(
+        [
+            _event(
+                grounding_chunks=[
+                    {
+                        "uri": requested,
+                        "title": "Grounding redirect",
+                        "domain": "example.com",
+                    }
+                ],
+            ),
+            _event(
+                function_responses=[
+                    (
+                        "read_adjudicator_sources",
+                        {
+                            "status": "success",
+                            "results": [
+                                {
+                                    "status": "success",
+                                    "requested_url": requested,
+                                    "url": resolved,
+                                }
+                            ],
+                            "sources": [{"url": resolved}],
+                            "auto_appended_urls": [requested],
+                            "attempted_count": 1,
+                            "success_count": 1,
+                            "failed_count": 0,
+                        },
+                    )
+                ],
+            ),
+        ]
+    )
+
+    funnel = parsed["source_funnel"]
+    assert funnel["captured_urls_attempted_by_reader_count"] == 1
+    assert funnel["captured_urls_not_attempted"] == []
+    assert funnel["reader_attempted_urls_not_in_packets_or_captured"] == []
+    assert funnel["reader_successful_urls"] == [resolved]
+    assert funnel["reader_returned_source_urls"] == [resolved]
+
+
+def test_parse_run_uses_exact_auto_appended_count_when_url_list_is_capped():
+    parsed = parse_run(
+        [
+            _event(
+                function_responses=[
+                    (
+                        "read_adjudicator_sources",
+                        {
+                            "status": "success",
+                            "auto_appended_urls": [
+                                "https://example.com/visible-1",
+                                "https://example.com/visible-2",
+                            ],
+                            "auto_appended_count": 25,
+                            "attempted_count": 25,
+                            "success_count": 0,
+                            "failed_count": 25,
+                        },
+                    )
+                ],
+            )
+        ]
+    )
+
+    funnel = parsed["source_funnel"]
+    assert funnel["reader_auto_appended_url_count"] == 25
+    assert funnel["reader_auto_appended_urls"] == [
+        "https://example.com/visible-1",
+        "https://example.com/visible-2",
+    ]
 
 
 def test_parse_run_keeps_read_success_separate_from_verified_support():

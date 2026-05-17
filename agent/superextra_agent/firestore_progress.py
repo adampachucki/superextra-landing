@@ -364,8 +364,9 @@ def _merge_tool_sources(
     """Surface successful page-reading tool URLs as run sources.
 
     Without this hook, fetched URLs would never appear in the per-turn
-    source pills. Grounding chunks are discovery context; final source
-    authority comes from fetched pages and `_tool_src_*` provider sources.
+    source pills or same-run adjudicator source queue. Grounding chunks,
+    fetched pages, and `_tool_src_*` provider sources all remain visible in
+    the drawer; adjudication decides claim support separately.
     Adjudicator reads are not merged directly because read success is not claim
     support; successful read URLs only gate later `evidence_memo` sources.
     """
@@ -382,7 +383,7 @@ def _merge_tool_sources(
         if result.get("status") != "success":
             return
         for entry in result.get("sources") or []:
-            per._merge_source(entry)
+            per._merge_source(entry, reader_candidate=True)
         return
     if tool_name == "fetch_web_content":
         if result.get("status") != "success":
@@ -390,7 +391,7 @@ def _merge_tool_sources(
         url = result.get("url") or (tool_args.get("url") if tool_args else None)
         entry = build_fetched_source(url, result.get("content"))
         if entry:
-            per._merge_source(entry)
+            per._merge_source(entry, reader_candidate=True)
         return
     if tool_name == "fetch_web_content_batch":
         for item in result.get("results") or []:
@@ -398,7 +399,7 @@ def _merge_tool_sources(
                 continue
             entry = build_fetched_source(item.get("url"), item.get("content"))
             if entry:
-                per._merge_source(entry)
+                per._merge_source(entry, reader_candidate=True)
 
 
 # ── Plugin ───────────────────────────────────────────────────────────────────

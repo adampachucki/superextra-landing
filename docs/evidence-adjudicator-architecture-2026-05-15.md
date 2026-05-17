@@ -68,7 +68,7 @@ the documented ADK/Gemini tool model and removes duplicate read mechanisms.
 Each specialist outputs structured material:
 
 - important claims
-- source URLs used or requested
+- source URLs used, requested, or captured from grounding/search metadata
 - search queries that found those URLs
 - confidence / caveats
 - source type hints when known, for example official page, local press, review
@@ -81,20 +81,22 @@ try to exhaustively read every result.
 
 ### Specialist Packet Contract
 
-The adjudicator gets its normal read queue from specialist outputs. It should
-not rediscover sources in the default path.
+The adjudicator gets its normal read queue from same-run grounding/fetched
+source capture. Specialist packet URLs are claim metadata only; they do not
+authorize reads. The adjudicator should not rediscover sources in the default
+path.
 
 Every specialist report must include a predictable validation packet with:
 
 - `claims_for_validation`: concrete factual claims that matter to the final
   answer
-- `candidate_sources`: concrete URLs the specialist found, read, cited, or wants
-  validated
+- `candidate_sources`: optional exact URLs the specialist saw in grounding/tool
+  metadata, used only as claim metadata
 - source priority: `high`, `medium`, or `low`
 - source type hint, for example official page, Google Places, local press, menu,
   delivery platform, review page, forum thread, aggregator, registry, PDF
-- source-to-claim links so the adjudicator knows which URLs are supposed to
-  support which claims
+- source-to-claim links so the adjudicator can map claims to captured/read
+  evidence when the same URL also appears in same-run source capture
 - source limits, for example snippet-only, unreadable, old, duplicate,
   aggregator, conflicting, or indirectly relevant
 
@@ -128,23 +130,24 @@ Example packet shape:
 
 ### Evidence Adjudicator
 
-The adjudicator has no search tool in the default path. It receives URLs and
-claims from all specialists, then:
+The adjudicator has no search tool in the default path. It receives captured
+grounding/fetched URLs plus claims from specialist packets, then:
 
 - dedupes and canonicalizes URLs
 - filters bad candidates such as social pages, domain roots, tracking variants,
   obvious junk, and unsupported file types
-- re-reads all eligible provided URLs with Jina Reader, appending any packet URLs the model omitted from the tool call
+- re-reads all eligible same-run captured URLs with Jina Reader, appending any
+  captured URLs the model omitted from the tool call
 - extracts verified facts from page text
 - maps facts back to specialist claims
 - marks claims as confirmed, contradicted, unsupported, or unresolved
 - records unreadable pages with failure reasons
 - emits final source metadata for the UI
 
-The adjudicator builds its read queue by ranking specialist-provided URLs:
+The adjudicator builds its read queue by ranking same-run captured URLs:
 
-1. URLs tied to important claims in `claims_for_validation`.
-2. URLs cited by more than one specialist.
+1. Captured URLs that also appear in packet claim metadata.
+2. URLs repeated across grounding/fetched capture.
 3. Direct operator pages, Google Places/provider data, current local press, menu
    pages, and concrete venue/detail pages.
 4. Specific pages over search pages, category pages, domain roots, and social
@@ -343,13 +346,13 @@ Near-term implementation can be incremental:
 5. Require specialists to emit source URLs and claims in a predictable section.
 6. Add an `evidence_adjudicator` agent after `research_lead` and before
    `report_writer`.
-7. Give the adjudicator Jina Reader tools that read all eligible provided URLs, with bounded concurrency. The tool treats model-supplied URLs as ordering hints and appends omitted same-run packet/grounding URLs before reading.
+7. Give the adjudicator Jina Reader tools that read all eligible same-run captured URLs, with bounded concurrency. The tool treats model-supplied URLs as ordering hints and appends omitted same-run grounding/fetched URLs before reading.
 8. Store adjudicator output in session state, for example `evidence_memo`.
 9. Update `report_writer.md` to treat `evidence_memo` as authoritative over
    unsupported specialist prose.
 10. Keep final writer tool-less.
-11. Remove direct source persistence from raw search snippets and native
-    grounding redirects; persist only fetched/verified/provider sources.
+11. Persist grounding/search-result source pills alongside fetched/provider
+    sources. Do not treat source-pill display as proof that a page was read.
 
 ## Cleanup Plan
 
@@ -473,13 +476,13 @@ The adjudicator trial succeeds only if:
 
 - Specialists still refine searches from their own evidence surfaces.
 - Every specialist report includes parseable claim/source packets.
-- The adjudicator reads eligible URLs from specialist packets, not a broad
-  self-discovered web set.
+- The adjudicator reads eligible URLs from same-run grounding/fetched source
+  capture, not specialist packet URL fields or a broad self-discovered web set.
 - The adjudicator marks claims as confirmed, contradicted, unsupported, or
   unresolved.
 - The writer does not use unsupported specialist claims as facts.
-- UI sources are fetched/provider/verified sources, not raw snippets or
-  `vertexaisearch.cloud.google.com/grounding-api-redirect` URLs.
+- UI sources include grounding/search-result sources, fetched sources, and
+  provider sources. They are display provenance, not claim-level proof.
 - A normal production prompt completes within the practical stream window.
 - Logs show bounded Jina reads rather than per-specialist batch read fanout.
 

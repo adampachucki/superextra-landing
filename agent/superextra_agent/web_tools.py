@@ -140,6 +140,7 @@ _FETCH_CACHE_DEEP = "deep"
 _FETCH_CACHE_DEEP_ALLOW_ROOT = "deep_allow_root"
 _fetch_cache: dict[tuple[str, str, str], dict] = {}
 _read_pages_cache: dict[tuple[str, tuple[str, ...], str], dict] = {}
+_adjudicator_source_candidates_by_run_id: dict[str, list[str]] = {}
 # Bounded so that a run whose `after_run_callback` doesn't fire (ADK
 # 1.28.0 doesn't call it from a `finally`, so cancelled/aborted runs
 # can skip cleanup) cannot grow the cache forever. FIFO eviction by
@@ -163,6 +164,7 @@ def clear_fetch_cache_for_run(run_id: str) -> None:
         _fetch_cache.pop(key, None)
     for key in [k for k in _read_pages_cache if k[0] == run_id]:
         _read_pages_cache.pop(key, None)
+    _adjudicator_source_candidates_by_run_id.pop(run_id, None)
 
 
 def _cache_key(url: str, mode: str) -> tuple[str, str, str] | None:
@@ -338,6 +340,35 @@ def _canonical_adjudicator_candidate_url(raw: Any) -> str | None:
     return url if _is_http_url(url) else None
 
 
+def record_adjudicator_source_candidates(run_id: str | None, sources: list[Any]) -> None:
+    """Remember same-run discovered web URLs for adjudicator reading."""
+    if not run_id:
+        return
+    queue = _adjudicator_source_candidates_by_run_id.setdefault(run_id, [])
+    seen = set(queue)
+    for source in sources:
+        raw = source.get("url") if isinstance(source, dict) else source
+        url = _canonical_adjudicator_candidate_url(raw)
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        queue.append(url)
+
+
+def _iter_adjudicator_discovered_urls() -> list[str]:
+    run_id = _fetch_run_id_var.get()
+    if not run_id:
+        return []
+    return list(_adjudicator_source_candidates_by_run_id.get(run_id, []))
+
+
+def format_adjudicator_source_candidates() -> str:
+    urls = _iter_adjudicator_discovered_urls()
+    if not urls:
+        return "No same-run grounding or fetched web sources captured."
+    return "\n".join(f"- {url}" for url in urls)
+
+
 def _iter_validation_packet_objects(text: str) -> list[dict[str, Any]]:
     packets: list[dict[str, Any]] = []
     matches = list(_VALIDATION_PACKET_HEADING_RE.finditer(text))
@@ -404,38 +435,14 @@ def collect_adjudicator_packet_claims(state: Any) -> list[dict[str, Any]]:
     return claims
 
 
-def _append_unique_adjudicator_url(
-    queue: list[str], seen: set[str], raw: Any
-) -> None:
-    url = _canonical_adjudicator_candidate_url(raw)
-    if not url or url in seen:
-        return
-    seen.add(url)
-    queue.append(url)
-
-
-def _iter_adjudicator_packet_urls(state: Any) -> list[str]:
-    if state is None:
-        return []
-
+def _iter_adjudicator_allowed_urls() -> list[str]:
     urls: list[str] = []
     seen: set[str] = set()
-    for key in SPECIALIST_RESULT_KEYS:
-        value = state.get(key)
-        if not value or value == "Agent did not produce output.":
+    for url in _iter_adjudicator_discovered_urls():
+        if url in seen:
             continue
-        if not isinstance(value, str):
-            value = str(value)
-        for packet in _iter_validation_packet_objects(value):
-            for source in packet.get("candidate_sources") or []:
-                if not isinstance(source, dict):
-                    continue
-                _append_unique_adjudicator_url(urls, seen, source.get("url"))
-            for claim in packet.get("claims_for_validation") or []:
-                if not isinstance(claim, dict):
-                    continue
-                for raw_url in claim.get("source_urls") or []:
-                    _append_unique_adjudicator_url(urls, seen, raw_url)
+        seen.add(url)
+        urls.append(url)
     return urls
 
 
@@ -468,8 +475,13 @@ def _compact_adjudicator_read_result(output: dict[str, Any]) -> dict[str, Any]:
         ],
         "failed_sources": failed_sources,
         "skipped_urls": output.get("skipped_urls", []),
+        "skipped_count": output.get("skipped_count", 0),
+        "auto_appended_urls": output.get("auto_appended_urls", []),
+        "auto_appended_count": output.get("auto_appended_count", 0),
         "rejected_urls": output.get("rejected_urls", []),
+        "rejected_count": output.get("rejected_count", 0),
         "invalid_urls": output.get("invalid_urls", []),
+        "invalid_count": output.get("invalid_count", 0),
         "error_message": output.get("error_message"),
     }
 
@@ -519,8 +531,13 @@ def _merge_compact_adjudicator_read_results(
         "sources": merged_dicts("sources"),
         "failed_sources": merged_dicts("failed_sources"),
         "skipped_urls": merged_strings("skipped_urls"),
+        "skipped_count": merged_count("skipped_count"),
+        "auto_appended_urls": merged_strings("auto_appended_urls"),
+        "auto_appended_count": merged_count("auto_appended_count"),
         "rejected_urls": merged_strings("rejected_urls"),
+        "rejected_count": merged_count("rejected_count"),
         "invalid_urls": merged_strings("invalid_urls"),
+        "invalid_count": merged_count("invalid_count"),
         "error_message": current.get("error_message") or existing.get("error_message"),
     }
 
@@ -1492,16 +1509,18 @@ async def _read_adjudicator_pages(urls: list[str]) -> dict:
 
     async def read(url: str) -> dict:
         async with semaphore:
-            return await _fetch_web_content(
+            result = await _fetch_web_content(
                 url,
                 allow_readerlm=False,
                 allow_domain_root=True,
                 allow_proxy_fallback=True,
             )
+            if isinstance(result, dict) and result.get("url") != url:
+                result = dict(result)
+                result["requested_url"] = url
+            return result
 
-    results = await asyncio.gather(
-        *(read(url) for url in urls)
-    )
+    results = await asyncio.gather(*(read(url) for url in urls))
     success_count = sum(
         1 for item in results if isinstance(item, dict) and item.get("status") == "success"
     )
@@ -1531,11 +1550,12 @@ async def _read_adjudicator_pages(urls: list[str]) -> dict:
 async def read_adjudicator_sources(urls: list[str], tool_context=None) -> dict:
     """Read the Evidence Adjudicator's source queue with Jina Reader.
 
-    Use only for concrete public URLs supplied in specialist validation packets.
-    This is not a search tool and does not accept broad discovery tasks. The
-    tool records attempted URLs in temporary run state so repeated calls do not
-    reread the same page. A read success means page text was fetched; whether
-    that text supports the claim is decided in the evidence memo.
+    Use only for concrete public URLs captured as same-run grounding/fetched
+    web sources. Specialist packet URLs are not read authority. This is not a
+    search tool and does not accept broad discovery tasks. The tool records
+    attempted URLs in temporary run state so repeated calls do not reread the
+    same page. A read success means page text was fetched; whether that text
+    supports the claim is decided in the evidence memo.
 
     Args:
         urls: Concrete http(s) URLs to verify.
@@ -1559,19 +1579,22 @@ async def read_adjudicator_sources(urls: list[str], tool_context=None) -> dict:
             "rejected_count": 0,
             "invalid_urls": [],
             "invalid_count": 0,
-            "error_message": "Validation packet state is required to read adjudicator sources",
+            "error_message": "Run state is required to read adjudicator sources",
         }
 
     existing = state.get(ADJUDICATOR_READ_STATE_KEY, []) if state is not None else []
     already_read = [u for u in existing if isinstance(u, str)] if isinstance(existing, list) else []
-    allowed_urls = set(_iter_adjudicator_packet_urls(state))
+    allowed_urls = _iter_adjudicator_allowed_urls()
+    allowed_url_set = set(allowed_urls)
     seen = set(already_read)
     to_read: list[str] = []
     request_seen: set[str] = set()
     skipped_urls: list[str] = []
+    auto_appended_urls: list[str] = []
     rejected_urls: list[str] = []
     invalid_urls: list[str] = []
     skipped_count = 0
+    auto_appended_count = 0
     rejected_count = 0
     invalid_count = 0
 
@@ -1582,7 +1605,7 @@ async def read_adjudicator_sources(urls: list[str], tool_context=None) -> dict:
             if isinstance(raw, str) and raw.strip():
                 _append_limited(invalid_urls, raw.strip())
             continue
-        if url not in allowed_urls:
+        if url not in allowed_url_set:
             rejected_count += 1
             _append_limited(rejected_urls, url)
             continue
@@ -1591,6 +1614,13 @@ async def read_adjudicator_sources(urls: list[str], tool_context=None) -> dict:
             _append_limited(skipped_urls, url)
             continue
         request_seen.add(url)
+        to_read.append(url)
+
+    for url in allowed_urls:
+        if url in request_seen or url in seen:
+            continue
+        auto_appended_count += 1
+        _append_limited(auto_appended_urls, url)
         to_read.append(url)
 
     if not to_read:
@@ -1606,6 +1636,8 @@ async def read_adjudicator_sources(urls: list[str], tool_context=None) -> dict:
             "attempted_count": 0,
             "skipped_urls": skipped_urls,
             "skipped_count": skipped_count,
+            "auto_appended_urls": auto_appended_urls,
+            "auto_appended_count": auto_appended_count,
             "rejected_urls": rejected_urls,
             "rejected_count": rejected_count,
             "invalid_urls": invalid_urls,
@@ -1628,6 +1660,8 @@ async def read_adjudicator_sources(urls: list[str], tool_context=None) -> dict:
             "attempted_count": len(to_read),
             "skipped_urls": skipped_urls,
             "skipped_count": skipped_count,
+            "auto_appended_urls": auto_appended_urls,
+            "auto_appended_count": auto_appended_count,
             "rejected_urls": rejected_urls,
             "rejected_count": rejected_count,
             "invalid_urls": invalid_urls,

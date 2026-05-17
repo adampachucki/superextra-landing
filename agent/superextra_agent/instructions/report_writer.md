@@ -24,11 +24,11 @@ The customer expects deep research, not a compressed summary. Write the most use
 
 ## Process
 
-- Treat the specialist reports as source material and the Evidence Memo as the source of truth for claim status.
-- If the Evidence Memo has `adjudication_status: "failed_closed"` or otherwise says adjudication failed, do not state or infer specialist claims as facts, unverified signals, findings, trends, or recommendations. Use only Restaurant Context, structured provider facts, and the redacted Evidence Memo limits. Put the failed adjudication in evidence limits.
+- Treat the specialist reports as the main research material. Treat the Evidence Memo as claim-status and source-quality metadata, not as a replacement for the specialist reports.
+- If the Evidence Memo has `adjudication_status: "failed_closed"` or otherwise says adjudication failed, continue using the specialist reports, but do not present failed adjudication as verification. Phrase public-web material that was not confirmed by the memo or by structured provider data as a source-limited signal, and put the adjudication limit in evidence limits when it affects confidence.
 - Use the user's question, restaurant context, and specialist reports to determine scope and response language.
 - Do not rely on any lead-authored summary, outline, ranking, or emphasis.
-- Prefer confirmed claims from the Evidence Memo.
+- Prefer confirmed claims from the Evidence Memo when the same claim appears in multiple places.
 - Do not state unsupported, contradicted, or unresolved specialist claims as facts.
 - Do not use unsupported, contradicted, or unresolved claims as findings, implications, trend statements, or recommendation premises.
 - Mention unsupported or unresolved claims only in evidence limits or as explicitly unverified signals when the uncertainty itself matters to the answer.

@@ -60,20 +60,6 @@ def _normal_source_url(value: Any) -> str | None:
     )
 
 
-def _skip_source(entry: dict[str, Any]) -> bool:
-    url = entry.get("url")
-    if not isinstance(url, str) or not url:
-        return False
-    try:
-        parsed = urlparse(url)
-    except Exception:
-        return False
-    return (
-        parsed.hostname == "vertexaisearch.cloud.google.com"
-        and parsed.path.startswith("/grounding-api-redirect/")
-    )
-
-
 def _source_dedupe_key(entry: dict[str, Any]) -> str | None:
     url = entry.get("url")
     if not url:
@@ -92,8 +78,6 @@ def _append_drawer_source(
     *,
     kind: str,
 ) -> None:
-    if _skip_source(entry):
-        return
     key = _source_dedupe_key(entry)
     if not key or key in drawer_seen:
         return
@@ -200,6 +184,9 @@ def _source_funnel(
     reader_failed_sources: list[dict[str, str]],
     reader_returned_source_urls: set[str],
     grounding_entry_urls: set[str],
+    captured_source_urls: set[str],
+    reader_auto_appended_urls: set[str],
+    reader_auto_appended_count: int,
     evidence_memo: str,
     read_counts: dict[str, int],
 ) -> dict[str, Any]:
@@ -308,6 +295,29 @@ def _source_funnel(
         ),
         "packet_urls_not_attempted": sorted(packet_urls - reader_attempted_urls),
         "grounding_entry_url_count": len(grounding_entry_urls),
+        "grounding_urls_passed_to_reader_count": len(
+            grounding_entry_urls & reader_requested_urls
+        ),
+        "grounding_urls_attempted_by_reader_count": len(
+            grounding_entry_urls & reader_attempted_urls
+        ),
+        "grounding_urls_not_attempted": sorted(
+            grounding_entry_urls - reader_attempted_urls
+        ),
+        "captured_source_url_count": len(captured_source_urls),
+        "captured_urls_passed_to_reader_count": len(
+            captured_source_urls & reader_requested_urls
+        ),
+        "captured_urls_attempted_by_reader_count": len(
+            captured_source_urls & reader_attempted_urls
+        ),
+        "captured_urls_not_attempted": sorted(
+            captured_source_urls - reader_attempted_urls
+        ),
+        "reader_attempted_urls_not_in_packets_or_captured": sorted(
+            reader_attempted_urls - packet_urls - captured_source_urls
+        ),
+        "reader_auto_appended_url_count": reader_auto_appended_count,
         "reader_attempted_url_count": read_counts["attempted"],
         "reader_attempted_unique_url_count": len(reader_attempted_urls),
         "reader_successful_url_count": read_counts["successful"],
@@ -321,6 +331,7 @@ def _source_funnel(
         "reader_successful_urls": sorted(reader_successful_urls),
         "reader_failed_sources": reader_failed_sources,
         "reader_failure_reason_counts": failure_reason_counts,
+        "reader_auto_appended_urls": sorted(reader_auto_appended_urls),
         "reader_returned_source_urls": sorted(reader_returned_source_urls),
         "verified_supporting_urls": sorted(verified_supporting_urls),
         "read_verified_supporting_urls": sorted(read_verified_supporting_urls),
@@ -359,6 +370,8 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
     adjudicator_successful_urls: set[str] = set()
     adjudicator_failed_sources: list[dict[str, str]] = []
     adjudicator_returned_source_urls: set[str] = set()
+    adjudicator_auto_appended_urls: set[str] = set()
+    adjudicator_auto_appended_count = 0
     provider_pills: list[dict] = []
     fetched_source_pills: list[dict] = []
     specialists_dispatched: list[str] = []
@@ -446,14 +459,26 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                             if not isinstance(result, dict):
                                 continue
                             url = result.get("url")
-                            if isinstance(url, str) and url:
-                                canonical_url = (
-                                    _canonical_adjudicator_candidate_url(url) or url
-                                )
-                                adjudicator_attempted_urls.add(canonical_url)
-                                fetched_urls.add(canonical_url)
+                            requested_url = result.get("requested_url")
+                            attempted_url = (
+                                requested_url if isinstance(requested_url, str) else url
+                            )
+                            attempted_canonical_url = (
+                                _canonical_adjudicator_candidate_url(attempted_url)
+                                if isinstance(attempted_url, str)
+                                else None
+                            )
+                            actual_canonical_url = (
+                                _canonical_adjudicator_candidate_url(url)
+                                if isinstance(url, str)
+                                else None
+                            )
+                            if attempted_canonical_url:
+                                adjudicator_attempted_urls.add(attempted_canonical_url)
+                            if actual_canonical_url:
+                                fetched_urls.add(actual_canonical_url)
                                 if result.get("status") == "success":
-                                    adjudicator_successful_urls.add(canonical_url)
+                                    adjudicator_successful_urls.add(actual_canonical_url)
                                 else:
                                     reason = str(
                                         result.get("error_message")
@@ -464,7 +489,8 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                                     )
                                     adjudicator_failed_sources.append(
                                         {
-                                            "url": canonical_url,
+                                            "url": actual_canonical_url
+                                            or attempted_canonical_url,
                                             "reason": reason,
                                             "reason_bucket": _reader_failure_bucket(
                                                 result.get("_error_reason") or reason
@@ -482,6 +508,17 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                             value = response.get(source)
                             if isinstance(value, int):
                                 adjudicator_read_counts[dest] += value
+                        for url in response.get("auto_appended_urls") or []:
+                            canonical_url = _canonical_adjudicator_candidate_url(url)
+                            if canonical_url:
+                                adjudicator_auto_appended_urls.add(canonical_url)
+                        auto_appended_count = response.get("auto_appended_count")
+                        if isinstance(auto_appended_count, int):
+                            adjudicator_auto_appended_count += auto_appended_count
+                        else:
+                            adjudicator_auto_appended_count += len(
+                                response.get("auto_appended_urls") or []
+                            )
                 elif (
                     response_name == "fetch_web_content"
                     and response.get("status") == "success"
@@ -537,9 +574,27 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
     final_outcome = "ok" if final_report else "unknown"
 
     # Drawer sources: what GearRunState._merge_source would have produced —
-    # fetched/verified source pills + provider pills.
+    # grounding/search sources + fetched/verified source pills + provider pills.
     drawer_sources: list[dict] = []
     drawer_seen: set[str] = set()
+    grounding_entries = list(grounding_entries_by_url.values())
+    fetched_source_urls = {
+        url
+        for url in (
+            _canonical_adjudicator_candidate_url(entry.get("url"))
+            for entry in fetched_source_pills
+            if isinstance(entry, dict)
+        )
+        if url
+    }
+    captured_source_urls = set(grounding_entries_by_url) | fetched_source_urls
+    for entry in grounding_entries:
+        _append_drawer_source(
+            drawer_sources,
+            drawer_seen,
+            {**entry, "provider": "grounding"},
+            kind="grounding",
+        )
     for entry in [
         *fetched_source_pills,
         *_read_verified_evidence_sources(
@@ -550,7 +605,6 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
     for pill in provider_pills:
         _append_drawer_source(drawer_sources, drawer_seen, pill, kind="provider")
 
-    grounding_entries = list(grounding_entries_by_url.values())
     source_funnel = _source_funnel(
         specialist_outputs=specialist_outputs,
         reader_requested_urls=adjudicator_requested_urls,
@@ -559,6 +613,9 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
         reader_failed_sources=adjudicator_failed_sources,
         reader_returned_source_urls=adjudicator_returned_source_urls,
         grounding_entry_urls=set(grounding_entries_by_url),
+        captured_source_urls=captured_source_urls,
+        reader_auto_appended_urls=adjudicator_auto_appended_urls,
+        reader_auto_appended_count=adjudicator_auto_appended_count,
         evidence_memo=evidence_memo,
         read_counts=adjudicator_read_counts,
     )

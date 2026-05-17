@@ -89,7 +89,7 @@ For the validation packet, URL accuracy matters more than URL volume. Copy only 
 
 ### Validation Packet
 
-End every report with a fenced JSON object using this shape. Include only claims and sources that matter to the final answer. Use concrete source URLs, not search result pages or bare domains, unless the listing page itself is the evidence. For structured provider data with no concrete public URL, leave `source_urls` and `url` empty, use `provider_refs` / `provider_ref`, and set `source_type: "provider_data"`; do not invent URLs.
+End every report with a fenced JSON object using this shape. Include only claims and sources that matter to the final answer. Use concrete source URLs only when the exact URL is available from grounding/source metadata or a tool result; do not reconstruct, guess, simplify, or invent URLs. Do not use search result pages or bare domains unless the listing page itself is the evidence. For structured provider data with no concrete public URL, leave `source_urls` and `url` empty, use `provider_refs` / `provider_ref`, and set `source_type: "provider_data"`; do not invent URLs.
 
 ```json
 {{

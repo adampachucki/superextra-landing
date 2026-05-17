@@ -49,6 +49,8 @@ def _fake_event(
     function_responses: list[tuple[str, dict]] | None = None,
     state_delta: dict | None = None,
     text: str | None = None,
+    grounding_chunks: list[dict] | None = None,
+    author: str = "model",
 ):
     """Compose a minimal stand-in for an ADK Event that the timeline +
     map_event helpers can read."""
@@ -73,11 +75,18 @@ def _fake_event(
         parts.append(SimpleNamespace(function_call=None, function_response=None, text=text))
     content = SimpleNamespace(parts=parts) if parts else None
     actions = SimpleNamespace(state_delta=state_delta or {}) if state_delta is not None else SimpleNamespace(state_delta={})
+    grounding_metadata = None
+    if grounding_chunks is not None:
+        grounding_metadata = SimpleNamespace(
+            grounding_chunks=[
+                SimpleNamespace(web=SimpleNamespace(**chunk)) for chunk in grounding_chunks
+            ]
+        )
     return SimpleNamespace(
         content=content,
         actions=actions,
-        author="model",
-        grounding_metadata=None,
+        author=author,
+        grounding_metadata=grounding_metadata,
         is_final_response=lambda: False,
     )
 
@@ -218,7 +227,7 @@ async def test_stop_heartbeat_handles_already_finished():
 # ── observe_event / _capture_final ───────────────────────────────────────────
 
 
-def test_capture_final_uses_only_verified_tool_and_provider_sources():
+def test_capture_final_uses_accumulated_and_grounding_sources():
     state = _make_state()
     state.specialist_sources = [
         {"url": "https://a", "title": "A"},
@@ -235,9 +244,10 @@ def test_capture_final_uses_only_verified_tool_and_provider_sources():
         }
     )
     urls = [s["url"] for s in state.final_sources]
-    assert urls == ["https://a", "https://b"]
+    assert urls == ["https://a", "https://b", "https://c"]
     titles = {s["url"]: s["title"] for s in state.final_sources}
     assert titles["https://a"] == "A"
+    assert titles["https://c"] == "C"
 
 
 def test_observe_event_returns_timeline_list():
@@ -258,6 +268,32 @@ def test_observe_event_drains_tool_source_state_delta():
     state.observe_event(_fake_event(state_delta={"_tool_src_google_maps_abc": source}))
 
     assert state.specialist_sources == [source]
+
+
+def test_observe_event_merges_grounding_sources_into_drawer_candidates():
+    state = _make_state()
+    source = {
+        "uri": "https://example.com/grounded",
+        "title": "Grounded",
+        "domain": "example.com",
+    }
+    drawer_source = {
+        "url": "https://example.com/grounded",
+        "title": "Grounded",
+        "domain": "example.com",
+    }
+
+    state.observe_event(
+        _fake_event(
+            state_delta={"market_result": "Result"},
+            text="Result",
+            grounding_chunks=[source],
+            author="market_landscape",
+        )
+    )
+    state._capture_final({"reply": "answer"})
+
+    assert state.final_sources == [{**drawer_source, "provider": "grounding"}]
 
 
 def test_observe_event_merges_adjudicated_evidence_memo_sources():
@@ -379,7 +415,7 @@ def test_source_dedupe_collapses_public_web_sources_by_url():
     ]
 
 
-def test_vertex_grounding_redirect_sources_are_not_persisted():
+def test_vertex_grounding_redirect_sources_are_persisted():
     state = _make_state()
     redirect = {
         "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/token",
@@ -390,8 +426,8 @@ def test_vertex_grounding_redirect_sources_are_not_persisted():
     state._merge_source(redirect)
     state._capture_final({"reply": "answer", "sources": [redirect]})
 
-    assert state.specialist_sources == []
-    assert state.final_sources == []
+    assert state.specialist_sources == [redirect]
+    assert state.final_sources == [redirect]
 
 
 def test_evidence_memo_sources_require_successful_adjudicator_read():

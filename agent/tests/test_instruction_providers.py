@@ -136,7 +136,7 @@ class TestReportWriterInstruction:
         assert "Average entree price is 21 USD." in result
         assert "### Market Landscape" in result
         assert "### Menu & Pricing" in result
-        assert "Evidence Memo as the source of truth for claim status" in result
+        assert "Evidence Memo as claim-status and source-quality metadata" in result
         assert "Do not cite unread pages as evidence" in result
 
     def test_defaults_when_state_empty(self):
@@ -148,7 +148,7 @@ class TestReportWriterInstruction:
         assert "No specialist reports available." in result
         assert "No adjudicated evidence memo available." in result
 
-    def test_failed_closed_memo_withholds_specialist_claims_from_writer(self):
+    def test_failed_closed_memo_keeps_specialist_reports_with_source_limits(self):
         ctx = MockCtx(
             state={
                 "places_context": "Google Places rating: 4.5",
@@ -177,10 +177,9 @@ class TestReportWriterInstruction:
         result = _report_writer_instruction(ctx)
 
         assert "Google Places rating: 4.5" in result
-        assert "Specialist reports are withheld" in result
+        assert "Raw specialist says Unverified noodle trend claim." in result
         assert "withheld_unresolved_claim_count" in result
-        assert "Unverified noodle trend claim" not in result
-        assert "Raw specialist says" not in result
+        assert "Phrase public-web material that was not confirmed" in result
 
     def test_handles_curly_braces_in_injected_material(self):
         ctx = MockCtx(state={
@@ -305,6 +304,7 @@ class TestEvidenceAdjudicatorInstruction:
 
         assert "Restaurant XYZ data" in result
         assert "Google Place ID: ChIJtarget" in result
+        assert "Same-Run Captured Web Sources" in result
         assert "claims_for_validation" in result
         assert "candidate_sources" in result
         assert "https://example.com/opening" in result
@@ -318,6 +318,7 @@ class TestEvidenceAdjudicatorInstruction:
 
         assert "No restaurant data available." in result
         assert "No structured place registry available." in result
+        assert "No same-run grounding or fetched web sources captured." in result
         assert "No specialist reports available." in result
 
     def test_preserves_braces_in_specialist_material(self):
@@ -493,8 +494,8 @@ class TestEvidenceAdjudicatorFallback:
                 "reason": (
                     "The evidence adjudicator did not produce a claim-status "
                     "memo, so this specialist claim must be treated as "
-                    "unresolved. Source reads may have been attempted, but no "
-                    "adjudicated support was recorded for this claim. Provider "
+                    "unresolved. Packet source URLs are not read authority; no "
+                    "captured-source read produced adjudicated support for this claim. Provider "
                     "references were present, but no adjudicated provider "
                     "confirmation was recorded for this claim."
                 ),

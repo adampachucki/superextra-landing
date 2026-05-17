@@ -15,7 +15,7 @@ Router -> research_pipeline
 Router -> continue_research
 ```
 
-The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief and surface as much useful writer material as possible. The Evidence Adjudicator reads specialist validation packets, attempts the concrete packet URLs with the bounded-concurrency Jina reader, and writes `evidence_memo`. The Report Writer reads Places context, specialist reports, and `evidence_memo`, without a lead-authored brief, and writes the final report. Continue Research answers from the existing report, specialist notes, Places context, direct venue/known-URL checks, and bounded non-durable specialist deepening. Source discovery belongs in focused helpers, not direct continuation-agent search. Broad new reports should become new research sessions instead of being merged into the old thread.
+The router routes. The context enricher builds Google Places context. The Research Lead plans, briefs specialists, checks sufficiency, and records internal research coverage notes. Specialists answer one evidence surface from the Lead's brief and surface as much useful writer material as possible. The Evidence Adjudicator parses specialist validation packets for claims, reads only same-run grounding/fetched source capture with the bounded-concurrency Jina reader, and writes `evidence_memo`. Packet URLs are claim metadata, not read authority. The Report Writer reads Places context, specialist reports, and `evidence_memo`, without a lead-authored brief, and writes the final report. Continue Research answers from the existing report, specialist notes, Places context, direct venue/known-URL checks, and bounded non-durable specialist deepening. Source discovery belongs in focused helpers, not direct continuation-agent search. Broad new reports should become new research sessions instead of being merged into the old thread.
 
 ## State Keys
 
@@ -148,7 +148,7 @@ Runtime templates use Python `str.format()`.
 Files with runtime variables:
 
 - `research_lead.md`: `{places_context}`, `{market_source_profiles}`.
-- `evidence_adjudicator.md`: `{places_context}`, `{known_places_context}`, `{specialist_reports}`.
+- `evidence_adjudicator.md`: `{places_context}`, `{known_places_context}`, `{captured_source_urls}`, `{specialist_reports}`.
 - `report_writer.md`: `{places_context}`, `{specialist_reports}`, `{evidence_memo}`.
 - `continue_research.md`: `{final_report}`, `{specialist_reports}`, `{research_coverage}`, `{continuation_notes}`, `{places_context}`, `{known_places_context}`.
 - `specialist_base.md`: `{role_title}`, `{places_context}`, `{known_places_context}`, `{specialist_body}`.

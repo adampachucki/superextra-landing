@@ -37,6 +37,7 @@ from .web_tools import (
     collect_adjudicator_packet_claims,
     fetch_web_content,
     fetch_web_content_batch,
+    format_adjudicator_source_candidates,
     read_adjudicator_sources,
     read_web_pages,
 )
@@ -275,11 +276,6 @@ def _parse_evidence_memo(value):
         return None
 
 
-def _is_failed_closed_evidence_memo(value) -> bool:
-    parsed = _parse_evidence_memo(value)
-    return isinstance(parsed, dict) and parsed.get("adjudication_status") == "failed_closed"
-
-
 def _format_evidence_memo_for_writer(value):
     parsed = _parse_evidence_memo(value)
     if not isinstance(parsed, dict) or parsed.get("adjudication_status") != "failed_closed":
@@ -296,8 +292,10 @@ def _format_evidence_memo_for_writer(value):
         "read_summary": parsed.get("read_summary", {}),
         "withheld_unresolved_claim_count": len(parsed.get("unresolved_claims") or []),
         "notes": (
-            "Adjudication failed closed. Unresolved specialist claim text is "
-            "withheld from the writer and must not be used as report evidence."
+            "Adjudication failed closed. Unresolved claim text was redacted "
+            "from this memo, so the memo provides no verified support. Use "
+            "specialist reports only under source-limited failed-adjudication "
+            "rules."
         ),
     }
     return json.dumps(redacted, ensure_ascii=False, indent=2)
@@ -321,8 +319,8 @@ def _record_evidence_adjudicator_fallback(*, callback_context):
         ]
         if claim.get("source_urls"):
             reason_parts.append(
-                "Source reads may have been attempted, but no adjudicated "
-                "support was recorded for this claim."
+                "Packet source URLs are not read authority; no captured-source "
+                "read produced adjudicated support for this claim."
             )
         if claim.get("provider_refs"):
             reason_parts.append(
@@ -348,7 +346,7 @@ def _record_evidence_adjudicator_fallback(*, callback_context):
             )
     for key, reason in (
         ("skipped_urls", "duplicate or already read in this adjudication run"),
-        ("rejected_urls", "not present in specialist validation packets"),
+        ("rejected_urls", "not present in same-run source capture"),
         ("invalid_urls", "invalid URL"),
     ):
         for url in read_result.get(key) or []:
@@ -423,22 +421,12 @@ def _report_writer_instruction(ctx):
     evidence_memo = ctx.state.get(
         "evidence_memo", "No adjudicated evidence memo available."
     )
-    if _is_failed_closed_evidence_memo(evidence_memo):
-        specialist_reports = (
-            "Evidence adjudication failed closed. Specialist reports are withheld "
-            "from writer context because their claims were not adjudicated. Use "
-            "Restaurant Context, structured provider facts, and the redacted "
-            "Evidence Memo limits only."
-        )
-    else:
-        specialist_reports = _format_specialist_reports(
-            ctx.state,
-            default="No specialist reports available.",
-        )
-
     values = {
         "places_context": ctx.state.get("places_context", "No restaurant data available."),
-        "specialist_reports": specialist_reports,
+        "specialist_reports": _format_specialist_reports(
+            ctx.state,
+            default="No specialist reports available.",
+        ),
         "evidence_memo": _format_evidence_memo_for_writer(evidence_memo),
     }
     return _REPORT_WRITER_TEMPLATE.format(**values)
@@ -449,6 +437,7 @@ def _evidence_adjudicator_instruction(ctx):
     values = {
         "places_context": ctx.state.get("places_context", "No restaurant data available."),
         "known_places_context": format_known_places_context(ctx.state),
+        "captured_source_urls": format_adjudicator_source_candidates(),
         "specialist_reports": _format_specialist_reports(
             ctx.state,
             default="No specialist reports available.",
