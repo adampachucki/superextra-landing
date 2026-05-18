@@ -55,6 +55,29 @@ SPECIALIST_DISCOVERED_READ_LIMIT = 6
 SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
 SERPAPI_SEARCH_TIMEOUT_S = 15.0
 PUBLIC_SEARCH_RESULT_LIMIT = 8
+PUBLIC_SEARCH_RECENCY_TBS = {
+    "day": "qdr:d",
+    "past_day": "qdr:d",
+    "24h": "qdr:d",
+    "week": "qdr:w",
+    "past_week": "qdr:w",
+    "month": "qdr:m",
+    "past_month": "qdr:m",
+    "year": "qdr:y",
+    "past_year": "qdr:y",
+}
+PUBLIC_NEWS_RECENCY_OPERATOR = {
+    "day": "1d",
+    "past_day": "1d",
+    "24h": "1d",
+    "week": "7d",
+    "past_week": "7d",
+    "month": "1m",
+    "past_month": "1m",
+    "year": "1y",
+    "past_year": "1y",
+}
+_TWO_LETTER_CODE_RE = re.compile(r"^[a-zA-Z]{2}$")
 
 # Gemini grounding exposes article URLs as tokenized redirects on
 # `https://vertexaisearch.cloud.google.com/grounding-api-redirect/...`.
@@ -630,7 +653,70 @@ def _domain_for_url(url: str) -> str:
         return ""
 
 
-def _search_source_entry(item: dict[str, Any]) -> dict[str, Any] | None:
+def _clean_optional_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = " ".join(value.split()).strip()
+    return cleaned or None
+
+
+def _normalize_search_type(value: Any) -> str:
+    cleaned = (_clean_optional_string(value) or "web").lower()
+    return "news" if cleaned in {"news", "google_news"} else "web"
+
+
+def _normalize_two_letter_code(value: Any) -> str | None:
+    cleaned = _clean_optional_string(value)
+    if not cleaned or not _TWO_LETTER_CODE_RE.fullmatch(cleaned):
+        return None
+    return cleaned.lower()
+
+
+def _normalize_site_filter(value: Any) -> str | None:
+    cleaned = _clean_optional_string(value)
+    if not cleaned:
+        return None
+    if "://" in cleaned:
+        host = urlparse(cleaned).hostname
+    else:
+        host = urlparse(f"https://{cleaned}").hostname
+    if not host:
+        return None
+    return host.removeprefix("www.").lower()
+
+
+def _normalize_recency(value: Any) -> str | None:
+    cleaned = (
+        (_clean_optional_string(value) or "")
+        .lower()
+        .replace("-", "_")
+        .replace(" ", "_")
+    )
+    return cleaned if cleaned in PUBLIC_SEARCH_RECENCY_TBS else None
+
+
+def _query_with_search_filters(
+    query: str,
+    *,
+    search_type: str,
+    site: str | None,
+    recency: str | None,
+) -> str:
+    parts = [query.strip()]
+    if site:
+        parts.append(f"site:{site}")
+    if search_type == "news" and recency:
+        parts.append(f"when:{PUBLIC_NEWS_RECENCY_OPERATOR[recency]}")
+    return " ".join(parts)
+
+
+def _source_name(value: Any) -> str | None:
+    if isinstance(value, dict):
+        return _clean_optional_string(value.get("name") or value.get("title"))
+    return _clean_optional_string(value)
+
+
+def _search_source_entry(item: dict[str, Any], *, provider: str) -> dict[str, Any] | None:
     url = _canonical_source_url(item.get("link"))
     if not url:
         return None
@@ -641,7 +727,7 @@ def _search_source_entry(item: dict[str, Any]) -> dict[str, Any] | None:
         "title": title.strip(),
         "url": url,
         "domain": _domain_for_url(url),
-        "provider": "public_search",
+        "provider": provider,
     }
     snippet = item.get("snippet")
     if isinstance(snippet, str) and snippet.strip():
@@ -649,6 +735,12 @@ def _search_source_entry(item: dict[str, Any]) -> dict[str, Any] | None:
     position = item.get("position")
     if isinstance(position, int):
         source["position"] = position
+    date = _clean_optional_string(item.get("date"))
+    if date:
+        source["date"] = date
+    source_name = _source_name(item.get("source"))
+    if source_name:
+        source["source_name"] = source_name
     return source
 
 
@@ -1388,9 +1480,15 @@ async def read_public_pages(urls: list[str]) -> dict:
 async def search_public_web(
     query: str,
     max_results: int = 6,
+    search_type: str = "web",
+    location: str = "",
+    country: str = "",
+    language: str = "",
+    recency: str = "",
+    site: str = "",
     tool_context=None,
 ) -> dict:
-    """Search public web results and return exact source URLs.
+    """Search public web/news results and return exact source URLs.
 
     Use this to discover material public pages before `read_discovered_sources`.
     The returned result URLs are recorded for this specialist, so a follow-up
@@ -1399,7 +1497,13 @@ async def search_public_web(
 
     Args:
         query: Search query, including location/date terms when relevant.
+        search_type: `web` for regular Google results, or `news` for Google News.
         max_results: Number of organic results to return, capped at 8.
+        location: Optional city/region/country bias for regular web results.
+        country: Optional two-letter country code such as `pl`, `us`, or `de`.
+        language: Optional two-letter language code such as `pl`, `en`, or `de`.
+        recency: Optional `day`, `week`, `month`, or `year` freshness filter.
+        site: Optional domain to restrict results, such as `trojmiasto.pl`.
     """
     if not isinstance(query, str) or not query.strip():
         return {"status": "error", "error_message": "query is required"}
@@ -1408,13 +1512,34 @@ async def search_public_web(
     except (TypeError, ValueError):
         limit = 6
     limit = max(1, min(limit, PUBLIC_SEARCH_RESULT_LIMIT))
+    normalized_type = _normalize_search_type(search_type)
+    normalized_location = _clean_optional_string(location)
+    normalized_country = _normalize_two_letter_code(country)
+    normalized_language = _normalize_two_letter_code(language)
+    normalized_recency = _normalize_recency(recency)
+    normalized_site = _normalize_site_filter(site)
+    provider = "public_news" if normalized_type == "news" else "public_search"
+    filtered_query = _query_with_search_filters(
+        query,
+        search_type=normalized_type,
+        site=normalized_site,
+        recency=normalized_recency,
+    )
 
     params = {
-        "engine": "google",
-        "q": query.strip(),
+        "engine": "google_news" if normalized_type == "news" else "google",
+        "q": filtered_query,
         "num": str(limit),
         "api_key": get_secret("SERPAPI_API_KEY"),
     }
+    if normalized_type == "web" and normalized_location:
+        params["location"] = normalized_location
+    if normalized_type == "web" and normalized_recency:
+        params["tbs"] = PUBLIC_SEARCH_RECENCY_TBS[normalized_recency]
+    if normalized_country:
+        params["gl"] = normalized_country
+    if normalized_language:
+        params["hl"] = normalized_language
     try:
         response = await _get_client().get(
             SERPAPI_SEARCH_URL,
@@ -1433,14 +1558,14 @@ async def search_public_web(
     except Exception as e:  # noqa: BLE001
         return {"status": "error", "error_message": f"Search failed: {e}"}
 
-    organic = payload.get("organic_results")
+    organic = payload.get("news_results" if normalized_type == "news" else "organic_results")
     results: list[dict[str, Any]] = []
     seen: set[str] = set()
     if isinstance(organic, list):
         for raw in organic:
             if not isinstance(raw, dict):
                 continue
-            source = _search_source_entry(raw)
+            source = _search_source_entry(raw, provider=provider)
             if not source:
                 continue
             url = source["url"]
@@ -1460,6 +1585,9 @@ async def search_public_web(
     output = {
         "status": status,
         "query": query.strip(),
+        "search_type": normalized_type,
+        "search_query": filtered_query,
+        "search_parameters": {k: v for k, v in params.items() if k != "api_key"},
         "results": results,
         "result_count": len(results),
         "sources": results,

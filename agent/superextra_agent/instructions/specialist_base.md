@@ -43,7 +43,9 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 Search and page reading have different jobs:
 
 - Search discovers current public sources and weak signals. Search snippets and search-result source pills are not the same as reading a page.
-- Use `search_public_web` for public web source discovery when it is available. It returns exact result URLs and records them for source reading.
+- Use `search_public_web` for public web source discovery when it is available. It returns exact result URLs, snippets, source metadata, and records URLs for source reading.
+- For broad reconnaissance, search snippets first to map the source landscape before reading pages. Use the tool's `location`, `country`, `language`, `recency`, `site`, and `search_type` options instead of repeating many near-duplicate query variants.
+- Use `search_type="news"` for recent openings, closures, policy changes, labor stories, local press, events, and other current signals. Use regular web search for official pages, menus, directories, reports, blogs, and evergreen background.
 - Use `read_discovered_sources` after `search_public_web` to read material public pages. Pass exact article/detail/menu/report URLs only when they came directly from a tool or source metadata; pass `[]` when the sources came from your latest search so the tool reads captured URLs without hand-copying them.
 - Completion gate: if your report uses public web/search evidence for concrete names, dates, prices, reasons, claims, or operator implications, and any material public source was discovered, call `read_discovered_sources` at least once before writing the final report. A search-only report is acceptable only when no material public source was found or page reading was unavailable; label that evidence as search/grounding-only.
 - Before writing from public web/search evidence, make a source-reading call when page content would materially affect confidence, dates, names, prices, reasons, or operator implications. Use concrete URLs if known; otherwise use `read_discovered_sources([])`.
@@ -64,7 +66,7 @@ Do not spend source-reading effort on bare domain roots, search result pages, lo
 
 Workflow:
 
-1. Search to discover candidate sources. When `search_public_web` finds material source results, call `read_discovered_sources([])` during your research before deciding. Prefer article/detail/menu/report sources over homepages.
+1. Search to discover candidate sources and weak signals. Start with one broad search per evidence angle, then use more focused searches only when snippets reveal a real lead or gap. When `search_public_web` finds material source results, call `read_discovered_sources([])` during your research before deciding. Prefer article/detail/menu/report sources over homepages.
 2. Iterate from what the pages say: refine searches, compare sources, or adjust conclusions when page content contradicts snippets or the brief.
 3. Use page-reading output when explicit evidence, source notes, exact wording, raw tables, or page text would materially improve the specialist report.
 4. After two or three searches on the same entity or angle, stop searching variants and either read the best URLs found or state the evidence gap.

@@ -217,6 +217,8 @@ class TestMakeInstruction:
         assert "## Search And Source Reading" in result
         assert "Search snippets and search-result source pills are not the same as reading a page" in result
         assert "Use `search_public_web` for public web source discovery" in result
+        assert "For broad reconnaissance, search snippets first" in result
+        assert "Use `search_type=\"news\"` for recent openings" in result
         assert "Use `read_discovered_sources` after `search_public_web`" in result
         assert "Completion gate: if your report uses public web/search evidence" in result
         assert "pass `[]` when the sources came from your latest search" in result

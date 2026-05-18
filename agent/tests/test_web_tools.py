@@ -304,6 +304,98 @@ async def test_search_public_web_records_results_for_discovered_source_reader():
 
 
 @pytest.mark.asyncio
+async def test_search_public_web_applies_locale_recency_and_site_parameters():
+    tool_context = SimpleNamespace(agent_name="market_landscape")
+    response = httpx.Response(
+        200,
+        json={
+            "organic_results": [
+                {
+                    "position": 1,
+                    "title": "Fresh report",
+                    "link": "https://trojmiasto.pl/report",
+                    "snippet": "Recent opening details",
+                    "date": "May 2026",
+                }
+            ]
+        },
+        request=httpx.Request("GET", web_tools.SERPAPI_SEARCH_URL),
+    )
+    client = SimpleNamespace(get=AsyncMock(return_value=response))
+
+    with patch("superextra_agent.web_tools._get_client", return_value=client):
+        search = await search_public_web(
+            "restaurant openings",
+            search_type="web",
+            location="Gdynia, Poland",
+            country="PL",
+            language="pl",
+            recency="month",
+            site="https://www.trojmiasto.pl/kulinaria/",
+            tool_context=tool_context,
+        )
+
+    params = client.get.await_args.kwargs["params"]
+    assert params["engine"] == "google"
+    assert params["q"] == "restaurant openings site:trojmiasto.pl"
+    assert params["location"] == "Gdynia, Poland"
+    assert params["gl"] == "pl"
+    assert params["hl"] == "pl"
+    assert params["tbs"] == "qdr:m"
+    assert "api_key" not in search["search_parameters"]
+    assert search["search_type"] == "web"
+    assert search["sources"][0]["date"] == "May 2026"
+
+
+@pytest.mark.asyncio
+async def test_search_public_web_reads_google_news_results_shape():
+    response = httpx.Response(
+        200,
+        json={
+            "news_results": [
+                {
+                    "position": 1,
+                    "title": "New venue opens",
+                    "link": "https://example.com/news",
+                    "snippet": "Opening details",
+                    "date": "2 hours ago",
+                    "source": {"name": "Local News"},
+                }
+            ]
+        },
+        request=httpx.Request("GET", web_tools.SERPAPI_SEARCH_URL),
+    )
+    client = SimpleNamespace(get=AsyncMock(return_value=response))
+
+    with patch("superextra_agent.web_tools._get_client", return_value=client):
+        search = await search_public_web(
+            "new restaurants Gdynia",
+            search_type="news",
+            country="pl",
+            language="pl",
+            recency="week",
+        )
+
+    params = client.get.await_args.kwargs["params"]
+    assert params["engine"] == "google_news"
+    assert params["q"] == "new restaurants Gdynia when:7d"
+    assert "tbs" not in params
+    assert search["search_type"] == "news"
+    assert search["sources"] == [
+        {
+            "title": "New venue opens",
+            "url": "https://example.com/news",
+            "domain": "example.com",
+            "provider": "public_news",
+            "snippet": "Opening details",
+            "position": 1,
+            "date": "2 hours ago",
+            "source_name": "Local News",
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_read_discovered_sources_prioritizes_latest_search_batch():
     run_id = "run-specialist-latest"
     limit = web_tools.SPECIALIST_DISCOVERED_READ_LIMIT
