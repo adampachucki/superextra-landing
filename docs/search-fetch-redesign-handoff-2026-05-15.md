@@ -23,7 +23,7 @@ Recent work tried to nudge agents to fetch more after Google Search grounding. I
 - Prompt pressure made agents "dance": repeated searches, repeated fetch attempts, and visible wasted activity.
 - Tight wording around "source cannot be displayed unless fetched" caused source pills to disappear or become underused. Product requirement is the opposite: source pills must continue to surface grounding/search-result sources, fetched-page sources, and provider sources.
 - Gemini URL Context was added, but production probes showed it is slow and unreliable in Agent Engine. In `probe-fetch-20260515-131515`, specialists called `read_web_pages` 4 times; 1 succeeded and 3 failed with Vertex `504 DEADLINE_EXCEEDED` after roughly 21-23s. The final answer worked only because specialists fell back to Jina reads.
-- `include_server_side_tool_invocations` looked like the native context-circulation switch, but the installed Vertex SDK rejects it before request dispatch: `ValueError: include_server_side_tool_invocations parameter is not supported in Vertex AI.`
+- `include_server_side_tool_invocations` looked like the native context-circulation switch, but that flag belongs to the Gemini Developer API / AI Studio path, not Vertex. Vertex rejects it; Gemini 3 Vertex tool combination works without it. See `docs/vertex-tool-combination-flag-2026-05-18.md`.
 - Parallel specialists still duplicate the same searches/reads. Prompt instructions cannot reliably coordinate shared in-flight fetch state across concurrent specialists.
 
 ## Relevant Commits

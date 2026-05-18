@@ -2,7 +2,16 @@
 
 from superextra_agent.specialists import ALL_SPECIALISTS, CONTINUATION_SPECIALISTS
 from superextra_agent.agent import _skip_enricher_if_cached
-from superextra_agent.web_tools import read_discovered_sources, search_public_web
+from superextra_agent.specialist_catalog import SPECIALISTS
+from superextra_agent.web_tools import (
+    read_discovered_sources,
+    record_research_sources,
+    search_public_web,
+)
+
+NATIVE_INITIAL_SPECIALISTS = {
+    specialist.name for specialist in SPECIALISTS if specialist.name != "review_analyst"
+}
 
 
 class FakeCallbackContext:
@@ -24,11 +33,19 @@ def test_specialists_accept_agenttool_request_context():
         assert specialist.before_agent_callback is None
 
 
-def test_web_research_specialists_use_search_and_captured_reader():
-    for specialist in ALL_SPECIALISTS:
-        if specialist.name == "review_analyst":
-            continue
-        assert specialist.tools == [search_public_web, read_discovered_sources]
+def test_first_turn_public_web_specialists_use_native_search_and_source_recorder():
+    specialists = [
+        agent for agent in ALL_SPECIALISTS if agent.name in NATIVE_INITIAL_SPECIALISTS
+    ]
+
+    assert {agent.name for agent in specialists} == NATIVE_INITIAL_SPECIALISTS
+    for specialist in specialists:
+        assert _tool_names(specialist.tools) == [
+            "google_search",
+            "url_context",
+            "record_research_sources",
+        ]
+        assert specialist.tools[-1] is record_research_sources
 
 
 def test_first_turn_specialists_do_not_expose_raw_fetch_tools():
@@ -43,6 +60,14 @@ def test_first_turn_specialists_do_not_expose_raw_fetch_tools():
 
     for specialist in ALL_SPECIALISTS:
         assert forbidden.isdisjoint(_tool_names(specialist.tools))
+
+
+def test_first_turn_public_web_specialists_do_not_use_custom_reader():
+    for specialist in ALL_SPECIALISTS:
+        if specialist.name == "review_analyst":
+            continue
+        assert search_public_web not in specialist.tools
+        assert read_discovered_sources not in specialist.tools
 
 
 def test_continuation_dynamic_researcher_uses_search_and_captured_reader():

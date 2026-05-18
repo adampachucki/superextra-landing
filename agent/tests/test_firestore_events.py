@@ -249,6 +249,92 @@ def test_public_search_tool_sources_are_captured_as_search_sources():
     assert map_event(ev, {})["grounding_sources"] == expected
 
 
+def test_recorded_native_sources_are_captured_as_grounding_sources():
+    source = {
+        "url": "https://example.com/native",
+        "title": "Native source",
+        "domain": "example.com",
+    }
+    ev = _event(
+        author="market_landscape",
+        function_responses=[
+            (
+                "record_research_sources",
+                {"status": "success", "sources": [source]},
+            )
+        ],
+    )
+
+    expected = [{**source, "provider": "grounding"}]
+    assert extract_sources_from_search_tool(ev) == expected
+    assert map_event(ev, {})["grounding_sources"] == expected
+
+
+def test_record_source_call_suppresses_raw_native_grounding_chunks():
+    selected = {
+        "url": "https://example.com/selected",
+        "title": "Selected",
+        "domain": "example.com",
+    }
+    ev = _event(
+        author="market_landscape",
+        function_calls=[("record_research_sources", {"sources": [selected]})],
+        function_responses=[
+            (
+                "record_research_sources",
+                {"status": "success", "sources": [selected]},
+            )
+        ],
+        grounding_chunks=[
+            {
+                "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/raw",
+                "title": "Raw",
+                "domain": "example.com",
+            }
+        ],
+    )
+
+    assert extract_sources_from_grounding(ev) == []
+    assert map_event(ev, {})["grounding_sources"] == [
+        {**selected, "provider": "grounding"}
+    ]
+
+
+def test_empty_record_source_result_keeps_raw_native_grounding_chunks():
+    ev = _event(
+        author="market_landscape",
+        function_calls=[("record_research_sources", {"sources": []})],
+        function_responses=[
+            (
+                "record_research_sources",
+                {"status": "error", "sources": []},
+            )
+        ],
+        grounding_chunks=[
+            {
+                "uri": "https://example.com/raw",
+                "title": "Raw",
+                "domain": "example.com",
+            }
+        ],
+    )
+
+    assert extract_sources_from_grounding(ev) == [
+        {
+            "url": "https://example.com/raw",
+            "title": "Raw",
+            "domain": "example.com",
+        }
+    ]
+    assert map_event(ev, {})["grounding_sources"] == [
+        {
+            "url": "https://example.com/raw",
+            "title": "Raw",
+            "domain": "example.com",
+        }
+    ]
+
+
 def test_research_lead_grounding_sources_are_captured():
     ev = _event(
         author="research_lead",

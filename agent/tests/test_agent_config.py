@@ -1,6 +1,6 @@
 """Tests for top-level agent configuration."""
 
-from google.adk.tools import google_search
+from google.adk.tools import google_search, url_context
 
 from superextra_agent.agent import (
     app,
@@ -21,10 +21,13 @@ from superextra_agent.specialists import (
 )
 from superextra_agent.web_tools import (
     fetch_web_content,
-    read_discovered_sources,
     read_web_pages,
-    search_public_web,
+    record_research_sources,
 )
+
+NATIVE_INITIAL_SPECIALISTS = {
+    specialist.name for specialist in SPECIALISTS if specialist.name != "review_analyst"
+}
 
 
 def _tool_names(tools):
@@ -63,18 +66,18 @@ def test_continuation_specialists_are_all_non_durable():
     assert all(agent.output_key is None for agent in CONTINUATION_SPECIALISTS)
 
 
-def test_web_research_specialists_can_read_captured_sources():
-    web_specialists = [
+def test_first_turn_public_web_specialists_use_native_source_recorder():
+    native_specialists = [
         tool.agent
         for tool in research_lead.tools
-        if getattr(tool, "agent", None)
-        and getattr(tool.agent, "name", "") != "review_analyst"
+        if getattr(getattr(tool, "agent", None), "name", "") in NATIVE_INITIAL_SPECIALISTS
     ]
 
-    assert web_specialists
-    assert all(search_public_web in agent.tools for agent in web_specialists)
-    assert all(read_discovered_sources in agent.tools for agent in web_specialists)
-    assert all(read_web_pages not in agent.tools for agent in web_specialists)
+    assert {agent.name for agent in native_specialists} == NATIVE_INITIAL_SPECIALISTS
+    assert all(
+        agent.tools == [google_search, url_context, record_research_sources]
+        for agent in native_specialists
+    )
 
 
 def test_research_pipeline_sends_specialist_reports_directly_to_writer():

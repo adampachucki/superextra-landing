@@ -7,6 +7,11 @@ bodies and return structured evidence plus public web source entries.
 `search_public_web` is the specialist search tool. It returns exact public
 result URLs and records them as same-run source candidates.
 
+`record_research_sources` is the native-search source recorder. Specialists
+using Gemini Google Search can record only the source URLs they judged useful;
+the tool resolves Vertex grounding redirects before those URLs enter the
+source drawer or same-run read queue.
+
 `read_discovered_sources` is the specialist reader for material public URLs
 found during research. It can read concrete URLs passed by the specialist, or
 same-run source URLs captured from that specialist's own search/tool results.
@@ -413,6 +418,89 @@ def record_source_candidates(
     )
     _latest_source_candidates_by_run_and_agent[(run_id, agent_name)] = candidates
     _append_source_candidates(agent_queue, candidates)
+
+
+async def record_research_sources(
+    sources: list[dict],
+    notes: str = "",
+    tool_context=None,
+) -> dict:
+    """Record selected native-search sources for drawer and source reading.
+
+    Use this with native Google Search / URL Context after deciding which
+    public sources are worth showing or using as evidence. Pass normal public
+    URLs or Vertex grounding redirect URLs exactly as exposed by the model; do
+    not guess publisher URLs from titles or snippets.
+
+    Args:
+        sources: Selected source objects. Each object should include `url` and
+            may include `title`, `reason`, `snippet`, or `date`.
+        notes: Short source-selection note or limitation.
+    """
+    if not isinstance(sources, list):
+        return {"status": "error", "error_message": "sources must be a list"}
+
+    run_id = _fetch_run_id_var.get()
+    agent_name = getattr(tool_context, "agent_name", None) if tool_context else None
+
+    selected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    invalid_count = 0
+    resolved_redirect_count = 0
+    unresolved_redirect_count = 0
+
+    for raw in sources:
+        if not isinstance(raw, dict):
+            invalid_count += 1
+            continue
+        url = _canonical_source_url(raw.get("url"))
+        if not url:
+            invalid_count += 1
+            continue
+
+        was_vertex_redirect = _is_vertex_redirect(url)
+        resolved_url = _canonical_source_url(await _unwrap_vertex_redirect(url))
+        if not resolved_url:
+            invalid_count += 1
+            continue
+        if was_vertex_redirect:
+            if resolved_url == url:
+                unresolved_redirect_count += 1
+            else:
+                resolved_redirect_count += 1
+
+        if resolved_url in seen:
+            continue
+        seen.add(resolved_url)
+
+        domain = _domain_for_url(resolved_url)
+        title = _clean_optional_string(raw.get("title")) or domain or resolved_url
+        entry: dict[str, Any] = {
+            "title": title,
+            "url": resolved_url,
+            "provider": "grounding",
+        }
+        if domain:
+            entry["domain"] = domain
+        for key in ("snippet", "date", "reason"):
+            value = _clean_optional_string(raw.get(key))
+            if value:
+                entry[key] = value
+        selected.append(entry)
+
+    if run_id and isinstance(agent_name, str):
+        record_source_candidates(run_id, selected, agent_name=agent_name)
+
+    return {
+        "status": "success" if selected else "error",
+        "requested_count": len(sources),
+        "selected_count": len(selected),
+        "invalid_count": invalid_count,
+        "resolved_redirect_count": resolved_redirect_count,
+        "unresolved_redirect_count": unresolved_redirect_count,
+        "notes": notes.strip() if isinstance(notes, str) else "",
+        "sources": selected,
+    }
 
 
 def _iter_agent_discovered_urls(agent_name: str | None) -> list[str]:

@@ -216,16 +216,19 @@ class TestMakeInstruction:
 
         assert "## Search And Source Reading" in result
         assert "Search snippets and search-result source pills are not the same as reading a page" in result
+        assert "Inspect the strongest few pages, not every result" in result
+        assert "Omit a source if the exact URL is not available" in result
         assert "Use `search_public_web` for public web source discovery" in result
         assert "For broad reconnaissance, search snippets first" in result
-        assert "Use `search_type=\"news\"` for recent openings" in result
+        assert "use `search_type=\"news\"` for recent openings" in result
         assert "Use `read_discovered_sources` after `search_public_web`" in result
         assert "Completion gate: if your report uses public web/search evidence" in result
         assert "pass `[]` when the sources came from your latest search" in result
         assert "Treat URLs supplied in the brief as source metadata" in result
         assert "Treat page reads as evidence" in result
         assert "Do not say \"Sources read\"" in result
-        assert "call `read_discovered_sources([])` during your research" in result
+        assert "call `read_discovered_sources([])` when material source results are found" in result
+        assert "Continue searching only when the next query tests a new lead" in result
         assert "Search and grounding sources may still appear as source pills" in result
         assert "proof that a page was read" in result
         assert "### Evidence Notes" in result

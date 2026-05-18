@@ -6,6 +6,7 @@ from typing import Any
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_response import LlmResponse
+from google.adk.tools import google_search, url_context
 from google.genai import Client, types
 
 from .apify_tools import get_google_reviews
@@ -15,7 +16,7 @@ from .specialist_catalog import (
     SPECIALISTS,
 )
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
-from .web_tools import read_discovered_sources, search_public_web
+from .web_tools import read_discovered_sources, record_research_sources, search_public_web
 
 _dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
 INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
@@ -104,6 +105,11 @@ _WEB_RESEARCH_TOOLS = [
     search_public_web,
     read_discovered_sources,
 ]
+_NATIVE_WEB_RESEARCH_TOOLS = [
+    google_search,
+    url_context,
+    record_research_sources,
+]
 
 
 def _make_instruction(name: str):
@@ -191,9 +197,15 @@ def _make_specialist(
 # `thinking="high" | "medium"`; we map to the actual config at build time.
 _THINKING_CONFIGS = {"high": THINKING_CONFIG, "medium": MEDIUM_THINKING_CONFIG}
 
-# Per-specialist tool overrides for first-turn research reports. Everything not
-# listed here uses the default `_WEB_RESEARCH_TOOLS` set.
+# First-turn public-web specialists use Gemini-native search and URL Context.
+# `review_analyst` is not a public-web specialist; it owns structured review
+# provider tools.
 _INITIAL_SPECIALIST_TOOLS: dict[str, list] = {
+    **{
+        specialist.name: _NATIVE_WEB_RESEARCH_TOOLS
+        for specialist in SPECIALISTS
+        if specialist.name != "review_analyst"
+    },
     "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
 }
 

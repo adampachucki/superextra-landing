@@ -18,6 +18,7 @@ from superextra_agent.web_tools import (
     read_public_page,
     read_public_pages,
     read_web_pages,
+    record_research_sources,
     search_public_web,
     set_fetch_run_id,
 )
@@ -301,6 +302,51 @@ async def test_search_public_web_records_results_for_discovered_source_reader():
     read_pages.assert_awaited_once_with([result_url])
     assert read["attempted_count"] == 1
     assert read["auto_appended_urls"] == [result_url]
+
+
+@pytest.mark.asyncio
+async def test_record_research_sources_unwraps_vertex_redirect_and_records_reader_candidate():
+    run_id = "run-native-sources"
+    requested = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZabc"
+    resolved = "https://www.trojmiasto.pl/kulinaria/article-n1.html"
+    tool_context = SimpleNamespace(agent_name="market_landscape")
+    unwrap_response = httpx.Response(
+        302,
+        headers={"Location": resolved},
+        request=httpx.Request("GET", requested),
+    )
+    client = SimpleNamespace(get=AsyncMock(return_value=unwrap_response))
+    set_fetch_run_id(run_id)
+
+    try:
+        with patch("superextra_agent.web_tools._get_client", return_value=client):
+            recorded = await record_research_sources(
+                [{"url": requested, "title": "Selected article"}],
+                notes="selected by native search",
+                tool_context=tool_context,
+            )
+        with patch(
+            "superextra_agent.web_tools._read_captured_pages",
+            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
+        ) as read_pages:
+            read = await read_discovered_sources([], tool_context=tool_context)
+    finally:
+        clear_fetch_cache_for_run(run_id)
+
+    assert recorded["status"] == "success"
+    assert recorded["selected_count"] == 1
+    assert recorded["resolved_redirect_count"] == 1
+    assert recorded["sources"] == [
+        {
+            "title": "Selected article",
+            "url": resolved,
+            "provider": "grounding",
+            "domain": "trojmiasto.pl",
+        }
+    ]
+    read_pages.assert_awaited_once_with([resolved])
+    assert read["attempted_count"] == 1
+    assert read["auto_appended_urls"] == [resolved]
 
 
 @pytest.mark.asyncio

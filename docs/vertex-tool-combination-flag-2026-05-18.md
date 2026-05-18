@@ -4,14 +4,17 @@ Date: 2026-05-18
 
 ## Summary
 
-`include_server_side_tool_invocations` failed because the current Vertex AI path
-does not support it in the installed Google GenAI Python SDK. The failure occurs
-before any HTTP request reaches Vertex.
+`include_server_side_tool_invocations` is a Gemini Developer API / AI Studio
+(`generativelanguage.googleapis.com`) option, not a Vertex AI
+(`aiplatform.googleapis.com`) option. When the flag is sent through the GenAI
+SDK in Vertex mode, the SDK rejects it before dispatch; when sent directly to
+Vertex REST, Vertex rejects it as an unknown `tool_config` field.
 
-This does not mean native Google Search and native URL Context can never produce
-grounding on Vertex. It means the specific flag needed for exposed server-side
-tool invocation history and built-in/custom tool context circulation is not
-available through the Vertex AI / Agent Engine SDK path we use.
+This does not block the tool-combination path we tested on Vertex. Gemini 3 on
+Vertex accepted built-in tools such as `google_search` and `url_context` with
+custom function declarations in the same turn without that flag. The correct
+porting behavior is to drop the flag on Vertex, not search for a Vertex
+equivalent.
 
 ## Local Verification
 
@@ -47,6 +50,18 @@ The same rejection still exists in the current upstream `python-genai` source,
 with updated wording that the parameter is supported only in Gemini Developer API
 mode, not Gemini Enterprise Agent Platform mode.
 
+External cross-check:
+
+- The Gemini API tool-combination docs show
+  `include_server_side_tool_invocations=True` in AI Studio / Gemini Developer API
+  examples.
+- Vercel AI SDK issue `vercel/ai#13911` documents the backend split: AI Studio
+  needs the flag for server-side tool invocation parts, while Vertex tool
+  combination works without it and rejects the field if it is sent.
+- I did not find one official Vertex page that documents the exact
+  built-ins-plus-custom-functions/no-flag combination in a single example; the
+  official docs cover the pieces separately.
+
 ## What This Means
 
 Native Google Search grounding itself is separate. When grounding succeeds,
@@ -56,9 +71,12 @@ citations.
 Native URL Context is also separate. It can retrieve content from supplied URLs,
 and its response includes URL retrieval metadata that must be checked.
 
-The blocked flag is specifically about exposing server-side built-in tool calls
-and responses in the content history so they can be circulated alongside custom
-function calls.
+In the Vertex Gemini 3 path we tested, server-side built-in tool parts and
+custom function-call parts were available without setting the flag. The
+requirement is that subsequent turns keep the full model `Content` object
+intact, including `toolCall`, `toolResponse`, `functionCall`,
+`functionResponse`, and thought signatures. Manual history reconstruction is
+the risky path.
 
 That matters for Superextra because the desired single-specialist loop would be:
 
@@ -67,16 +85,20 @@ That matters for Superextra because the desired single-specialist loop would be:
 3. the same agent calls a custom reader/read-queue function;
 4. the final answer can be audited against both search grounding and page reads.
 
-Our current Vertex path cannot rely on that flag to make this loop clean.
+Our current Vertex path should not set that flag. It can still run the native
+tool-combination loop, but ADK currently drops `candidate.url_context_metadata`
+when converting GenAI responses to ADK `LlmResponse`, so per-URL URL Context
+read observability remains weaker than the explicit custom read path.
 
 ## Conclusion
 
-Do not make native Google Search + native URL Context + custom function tools the
-main specialist research loop yet. Keep the explicit custom loop:
+The earlier conclusion was too pessimistic. Vertex tool combination is viable
+without `include_server_side_tool_invocations`.
 
-- `search_public_web` for source discovery and snippets;
-- `read_discovered_sources` for explicit page reads through Jina;
-- source funnel logging for observability.
+The practical constraint is observability, not basic support:
 
-The practical next step is to improve the custom discovery tool and specialist
-workflow, rather than wait for Vertex tool-combination support to catch up.
+- native search + URL Context can run inside the specialist turn;
+- `record_research_sources` can capture selected sources cleanly;
+- ADK does not currently expose URL Context read metadata in the events we use;
+- an explicit custom read step is still the cleaner path when audited
+  attempted/read/failed page-read funnels are required.
