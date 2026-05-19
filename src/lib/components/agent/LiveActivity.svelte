@@ -20,6 +20,7 @@
 	let now = $state(Date.now());
 	let expanded = $state(false);
 	let expandedTools: Record<string, boolean> = $state({});
+	let expandedThoughts: Record<string, boolean> = $state({});
 
 	const IDLE_LABELS = ['Thinking', 'Working', 'Analyzing'] as const;
 	type IdleLabel = (typeof IDLE_LABELS)[number];
@@ -124,6 +125,7 @@
 		'follow_up'
 	]);
 	const TOOL_PREVIEW_LIMIT = 5;
+	const THOUGHT_PREVIEW_CHARS = 700;
 	const leadRe = /^\s*\*\*([^*]+)\*\*\s*([\s\S]*)$/;
 
 	type StepThought = { id: string; text: string; open: boolean };
@@ -145,6 +147,10 @@
 
 	function toggleTools(stepId: string) {
 		expandedTools = { ...expandedTools, [stepId]: !expandedTools[stepId] };
+	}
+
+	function toggleThought(thoughtId: string) {
+		expandedThoughts = { ...expandedThoughts, [thoughtId]: !expandedThoughts[thoughtId] };
 	}
 
 	function normalizeNewlines(text: string): string {
@@ -225,12 +231,30 @@
 		)
 	);
 
+	function thoughtNeedsTruncation(thought: StepThought): boolean {
+		return thought.text.trim().length > THOUGHT_PREVIEW_CHARS;
+	}
+
+	function truncateThoughtText(text: string): string {
+		const trimmed = text.trimEnd();
+		if (trimmed.length <= THOUGHT_PREVIEW_CHARS) return text;
+		const wordBoundary = trimmed.lastIndexOf(' ', THOUGHT_PREVIEW_CHARS);
+		const minBoundary = Math.floor(THOUGHT_PREVIEW_CHARS * 0.7);
+		const end = wordBoundary >= minBoundary ? wordBoundary : THOUGHT_PREVIEW_CHARS;
+		return `${trimmed.slice(0, end).trimEnd()}...`;
+	}
+
+	function visibleThoughtText(thought: StepThought): string {
+		return expandedThoughts[thought.id] ? thought.text : truncateThoughtText(thought.text);
+	}
+
 	function thoughtSegments(thought: StepThought): ThoughtSegment[] {
-		const parts = thought.text
+		const text = visibleThoughtText(thought);
+		const parts = text
 			.split(/\n{2,}/)
 			.map((part) => part.trim())
 			.filter(Boolean);
-		const trailingBoundary = /\n{2,}\s*$/.test(thought.text);
+		const trailingBoundary = /\n{2,}\s*$/.test(text);
 		return parts.map((part, index) => ({
 			key: `${thought.id}:${index}`,
 			text: part,
@@ -330,6 +354,15 @@
 											{/each}
 										</div>
 									{/each}
+									{#if thoughtNeedsTruncation(thought)}
+										<button
+											type="button"
+											onclick={() => toggleThought(thought.id)}
+											class="mt-1 w-fit text-left text-[13px] leading-snug text-black/38 transition-colors hover:text-black/58 dark:text-white/38 dark:hover:text-white/58"
+										>
+											{expandedThoughts[thought.id] ? 'Show less' : 'Show more'}
+										</button>
+									{/if}
 								</div>
 							{/each}
 

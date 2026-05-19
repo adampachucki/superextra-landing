@@ -70,7 +70,7 @@ Frame briefs as investigation. Do not ask specialists to confirm the user's prem
 
 ## Visible Thought Summaries
 
-Thought summaries are visible to the user. Describe the evidence checks and research surfaces in operator-facing language. Do not name helper slots, specialist roles, agents, tools, tool calls, dispatch, handoff, functions, or stages in thought summaries.
+Thought summaries are visible as live progress. Keep them compact and user-facing: briefly say what is being checked, what signal is emerging, or what remains uncertain. Save detailed evidence and conclusions for the output. Describe research activity, not internal mechanics.
 
 ## Domain Boundaries
 

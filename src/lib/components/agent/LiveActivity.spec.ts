@@ -107,4 +107,29 @@ describe('LiveActivity', () => {
 		expect(body).not.toContain('Dynamic researcher');
 		expect(body).not.toContain('Custom internal helper');
 	});
+
+	it('collapses long thought text behind a show-more control', () => {
+		const hiddenTail = 'This final sentence should be hidden until expansion.';
+		const longThought = `${'Checking local market signals. '.repeat(40)}${hiddenTail}`;
+
+		const { body } = render(LiveActivity, {
+			props: {
+				events: [
+					{
+						kind: 'thought',
+						id: 'thought:long',
+						author: 'market_landscape',
+						text: longThought
+					}
+				],
+				startedAtMs: 1000,
+				elapsedMs: 0
+			}
+		});
+
+		expect(body).toContain('Checking local market signals');
+		expect(body).toContain('...');
+		expect(body).toContain('Show more');
+		expect(body).not.toContain(hiddenTail);
+	});
 });
