@@ -19,10 +19,6 @@ from superextra_agent.specialists import (
     MODEL_GEMINI,
     _on_model_error,
 )
-from superextra_agent.web_tools import (
-    fetch_web_content,
-    read_web_pages,
-)
 
 NATIVE_INITIAL_SPECIALISTS = {
     specialist.name for specialist in SPECIALISTS if specialist.name != "review_analyst"
@@ -38,8 +34,11 @@ def test_continue_research_uses_tool_compatible_model_config():
     assert continue_research.model is MODEL_GEMINI
     assert continue_research.generate_content_config is MEDIUM_THINKING_CONFIG
     assert google_search not in continue_research.tools
-    assert read_web_pages in continue_research.tools
-    assert fetch_web_content in continue_research.tools
+    assert "read_web_pages" not in _tool_names(continue_research.tools)
+    assert "fetch_web_content" not in _tool_names(continue_research.tools)
+    assert "fetch_web_content_batch" not in _tool_names(continue_research.tools)
+    assert "search_public_web" not in _tool_names(continue_research.tools)
+    assert "read_discovered_sources" not in _tool_names(continue_research.tools)
     assert any(
         getattr(tool, "name", "") == "market_landscape" for tool in continue_research.tools
     )

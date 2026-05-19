@@ -16,7 +16,6 @@ from .specialist_catalog import (
     SPECIALISTS,
 )
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
-from .web_tools import read_discovered_sources, search_public_web
 
 _dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
 INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
@@ -101,11 +100,7 @@ SPECIALIST_GEMINI = _make_gemini(SPECIALIST_MODEL)
 
 
 _SPECIALIST_BASE = (INSTRUCTIONS_DIR / "specialist_base.md").read_text()
-_WEB_RESEARCH_TOOLS = [
-    search_public_web,
-    read_discovered_sources,
-]
-_NATIVE_WEB_RESEARCH_TOOLS = [
+_DEFAULT_WEB_RESEARCH_TOOLS = [
     google_search,
     url_context,
 ]
@@ -181,7 +176,7 @@ def _make_specialist(
         model=SPECIALIST_GEMINI,
         description=description,
         instruction=_make_instruction(instruction_name or name),
-        tools=tools or _WEB_RESEARCH_TOOLS,
+        tools=_DEFAULT_WEB_RESEARCH_TOOLS if tools is None else tools,
         output_key=output_key,
         include_contents="default",
         generate_content_config=thinking_config if thinking_config is not None else THINKING_CONFIG,
@@ -196,15 +191,10 @@ def _make_specialist(
 # `thinking="high" | "medium"`; we map to the actual config at build time.
 _THINKING_CONFIGS = {"high": THINKING_CONFIG, "medium": MEDIUM_THINKING_CONFIG}
 
-# First-turn public-web specialists use Gemini-native search and URL Context.
+# Public-web specialists use Gemini-native search and URL Context by default.
 # `review_analyst` is not a public-web specialist; it owns structured review
 # provider tools.
 _INITIAL_SPECIALIST_TOOLS: dict[str, list] = {
-    **{
-        specialist.name: _NATIVE_WEB_RESEARCH_TOOLS
-        for specialist in SPECIALISTS
-        if specialist.name != "review_analyst"
-    },
     "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
 }
 

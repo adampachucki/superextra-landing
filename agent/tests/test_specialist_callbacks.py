@@ -1,12 +1,10 @@
 """Tests for specialist construction callbacks in specialists.py."""
 
+from google.adk.tools import google_search, url_context
+
 from superextra_agent.specialists import ALL_SPECIALISTS, CONTINUATION_SPECIALISTS
 from superextra_agent.agent import _skip_enricher_if_cached
 from superextra_agent.specialist_catalog import SPECIALISTS
-from superextra_agent.web_tools import (
-    read_discovered_sources,
-    search_public_web,
-)
 
 NATIVE_INITIAL_SPECIALISTS = {
     specialist.name for specialist in SPECIALISTS if specialist.name != "review_analyst"
@@ -49,6 +47,8 @@ def test_first_turn_specialists_do_not_expose_raw_fetch_tools():
     forbidden = {
         "search_web",
         "search_and_read_public_pages",
+        "search_public_web",
+        "read_discovered_sources",
         "fetch_web_content",
         "fetch_web_content_batch",
         "read_public_page",
@@ -63,16 +63,18 @@ def test_first_turn_public_web_specialists_do_not_use_custom_reader():
     for specialist in ALL_SPECIALISTS:
         if specialist.name == "review_analyst":
             continue
-        assert search_public_web not in specialist.tools
-        assert read_discovered_sources not in specialist.tools
+        assert "search_public_web" not in _tool_names(specialist.tools)
+        assert "read_discovered_sources" not in _tool_names(specialist.tools)
 
 
-def test_continuation_dynamic_researcher_uses_search_and_captured_reader():
-    continuation = next(
-        agent for agent in CONTINUATION_SPECIALISTS if agent.name == "dynamic_researcher_1"
-    )
+def test_continuation_public_web_specialists_use_native_search_and_url_context():
+    specialists = [
+        agent for agent in CONTINUATION_SPECIALISTS if agent.name in NATIVE_INITIAL_SPECIALISTS
+    ]
 
-    assert continuation.tools == [search_public_web, read_discovered_sources]
+    assert {agent.name for agent in specialists} == NATIVE_INITIAL_SPECIALISTS
+    for specialist in specialists:
+        assert specialist.tools == [google_search, url_context]
 
 
 def test_skip_enricher_returns_cached_context():

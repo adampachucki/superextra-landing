@@ -4,19 +4,20 @@
 It uses Vertex Gemini URL Context through a direct model call to read page/PDF
 bodies and return structured evidence plus public web source entries.
 
-`search_public_web` is the specialist search tool. It returns exact public
-result URLs and records them as same-run source candidates.
+`search_public_web` is the targeted custom search tool. It returns exact
+public result URLs and records them as same-run source candidates. Expose it
+only in dedicated agents where explicit URL discovery is the task.
 
-`read_discovered_sources` is the specialist reader for material public URLs
-found during research. It can read concrete URLs passed by the specialist, or
-same-run source URLs captured from that specialist's own search/tool results.
-It uses the Jina-based page reader path.
+`read_discovered_sources` is the companion reader for material public URLs
+found by `search_public_web`. It can read concrete URLs passed by the agent, or
+same-run source URLs captured from that agent's own search/tool results. It
+uses the Jina-based page reader path.
 
-`fetch_web_content[_batch]` are raw-Markdown fallbacks backed by Jina Reader
-(r.jina.ai). Use them when URL Context is insufficient or blocked, or when
-exact wording, raw tables, or raw page text are needed. Single-page reads try
-Jina's fast plain reader first, then fall back to `readerlm-v2` only when the
-first pass looks like thin/noisy extraction. Batch reads use the fast plain
+`fetch_web_content[_batch]` are raw-Markdown readers backed by Jina Reader
+(r.jina.ai). Keep them for dedicated exact-URL agents that need raw wording,
+raw tables, or pages that native URL Context cannot expose. Single-page reads
+try Jina's fast plain reader first, then fall back to `readerlm-v2` only when
+the first pass looks like thin/noisy extraction. Batch reads use the fast plain
 reader only.
 """
 import asyncio
@@ -1442,10 +1443,10 @@ async def fetch_web_content_batch(urls: list[str]) -> dict:
 async def read_public_page(url: str) -> dict:
     """Read one concrete public URL with Jina Reader.
 
-    Primary page reader for concrete URLs discovered by search tools, supplied
-    in the brief, or found in source text. Returns clean Markdown content and a
-    source entry on success. Do not pass search result pages,
-    bare domain roots, private/login-only URLs, or app-only/social-group URLs.
+    Jina page reader for concrete URLs discovered by dedicated search tools,
+    supplied in a brief, or found in source text. Returns clean Markdown content
+    and a source entry on success. Do not pass search result pages, bare domain
+    roots, private/login-only URLs, or app-only/social-group URLs.
 
     Args:
         url: Full public http(s) URL to read.
@@ -1461,10 +1462,10 @@ async def read_public_page(url: str) -> dict:
 async def read_public_pages(urls: list[str]) -> dict:
     """Read multiple concrete public URLs with Jina Reader in parallel.
 
-    Batch page reader for concrete URLs discovered by search tools, supplied in
-    the brief, or found in source text. Each successful result includes clean
-    Markdown content; the response includes source entries for successful
-    reads. Capped at 10 URLs.
+    Batch Jina page reader for concrete URLs discovered by dedicated search
+    tools, supplied in a brief, or found in source text. Each successful result
+    includes clean Markdown content; the response includes source entries for
+    successful reads. Capped at 10 URLs.
 
     Args:
         urls: Full public http(s) URLs to read, max 10.

@@ -195,19 +195,16 @@ class TestMakeInstruction:
         assert "Inspect the strongest few pages, not every result" in result
         assert "Search grounding will populate source pills when available" in result
         assert "do not create or guess URLs from titles" in result
-        assert "Use `search_public_web` for public web source discovery" in result
         assert "For broad reconnaissance, search snippets first" in result
-        assert "use `search_type=\"news\"` for recent openings" in result
-        assert "Use `read_discovered_sources` after `search_public_web`" in result
         assert "Completion gate: if your report uses public web/search evidence" in result
-        assert "pass `[]` when the sources came from your latest search" in result
         assert "Treat URLs supplied in the brief as source metadata" in result
         assert "Treat page reads as evidence" in result
         assert "Do not say \"Sources read\"" in result
-        assert "call `read_discovered_sources([])` when material source results are found" in result
         assert "Continue searching only when the next query tests a new lead" in result
         assert "Search and grounding sources may still appear as source pills" in result
         assert "proof that a page was read" in result
+        assert "search_public_web" not in result
+        assert "read_discovered_sources" not in result
         assert "### Evidence Notes" in result
 
     def test_specialists_surface_writer_material_and_evidence_notes(self):

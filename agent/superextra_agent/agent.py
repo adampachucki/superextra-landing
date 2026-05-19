@@ -31,11 +31,6 @@ from .specialists import (
     _on_model_error,
     _on_tool_error,
 )
-from .web_tools import (
-    fetch_web_content,
-    fetch_web_content_batch,
-    read_web_pages,
-)
 
 # Fast model for routing — no thinking needed.
 # Routed via the global Vertex AI endpoint because 2.5 Flash isn't served
@@ -240,9 +235,6 @@ continue_research = LlmAgent(
         "context, observable focused helpers, and bounded specialist deepening."
     ),
     tools=[
-        read_web_pages,
-        fetch_web_content,
-        fetch_web_content_batch,
         *_ENRICHER_TOOLS,
         *(
             AgentTool(agent=spec, include_plugins=True)

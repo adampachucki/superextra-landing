@@ -63,8 +63,8 @@ def test_tool_docstrings_describe_source_reading_workflow():
     assert "Do not use this as the first read" in fetch_doc
     assert "Raw-Markdown fallback for multiple URLs" in batch_doc
     assert "prefer URL Context or `read_web_pages` first" in batch_doc
-    assert "Primary page reader for concrete URLs discovered by search tools" in read_public_doc
-    assert "Batch page reader for concrete URLs discovered by search tools" in read_public_batch_doc
+    assert "Jina page reader for concrete URLs discovered by dedicated search tools" in read_public_doc
+    assert "Batch Jina page reader for concrete URLs discovered by dedicated search tools" in read_public_batch_doc
     assert "return exact source URLs" in search_doc
     assert "same-run discovered web sources" in discovered_doc
     assert "concrete public URLs to read them directly" in discovered_doc

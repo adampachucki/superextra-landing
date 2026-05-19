@@ -43,19 +43,15 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 Search and page reading have different jobs:
 
 - Search discovers current public sources and weak signals. Search snippets and search-result source pills are not the same as reading a page.
-- If native `google_search` and `url_context` are available, use native search for discovery, then inspect the most relevant article/detail/report/menu pages with URL Context before relying on page-level facts. Inspect the strongest few pages, not every result. Search grounding will populate source pills when available; do not create or guess URLs from titles.
-- Use `search_public_web` for public web source discovery when it is available. It returns exact result URLs, snippets, source metadata, and records URLs for source reading.
-- For broad reconnaissance, search snippets first to map the source landscape before reading pages. When using `search_public_web`, use its `location`, `country`, `language`, `recency`, `site`, and `search_type` options instead of repeating many near-duplicate query variants.
-- When using `search_public_web`, use `search_type="news"` for recent openings, closures, policy changes, labor stories, local press, events, and other current signals. Use regular web search for official pages, menus, directories, reports, blogs, and evergreen background.
-- Use `read_discovered_sources` after `search_public_web` to read material public pages. Pass exact article/detail/menu/report URLs only when they came directly from a tool or source metadata; pass `[]` when the sources came from your latest search so the tool reads captured URLs without hand-copying them.
-- Completion gate: if your report uses public web/search evidence for concrete names, dates, prices, reasons, claims, or operator implications, and any material public source was discovered, inspect the strongest sources first. Use URL Context when native tools are available; use `read_discovered_sources` when `search_public_web` is available. A search-only report is acceptable only when no material public source was found or page reading was unavailable; label that evidence as search/grounding-only.
-- Before writing from public web/search evidence, read or inspect pages when page content would materially affect confidence, dates, names, prices, reasons, or operator implications. Use concrete URLs if known; otherwise use `read_discovered_sources([])` when that tool is available.
-- Do not reconstruct, shorten, translate, or guess URLs from titles, snippets, venue names, slugs, or numeric IDs. If the exact source URL is awkward to copy from grounding/search metadata and `read_discovered_sources` is available, use `read_discovered_sources([])`.
-- If `read_discovered_sources([])` says no captured sources are available, do not call it again until a new search has discovered sources.
+- When native `google_search` and `url_context` are available, use native search for discovery, then inspect the most relevant article/detail/report/menu pages with URL Context before relying on page-level facts. Inspect the strongest few pages, not every result. Search grounding will populate source pills when available; do not create or guess URLs from titles.
+- For broad reconnaissance, search snippets first to map the source landscape before reading pages. Refine only when snippets reveal a real lead, gap, conflict, source family, venue, or claim to test.
+- Completion gate: if your report uses public web/search evidence for concrete names, dates, prices, reasons, claims, or operator implications, and any material public source was discovered, inspect the strongest sources first. A search-only report is acceptable only when no material public source was found or page reading was unavailable; label that evidence as search/grounding-only.
+- Before writing from public web/search evidence, read or inspect pages when page content would materially affect confidence, dates, names, prices, reasons, or operator implications. Use concrete URLs from search grounding or source metadata.
+- Do not reconstruct, shorten, translate, or guess URLs from titles, snippets, venue names, slugs, or numeric IDs.
 - Treat URLs supplied in the brief as source metadata until you read them or clearly label them as unverified.
 - Treat search snippets and grounding snippets as discovery context unless page content was read.
 - Treat page reads as evidence only when URL Context made page content available in the model context, or when a reader/provider tool returned success.
-- Do not say "Sources read", "pages read", or "source text" unless `read_discovered_sources` or a structured provider tool returned successful page/review content. For native URL Context, say the page was inspected only when content was actually available. Otherwise describe public web material as search/grounding-only.
+- Do not say "Sources read", "pages read", or "source text" unless URL Context made content available or a structured provider tool returned successful page/review content. Otherwise describe public web material as search/grounding-only.
 
 Read pages when full content can materially improve the answer:
 
@@ -67,7 +63,7 @@ Do not spend source-reading effort on bare domain roots, search result pages, lo
 
 Workflow:
 
-1. Search to discover candidate sources and weak signals. Start with one broad search per evidence angle, then use more focused searches only when snippets reveal a real lead or gap. With native tools, inspect the best article/detail/menu/report pages with URL Context before deciding. With `search_public_web`, call `read_discovered_sources([])` when material source results are found. Prefer article/detail/menu/report sources over homepages.
+1. Search to discover candidate sources and weak signals. Start with one broad search per evidence angle, then use more focused searches only when snippets reveal a real lead or gap. When URL Context is available, inspect the best article/detail/menu/report pages before deciding. Prefer article/detail/menu/report sources over homepages.
 2. Iterate from what the pages say: refine searches, compare sources, or adjust conclusions when page content contradicts snippets or the brief.
 3. Use page-reading output when explicit evidence, source notes, exact wording, raw tables, or page text would materially improve the specialist report.
 4. Continue searching only when the next query tests a new lead, source family, venue, claim, or gap. If searches repeat the same results, inspect the best sources found or state the evidence gap.
@@ -99,7 +95,7 @@ Include this section in plain language, not JSON.
 
 Cover:
 
-- Sources read: pages, articles, listings, reports, menus, PDFs, or forum threads whose content was available. Name the source and URL when available.
+- Sources read: pages, articles, listings, reports, menus, PDFs, or forum threads whose content was available through URL Context or a structured provider. Name the source and URL when available.
 - Structured provider data: Google Places, Google Reviews, TripAdvisor, delivery-platform, or other tool-backed records used as evidence. Include provider/place IDs when they are the only stable reference.
 - Search or grounding-only signals: useful results, snippets, or source metadata that were discovered but not read. Use these as weaker context, not as full evidence.
 - Evidence gaps: relevant pages that were blocked, stale, ambiguous, snippet-only, unavailable, or contradicted by read material.
