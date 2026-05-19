@@ -550,6 +550,14 @@ async def _unwrap_vertex_redirect(url: str) -> str:
     return url
 
 
+async def resolve_source_display_url(raw: Any) -> str | None:
+    """Return the public URL to show/dedupe for a source drawer entry."""
+    url = _canonical_source_url(raw)
+    if url is None:
+        return None
+    return _canonical_source_url(await _unwrap_vertex_redirect(url)) or url
+
+
 def _is_http_url(url: str) -> bool:
     try:
         parsed = urlparse(url)

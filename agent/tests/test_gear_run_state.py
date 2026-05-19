@@ -421,19 +421,40 @@ def test_source_dedupe_collapses_same_url_sources_by_url():
     ]
 
 
-def test_vertex_grounding_redirect_sources_are_persisted():
+@pytest.mark.asyncio
+async def test_finalize_resolves_and_dedupes_grounding_redirect_sources(monkeypatch):
     state = _make_state()
-    redirect = {
-        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/token",
+    state.final_reply = "answer"
+    redirect_a = {
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/a",
         "title": "trojmiasto.pl",
         "domain": "trojmiasto.pl",
+        "provider": "grounding",
     }
+    redirect_b = {
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/b",
+        "title": "Duplicate article",
+        "domain": "trojmiasto.pl",
+        "provider": "grounding",
+    }
+    other = {"url": "https://example.com/other", "title": "Other"}
+    state.final_sources = [redirect_a, redirect_b, other]
 
-    state._merge_source(redirect)
-    state._capture_final({"reply": "answer", "sources": [redirect]})
+    async def resolve(url):
+        if url in {redirect_a["url"], redirect_b["url"]}:
+            return "https://www.trojmiasto.pl/article"
+        return url
 
-    assert state.specialist_sources == [redirect]
-    assert state.final_sources == [redirect]
+    monkeypatch.setattr(gear_run_state, "resolve_source_display_url", resolve)
+
+    _session_update, turn_update, status = await state.finalize()
+
+    assert status == "complete"
+    assert turn_update["sources"] == [
+        {**redirect_a, "url": "https://www.trojmiasto.pl/article"},
+        other,
+    ]
+    assert turn_update["turnSummary"]["diagnostics"]["sourceCount"] == 2
 
 
 def test_capture_final_preserves_place_scoped_sources_with_same_url():

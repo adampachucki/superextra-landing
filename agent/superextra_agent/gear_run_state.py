@@ -26,7 +26,7 @@ from .firestore_events import map_event
 from .notes import TITLE_TIMEOUT_S
 from .place_state import TOOL_SOURCE_PREFIX
 from .timeline import TimelineWriter, TurnSummaryBuilder
-from .web_tools import record_source_candidates
+from .web_tools import record_source_candidates, resolve_source_display_url
 
 log = logging.getLogger(__name__)
 
@@ -197,6 +197,29 @@ class GearRunState:
             merged.append(s)
         self.final_sources = merged
 
+    async def _resolve_final_sources(self) -> None:
+        if not self.final_sources:
+            return
+        resolved_urls = await asyncio.gather(
+            *(
+                resolve_source_display_url(source.get("url"))
+                for source in self.final_sources
+            )
+        )
+        seen: set[str] = set()
+        merged: list[dict[str, Any]] = []
+        for source, resolved_url in zip(self.final_sources, resolved_urls, strict=True):
+            if not resolved_url:
+                continue
+            entry = dict(source)
+            entry["url"] = resolved_url
+            key = self._source_dedupe_key(entry)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            merged.append(entry)
+        self.final_sources = merged
+
     # ── Lifecycle ────────────────────────────────────────────────────────────
 
     async def stop_heartbeat(self) -> None:
@@ -253,6 +276,8 @@ class GearRunState:
                 },
                 "error",
             )
+
+        await self._resolve_final_sources()
 
         session_update: dict[str, Any] = {
             "status": "complete",
