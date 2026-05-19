@@ -118,17 +118,14 @@ _CONTINUATION_NOTES_KEY = "continuation_notes"
 _MAX_CONTINUATION_NOTES_CHARS = 6000
 _MAX_CONTINUATION_NOTE_ANSWER_CHARS = 1600
 _MAX_CONTINUATION_NOTE_QUESTION_CHARS = 500
-_VALIDATION_PACKET_HEADING_RE = re.compile(
+_LEGACY_VALIDATION_PACKET_RE = re.compile(
     r"(?im)^#{1,6}\s+(?:\*\*)?Validation Packet\s*:?(?:\*\*)?\s*:?\s*$"
 )
 
 
-def _strip_legacy_validation_packet(report: str) -> str:
-    """Remove legacy specialist validation metadata from writer-facing text."""
-    match = _VALIDATION_PACKET_HEADING_RE.search(report)
-    if not match:
-        return report
-    return report[: match.start()].rstrip()
+def _strip_legacy_internal_packet(report: str) -> str:
+    match = _LEGACY_VALIDATION_PACKET_RE.search(report)
+    return report[: match.start()].rstrip() if match else report
 
 
 def _format_specialist_reports(
@@ -140,8 +137,7 @@ def _format_specialist_reports(
     for key, label in SPECIALIST_RESULT_KEYS.items():
         value = state.get(key)
         if value and value != "Agent did not produce output.":
-            value = str(value)
-            value = _strip_legacy_validation_packet(value)
+            value = _strip_legacy_internal_packet(str(value))
             if value.strip():
                 sections.append(f"### {label}\n\n{value}")
     if not sections:

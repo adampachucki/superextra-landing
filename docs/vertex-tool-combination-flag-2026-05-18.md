@@ -98,7 +98,8 @@ without `include_server_side_tool_invocations`.
 The practical constraint is observability, not basic support:
 
 - native search + URL Context can run inside the specialist turn;
-- `record_research_sources` can capture selected sources cleanly;
+- source drawer provenance should come from native grounding chunks plus
+  structured provider sources;
 - ADK does not currently expose URL Context read metadata in the events we use;
 - an explicit custom read step is still the cleaner path when audited
   attempted/read/failed page-read funnels are required.

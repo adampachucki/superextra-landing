@@ -140,7 +140,6 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "get_google_reviews": "structured reviews",
     "google_search": "source search",
     "search_public_web": "source search",
-    "record_research_sources": "source selection",
     "read_discovered_sources": "source reading",
     "read_web_pages": "source reading",
     "fetch_web_content": "source reading",
@@ -229,15 +228,6 @@ def _extract_search_queries(event: Any) -> list[str]:
 
 
 def extract_sources_from_grounding(event: Any) -> list[dict[str, Any]]:
-    for part in _iter_parts(event):
-        fr = _get(part, "function_response")
-        if (
-            fr
-            and _get(fr, "name") == "record_research_sources"
-            and isinstance(_get(fr, "response"), dict)
-            and _get(fr, "response").get("sources")
-        ):
-            return []
     gm = _get(event, "grounding_metadata")
     if not gm:
         return []
@@ -265,10 +255,7 @@ def extract_sources_from_search_tool(event: Any) -> list[dict[str, Any]]:
     seen: set[str] = set()
     for part in _iter_parts(event):
         fr = _get(part, "function_response")
-        if not fr or _get(fr, "name") not in (
-            "search_public_web",
-            "record_research_sources",
-        ):
+        if not fr or _get(fr, "name") != "search_public_web":
             continue
         response = _get(fr, "response")
         if not isinstance(response, dict):
@@ -283,12 +270,7 @@ def extract_sources_from_search_tool(event: Any) -> list[dict[str, Any]]:
             entry = {
                 "title": source.get("title") or url,
                 "url": url,
-                "provider": source.get("provider")
-                or (
-                    "grounding"
-                    if _get(fr, "name") == "record_research_sources"
-                    else "public_search"
-                ),
+                "provider": source.get("provider") or "public_search",
             }
             domain = source.get("domain")
             if domain:
@@ -345,11 +327,6 @@ def map_tool_call(
         if query:
             return _detail(row_id, "search", "Searching the web", query)
         return _detail(row_id, "search", "Searching the web", "Public web")
-    if name == "record_research_sources":
-        sources = args.get("sources")
-        if isinstance(sources, list):
-            return _detail(row_id, "source", "Public sources", f"{len(sources)} selected")
-        return _detail(row_id, "source", "Public sources", "Selected sources")
     if name in ("read_web_pages", "fetch_web_content", "read_public_page"):
         url = str(args.get("url") or "").strip()
         urls = args.get("urls") or []
@@ -445,12 +422,6 @@ def map_tool_result(
         if status == "error":
             return [_detail(row_id, "warning", "Warnings", "Source search failed")]
         return []
-
-    if name == "record_research_sources":
-        if status == "success":
-            count = int(response.get("selected_count") or 0)
-            return [_detail(row_id, "source", "Public sources", f"{count} sources selected")]
-        return [_detail(row_id, "warning", "Warnings", "Source selection failed")]
 
     if name == "find_tripadvisor_restaurant":
         display_name = str(response.get("name") or "").strip() or str(

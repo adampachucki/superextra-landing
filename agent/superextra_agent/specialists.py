@@ -16,7 +16,7 @@ from .specialist_catalog import (
     SPECIALISTS,
 )
 from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
-from .web_tools import read_discovered_sources, record_research_sources, search_public_web
+from .web_tools import read_discovered_sources, search_public_web
 
 _dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
 INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
@@ -108,7 +108,6 @@ _WEB_RESEARCH_TOOLS = [
 _NATIVE_WEB_RESEARCH_TOOLS = [
     google_search,
     url_context,
-    record_research_sources,
 ]
 
 

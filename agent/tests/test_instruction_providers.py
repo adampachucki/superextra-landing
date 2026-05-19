@@ -5,7 +5,6 @@ from google.genai import types
 from superextra_agent.agent import (
     _CONTINUATION_NOTES_KEY,
     _continue_research_instruction,
-    _format_specialist_reports,
     _record_continuation_notes,
     _report_writer_instruction,
     _research_lead_instruction,
@@ -71,7 +70,7 @@ class TestReportWriterInstruction:
                     "places_context": "Restaurant XYZ data",
                     "writer_brief": "Focus on demand and pricing links.",
                     "research_coverage": "Lead thinks demand is most important.",
-                    "evidence_memo": "Old memo should not be injected.",
+                    "unused_internal_memo": "Old memo should not be injected.",
                     "market_result": "Market demand is weekday-heavy.",
                     "pricing_result": "Average entree price is 21 USD.",
                 }
@@ -89,12 +88,28 @@ class TestReportWriterInstruction:
         assert "Treat the specialist reports as the research material" in result
         assert "Do not cite unread pages as evidence" in result
 
+    def test_drops_legacy_validation_packets_from_specialist_reports(self):
+        result = _report_writer_instruction(
+            MockCtx(
+                state={
+                    "market_result": (
+                        "Market finding to preserve.\n\n"
+                        "### Validation Packet\n"
+                        '{"claims_for_validation": ["old internal artifact"]}'
+                    ),
+                }
+            )
+        )
+
+        assert "Market finding to preserve." in result
+        assert "Validation Packet" not in result
+        assert "claims_for_validation" not in result
+
     def test_defaults_when_state_empty(self):
         result = _report_writer_instruction(MockCtx(state={}))
 
         assert "No restaurant data available." in result
         assert "No specialist reports available." in result
-        assert "No adjudicated evidence memo available." not in result
 
     def test_handles_curly_braces_in_injected_material(self):
         result = _report_writer_instruction(
@@ -138,45 +153,6 @@ class TestReportWriterInstruction:
         assert "Filmor has a visible launch signal" in result
         assert "Brassica has weak closure evidence" in result
 
-    def test_strips_legacy_validation_packets_from_writer_input(self):
-        result = _report_writer_instruction(
-            MockCtx(
-                state={
-                    "market_result": (
-                        "Market finding.\n\n"
-                        "## Writer Material\n\n"
-                        "- Preserve this caveat.\n\n"
-                        "### Validation Packet:\n\n"
-                        "```json\n"
-                        '{"claims_for_validation":[],"candidate_sources":[]}\n'
-                        "```"
-                    )
-                }
-            )
-        )
-
-        assert "Market finding" in result
-        assert "Preserve this caveat" in result
-        assert "claims_for_validation" not in result
-        assert "candidate_sources" not in result
-
-    def test_specialist_formatter_always_strips_legacy_packets(self):
-        result = _format_specialist_reports(
-            {
-                "market_result": (
-                    "Market finding.\n\n"
-                    "### **Validation Packet:**\n\n"
-                    "```json\n"
-                    '{"claims_for_validation":[]}\n'
-                    "```"
-                )
-            }
-        )
-
-        assert "Market finding" in result
-        assert "claims_for_validation" not in result
-
-
 class TestMakeInstruction:
     def test_returns_provider_that_injects_places_context(self):
         provider = _make_instruction("market_landscape")
@@ -217,7 +193,8 @@ class TestMakeInstruction:
         assert "## Search And Source Reading" in result
         assert "Search snippets and search-result source pills are not the same as reading a page" in result
         assert "Inspect the strongest few pages, not every result" in result
-        assert "Omit a source if the exact URL is not available" in result
+        assert "Search grounding will populate source pills when available" in result
+        assert "do not create or guess URLs from titles" in result
         assert "Use `search_public_web` for public web source discovery" in result
         assert "For broad reconnaissance, search snippets first" in result
         assert "use `search_type=\"news\"` for recent openings" in result
@@ -232,8 +209,6 @@ class TestMakeInstruction:
         assert "Search and grounding sources may still appear as source pills" in result
         assert "proof that a page was read" in result
         assert "### Evidence Notes" in result
-        assert "Validation Packet" not in result
-        assert "claims_for_validation" not in result
 
     def test_specialists_surface_writer_material_and_evidence_notes(self):
         provider = _make_instruction("market_landscape")
@@ -286,27 +261,6 @@ class TestContinueResearchInstruction:
         assert "No research coverage notes available." in result
         assert "No continuation notes yet." in result
         assert "No restaurant data available." in result
-
-    def test_strips_legacy_validation_packets_from_continuation_input(self):
-        result = _continue_research_instruction(
-            MockCtx(
-                state={
-                    "final_report": "Existing report",
-                    "market_result": (
-                        "Market finding.\n\n"
-                        "### Validation Packet\n\n"
-                        "```json\n"
-                        '{"claims_for_validation":[],"candidate_sources":[]}\n'
-                        "```"
-                    ),
-                }
-            )
-        )
-
-        assert "Market finding" in result
-        assert "claims_for_validation" not in result
-        assert "candidate_sources" not in result
-
 
 class TestRecordContinuationNotes:
     def test_records_reply_in_session_state(self):

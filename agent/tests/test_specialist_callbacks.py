@@ -5,7 +5,6 @@ from superextra_agent.agent import _skip_enricher_if_cached
 from superextra_agent.specialist_catalog import SPECIALISTS
 from superextra_agent.web_tools import (
     read_discovered_sources,
-    record_research_sources,
     search_public_web,
 )
 
@@ -33,7 +32,7 @@ def test_specialists_accept_agenttool_request_context():
         assert specialist.before_agent_callback is None
 
 
-def test_first_turn_public_web_specialists_use_native_search_and_source_recorder():
+def test_first_turn_public_web_specialists_use_native_search_and_url_context():
     specialists = [
         agent for agent in ALL_SPECIALISTS if agent.name in NATIVE_INITIAL_SPECIALISTS
     ]
@@ -43,9 +42,7 @@ def test_first_turn_public_web_specialists_use_native_search_and_source_recorder
         assert _tool_names(specialist.tools) == [
             "google_search",
             "url_context",
-            "record_research_sources",
         ]
-        assert specialist.tools[-1] is record_research_sources
 
 
 def test_first_turn_specialists_do_not_expose_raw_fetch_tools():

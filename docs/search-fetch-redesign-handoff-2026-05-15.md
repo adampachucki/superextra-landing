@@ -2,8 +2,8 @@
 
 Date: 2026-05-15
 
-> Superseded: use `docs/specialist-source-reading-architecture-2026-05-17.md` for
-> the current target architecture. This document is historical context for the
+> Superseded: first-turn public-web specialists now use native Google Search
+> grounding and URL Context. This document is historical context for the
 > SerpAPI/Jina pilot and should not be implemented as the active direction.
 
 ## Goal

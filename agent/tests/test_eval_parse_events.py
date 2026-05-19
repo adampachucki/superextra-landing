@@ -117,8 +117,6 @@ def test_parse_run_keeps_source_drawer_as_provenance():
         },
         {**provider, "kind": "provider", "domain": "maps.google.com"},
     ]
-    assert "evidence_memo" not in parsed
-
 
 def test_parse_run_builds_specialist_read_funnel_from_read_discovered_sources():
     url = "https://example.com/source"
