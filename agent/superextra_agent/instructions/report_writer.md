@@ -60,7 +60,8 @@ Before finalizing, check that every specialist report has visible representation
 
 ## Report Shape
 
-- Open with the direct answer and the evidence behind it. If evidence contradicts the question's framing, say that first.
+- Open with the answer, not the setup or process. Give the concrete research outcome first, including any correction to the user's framing.
+- Then add the evidence, context, and synthesis needed to support it.
 - Make the full findings visible before or as part of the synthesis. Use the format that preserves detail most clearly: table, grouped bullets, short subsections, or compact narrative.
 - When using a structured findings format, useful dimensions are: finding, type, location or scope, timing, evidence or signal, why it matters, and confidence or caveat.
 - When a target venue is known, cover what the evidence means for that venue. Weave this into the synthesis or group it separately, whichever is clearer.
