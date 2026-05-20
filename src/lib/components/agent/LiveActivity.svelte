@@ -20,7 +20,7 @@
 	let now = $state(Date.now());
 	let expanded = $state(false);
 	let expandedTools: Record<string, boolean> = $state({});
-	let expandedThoughts: Record<string, boolean> = $state({});
+	let expandedStepBodies: Record<string, boolean> = $state({});
 
 	const IDLE_LABELS = ['Thinking', 'Working', 'Analyzing'] as const;
 	type IdleLabel = (typeof IDLE_LABELS)[number];
@@ -147,8 +147,8 @@
 		expandedTools = { ...expandedTools, [stepId]: !expandedTools[stepId] };
 	}
 
-	function toggleThought(thoughtId: string) {
-		expandedThoughts = { ...expandedThoughts, [thoughtId]: !expandedThoughts[thoughtId] };
+	function toggleStepBody(stepId: string) {
+		expandedStepBodies = { ...expandedStepBodies, [stepId]: !expandedStepBodies[stepId] };
 	}
 
 	function normalizeNewlines(text: string): string {
@@ -229,25 +229,45 @@
 		)
 	);
 
-	function thoughtNeedsTruncation(thought: StepThought): boolean {
-		return thought.text.trim().length > THOUGHT_PREVIEW_CHARS;
+	function stepBodyChars(step: Step): number {
+		let total = 0;
+		for (const t of step.thoughts) total += t.text.trim().length;
+		return total;
 	}
 
-	function truncateThoughtText(text: string): string {
+	function stepNeedsTruncation(step: Step): boolean {
+		return stepBodyChars(step) > THOUGHT_PREVIEW_CHARS;
+	}
+
+	function truncateToBudget(text: string, budget: number): string {
 		const trimmed = text.trimEnd();
-		if (trimmed.length <= THOUGHT_PREVIEW_CHARS) return text;
-		const wordBoundary = trimmed.lastIndexOf(' ', THOUGHT_PREVIEW_CHARS);
-		const minBoundary = Math.floor(THOUGHT_PREVIEW_CHARS * 0.7);
-		const end = wordBoundary >= minBoundary ? wordBoundary : THOUGHT_PREVIEW_CHARS;
+		if (trimmed.length <= budget) return text;
+		const clampedBudget = Math.max(budget, 0);
+		const wordBoundary = trimmed.lastIndexOf(' ', clampedBudget);
+		const minBoundary = Math.floor(clampedBudget * 0.7);
+		const end = wordBoundary >= minBoundary ? wordBoundary : clampedBudget;
 		return `${trimmed.slice(0, end).trimEnd()}...`;
 	}
 
-	function visibleThoughtText(thought: StepThought): string {
-		return expandedThoughts[thought.id] ? thought.text : truncateThoughtText(thought.text);
+	function visibleStepThoughts(step: Step): StepThought[] {
+		if (expandedStepBodies[step.id] || !stepNeedsTruncation(step)) return step.thoughts;
+		const out: StepThought[] = [];
+		let budget = THOUGHT_PREVIEW_CHARS;
+		for (const thought of step.thoughts) {
+			const len = thought.text.trim().length;
+			if (len <= budget) {
+				out.push(thought);
+				budget -= len;
+				continue;
+			}
+			out.push({ ...thought, text: truncateToBudget(thought.text, budget) });
+			break;
+		}
+		return out;
 	}
 
 	function thoughtSegments(thought: StepThought): ThoughtSegment[] {
-		const text = visibleThoughtText(thought);
+		const text = thought.text;
 		const parts = text
 			.split(/\n{2,}/)
 			.map((part) => part.trim())
@@ -340,7 +360,7 @@
 								</div>
 							{/if}
 
-							{#each step.thoughts as thought (thought.id)}
+							{#each visibleStepThoughts(step) as thought (thought.id)}
 								<div
 									in:fade={{ duration: 220 }}
 									class="prose-thought mt-1.5 text-[14px] leading-relaxed text-black/70 dark:text-white/72"
@@ -352,17 +372,17 @@
 											{/each}
 										</div>
 									{/each}
-									{#if thoughtNeedsTruncation(thought)}
-										<button
-											type="button"
-											onclick={() => toggleThought(thought.id)}
-											class="mt-1 w-fit text-left text-[13px] leading-snug text-black/38 transition-colors hover:text-black/58 dark:text-white/38 dark:hover:text-white/58"
-										>
-											{expandedThoughts[thought.id] ? 'Show less' : 'Show more'}
-										</button>
-									{/if}
 								</div>
 							{/each}
+							{#if stepNeedsTruncation(step)}
+								<button
+									type="button"
+									onclick={() => toggleStepBody(step.id)}
+									class="mt-1.5 w-fit text-left text-[13px] leading-snug text-black/38 transition-colors hover:text-black/58 dark:text-white/38 dark:hover:text-white/58"
+								>
+									{expandedStepBodies[step.id] ? 'Show less' : 'Show more'}
+								</button>
+							{/if}
 
 							{#if step.tools.length}
 								<div
