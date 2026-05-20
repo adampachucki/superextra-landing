@@ -87,7 +87,6 @@
 		research_lead: 'Reasoning',
 		report_writer: 'Drafting final report',
 		continue_research: 'Continuing research',
-		follow_up: 'Following up',
 		market_landscape: 'Researching market signals',
 		menu_pricing: 'Researching menu and pricing',
 		revenue_sales: 'Researching revenue signals',
@@ -121,8 +120,7 @@
 		'context_enricher',
 		'research_lead',
 		'report_writer',
-		'continue_research',
-		'follow_up'
+		'continue_research'
 	]);
 	const TOOL_PREVIEW_LIMIT = 5;
 	const THOUGHT_PREVIEW_CHARS = 700;

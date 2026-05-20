@@ -5,13 +5,8 @@ It uses Vertex Gemini URL Context through a direct model call to read page/PDF
 bodies and return structured evidence plus public web source entries.
 
 `search_public_web` is the targeted custom search tool. It returns exact
-public result URLs and records them as same-run source candidates. Expose it
-only in dedicated agents where explicit URL discovery is the task.
-
-`read_discovered_sources` is the companion reader for material public URLs
-found by `search_public_web`. It can read concrete URLs passed by the agent, or
-same-run source URLs captured from that agent's own search/tool results. It
-uses the Jina-based page reader path.
+public result URLs. Expose it only in dedicated agents where explicit URL
+discovery is the task.
 
 `fetch_web_content[_batch]` are raw-Markdown readers backed by Jina Reader
 (r.jina.ai). Keep them for dedicated exact-URL agents that need raw wording,
@@ -51,8 +46,6 @@ CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 # single-page read. Batch reads stay fast so broad source scans don't spend
 # one timeout per noisy page.
 MAX_BATCH = 10
-CAPTURED_SOURCE_READ_CONCURRENCY = 15
-SPECIALIST_DISCOVERED_READ_LIMIT = 6
 SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
 SERPAPI_SEARCH_TIMEOUT_S = 15.0
 PUBLIC_SEARCH_RESULT_LIMIT = 8
@@ -92,11 +85,7 @@ ERROR_MESSAGE_LOG_CHARS = 500
 JINA_READERLM_FALLBACK_REASONS = frozenset(
     {"thin_content", "iframe_spa", "consent_noise"}
 )
-JINA_PROXY_FALLBACK_REASONS = frozenset(
-    {"upstream_http_403", "upstream_captcha", "cloudflare_interstitial"}
-)
 _JINA_TITLE_RE = re.compile(r"^Title:\s*(.+?)\s*$", re.MULTILINE)
-_SOURCE_RETURN_LIST_LIMIT = 20
 
 
 def _is_vertex_redirect(url: str) -> bool:
@@ -162,15 +151,10 @@ _fetch_run_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 )
 _FETCH_CACHE_FAST = "fast"
 _FETCH_CACHE_FAST_ALLOW_ROOT = "fast_allow_root"
-_FETCH_CACHE_FAST_PROXY = "fast_proxy"
-_FETCH_CACHE_FAST_PROXY_ALLOW_ROOT = "fast_proxy_allow_root"
 _FETCH_CACHE_DEEP = "deep"
 _FETCH_CACHE_DEEP_ALLOW_ROOT = "deep_allow_root"
 _fetch_cache: dict[tuple[str, str, str], dict] = {}
 _read_pages_cache: dict[tuple[str, tuple[str, ...], str], dict] = {}
-_source_candidates_by_run_and_agent: dict[tuple[str, str], list[str]] = {}
-_latest_source_candidates_by_run_and_agent: dict[tuple[str, str], list[str]] = {}
-_source_read_urls_by_run_and_agent: dict[tuple[str, str], list[str]] = {}
 # Bounded so that a run whose `after_run_callback` doesn't fire (ADK
 # 1.28.0 doesn't call it from a `finally`, so cancelled/aborted runs
 # can skip cleanup) cannot grow the cache forever. FIFO eviction by
@@ -194,12 +178,6 @@ def clear_fetch_cache_for_run(run_id: str) -> None:
         _fetch_cache.pop(key, None)
     for key in [k for k in _read_pages_cache if k[0] == run_id]:
         _read_pages_cache.pop(key, None)
-    for key in [k for k in _source_candidates_by_run_and_agent if k[0] == run_id]:
-        _source_candidates_by_run_and_agent.pop(key, None)
-    for key in [k for k in _latest_source_candidates_by_run_and_agent if k[0] == run_id]:
-        _latest_source_candidates_by_run_and_agent.pop(key, None)
-    for key in [k for k in _source_read_urls_by_run_and_agent if k[0] == run_id]:
-        _source_read_urls_by_run_and_agent.pop(key, None)
 
 
 def _cache_key(url: str, mode: str) -> tuple[str, str, str] | None:
@@ -363,77 +341,11 @@ def _is_domain_root_url(url: str) -> bool:
     return not parsed.path or parsed.path == "/"
 
 
-def _append_limited(items: list[str], value: str) -> None:
-    if len(items) < _SOURCE_RETURN_LIST_LIMIT:
-        items.append(value)
-
-
 def _canonical_source_url(raw: Any) -> str | None:
     if not isinstance(raw, str) or not raw.strip():
         return None
     url = _strip_fragment(raw.strip())
     return url if _is_http_url(url) else None
-
-
-def _canonical_source_candidates(sources: list[Any]) -> list[str]:
-    out: list[str] = []
-    seen: set[str] = set()
-    for source in sources:
-        raw = source.get("url") if isinstance(source, dict) else source
-        url = _canonical_source_url(raw)
-        if not url or url in seen:
-            continue
-        seen.add(url)
-        out.append(url)
-    return out
-
-
-def _append_source_candidates(queue: list[str], candidates: list[str]) -> None:
-    seen = set(queue)
-    for url in candidates:
-        if url in seen:
-            continue
-        seen.add(url)
-        queue.append(url)
-
-
-def record_source_candidates(
-    run_id: str | None,
-    sources: list[Any],
-    *,
-    agent_name: str | None = None,
-) -> None:
-    """Remember same-run discovered web URLs for captured-source reading."""
-    if not run_id or not agent_name:
-        return
-    candidates = _canonical_source_candidates(sources)
-    if not candidates:
-        return
-    agent_queue = _source_candidates_by_run_and_agent.setdefault(
-        (run_id, agent_name), []
-    )
-    _latest_source_candidates_by_run_and_agent[(run_id, agent_name)] = candidates
-    _append_source_candidates(agent_queue, candidates)
-
-
-def _iter_agent_discovered_urls(agent_name: str | None) -> list[str]:
-    run_id = _fetch_run_id_var.get()
-    if not run_id or not agent_name:
-        return []
-    return list(_source_candidates_by_run_and_agent.get((run_id, agent_name), []))
-
-
-def _iter_agent_discovered_urls_latest_first(agent_name: str | None) -> list[str]:
-    run_id = _fetch_run_id_var.get()
-    if not run_id or not agent_name:
-        return []
-    all_urls = _source_candidates_by_run_and_agent.get((run_id, agent_name), [])
-    latest_urls = _latest_source_candidates_by_run_and_agent.get((run_id, agent_name), [])
-    if not latest_urls:
-        return list(all_urls)
-    latest = [url for url in latest_urls if url in all_urls]
-    latest_seen = set(latest)
-    return latest + [url for url in all_urls if url not in latest_seen]
 
 
 # ── Block detection ──────────────────────────────────────────────────────────
@@ -1116,7 +1028,6 @@ async def _fetch_web_content(
     *,
     allow_readerlm: bool,
     allow_domain_root: bool = False,
-    allow_proxy_fallback: bool = False,
 ) -> dict:
     original_url = url
     started = time.monotonic()
@@ -1130,13 +1041,7 @@ async def _fetch_web_content(
     log_original = original_url if vertex_rewrote else None
 
     domain_root_allowed = allow_domain_root and _is_domain_root_url(url)
-    if allow_proxy_fallback and not allow_readerlm:
-        cache_mode = (
-            _FETCH_CACHE_FAST_PROXY_ALLOW_ROOT
-            if domain_root_allowed
-            else _FETCH_CACHE_FAST_PROXY
-        )
-    elif allow_readerlm:
+    if allow_readerlm:
         cache_mode = (
             _FETCH_CACHE_DEEP_ALLOW_ROOT
             if domain_root_allowed
@@ -1183,8 +1088,6 @@ async def _fetch_web_content(
         result, _fast_result_for_cache = await _fetch_uncached(
             url, allow_readerlm=False, allow_domain_root=allow_domain_root
         )
-        if allow_proxy_fallback:
-            result, _proxy_attempted = await _apply_jina_proxy_fallback(url, result)
 
     # Cache every outcome — including errors — so the model doesn't
     # refetch a URL that already returned thin content, an HTTP error,
@@ -1288,29 +1191,10 @@ def _fallback_reason_label(reason: Any) -> str:
     return "unusable content"
 
 
-async def _apply_jina_proxy_fallback(url: str, result: dict) -> tuple[dict, bool]:
-    fallback_reason = result.get("_error_reason")
-    if fallback_reason not in JINA_PROXY_FALLBACK_REASONS:
-        return result, False
-
-    proxied = await _fetch_jina_reader(url, mode="plain", proxy=True)
-    if proxied.get("status") == "success":
-        proxied["_fallback_reason"] = fallback_reason
-        return proxied, True
-
-    result["_fallback_reason"] = fallback_reason
-    result["_fallback_status"] = proxied.get("status")
-    result["_fallback_reader_mode"] = proxied.get("_reader_mode")
-    result["_fallback_error_reason"] = proxied.get("_error_reason")
-    return result, True
-
-
-async def _fetch_jina_reader(url: str, *, mode: str, proxy: bool = False) -> dict:
+async def _fetch_jina_reader(url: str, *, mode: str) -> dict:
     try:
         headers = _jina_reader_headers(mode)
-        reader_mode = f"{mode}_proxy" if proxy else mode
-        if proxy:
-            headers["X-Proxy"] = "auto"
+        reader_mode = mode
         timeout = TIMEOUT_S
         if mode == "readerlm-v2":
             timeout = JINA_READERLM_TIMEOUT_S
@@ -1369,7 +1253,7 @@ async def _fetch_jina_reader(url: str, *, mode: str, proxy: bool = False) -> dic
             "url": url,
             "error_message": f"Timeout fetching {url}",
             "_error_reason": "timeout",
-            "_reader_mode": f"{mode}_proxy" if proxy else mode,
+            "_reader_mode": mode,
         }
     except httpx.RequestError as e:
         # Connect, read, network, DNS, etc. — anything httpx classifies
@@ -1380,7 +1264,7 @@ async def _fetch_jina_reader(url: str, *, mode: str, proxy: bool = False) -> dic
             "url": url,
             "error_message": f"Network error fetching {url}: {e}",
             "_error_reason": "network_error",
-            "_reader_mode": f"{mode}_proxy" if proxy else mode,
+            "_reader_mode": mode,
         }
     except Exception as e:
         return {
@@ -1388,7 +1272,7 @@ async def _fetch_jina_reader(url: str, *, mode: str, proxy: bool = False) -> dic
             "url": url,
             "error_message": str(e),
             "_error_reason": "exception",
-            "_reader_mode": f"{mode}_proxy" if proxy else mode,
+            "_reader_mode": mode,
         }
 
 
@@ -1495,14 +1379,11 @@ async def search_public_web(
     language: str = "",
     recency: str = "",
     site: str = "",
-    tool_context=None,
 ) -> dict:
     """Search public web/news results and return exact source URLs.
 
-    Use this to discover material public pages before `read_discovered_sources`.
-    The returned result URLs are recorded for this specialist, so a follow-up
-    `read_discovered_sources([])` reads the strongest discovered URLs without
-    hand-copying them.
+    Use this to discover material public pages before an explicit
+    `read_web_pages`, `read_public_page`, or `read_public_pages` call.
 
     Args:
         query: Search query, including location/date terms when relevant.
@@ -1585,11 +1466,6 @@ async def search_public_web(
             if len(results) >= limit:
                 break
 
-    run_id = _fetch_run_id_var.get()
-    agent_name = getattr(tool_context, "agent_name", None) if tool_context else None
-    if isinstance(run_id, str) and isinstance(agent_name, str):
-        record_source_candidates(run_id, results, agent_name=agent_name)
-
     status = "success" if results else "error"
     output = {
         "status": status,
@@ -1603,170 +1479,4 @@ async def search_public_web(
     }
     if not results:
         output["error_message"] = "Search returned no public result URLs"
-    return output
-
-
-async def _read_captured_pages(urls: list[str]) -> dict:
-    """Read captured source URLs with bounded parallelism."""
-    semaphore = asyncio.Semaphore(CAPTURED_SOURCE_READ_CONCURRENCY)
-
-    async def read(url: str) -> dict:
-        async with semaphore:
-            result = await _fetch_web_content(
-                url,
-                allow_readerlm=False,
-                allow_domain_root=True,
-                allow_proxy_fallback=True,
-            )
-            if isinstance(result, dict) and result.get("url") != url:
-                result = dict(result)
-                result["requested_url"] = url
-            return result
-
-    results = await asyncio.gather(*(read(url) for url in urls))
-    success_count = sum(
-        1 for item in results if isinstance(item, dict) and item.get("status") == "success"
-    )
-    failed_count = len(results) - success_count
-    sources = [
-        source
-        for source in (
-            _source_for_jina_result(item.get("url"), item.get("content"))
-            for item in results
-            if isinstance(item, dict) and item.get("status") == "success"
-        )
-        if source is not None
-    ]
-    output = {
-        "status": "success" if success_count else "error",
-        "results": results,
-        "success_count": success_count,
-        "failed_count": failed_count,
-    }
-    if sources:
-        output["sources"] = sources
-    if not success_count:
-        output["error_message"] = f"All {len(results)} sources failed to fetch"
-    return output
-
-
-async def read_discovered_sources(urls: list[str], tool_context=None) -> dict:
-    """Read this specialist's same-run discovered web sources with Jina Reader.
-
-    Use after `search_public_web` has discovered material source results. Pass
-    concrete public URLs to read them directly, or pass an empty list to read
-    the strongest same-run grounding/source URLs captured for this specialist.
-    Capped at 6 new URLs per call.
-
-    Args:
-        urls: Public http(s) URLs to read, or [] to read captured discovered sources.
-    """
-    if not isinstance(urls, list):
-        return {"status": "error", "error_message": "urls must be a list"}
-
-    run_id = _fetch_run_id_var.get()
-    agent_name = getattr(tool_context, "agent_name", None) if tool_context else None
-    if not run_id or not isinstance(agent_name, str) or not agent_name:
-        return {
-            "status": "error",
-            "requested_count": len(urls),
-            "attempted_count": 0,
-            "error_message": "Run and specialist context are required to read discovered sources",
-        }
-
-    discovered_urls = _iter_agent_discovered_urls(agent_name)
-    allowed_urls = (
-        _iter_agent_discovered_urls_latest_first(agent_name)
-        if not urls
-        else discovered_urls
-    )
-    read_key = (run_id, agent_name)
-    already_read = _source_read_urls_by_run_and_agent.setdefault(read_key, [])
-    seen = set(already_read)
-
-    to_read: list[str] = []
-    request_seen: set[str] = set()
-    skipped_urls: list[str] = []
-    auto_appended_urls: list[str] = []
-    rejected_urls: list[str] = []
-    invalid_urls: list[str] = []
-    omitted_urls: list[str] = []
-    skipped_count = 0
-    auto_appended_count = 0
-    rejected_count = 0
-    invalid_count = 0
-    omitted_count = 0
-    accepted_request_count = 0
-
-    def append_candidate(url: str, *, auto_appended: bool = False) -> None:
-        nonlocal auto_appended_count, omitted_count
-        if len(to_read) >= SPECIALIST_DISCOVERED_READ_LIMIT:
-            omitted_count += 1
-            _append_limited(omitted_urls, url)
-            return
-        to_read.append(url)
-        if auto_appended:
-            auto_appended_count += 1
-            _append_limited(auto_appended_urls, url)
-
-    for raw in urls:
-        url = _canonical_source_url(raw)
-        if url is None:
-            invalid_count += 1
-            if isinstance(raw, str) and raw.strip():
-                _append_limited(invalid_urls, raw.strip())
-            continue
-        if url in request_seen or url in seen:
-            skipped_count += 1
-            _append_limited(skipped_urls, url)
-            continue
-        request_seen.add(url)
-        accepted_request_count += 1
-        append_candidate(url)
-
-    if not urls:
-        for url in allowed_urls:
-            if url in request_seen or url in seen:
-                continue
-            request_seen.add(url)
-            append_candidate(url, auto_appended=True)
-
-    base = {
-        "requested_count": len(urls),
-        "valid_url_count": accepted_request_count,
-        "available_count": len(discovered_urls),
-        "attempted_count": len(to_read),
-        "skipped_urls": skipped_urls,
-        "skipped_count": skipped_count,
-        "auto_appended_urls": auto_appended_urls,
-        "auto_appended_count": auto_appended_count,
-        "rejected_urls": rejected_urls,
-        "rejected_count": rejected_count,
-        "invalid_urls": invalid_urls,
-        "invalid_count": invalid_count,
-        "omitted_urls": omitted_urls,
-        "omitted_count": omitted_count,
-    }
-
-    if not to_read:
-        no_captured_sources = not urls and not discovered_urls and not invalid_count
-        status = "success" if (
-            no_captured_sources
-            or (skipped_count and not invalid_count and not rejected_count)
-        ) else "error"
-        output = {"status": status, **base}
-        if no_captured_sources:
-            output["message"] = (
-                "No captured discovered source URLs are available for this specialist. "
-                "Search first or pass exact public URLs; do not retry the empty call "
-                "until new sources are discovered."
-            )
-        elif status == "error":
-            output["error_message"] = "No valid new discovered source URLs to read"
-        return output
-
-    _source_read_urls_by_run_and_agent[read_key] = already_read + to_read
-    result = await _read_captured_pages(to_read)
-    output = dict(result)
-    output.update(base)
     return output

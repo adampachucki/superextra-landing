@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from google.cloud import firestore
-
 from superextra_agent import firestore_progress
 from superextra_agent.firestore_progress import FirestoreProgressPlugin
 from superextra_agent.gear_run_state import GearRunState
@@ -77,9 +76,6 @@ async def test_before_model_writes_active_stage(monkeypatch):
         {
             "activeAgent": "report_writer",
             "activeStage": "writing_final_report",
-            "activeStageStartedAt": firestore.SERVER_TIMESTAMP,
-            "activeModel": "gemini-3.1-pro",
-            "activeInvocationId": "inv-parent",
         }
     ]
     assert cloud_logs[0][0] == "active_stage"
@@ -95,8 +91,10 @@ async def test_after_run_finalize_logs_use_shared_correlation(monkeypatch):
     plugin, state = _make_plugin_state()
     state.final_reply = "Final answer"
     cloud_logs: list[tuple[str, dict]] = []
+    terminal_updates: list[dict] = []
 
-    async def _fenced(_fs, _state, _session_update, _turn_update):
+    async def _fenced(_fs, _state, session_update, _turn_update):
+        terminal_updates.append(session_update)
         return None
 
     def _emit(event: str, **fields):
@@ -120,6 +118,11 @@ async def test_after_run_finalize_logs_use_shared_correlation(monkeypatch):
     assert emitted["finalize_start"]["invocation_id"] == "inv-parent"
     assert emitted["finalize_success"]["root_invocation_id"] == "inv-parent"
     assert emitted["finalize_success"]["invocation_id"] == "inv-parent"
+    assert terminal_updates[0]["activeAgent"] == firestore.DELETE_FIELD
+    assert terminal_updates[0]["activeStage"] == firestore.DELETE_FIELD
+    assert terminal_updates[0]["activeStageStartedAt"] == firestore.DELETE_FIELD
+    assert terminal_updates[0]["activeModel"] == firestore.DELETE_FIELD
+    assert terminal_updates[0]["activeInvocationId"] == firestore.DELETE_FIELD
 
 
 @pytest.mark.asyncio
@@ -178,20 +181,6 @@ async def test_tool_error_fetch_web_content_writes_warning():
                     {
                         "url": "https://example.com/menu",
                         "title": "Menu",
-                        "domain": "example.com",
-                    }
-                ],
-            },
-        ),
-        (
-            "read_discovered_sources",
-            {"urls": []},
-            {
-                "status": "success",
-                "sources": [
-                    {
-                        "url": "https://example.com/grounded",
-                        "title": "Grounded",
                         "domain": "example.com",
                     }
                 ],

@@ -154,13 +154,6 @@ async def test_finalize_real_reply_returns_complete_payload():
     state.final_reply = "Here's the answer: ..."
     state.final_sources = [{"url": "https://example.com", "title": "Example"}]
     state.timeline_writer.write_timeline = AsyncMock(return_value=None)
-    state.timeline_builder.record_model_call(
-        agent="report_writer", model="gemini-test"
-    )
-    state.timeline_builder.record_tool_call(
-        agent="review_analyst", tool="get_google_reviews"
-    )
-    state.timeline_builder.record_tool_result()
     await state.observe_typed_pill(
         {
             "kind": "thought",
@@ -178,16 +171,7 @@ async def test_finalize_real_reply_returns_complete_payload():
     assert turn_update["sources"] == state.final_sources
     assert "turnSummary" in turn_update
     assert "notes" not in turn_update["turnSummary"]
-    diagnostics = turn_update["turnSummary"]["diagnostics"]
-    assert diagnostics["sourceCount"] == 1
-    assert diagnostics["modelCalls"] == 1
-    assert diagnostics["toolCalls"] == 1
-    assert diagnostics["toolResults"] == 1
-    assert diagnostics["thoughts"] == 1
-    assert diagnostics["agents"] == ["report_writer", "review_analyst"]
-    assert diagnostics["models"] == ["gemini-test"]
-    assert diagnostics["tools"] == ["get_google_reviews"]
-    assert diagnostics["msToFirstThought"] >= 0
+    assert "diagnostics" not in turn_update["turnSummary"]
     assert "completedAt" in turn_update
 
 
@@ -321,47 +305,8 @@ def test_partial_source_event_is_not_lost_if_no_aggregate_repeats_it():
     ]
 
 
-def test_observe_event_records_grounding_reader_candidates_by_author(monkeypatch):
+def test_observe_event_merges_search_tool_sources():
     state = _make_state()
-    calls = []
-
-    def record(run_id, sources, *, agent_name=None):
-        calls.append((run_id, sources, agent_name))
-
-    monkeypatch.setattr(gear_run_state, "record_source_candidates", record)
-
-    state.observe_event(
-        _fake_event(
-            grounding_chunks=[
-                {
-                    "uri": "https://example.com/grounded",
-                    "title": "Grounded",
-                    "domain": "example.com",
-                }
-            ],
-            author="market_landscape",
-        )
-    )
-
-    assert calls == [
-        (
-            "run-test",
-            [
-                {
-                    "url": "https://example.com/grounded",
-                    "title": "Grounded",
-                    "domain": "example.com",
-                    "provider": "grounding",
-                }
-            ],
-            "market_landscape",
-        )
-    ]
-
-
-def test_observe_event_records_search_tool_candidates_as_one_batch(monkeypatch):
-    state = _make_state()
-    calls = []
     sources = [
         {
             "url": "https://example.com/a",
@@ -377,11 +322,6 @@ def test_observe_event_records_search_tool_candidates_as_one_batch(monkeypatch):
         },
     ]
 
-    def record(run_id, sources, *, agent_name=None):
-        calls.append((run_id, sources, agent_name))
-
-    monkeypatch.setattr(gear_run_state, "record_source_candidates", record)
-
     state.observe_event(
         _fake_event(
             function_responses=[
@@ -391,7 +331,6 @@ def test_observe_event_records_search_tool_candidates_as_one_batch(monkeypatch):
         )
     )
 
-    assert calls == [("run-test", sources, "market_landscape")]
     assert state.specialist_sources == sources
 
 
@@ -480,7 +419,7 @@ async def test_finalize_resolves_and_dedupes_grounding_redirect_sources(monkeypa
         {**redirect_a, "url": "https://www.trojmiasto.pl/article"},
         other,
     ]
-    assert turn_update["turnSummary"]["diagnostics"]["sourceCount"] == 2
+    assert "diagnostics" not in turn_update["turnSummary"]
 
 
 def test_capture_final_preserves_place_scoped_sources_with_same_url():

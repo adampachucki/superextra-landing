@@ -26,7 +26,7 @@ from .firestore_events import map_event
 from .notes import TITLE_TIMEOUT_S
 from .place_state import TOOL_SOURCE_PREFIX
 from .timeline import TimelineWriter, TurnSummaryBuilder
-from .web_tools import record_source_candidates, resolve_source_display_url
+from .web_tools import resolve_source_display_url
 
 log = logging.getLogger(__name__)
 
@@ -122,11 +122,6 @@ class GearRunState:
             mapped_sources.append(entry)
 
         if mapped_sources:
-            record_source_candidates(
-                self.run_id,
-                mapped_sources,
-                agent_name=event.author,
-            )
             for entry in mapped_sources:
                 self._merge_source(entry)
 
@@ -151,7 +146,6 @@ class GearRunState:
             event
         ):
             return None
-        self.timeline_builder.record_timeline_event(event)
         return await self.timeline_writer.write_timeline(event)
 
     def _merge_source(
@@ -280,9 +274,7 @@ class GearRunState:
             "status": "complete",
             "reply": self.final_reply,
             "sources": self.final_sources,
-            "turnSummary": self.timeline_builder.build_summary(
-                source_count=len(self.final_sources)
-            ),
+            "turnSummary": self.timeline_builder.build_summary(),
             "completedAt": firestore.SERVER_TIMESTAMP,
         }
         return session_update, turn_update, "complete"

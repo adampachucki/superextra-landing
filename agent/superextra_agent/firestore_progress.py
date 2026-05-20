@@ -427,7 +427,6 @@ class FirestoreProgressPlugin(BasePlugin):
         model: str | None = None,
         invocation_id: str | None = None,
     ) -> None:
-        per.timeline_builder.record_model_call(agent=agent_name, model=model)
         corr = build_run_correlation(
             per, invocation_id=invocation_id, agent=agent_name
         )
@@ -435,14 +434,7 @@ class FirestoreProgressPlugin(BasePlugin):
         update: dict[str, Any] = {
             "activeAgent": agent_name or "unknown",
             "activeStage": stage or self._stage_for_agent(agent_name),
-            "activeStageStartedAt": firestore.SERVER_TIMESTAMP,
         }
-        if model is not None:
-            update["activeModel"] = model
-        else:
-            update["activeModel"] = firestore.DELETE_FIELD
-        if invocation_id is not None:
-            update["activeInvocationId"] = invocation_id
 
         emit_cloud_log(
             "active_stage",
@@ -550,10 +542,6 @@ class FirestoreProgressPlugin(BasePlugin):
         per = self._state_for_context(tool_context, allow_run_id_fallback=True)
         if per is None:
             return None
-        per.timeline_builder.record_tool_call(
-            agent=getattr(tool_context, "agent_name", None),
-            tool=tool.name,
-        )
         pill = map_tool_call(
             tool.name,
             tool_args,
@@ -571,7 +559,6 @@ class FirestoreProgressPlugin(BasePlugin):
         per = self._state_for_context(tool_context, allow_run_id_fallback=True)
         if per is None:
             return None
-        per.timeline_builder.record_tool_result(error=False)
         for pill in map_tool_result(
             tool.name,
             result if isinstance(result, dict) else {},
@@ -586,7 +573,6 @@ class FirestoreProgressPlugin(BasePlugin):
         per = self._state_for_context(tool_context, allow_run_id_fallback=True)
         if per is None:
             return None
-        per.timeline_builder.record_tool_result(error=True)
         for pill in map_tool_error(
             tool.name,
             tool_args,
@@ -646,7 +632,6 @@ class FirestoreProgressPlugin(BasePlugin):
         # lock so concurrent writers don't interleave.
         for ev in timeline_events:
             try:
-                per.timeline_builder.record_timeline_event(ev)
                 await per.timeline_writer.write_timeline(ev)
             except Exception:  # noqa: BLE001
                 log.exception(
@@ -721,7 +706,11 @@ class FirestoreProgressPlugin(BasePlugin):
                             "status": "error",
                             "error": "finalize_failed",
                             "updatedAt": firestore.SERVER_TIMESTAMP,
-                            "activeStage": "finalize_failed",
+                            "activeAgent": firestore.DELETE_FIELD,
+                            "activeStage": firestore.DELETE_FIELD,
+                            "activeStageStartedAt": firestore.DELETE_FIELD,
+                            "activeModel": firestore.DELETE_FIELD,
+                            "activeInvocationId": firestore.DELETE_FIELD,
                         },
                         {
                             "status": "error",
@@ -742,7 +731,7 @@ class FirestoreProgressPlugin(BasePlugin):
                 )
             return None
 
-        if session_update.get("status") == "complete":
+        if session_update.get("status") in ("complete", "error"):
             session_update.update(
                 {
                     "activeAgent": firestore.DELETE_FIELD,

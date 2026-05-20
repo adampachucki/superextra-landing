@@ -112,7 +112,6 @@ const ACTIVE_AGENT_LABEL: Record<string, string> = {
 	research_lead: 'Planning research',
 	report_writer: 'Drafting final report',
 	continue_research: 'Continuing research',
-	follow_up: 'Following up',
 	market_landscape: 'Researching market landscape',
 	menu_pricing: 'Researching menu and pricing',
 	revenue_sales: 'Researching revenue and sales',

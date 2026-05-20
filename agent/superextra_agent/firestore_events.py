@@ -101,7 +101,7 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
         extract_sources_from_grounding(event) + extract_sources_from_search_tool(event)
     )
 
-    if author in ("router", "report_writer", "continue_research", "follow_up"):
+    if author in ("router", "report_writer", "continue_research"):
         complete = _map_complete(event)
         if complete is not None:
             mapping["complete"] = complete
@@ -140,7 +140,6 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "get_google_reviews": "structured reviews",
     "google_search": "source search",
     "search_public_web": "source search",
-    "read_discovered_sources": "source reading",
     "read_web_pages": "source reading",
     "fetch_web_content": "source reading",
     "fetch_web_content_batch": "source reading",
@@ -286,9 +285,8 @@ def _map_complete(event: Any) -> dict[str, Any] | None:
     reply: str | None = None
     # `continue_research_reply` is the continuation agent's output_key (kept
     # distinct so a continuation reply doesn't clobber the original report
-    # in session state). `final_report_followup` is kept for older deployed
-    # sessions/events. `final_report` is the report writer's.
-    for key in ("continue_research_reply", "final_report_followup", "final_report"):
+    # in session state). `final_report` is the report writer's.
+    for key in ("continue_research_reply", "final_report"):
         if _has_state_delta(event, key):
             candidate = _state_delta(event).get(key)
             if isinstance(candidate, str) and candidate.strip():
@@ -338,19 +336,13 @@ def map_tool_call(
         if url:
             return _detail(row_id, "source", "Public sources", _short_url(url))
         return None
-    if name in (
-        "fetch_web_content_batch",
-        "read_public_pages",
-        "read_discovered_sources",
-    ):
+    if name in ("fetch_web_content_batch", "read_public_pages"):
         urls = args.get("urls") or []
         if isinstance(urls, list) and urls:
             label = ", ".join(_short_url(str(u)) for u in urls[:3])
             if len(urls) > 3:
                 label += f" (+{len(urls) - 3} more)"
             return _detail(row_id, "source", "Public sources", label)
-        if name == "read_discovered_sources":
-            return _detail(row_id, "source", "Public sources", "Captured source queue")
         return None
     if name == "search_restaurants":
         query = _normalize_space(str(args.get("query") or "")).strip()
@@ -480,11 +472,7 @@ def map_tool_result(
     if name in ("read_web_pages", "fetch_web_content", "read_public_page") and status == "error":
         return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
 
-    if name in (
-        "fetch_web_content_batch",
-        "read_public_pages",
-        "read_discovered_sources",
-    ):
+    if name in ("fetch_web_content_batch", "read_public_pages"):
         results = response.get("results") if isinstance(response, dict) else None
         if isinstance(results, list):
             failed = sum(1 for r in results if isinstance(r, dict) and r.get("status") == "error")

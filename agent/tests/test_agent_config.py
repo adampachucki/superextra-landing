@@ -38,7 +38,6 @@ def test_continue_research_uses_tool_compatible_model_config():
     assert "fetch_web_content" not in _tool_names(continue_research.tools)
     assert "fetch_web_content_batch" not in _tool_names(continue_research.tools)
     assert "search_public_web" not in _tool_names(continue_research.tools)
-    assert "read_discovered_sources" not in _tool_names(continue_research.tools)
     assert any(
         getattr(tool, "name", "") == "market_landscape" for tool in continue_research.tools
     )

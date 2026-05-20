@@ -204,7 +204,6 @@ class TestMakeInstruction:
         assert "Search and grounding sources may still appear as source pills" in result
         assert "proof that a page was read" in result
         assert "search_public_web" not in result
-        assert "read_discovered_sources" not in result
         assert "### Evidence Notes" in result
 
     def test_specialists_surface_writer_material_and_evidence_notes(self):

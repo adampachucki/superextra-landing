@@ -10,11 +10,9 @@ from superextra_agent import web_tools
 from superextra_agent.web_tools import (
     MAX_BATCH,
     MAX_CONTENT_LENGTH,
-    _read_captured_pages,
     clear_fetch_cache_for_run,
     fetch_web_content,
     fetch_web_content_batch,
-    read_discovered_sources,
     read_public_page,
     read_public_pages,
     read_web_pages,
@@ -54,7 +52,6 @@ def test_tool_docstrings_describe_source_reading_workflow():
     read_public_doc = " ".join((read_public_page.__doc__ or "").split())
     read_public_batch_doc = " ".join((read_public_pages.__doc__ or "").split())
     search_doc = " ".join((search_public_web.__doc__ or "").split())
-    discovered_doc = " ".join((read_discovered_sources.__doc__ or "").split())
 
     assert "Explicit structured reader for concrete public URLs" in read_doc
     assert "public web source capture" in read_doc
@@ -66,8 +63,6 @@ def test_tool_docstrings_describe_source_reading_workflow():
     assert "Jina page reader for concrete URLs discovered by dedicated search tools" in read_public_doc
     assert "Batch Jina page reader for concrete URLs discovered by dedicated search tools" in read_public_batch_doc
     assert "return exact source URLs" in search_doc
-    assert "same-run discovered web sources" in discovered_doc
-    assert "concrete public URLs to read them directly" in discovered_doc
 
 
 def test_source_reading_timeouts_are_short_bounded_attempts():
@@ -138,125 +133,8 @@ async def test_read_public_pages_collects_successful_sources():
 
 
 @pytest.mark.asyncio
-async def test_read_captured_pages_reads_above_public_batch_cap():
-    urls = [f"https://example.com/{i}" for i in range(MAX_BATCH + 2)]
-
-    async def fetch(
-        url,
-        *,
-        allow_readerlm,
-        allow_domain_root=False,
-        allow_proxy_fallback=False,
-    ):
-        return {
-            "status": "success",
-            "url": url,
-            "content": f"Title: {url.rsplit('/', 1)[-1]}\n\nText",
-        }
-
-    with patch("superextra_agent.web_tools._fetch_web_content", fetch):
-        result = await _read_captured_pages(urls)
-
-    assert result["status"] == "success"
-    assert result["success_count"] == len(urls)
-    assert result["failed_count"] == 0
-    assert [item["url"] for item in result["results"]] == urls
-    assert [source["url"] for source in result["sources"]] == urls
-
-
-@pytest.mark.asyncio
-async def test_read_captured_pages_allows_restaurant_homepage_roots():
-    url = "https://restaurant.example/"
-
-    async def fetch(
-        url,
-        *,
-        allow_readerlm,
-        allow_domain_root=False,
-        allow_proxy_fallback=False,
-    ):
-        assert allow_domain_root is True
-        assert allow_proxy_fallback is True
-        return {
-            "status": "success",
-            "url": url,
-            "content": "Title: Restaurant\n\nMenu item " * 80,
-        }
-
-    with patch("superextra_agent.web_tools._fetch_web_content", fetch):
-        result = await _read_captured_pages([url])
-
-    assert result["status"] == "success"
-    assert result["success_count"] == 1
-    assert result["sources"][0]["url"] == url
-
-
-@pytest.mark.asyncio
-async def test_read_captured_pages_preserves_requested_url_after_unwrap():
-    requested = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc"
-    resolved = "https://example.com/article"
-
-    async def fetch(
-        url,
-        *,
-        allow_readerlm,
-        allow_domain_root=False,
-        allow_proxy_fallback=False,
-    ):
-        return {
-            "status": "success",
-            "url": resolved,
-            "content": "Title: Article\n\nText",
-        }
-
-    with patch("superextra_agent.web_tools._fetch_web_content", fetch):
-        result = await _read_captured_pages([requested])
-
-    assert result["results"][0]["url"] == resolved
-    assert result["results"][0]["requested_url"] == requested
-    assert result["sources"][0]["url"] == resolved
-
-
-@pytest.mark.asyncio
-async def test_read_discovered_sources_reads_current_specialist_capture_from_empty_request():
-    run_id = "run-specialist-discovered"
-    market_url = "https://example.com/market"
-    guest_url = "https://example.com/guest"
-    tool_context = SimpleNamespace(agent_name="market_landscape")
-    set_fetch_run_id(run_id)
-    web_tools.record_source_candidates(
-        run_id,
-        [market_url],
-        agent_name="market_landscape",
-    )
-    web_tools.record_source_candidates(
-        run_id,
-        [guest_url],
-        agent_name="guest_intelligence",
-    )
-
-    try:
-        with patch(
-            "superextra_agent.web_tools._read_captured_pages",
-            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
-        ) as read_pages:
-            result = await read_discovered_sources([], tool_context=tool_context)
-    finally:
-        clear_fetch_cache_for_run(run_id)
-
-    read_pages.assert_awaited_once_with([market_url])
-    assert result["status"] == "success"
-    assert result["available_count"] == 1
-    assert result["requested_count"] == 0
-    assert result["attempted_count"] == 1
-    assert result["auto_appended_urls"] == [market_url]
-
-
-@pytest.mark.asyncio
-async def test_search_public_web_records_results_for_discovered_source_reader():
-    run_id = "run-specialist-search"
+async def test_search_public_web_returns_source_results():
     result_url = "https://example.com/article"
-    tool_context = SimpleNamespace(agent_name="market_landscape")
     response = httpx.Response(
         200,
         json={
@@ -272,20 +150,9 @@ async def test_search_public_web_records_results_for_discovered_source_reader():
         request=httpx.Request("GET", web_tools.SERPAPI_SEARCH_URL),
     )
     client = SimpleNamespace(get=AsyncMock(return_value=response))
-    set_fetch_run_id(run_id)
 
-    try:
-        with patch("superextra_agent.web_tools._get_client", return_value=client):
-            search = await search_public_web(
-                "gdynia restaurant openings", tool_context=tool_context
-            )
-        with patch(
-            "superextra_agent.web_tools._read_captured_pages",
-            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
-        ) as read_pages:
-            read = await read_discovered_sources([], tool_context=tool_context)
-    finally:
-        clear_fetch_cache_for_run(run_id)
+    with patch("superextra_agent.web_tools._get_client", return_value=client):
+        search = await search_public_web("gdynia restaurant openings")
 
     assert search["status"] == "success"
     assert search["sources"] == [
@@ -298,14 +165,10 @@ async def test_search_public_web_records_results_for_discovered_source_reader():
             "position": 1,
         }
     ]
-    read_pages.assert_awaited_once_with([result_url])
-    assert read["attempted_count"] == 1
-    assert read["auto_appended_urls"] == [result_url]
 
 
 @pytest.mark.asyncio
 async def test_search_public_web_applies_locale_recency_and_site_parameters():
-    tool_context = SimpleNamespace(agent_name="market_landscape")
     response = httpx.Response(
         200,
         json={
@@ -332,7 +195,6 @@ async def test_search_public_web_applies_locale_recency_and_site_parameters():
             language="pl",
             recency="month",
             site="https://www.trojmiasto.pl/kulinaria/",
-            tool_context=tool_context,
         )
 
     params = client.get.await_args.kwargs["params"]
@@ -393,191 +255,6 @@ async def test_search_public_web_reads_google_news_results_shape():
             "source_name": "Local News",
         }
     ]
-
-
-@pytest.mark.asyncio
-async def test_read_discovered_sources_prioritizes_latest_search_batch():
-    run_id = "run-specialist-latest"
-    limit = web_tools.SPECIALIST_DISCOVERED_READ_LIMIT
-    old_urls = [f"https://example.com/old-{i}" for i in range(limit)]
-    latest_url = "https://example.com/refined"
-    tool_context = SimpleNamespace(agent_name="market_landscape")
-    set_fetch_run_id(run_id)
-    web_tools.record_source_candidates(
-        run_id,
-        old_urls,
-        agent_name="market_landscape",
-    )
-    web_tools.record_source_candidates(
-        run_id,
-        [latest_url],
-        agent_name="market_landscape",
-    )
-
-    try:
-        with patch(
-            "superextra_agent.web_tools._read_captured_pages",
-            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
-        ) as read_pages:
-            result = await read_discovered_sources([], tool_context=tool_context)
-    finally:
-        clear_fetch_cache_for_run(run_id)
-
-    expected = [latest_url] + old_urls[: limit - 1]
-    read_pages.assert_awaited_once_with(expected)
-    assert result["available_count"] == limit + 1
-    assert result["attempted_count"] == limit
-    assert result["auto_appended_urls"] == expected
-
-
-@pytest.mark.asyncio
-async def test_read_discovered_sources_empty_request_without_capture_is_noop_success():
-    run_id = "run-specialist-empty"
-    tool_context = SimpleNamespace(agent_name="market_landscape")
-    set_fetch_run_id(run_id)
-
-    try:
-        with patch("superextra_agent.web_tools._read_captured_pages", AsyncMock()) as read_pages:
-            result = await read_discovered_sources([], tool_context=tool_context)
-    finally:
-        clear_fetch_cache_for_run(run_id)
-
-    read_pages.assert_not_awaited()
-    assert result["status"] == "success"
-    assert result["available_count"] == 0
-    assert result["attempted_count"] == 0
-    assert "do not retry" in result["message"]
-
-
-@pytest.mark.asyncio
-async def test_read_discovered_sources_reads_explicit_urls_without_capture_requirement():
-    run_id = "run-specialist-explicit"
-    requested = "https://example.com/direct-url"
-    captured = "https://example.com/captured"
-    tool_context = SimpleNamespace(agent_name="market_landscape")
-    set_fetch_run_id(run_id)
-    web_tools.record_source_candidates(
-        run_id,
-        [captured],
-        agent_name="market_landscape",
-    )
-
-    try:
-        with patch(
-            "superextra_agent.web_tools._read_captured_pages",
-            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
-        ) as read_pages:
-            result = await read_discovered_sources(
-                [requested], tool_context=tool_context
-            )
-    finally:
-        clear_fetch_cache_for_run(run_id)
-
-    read_pages.assert_awaited_once_with([requested])
-    assert result["attempted_count"] == 1
-    assert result["valid_url_count"] == 1
-    assert result["rejected_count"] == 0
-    assert result["rejected_urls"] == []
-    assert result["auto_appended_urls"] == []
-
-
-@pytest.mark.asyncio
-async def test_read_discovered_sources_invalid_explicit_url_does_not_drain_capture():
-    run_id = "run-specialist-invalid-explicit"
-    captured = "https://example.com/captured"
-    tool_context = SimpleNamespace(agent_name="market_landscape")
-    set_fetch_run_id(run_id)
-    web_tools.record_source_candidates(
-        run_id,
-        [captured],
-        agent_name="market_landscape",
-    )
-
-    try:
-        with patch("superextra_agent.web_tools._read_captured_pages", AsyncMock()) as read_pages:
-            result = await read_discovered_sources(
-                ["not a url"], tool_context=tool_context
-            )
-    finally:
-        clear_fetch_cache_for_run(run_id)
-
-    read_pages.assert_not_awaited()
-    assert result["status"] == "error"
-    assert result["available_count"] == 1
-    assert result["requested_count"] == 1
-    assert result["attempted_count"] == 0
-    assert result["invalid_count"] == 1
-    assert result["auto_appended_count"] == 0
-    assert result["auto_appended_urls"] == []
-
-
-@pytest.mark.asyncio
-async def test_read_discovered_sources_reads_requested_capture_without_queue_drain():
-    run_id = "run-specialist-targeted"
-    requested = "https://example.com/requested"
-    queued = "https://example.com/queued"
-    tool_context = SimpleNamespace(agent_name="market_landscape")
-    set_fetch_run_id(run_id)
-    web_tools.record_source_candidates(
-        run_id,
-        [requested, queued],
-        agent_name="market_landscape",
-    )
-
-    try:
-        with patch(
-            "superextra_agent.web_tools._read_captured_pages",
-            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
-        ) as read_pages:
-            result = await read_discovered_sources(
-                [requested], tool_context=tool_context
-            )
-    finally:
-        clear_fetch_cache_for_run(run_id)
-
-    read_pages.assert_awaited_once_with([requested])
-    assert result["attempted_count"] == 1
-    assert result["valid_url_count"] == 1
-    assert result["auto_appended_count"] == 0
-    assert result["auto_appended_urls"] == []
-    assert result["omitted_count"] == 0
-
-
-@pytest.mark.asyncio
-async def test_read_discovered_sources_caps_each_call_and_remembers_reads():
-    run_id = "run-specialist-cap"
-    limit = web_tools.SPECIALIST_DISCOVERED_READ_LIMIT
-    urls = [f"https://example.com/{i}" for i in range(limit + 2)]
-    tool_context = SimpleNamespace(agent_name="market_landscape")
-    set_fetch_run_id(run_id)
-    web_tools.record_source_candidates(
-        run_id,
-        urls,
-        agent_name="market_landscape",
-    )
-
-    try:
-        with patch(
-            "superextra_agent.web_tools._read_captured_pages",
-            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
-        ) as read_pages:
-            first = await read_discovered_sources([], tool_context=tool_context)
-        with patch(
-            "superextra_agent.web_tools._read_captured_pages",
-            AsyncMock(return_value={"status": "success", "results": [], "sources": []}),
-        ) as read_pages_second:
-            second = await read_discovered_sources([], tool_context=tool_context)
-    finally:
-        clear_fetch_cache_for_run(run_id)
-
-    read_pages.assert_awaited_once_with(urls[:limit])
-    assert first["attempted_count"] == limit
-    assert first["auto_appended_count"] == limit
-    assert first["omitted_count"] == 2
-    read_pages_second.assert_awaited_once_with(urls[limit:])
-    assert second["attempted_count"] == 2
-    assert second["skipped_count"] == 0
-
 
 class TestReadWebPages:
     def test_url_context_client_uses_cloud_platform_scoped_credentials(self, monkeypatch):
@@ -1380,57 +1057,6 @@ class TestFetchWebContent:
 
         assert result["status"] == "error"
         assert mock_client.get.call_count == 1
-
-    @pytest.mark.asyncio
-    async def test_captured_reader_uses_proxy_fallback_for_upstream_403(
-        self, mock_emit_cloud_log
-    ):
-        blocked = "Warning: Target URL returned error 403: Forbidden\n\nMarkdown Content:\n"
-        content = "# Menu\n\n" + "Chinese Wok menu and delivery details. " * 30
-        mock_client = AsyncMock()
-        mock_client.get = AsyncMock(
-            side_effect=[_mock_response(blocked), _mock_response(content)]
-        )
-
-        with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
-             patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
-            result = await _read_captured_pages(
-                ["https://www.pyszne.pl/menu/chinese-wok"]
-            )
-
-        assert result["status"] == "success"
-        assert result["success_count"] == 1
-        assert mock_client.get.call_count == 2
-        proxy_headers = mock_client.get.call_args_list[1].kwargs.get("headers", {})
-        assert proxy_headers["X-Proxy"] == "auto"
-        assert proxy_headers["Authorization"] == "Bearer test-key-123"
-
-        kw = _log_kwargs(mock_emit_cloud_log)
-        assert kw["reader_mode"] == "plain_proxy"
-        assert kw["fallback_reason"] == "upstream_http_403"
-
-    @pytest.mark.asyncio
-    async def test_captured_proxy_fallback_keeps_original_error_when_blocked(
-        self, mock_emit_cloud_log
-    ):
-        blocked = "Warning: Target URL returned error 403: Forbidden\n\nMarkdown Content:\n"
-        still_blocked = "Just a moment...\n\nChecking your browser"
-        mock_client = AsyncMock()
-        mock_client.get = AsyncMock(
-            side_effect=[_mock_response(blocked), _mock_response(still_blocked)]
-        )
-
-        with patch("superextra_agent.web_tools._get_client", return_value=mock_client), \
-             patch.dict("os.environ", {"JINA_API_KEY": "test-key-123"}):
-            result = await _read_captured_pages(["https://blocked.example/page"])
-
-        assert result["status"] == "error"
-        assert result["results"][0]["error_message"].endswith("upstream HTTP 403")
-
-        kw = _log_kwargs(mock_emit_cloud_log)
-        assert kw["reader_mode"] == "plain"
-        assert kw["fallback_reason"] == "upstream_http_403"
-        assert kw["fallback_error_reason"] == "cloudflare_interstitial"
 
     @pytest.mark.asyncio
     async def test_thin_content_becomes_error(self):

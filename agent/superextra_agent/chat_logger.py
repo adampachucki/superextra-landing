@@ -1,13 +1,10 @@
-"""Chat logging plugin — writes structured JSONL logs per session for debugging."""
+"""ADK plugin that emits structured Cloud Logging diagnostics for agent runs."""
 
 from __future__ import annotations
 
-import json
-import logging
 import time
 import traceback
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
 from google.genai import types
@@ -34,14 +31,6 @@ from .correlation import (
 if TYPE_CHECKING:
     from google.adk.agents.invocation_context import InvocationContext
     from google.adk.tools.tool_context import ToolContext
-
-import os as _os
-
-# Cloud Run containers have a read-only filesystem except /tmp
-_default_logs = Path(__file__).parent.parent / "logs"
-LOGS_DIR = Path("/tmp/agent_logs") if _os.environ.get("K_SERVICE") else _default_logs
-
-logger = logging.getLogger(__name__)
 
 _CLOUD_EVENTS = {
     "invocation_start",
@@ -80,29 +69,6 @@ def _safe(obj: Any) -> Any:
         return str(obj)
     except Exception:
         return "<unserializable>"
-
-
-def _serialize_content(content: types.Content | None) -> dict | None:
-    if content is None:
-        return None
-    parts = []
-    for part in content.parts or []:
-        d: dict[str, Any] = {}
-        if part.text:
-            d["text"] = part.text
-        if part.function_call:
-            d["function_call"] = {
-                "name": part.function_call.name,
-                "args": part.function_call.args,
-            }
-        if part.function_response:
-            d["function_response"] = {
-                "name": part.function_response.name,
-                "response": _safe(part.function_response.response),
-            }
-        if d:
-            parts.append(d)
-    return {"role": content.role, "parts": parts}
 
 
 def _summarize_tool_result(result: Any) -> dict[str, Any]:
@@ -289,20 +255,15 @@ def _cloud_payload(entry: dict[str, Any]) -> dict[str, Any]:
 
 
 class ChatLoggerPlugin(BasePlugin):
-    """Logs every chat event to per-session JSONL files in agent/logs/."""
+    """Logs sanitized run metadata to Cloud Logging."""
 
     def __init__(self, *, name: str = "chat_logger"):
         super().__init__(name)
-        LOGS_DIR.mkdir(parents=True, exist_ok=True)
         # track model/tool call start times for duration logging
         self._model_starts: dict[str, float] = {}  # invocation_id -> time
         self._tool_starts: dict[str, float] = {}  # function_call_id -> time
         self._root_by_run_id: dict[str, CorrelationFields] = {}
         self._run_id_by_root_invocation: dict[str, str] = {}
-
-    def _log_file(self, session_id: str) -> Path:
-        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        return LOGS_DIR / f"{date}_{session_id}.jsonl"
 
     def _correlation_for_invocation(
         self,
@@ -341,11 +302,6 @@ class ChatLoggerPlugin(BasePlugin):
             emit_cloud_log(
                 str(entry["event"]), severity=severity, **_cloud_payload(entry)
             )
-        try:
-            with self._log_file(correlation.log_session_id()).open("a") as f:
-                f.write(json.dumps(entry, default=str, ensure_ascii=False) + "\n")
-        except Exception:
-            logger.exception("Failed to write chat log")
 
     def _run_id(self, ctx: InvocationContext) -> str | None:
         return run_id_from_context(ctx)
@@ -368,18 +324,6 @@ class ChatLoggerPlugin(BasePlugin):
             {
                 "event": "invocation_start",
                 "user_id": invocation_context.user_id,
-            },
-        )
-        return None
-
-    @override
-    async def on_user_message_callback(self, *, invocation_context: InvocationContext, user_message: types.Content) -> types.Content | None:
-        correlation = self._correlation_for_invocation(invocation_context)
-        self._write(
-            correlation,
-            {
-                "event": "user_message",
-                "content": _serialize_content(user_message),
             },
         )
         return None

@@ -381,23 +381,6 @@ def test_failed_fetch_batch_warning_preserves_failure_count():
     assert rows[0]["text"] == "2/2 sources failed"
 
 
-def test_failed_discovered_source_batch_warning_preserves_failure_count():
-    rows = map_tool_result(
-        "read_discovered_sources",
-        {
-            "status": "success",
-            "results": [
-                {"status": "success", "url": "https://example.com/a", "content": "ok"},
-                {"status": "error", "url": "https://example.com/b"},
-            ],
-        },
-        {},
-        "call-1",
-    )
-
-    assert rows[0]["text"] == "1/2 sources failed"
-
-
 def test_tripadvisor_unverified_becomes_warning():
     """Unverified status (coord check failed or no coords available) renders
     as a timeline warning row. On unverified the tool strips `name`, so the
@@ -506,21 +489,6 @@ def test_continue_research_notes_state_delta_does_not_complete_or_emit_activity(
         "timeline_events": [],
         "complete": None,
         "grounding_sources": [],
-    }
-
-
-def test_legacy_followup_complete_still_reads_final_report_followup_key():
-    ev = _event(
-        author="follow_up",
-        is_final=True,
-        state_delta={
-            "final_report_followup": "Short follow-up answer.",
-            "final_report": "# Original full research report",
-        },
-    )
-    mapped = map_event(ev, {})
-    assert mapped["complete"] == {
-        "reply": "Short follow-up answer.",
     }
 
 

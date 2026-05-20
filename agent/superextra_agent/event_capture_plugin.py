@@ -8,11 +8,8 @@ events. ADK propagates plugins from the parent runner to child runners
 for child events. This plugin exploits that to recover the per-specialist
 event stream the eval scorer needs.
 
-`before_run_callback` binds the local ADK session id as the fetch run id so
-eval runs exercise the same same-run source-reading queue that production
-gets from `FirestoreProgressPlugin`. Under AgentTool each child invocation is
-its own root from ADK's perspective, which is exactly the scope specialists
-need for their captured grounding URLs.
+`before_run_callback` binds the local ADK session id as the fetch run id so eval
+runs exercise the same per-run fetch cache scope as production.
 """
 
 from __future__ import annotations
@@ -22,10 +19,8 @@ from google.adk.events.event import Event
 from google.adk.plugins.base_plugin import BasePlugin
 from typing_extensions import override
 
-from .firestore_events import extract_sources_from_grounding, extract_sources_from_search_tool
 from .web_tools import (
     clear_fetch_cache_for_run,
-    record_source_candidates,
     set_fetch_run_id,
 )
 
@@ -48,8 +43,4 @@ class EventCapturePlugin(BasePlugin):
         self, *, invocation_context: InvocationContext, event: Event
     ):
         self.events.append(event)
-        run_id = getattr(invocation_context.session, "id", None)
-        sources = extract_sources_from_grounding(event) + extract_sources_from_search_tool(event)
-        if isinstance(run_id, str) and sources:
-            record_source_candidates(run_id, sources, agent_name=event.author)
         return None

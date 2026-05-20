@@ -26,6 +26,22 @@ SPECIALIST_LABEL_BY_AUTHOR = {
     author: SPECIALIST_RESULT_KEYS[output_key]
     for author, output_key in AUTHOR_TO_OUTPUT_KEY.items()
 }
+READ_TOOL_NAMES = {
+    "read_web_pages",
+    "read_public_page",
+    "read_public_pages",
+    "fetch_web_content",
+    "fetch_web_content_batch",
+    # Historical eval logs still contain this removed runtime tool.
+    "read_discovered_sources",
+}
+SINGLE_URL_READ_TOOLS = {"read_public_page", "fetch_web_content"}
+BATCH_URL_READ_TOOLS = {
+    "read_web_pages",
+    "read_public_pages",
+    "fetch_web_content_batch",
+    "read_discovered_sources",
+}
 
 
 def _domain_of(url: str) -> str:
@@ -136,6 +152,16 @@ def _canonical_urls(values: Any) -> list[str]:
     return out
 
 
+def _read_request_urls(name: str, args: Any) -> list[str]:
+    if not isinstance(args, dict):
+        return []
+    if name in SINGLE_URL_READ_TOOLS:
+        return _canonical_urls([args.get("url")])
+    if name in BATCH_URL_READ_TOOLS:
+        return _canonical_urls(args.get("urls"))
+    return []
+
+
 def _count(response: dict[str, Any], key: str, fallback: int = 0) -> int:
     value = response.get(key)
     return value if isinstance(value, int) else fallback
@@ -152,12 +178,29 @@ def _read_call_from_response(
     returned_source_urls: list[str] = []
     failed_sources: list[dict[str, str]] = []
 
-    for result in response.get("results") or []:
+    raw_results = response.get("results")
+    if isinstance(raw_results, list):
+        result_items = [item for item in raw_results if isinstance(item, dict)]
+    elif response.get("url"):
+        result_items = [response]
+    elif response.get("status") == "error" and requested_urls:
+        result_items = [{**response, "url": url} for url in requested_urls]
+    elif response.get("status") == "error":
+        result_items = [response]
+    else:
+        result_items = []
+
+    for index, result in enumerate(result_items):
         if not isinstance(result, dict):
             continue
-        actual_url = _canonical_source_url(result.get("url"))
+        actual_url = _canonical_source_url(
+            result.get("retrieved_url") or result.get("url")
+        )
         requested_url = _canonical_source_url(result.get("requested_url"))
-        attempted_url = requested_url or actual_url
+        positional_requested_url = (
+            requested_urls[index] if index < len(requested_urls) else None
+        )
+        attempted_url = requested_url or positional_requested_url or actual_url
         if attempted_url:
             attempted_urls.append(attempted_url)
         if result.get("status") == "success":
@@ -169,8 +212,10 @@ def _read_call_from_response(
             continue
         reason = str(
             result.get("error_message")
+            or result.get("retrieval_status")
             or result.get("reason")
             or result.get("error")
+            or result.get("limits")
             or result.get("status")
             or "read failed"
         )
@@ -183,6 +228,25 @@ def _read_call_from_response(
                 ),
             }
         )
+
+    if not result_items and response.get("status") == "error":
+        reason = str(
+            response.get("error_message")
+            or response.get("reason")
+            or response.get("error")
+            or "read failed"
+        )
+        for url in requested_urls:
+            attempted_urls.append(url)
+            failed_sources.append(
+                {
+                    "url": url,
+                    "reason": reason,
+                    "reason_bucket": _reader_failure_bucket(
+                        response.get("_error_reason") or reason
+                    ),
+                }
+            )
 
     for source in response.get("sources") or []:
         if not isinstance(source, dict):
@@ -206,8 +270,8 @@ def _read_call_from_response(
         "agent": author,
         "requested_urls": requested_urls,
         "requested_count": _count(response, "requested_count", len(requested_urls)),
-        "valid_url_count": _count(response, "valid_url_count", 0),
-        "available_count": _count(response, "available_count", 0),
+        "valid_url_count": _count(response, "valid_url_count", len(requested_urls)),
+        "available_count": _count(response, "available_count", len(requested_urls)),
         "attempted_urls": attempted_unique,
         "attempted_count": _count(response, "attempted_count", len(attempted_unique)),
         "successful_urls": successful_unique,
@@ -418,7 +482,7 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
     tool_call_counts: dict[str, int] = {}
     authors_seen: dict[str, int] = {}
     token_totals = {"prompt": 0, "candidates": 0, "total": 0}
-    pending_read_requests_by_author: dict[str, list[list[str]]] = {}
+    pending_read_requests_by_author: dict[str, dict[str, list[list[str]]]] = {}
     specialist_read_calls: list[dict[str, Any]] = []
 
     for event in events:
@@ -447,21 +511,12 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
             if name:
                 tool_call_counts[name] = tool_call_counts.get(name, 0) + 1
                 args = _get(fc, "args") or {}
-                if name == "fetch_web_content":
-                    url = args.get("url") if isinstance(args, dict) else None
-                    if isinstance(url, str) and url:
-                        fetched_urls.add(url)
-                elif name in ("fetch_web_content_batch", "read_public_pages"):
-                    urls = args.get("urls") if isinstance(args, dict) else None
-                    for url in urls or []:
-                        if isinstance(url, str) and url:
-                            fetched_urls.add(url)
-                elif name == "read_discovered_sources":
-                    urls = args.get("urls") if isinstance(args, dict) else None
-                    requested_urls = _canonical_urls(urls)
-                    pending_read_requests_by_author.setdefault(author, []).append(
-                        requested_urls
+                if name in READ_TOOL_NAMES:
+                    requested_urls = _read_request_urls(name, args)
+                    pending_by_tool = pending_read_requests_by_author.setdefault(
+                        author, {}
                     )
+                    pending_by_tool.setdefault(name, []).append(requested_urls)
                     fetched_urls.update(requested_urls)
 
             fr = _get(part, "function_response")
@@ -475,6 +530,8 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                 "read_web_pages",
                 "read_public_page",
                 "read_public_pages",
+                "fetch_web_content",
+                "fetch_web_content_batch",
                 "read_discovered_sources",
             ):
                 for source in response.get("sources") or []:
@@ -483,32 +540,26 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                         if url:
                             fetched_urls.add(url)
 
-            if response_name == "read_discovered_sources":
-                pending = pending_read_requests_by_author.get(author) or []
+            if response_name in READ_TOOL_NAMES:
+                pending = (
+                    pending_read_requests_by_author.get(author, {}).get(response_name)
+                    or []
+                )
                 requested_urls = pending.pop(0) if pending else []
+                if not requested_urls:
+                    requested_urls = _canonical_urls(response.get("urls"))
+                if not requested_urls:
+                    requested_urls = _canonical_urls([response.get("url")])
                 read_call = _read_call_from_response(
                     author=author,
                     response=response,
                     requested_urls=requested_urls,
                 )
-                specialist_read_calls.append(read_call)
+                if author in SPECIALIST_NAMES:
+                    specialist_read_calls.append(read_call)
                 fetched_urls.update(read_call["attempted_urls"])
                 fetched_urls.update(read_call["successful_urls"])
                 fetched_urls.update(read_call["returned_source_urls"])
-            elif (
-                response_name == "fetch_web_content"
-                and response.get("status") == "success"
-            ):
-                url = _normal_source_url(response.get("url"))
-                if url:
-                    fetched_urls.add(url)
-            elif response_name == "fetch_web_content_batch":
-                for item in response.get("results") or []:
-                    if not isinstance(item, dict) or item.get("status") != "success":
-                        continue
-                    url = _normal_source_url(item.get("url"))
-                    if url:
-                        fetched_urls.add(url)
 
         sd = _state_delta(event)
         for key, value in sd.items():

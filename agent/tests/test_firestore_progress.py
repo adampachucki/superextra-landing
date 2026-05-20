@@ -25,6 +25,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from google.api_core.exceptions import DeadlineExceeded, GoogleAPICallError
+from google.cloud import firestore
 from google.genai import types
 
 from superextra_agent import firestore_progress
@@ -613,6 +614,7 @@ async def test_plugin_after_run_writes_finalize_failed_terminal_on_finalize_cras
     retry the same way the happy-path terminal write does)."""
     plugin = FirestoreProgressPlugin(project="superextra-site")
     plugin._fs = MagicMock()
+    terminal_session_updates: list[dict] = []
 
     async def _claim(_fs, _state):
         return None
@@ -629,13 +631,14 @@ async def test_plugin_after_run_writes_finalize_failed_terminal_on_finalize_cras
     # waiting for watchdog.
     fenced_calls = 0
 
-    async def _fenced(_fs, _state, _su, _tu):
+    async def _fenced(_fs, _state, session_update, _tu):
         nonlocal fenced_calls
         fenced_calls += 1
         if fenced_calls < 3:
             from google.api_core.exceptions import DeadlineExceeded
             raise DeadlineExceeded("transient")
         # Third attempt succeeds.
+        terminal_session_updates.append(session_update)
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
@@ -661,6 +664,11 @@ async def test_plugin_after_run_writes_finalize_failed_terminal_on_finalize_cras
         "expected _retry_critical to retry 3× (transient × 2 → success); "
         f"saw {fenced_calls} calls — terminal-error write isn't retry-wrapped"
     )
+    assert terminal_session_updates[0]["activeAgent"] == firestore.DELETE_FIELD
+    assert terminal_session_updates[0]["activeStage"] == firestore.DELETE_FIELD
+    assert terminal_session_updates[0]["activeStageStartedAt"] == firestore.DELETE_FIELD
+    assert terminal_session_updates[0]["activeModel"] == firestore.DELETE_FIELD
+    assert terminal_session_updates[0]["activeInvocationId"] == firestore.DELETE_FIELD
 
 
 @pytest.mark.asyncio

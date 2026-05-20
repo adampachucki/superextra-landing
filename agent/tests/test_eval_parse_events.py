@@ -91,8 +91,19 @@ def test_parse_run_keeps_source_drawer_as_provenance():
                         },
                     ),
                     (
-                        "read_discovered_sources",
-                        {"status": "success", "sources": [source]},
+                        "read_web_pages",
+                        {
+                            "status": "success",
+                            "results": [
+                                {
+                                    "status": "success",
+                                    "url": source["url"],
+                                    "retrieved_url": source["url"],
+                                    "content": "# Source\n\nText",
+                                }
+                            ],
+                            "sources": [source],
+                        },
                     )
                 ],
                 state_delta={"_tool_src_google_maps_abc": provider},
@@ -118,7 +129,8 @@ def test_parse_run_keeps_source_drawer_as_provenance():
         {**provider, "kind": "provider", "domain": "maps.google.com"},
     ]
 
-def test_parse_run_builds_specialist_read_funnel_from_read_discovered_sources():
+
+def test_parse_run_builds_specialist_read_funnel_from_read_web_pages():
     url = "https://example.com/source"
 
     parsed = parse_run(
@@ -131,16 +143,17 @@ def test_parse_run_builds_specialist_read_funnel_from_read_discovered_sources():
             ),
             _event(
                 author="market_landscape",
-                function_calls=[("read_discovered_sources", {"urls": [url]})],
+                function_calls=[("read_web_pages", {"urls": [url]})],
                 function_responses=[
                     (
-                        "read_discovered_sources",
+                        "read_web_pages",
                         {
                             "status": "success",
                             "results": [
                                 {
                                     "status": "success",
                                     "url": url,
+                                    "retrieved_url": url,
                                     "content": "# Source\n\nText",
                                 }
                             ],
@@ -151,12 +164,7 @@ def test_parse_run_builds_specialist_read_funnel_from_read_discovered_sources():
                                     "domain": "example.com",
                                 }
                             ],
-                            "requested_count": 1,
-                            "valid_url_count": 1,
-                            "available_count": 1,
-                            "attempted_count": 1,
                             "success_count": 1,
-                            "failed_count": 0,
                         },
                     )
                 ],
@@ -187,7 +195,7 @@ def test_parse_run_builds_specialist_read_funnel_from_read_discovered_sources():
     assert funnel["specialists"][0]["successful_urls"] == [url]
 
 
-def test_parse_run_tracks_auto_appended_omitted_and_failed_reads():
+def test_parse_run_tracks_reader_failures_and_unattempted_grounding():
     read = "https://example.com/read"
     failed = "https://example.com/blocked"
     omitted = "https://example.com/omitted"
@@ -204,10 +212,10 @@ def test_parse_run_tracks_auto_appended_omitted_and_failed_reads():
             ),
             _event(
                 author="guest_intelligence",
-                function_calls=[("read_discovered_sources", {"urls": []})],
+                function_calls=[("read_public_pages", {"urls": [read, failed]})],
                 function_responses=[
                     (
-                        "read_discovered_sources",
+                        "read_public_pages",
                         {
                             "status": "success",
                             "results": [
@@ -229,14 +237,9 @@ def test_parse_run_tracks_auto_appended_omitted_and_failed_reads():
                                     "domain": "example.com",
                                 }
                             ],
-                            "requested_count": 0,
                             "attempted_count": 2,
                             "success_count": 1,
                             "failed_count": 1,
-                            "auto_appended_urls": [read, failed],
-                            "auto_appended_count": 2,
-                            "omitted_urls": [omitted],
-                            "omitted_count": 1,
                         },
                     )
                 ],
@@ -245,8 +248,8 @@ def test_parse_run_tracks_auto_appended_omitted_and_failed_reads():
     )
 
     funnel = parsed["source_funnel"]
-    assert funnel["specialist_read_auto_appended_url_count"] == 2
-    assert funnel["specialist_read_omitted_url_count"] == 1
+    assert funnel["specialist_read_auto_appended_url_count"] == 0
+    assert funnel["specialist_read_omitted_url_count"] == 0
     assert funnel["specialist_read_failed_sources"] == [
         {
             "url": failed,
@@ -276,17 +279,17 @@ def test_parse_run_uses_requested_url_for_resolved_reader_attempts():
             ),
             _event(
                 author="market_landscape",
-                function_calls=[("read_discovered_sources", {"urls": [requested]})],
+                function_calls=[("read_web_pages", {"urls": [requested]})],
                 function_responses=[
                     (
-                        "read_discovered_sources",
+                        "read_web_pages",
                         {
                             "status": "success",
                             "results": [
                                 {
                                     "status": "success",
-                                    "requested_url": requested,
-                                    "url": resolved,
+                                    "url": requested,
+                                    "retrieved_url": resolved,
                                     "content": "# Article\n\nText",
                                 }
                             ],
@@ -297,7 +300,6 @@ def test_parse_run_uses_requested_url_for_resolved_reader_attempts():
                                     "domain": "example.com",
                                 }
                             ],
-                            "attempted_count": 1,
                             "success_count": 1,
                         },
                     )
@@ -339,23 +341,13 @@ def test_parse_run_separates_noop_read_calls_from_effective_read_calls():
         [
             _event(
                 author="market_landscape",
-                function_calls=[("read_discovered_sources", {"urls": []})],
+                function_calls=[("read_public_pages", {"urls": []})],
                 function_responses=[
                     (
-                        "read_discovered_sources",
+                        "read_public_pages",
                         {
-                            "status": "success",
-                            "requested_count": 0,
-                            "valid_url_count": 0,
-                            "available_count": 0,
-                            "attempted_count": 0,
-                            "success_count": 0,
-                            "failed_count": 0,
-                            "skipped_count": 0,
-                            "auto_appended_count": 0,
-                            "rejected_count": 0,
-                            "invalid_count": 0,
-                            "omitted_count": 0,
+                            "status": "error",
+                            "error_message": "urls is empty",
                         },
                     )
                 ],
@@ -374,7 +366,40 @@ def test_parse_run_separates_noop_read_calls_from_effective_read_calls():
     assert row["noop_read_call_count"] == 1
 
 
-def test_parse_run_does_not_count_skipped_only_read_as_effective():
+def test_parse_run_expands_top_level_reader_errors_across_requested_urls():
+    urls = [
+        "https://example.com/a",
+        "https://example.com/b",
+        "https://example.com/c",
+    ]
+
+    parsed = parse_run(
+        [
+            _event(
+                author="market_landscape",
+                function_calls=[("read_web_pages", {"urls": urls})],
+                function_responses=[
+                    (
+                        "read_web_pages",
+                        {
+                            "status": "error",
+                            "error_message": "Timeout reading pages with URL Context",
+                        },
+                    )
+                ],
+            )
+        ]
+    )
+
+    funnel = parsed["source_funnel"]
+    assert funnel["specialist_read_requested_url_count"] == 3
+    assert funnel["specialist_read_attempted_url_count"] == 3
+    assert funnel["specialist_read_failed_url_count"] == 3
+    assert funnel["specialist_read_failure_reason_counts"] == {"timeout": 3}
+    assert [item["url"] for item in funnel["specialist_read_failed_sources"]] == urls
+
+
+def test_parse_run_keeps_historical_skipped_reads_from_removed_tool_non_effective():
     url = "https://example.com/already-read"
 
     parsed = parse_run(

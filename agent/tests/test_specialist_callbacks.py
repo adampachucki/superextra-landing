@@ -48,7 +48,6 @@ def test_first_turn_specialists_do_not_expose_raw_fetch_tools():
         "search_web",
         "search_and_read_public_pages",
         "search_public_web",
-        "read_discovered_sources",
         "fetch_web_content",
         "fetch_web_content_batch",
         "read_public_page",
@@ -64,7 +63,6 @@ def test_first_turn_public_web_specialists_do_not_use_custom_reader():
         if specialist.name == "review_analyst":
             continue
         assert "search_public_web" not in _tool_names(specialist.tools)
-        assert "read_discovered_sources" not in _tool_names(specialist.tools)
 
 
 def test_continuation_public_web_specialists_use_native_search_and_url_context():
