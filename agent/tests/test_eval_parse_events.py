@@ -399,51 +399,6 @@ def test_parse_run_expands_top_level_reader_errors_across_requested_urls():
     assert [item["url"] for item in funnel["specialist_read_failed_sources"]] == urls
 
 
-def test_parse_run_keeps_historical_skipped_reads_from_removed_tool_non_effective():
-    url = "https://example.com/already-read"
-
-    parsed = parse_run(
-        [
-            _event(
-                author="market_landscape",
-                function_calls=[("read_discovered_sources", {"urls": [url]})],
-                function_responses=[
-                    (
-                        "read_discovered_sources",
-                        {
-                            "status": "success",
-                            "requested_count": 1,
-                            "valid_url_count": 0,
-                            "available_count": 1,
-                            "attempted_count": 0,
-                            "success_count": 0,
-                            "failed_count": 0,
-                            "skipped_count": 1,
-                            "auto_appended_count": 0,
-                            "rejected_count": 0,
-                            "invalid_count": 0,
-                            "omitted_count": 0,
-                            "skipped_urls": [url],
-                        },
-                    )
-                ],
-            )
-        ]
-    )
-
-    funnel = parsed["source_funnel"]
-    assert funnel["specialist_read_tool_call_count"] == 1
-    assert funnel["specialist_read_call_count"] == 0
-    assert funnel["specialist_read_effective_call_count"] == 0
-    assert funnel["specialist_read_noop_call_count"] == 0
-    assert funnel["specialist_read_skipped_url_count"] == 1
-    row = next(row for row in funnel["specialists"] if row["key"] == "market_landscape")
-    assert row["read_tool_call_count"] == 1
-    assert row["read_call_count"] == 0
-    assert row["noop_read_call_count"] == 0
-    assert row["skipped_url_count"] == 1
-
-
 def test_parse_run_excludes_non_specialist_grounding_from_read_funnel():
     lead_url = "https://example.com/lead"
     specialist_url = "https://example.com/specialist"

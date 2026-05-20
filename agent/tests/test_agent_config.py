@@ -89,7 +89,6 @@ def test_research_pipeline_sends_specialist_reports_directly_to_writer():
     assert "read_web_pages" not in _tool_names(research_lead.tools)
     assert "fetch_web_content" not in _tool_names(research_lead.tools)
     assert "fetch_web_content_batch" not in _tool_names(research_lead.tools)
-    assert "search_and_read_public_pages" not in _tool_names(research_lead.tools)
     assert report_writer.output_key == "final_report"
     assert getattr(report_writer.model, "model", None) == "gemini-3.1-pro-preview"
     assert report_writer.tools == []

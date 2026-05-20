@@ -32,15 +32,12 @@ READ_TOOL_NAMES = {
     "read_public_pages",
     "fetch_web_content",
     "fetch_web_content_batch",
-    # Historical eval logs still contain this removed runtime tool.
-    "read_discovered_sources",
 }
 SINGLE_URL_READ_TOOLS = {"read_public_page", "fetch_web_content"}
 BATCH_URL_READ_TOOLS = {
     "read_web_pages",
     "read_public_pages",
     "fetch_web_content_batch",
-    "read_discovered_sources",
 }
 
 
@@ -526,13 +523,11 @@ def parse_run(events: list[Any]) -> dict[str, Any]:
                 continue
 
             if response_name in (
-                "search_and_read_public_pages",
                 "read_web_pages",
                 "read_public_page",
                 "read_public_pages",
                 "fetch_web_content",
                 "fetch_web_content_batch",
-                "read_discovered_sources",
             ):
                 for source in response.get("sources") or []:
                     if isinstance(source, dict):

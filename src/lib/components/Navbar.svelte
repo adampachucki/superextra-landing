@@ -31,10 +31,6 @@
 		el.scrollIntoView({ behavior: 'smooth' });
 	}
 
-	const iconBtnClass = $derived(
-		`relative rounded-full border p-2 transition-all duration-200 ${over ? 'border-white/[0.12] text-white/55 hover:border-white/[0.30] hover:text-white/75' : 'border-black/[0.12] text-black/55 hover:border-black/[0.30] hover:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75'}`
-	);
-
 	const chatIconClass = $derived(
 		`relative mr-2 p-1 transition-colors duration-200 ${over ? 'text-white/70 hover:text-white' : 'text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white'}`
 	);
@@ -117,14 +113,6 @@
 			{#if minimal}
 				{@render chatIcon()}
 			{/if}
-			{#if !minimal}
-				<a
-					href="/login"
-					class="px-5 py-2 {over
-						? 'rounded-full border border-white/15 text-sm font-medium text-white/70 transition-all hover:border-white/25 hover:text-white/90'
-						: 'btn-ghost'}">Log In</a
-				>
-			{/if}
 			<button onclick={() => formState.open()} class="btn-primary px-5 py-2 text-sm"
 				>Contact Us</button
 			>
@@ -133,17 +121,6 @@
 		<div class="flex items-center gap-3 md:hidden">
 			{#if minimal}
 				{@render chatIcon()}
-			{/if}
-			{#if !minimal}
-				<a href="/login" class={iconBtnClass} aria-label="Log In">
-					<svg
-						class="h-4 w-4"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="1.5"><circle cx="12" cy="8" r="4" /><path d="M4 23a8 8 0 0 1 16 0" /></svg
-					>
-				</a>
 			{/if}
 			<button onclick={() => formState.open()} class="btn-primary px-4 py-1.5 text-sm"
 				>Contact Us</button

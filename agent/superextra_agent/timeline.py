@@ -13,7 +13,7 @@ from typing import Any
 
 from google.cloud import firestore
 
-EVENT_TTL_DAYS = 30
+EVENT_TTL_DAYS = 180
 
 
 # ── TurnSummaryBuilder ───────────────────────────────────────────────────────

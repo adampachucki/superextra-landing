@@ -30,19 +30,6 @@
 	});
 
 	let { children } = $props();
-	let unlocked = $state(true); // TEMP: password wall disabled
-	let input = $state('');
-	let shake = $state(false);
-
-	function submit() {
-		if (input === 'superpower') {
-			localStorage.setItem('se_pass', 'superpower');
-			unlocked = true;
-		} else {
-			shake = true;
-			setTimeout(() => (shake = false), 500);
-		}
-	}
 </script>
 
 <svelte:head>
@@ -66,33 +53,10 @@
 	/>
 </svelte:head>
 
-{#if unlocked}
-	{@render children()}
-	{#if !page.url.pathname.startsWith('/agent') && !page.url.pathname.startsWith('/login')}
-		<div class="fixed bottom-5 left-5 z-50 hidden md:block">
-			<PreviewBadge />
-		</div>
-	{/if}
-	<CookieBanner />
-{:else}
-	<div class="fixed inset-0 z-[200] flex items-center justify-center bg-white dark:bg-cream">
-		<form
-			onsubmit={(e) => {
-				e.preventDefault();
-				submit();
-			}}
-			class="flex flex-col items-center gap-4"
-		>
-			<input
-				bind:value={input}
-				type="password"
-				placeholder="Password"
-				autofocus
-				class="w-64 rounded-xl border border-cream-200 bg-white px-4 py-3 text-center text-sm text-black placeholder:text-black/25 focus:border-black focus:ring-0 focus:outline-none dark:bg-cream-50 dark:text-white dark:placeholder:text-white/25 dark:focus:border-white {shake
-					? 'animate-shake'
-					: ''}"
-			/>
-			<button type="submit" class="btn-primary px-7 py-2.5 text-sm"> Enter </button>
-		</form>
+{@render children()}
+{#if !page.url.pathname.startsWith('/agent')}
+	<div class="fixed bottom-5 left-5 z-50 hidden md:block">
+		<PreviewBadge />
 	</div>
 {/if}
+<CookieBanner />

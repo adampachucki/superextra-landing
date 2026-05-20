@@ -106,9 +106,9 @@
 			</li>
 			<li>
 				<strong>Operational activity events</strong> (e.g., per-turn search/tool activity) are retained
-				for debugging and reliability, are set to expire after 30 days, and then become eligible for automatic
-				deletion. The question, answer, and source list for each turn are retained for as long as the
-				chat exists.
+				for debugging and reliability, are set to expire after 180 days, and then become eligible for
+				automatic deletion. The question, answer, and source list for each turn are retained for as long
+				as the chat exists.
 			</li>
 		</ul>
 

@@ -126,7 +126,7 @@ No `export let`, `$:`, `on:click`, or `<slot>`.
 
 ## Agent system
 
-- Pipeline: Router → `research_pipeline` (`SequentialAgent` of Context Enricher + `research_lead`). The `research_lead` plans the work, calls specialists as `AgentTool` tools, and writes `final_report`. No separate synthesizer agent.
+- Pipeline: Router → `research_pipeline` (`SequentialAgent` of Context Enricher + `research_lead` + `report_writer`). The `research_lead` plans the work, calls specialists as `AgentTool` tools, and writes internal `research_coverage`; `report_writer` reads Places context + specialist reports and writes `final_report`. No separate synthesizer agent.
 - Agent code: `agent/superextra_agent/`. Instructions: `agent/superextra_agent/instructions/`
 - **Read `instructions/AUTHORING.md` before writing or modifying any agent instruction file**
 - ADK / Agent Engine docs: see "Verify, never assume" above
@@ -178,7 +178,7 @@ Historical migration plans are archived outside this repo; current deployment go
 
 Four test suites — **run all before pushing changes to chat transport, Cloud Functions, or agent code**:
 
-- `npm run test` — Vitest: Firestore stream client, chat state machine, chat-recovery, plus any `.spec.ts`/`.test.ts` files
+- `npm run test` — Vitest: Firestore stream client, chat state machine, plus any `.spec.ts`/`.test.ts` files
 - `cd functions && npm test` — Node test runner: agentStream, gearHandoff, watchdog, utils
 - `npm run test:rules` — Firestore rules emulator (sessions + per-session `turns` and `events` reads/writes)
 - `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — pytest: Firestore-event mapper, source extraction, Places tools, instruction providers

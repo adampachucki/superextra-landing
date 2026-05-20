@@ -15,10 +15,8 @@
  *      the latest turn is `queued`/`running`; detaches on the turn doc's
  *      terminal status (plan §10 / pin #6).
  *
- * There is no browser-local conversation store. Stage 6 deleted
- * `chat-recovery.ts` and `ios-sse-workaround.ts` — the Firestore SDK's
- * persistent cache + automatic listener resumption cover the reconnect cases
- * those modules used to mitigate.
+ * There is no browser-local conversation store. Firestore SDK persistence and
+ * listener resumption cover reconnects.
  */
 
 import type { Unsubscribe } from 'firebase/firestore';

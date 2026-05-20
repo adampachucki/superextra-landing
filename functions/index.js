@@ -435,7 +435,7 @@ export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (re
 // No soft-delete, no undo, no mid-run drain protocol. If the Reasoning Engine
 // plugin is still writing when the delete lands, its next fenced write will
 // hit OwnershipLost and bail; any event docs it writes before that are bounded
-// by the 30-day events TTL.
+// by the events TTL.
 export const agentDelete = onRequest(
 	{ cors: true, timeoutSeconds: 120, memory: '256MiB' },
 	async (req, res) => {

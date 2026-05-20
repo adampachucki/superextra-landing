@@ -40,10 +40,6 @@
 				{
 					"source": "/api/tts",
 					"function": "tts"
-				},
-				{
-					"source": "**",
-					"destination": "/200.html"
 				}
 			]
 		},

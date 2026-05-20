@@ -49,7 +49,6 @@ def test_first_turn_public_web_specialists_use_native_search_and_url_context():
 def test_first_turn_specialists_do_not_expose_raw_fetch_tools():
     forbidden = {
         "search_web",
-        "search_and_read_public_pages",
         "search_public_web",
         "fetch_web_content",
         "fetch_web_content_batch",

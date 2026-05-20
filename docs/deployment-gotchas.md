@@ -22,7 +22,7 @@ Data shape and listeners are documented in CLAUDE.md's "Transport architecture" 
 
 - **Composite indexes must be rolled out before traffic hits `agentStream`.** `firestore.indexes.json` declares two `sessions` indexes for the watchdog (`status+queuedAt`, `status+lastHeartbeat`), a `sessions(participants array-contains, updatedAt desc)` composite for the client sidebar listener, and an `events(runId, attempt, seqInAttempt)` index for the in-flight events listener.
 - **Capability-URL rules.** `sessions/{sid}` allows `get` for any signed-in visitor; `list` requires `where('participants','array-contains',uid)`; all writes are Admin-SDK-only. Subcollections (`turns`, `events`) allow path-scoped `read` for any signed-in visitor; writes server-only.
-- **TTL only on events.** `events.expiresAt` is 30 days. Sessions and turns persist until the creator deletes the chat via `agentDelete`.
+- **TTL only on events.** `events.expiresAt` is 180 days. Sessions and turns persist until the creator deletes the chat via `agentDelete`. Existing session events were backfilled to the 180-day expiry on 2026-05-20.
 
 ## Watchdog (`functions/watchdog.js`)
 
@@ -46,7 +46,7 @@ Ad-hoc real-prompt monitoring — drive the real UI against the real backend and
 2. **Submit.** `fill` the textarea, `press_key` Enter (Shift+Enter is multiline — use Enter). Poll the page URL; once `?sid=<sid>` appears, the session id is yours.
 3. **Watch the user's view.** Periodic `take_screenshot` + `take_snapshot` while `chatState.loading` would be true. `list_console_messages` and `list_network_requests` give client-side signal for free.
 4. **Backend logs.** Reasoning Engine logs carry the structured `sid`/`runId` payload; query via `gcloud logging read 'resource.type="aiplatform.googleapis.com/ReasoningEngine"' --project=superextra-site --limit=500 --format=json --freshness=10m`.
-5. **Firestore state.** Session doc `sessions/<sid>` (run status, fencing info, heartbeats, participants); turn docs `sessions/<sid>/turns/<nnnn>` (terminal reply, sources, turnSummary); events subcollection `sessions/<sid>/events` (in-flight activity, 30-day TTL).
+5. **Firestore state.** Session doc `sessions/<sid>` (run status, fencing info, heartbeats, participants); turn docs `sessions/<sid>/turns/<nnnn>` (terminal reply, sources, turnSummary); events subcollection `sessions/<sid>/events` (in-flight activity, 180-day TTL).
 
 ## ADC quota project (required for `firebase deploy` from the VM)
 

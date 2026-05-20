@@ -628,7 +628,7 @@ If Tailscale breaks and the VM is unreachable:
 | **Codex says "config profile X not found"**                   | The VM's `~/.codex/config.toml` puts Azure at the top level, not under `[profiles.azure]`. Plain `codex` is correct. Don't use `codex --profile azure`.     |
 | **Codex starts but immediately fails to authenticate**        | `AZURE_OPENAI_API_KEY` not in pane env. Run `echo "$AZURE_OPENAI_API_KEY" \| wc -c` in the offending pane — if zero, the bashrc `-e` injection didn't fire. |
 | **Tab in VS Code shows `[mosh] NAME`**                        | `MOSH_TITLE_NOPREFIX=1` not set or not picked up. Add to `/etc/environment` on VM, reconnect mosh.                                                          |
-| **Mac shows stale content from other device after switching** | Known Ink/SIGWINCH bug; full analysis archived in `zmx-scroll-and-device-switching.md`. No clean fix at our layer.                                          |
+| **Mac shows stale content from other device after switching** | Known Ink/SIGWINCH repaint issue. No clean fix at our layer.                                                                                                |
 | **Mobile tmux shows duplicate session content mid-session**   | Cross-device size mismatch triggers Claude repaints at Mac size into mobile-sized tmux panes. Same upstream root cause.                                     |
 | **VS Code / Cursor SSH can't connect**                        | Try `ssh ai-workstation` from a terminal first. If editor was just updated, `rm -rf ~/.vscode-server/` on VM and reconnect.                                 |
 | **Mutagen not syncing**                                       | `mutagen sync list` for status. `mutagen sync flush` to force. `mutagen daemon start` if daemon died.                                                       |
@@ -692,5 +692,3 @@ Removed: `zmx attach …` from session creation; mode-detection logic; backgroun
 Removed: parallel `zx`/`tx` command families. Single `x` function with auto-mode-detection (later removed in 2026-05-07).
 
 ---
-
-See [zmx-scroll-and-device-switching.md](zmx-scroll-and-device-switching.md) for the detailed postmortem of the zmx-era debugging session (archived 2026-05-07).

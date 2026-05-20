@@ -39,15 +39,20 @@
 			represent that you have authority to bind that entity to these Terms.
 		</p>
 
-		<h2>3. Account Registration</h2>
-		<p>To access certain features, you may need to create an account. You agree to:</p>
+		<h2>3. Access</h2>
+		<p>
+			Some features may use browser-based anonymous access or account-based access if enabled. You
+			agree to:
+		</p>
 		<ul>
-			<li>Provide accurate, current, and complete registration information.</li>
-			<li>Maintain the security and confidentiality of your login credentials.</li>
-			<li>Notify us immediately of any unauthorized use of your account.</li>
-			<li>Accept responsibility for all activities that occur under your account.</li>
+			<li>Provide accurate, current, and complete information when requested.</li>
+			<li>Maintain the security and confidentiality of any access credentials issued to you.</li>
+			<li>Notify us immediately of any unauthorized use of your access.</li>
+			<li>
+				Accept responsibility for activities submitted through your browser session or account.
+			</li>
 		</ul>
-		<p>We reserve the right to suspend or terminate accounts that violate these Terms.</p>
+		<p>We reserve the right to suspend or terminate access that violates these Terms.</p>
 
 		<h2>4. Use of the Service</h2>
 		<p>
