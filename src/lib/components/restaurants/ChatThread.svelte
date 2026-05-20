@@ -412,7 +412,9 @@
 	:global(.chat-markdown > h5),
 	:global(.chat-markdown > h6),
 	:global(.chat-markdown > blockquote),
-	:global(.chat-markdown > pre) {
+	:global(.chat-markdown > pre),
+	:global(.chat-markdown > hr),
+	:global(.chat-markdown > .chart-block) {
 		max-width: 700px;
 	}
 
