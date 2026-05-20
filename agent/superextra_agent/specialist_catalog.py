@@ -146,6 +146,21 @@ SPECIALISTS: tuple[Specialist, ...] = (
         thinking="high",
     ),
     Specialist(
+        name="social_analyst",
+        output_key="social_result",
+        label="Social Media Analysis",
+        description=(
+            "Structured social-platform-page data from TripAdvisor, Facebook "
+            "(page + posts), Instagram, and TikTok via direct page fetches. "
+            "Reports follower stats, posting cadence, content themes, tone "
+            "of voice, and platform-exposed business info. Does not handle "
+            "review bodies (use review_analyst) or marketing-strategy "
+            "interpretation (use marketing_brand)."
+        ),
+        role_title="Social Media Analyst",
+        thinking="medium",
+    ),
+    Specialist(
         name="dynamic_researcher_1",
         output_key="dynamic_result_1",
         label="Dynamic Research 1",

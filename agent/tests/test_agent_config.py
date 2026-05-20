@@ -20,8 +20,11 @@ from superextra_agent.specialists import (
     _on_model_error,
 )
 
+_SPECIALISTS_WITH_CUSTOM_TOOLS = {"review_analyst", "social_analyst"}
 NATIVE_INITIAL_SPECIALISTS = {
-    specialist.name for specialist in SPECIALISTS if specialist.name != "review_analyst"
+    specialist.name
+    for specialist in SPECIALISTS
+    if specialist.name not in _SPECIALISTS_WITH_CUSTOM_TOOLS
 }
 
 

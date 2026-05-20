@@ -162,6 +162,18 @@ class TestMakeInstruction:
         assert "Competitor data for area" in result
         assert "## Market Source Profiles" not in result
 
+    def test_social_analyst_renders_with_platform_scope_markers(self):
+        provider = _make_instruction("social_analyst")
+        result = provider(MockCtx(state={"places_context": "Target data"}))
+        # Specialist body's platform markers must survive instruction injection.
+        for marker in ("TripAdvisor", "Facebook", "Instagram", "TikTok"):
+            assert marker in result, f"missing {marker!r} in rendered social_analyst prompt"
+        assert "fetch_tripadvisor_page" in result
+        assert "fetch_instagram_profile" in result
+        assert "fetch_tiktok_video" in result
+        assert "review_analyst" in result  # boundary clause references review_analyst
+        assert "Target data" in result      # places_context injection
+
     def test_review_analyst_disclaims_web_fetch_tools(self):
         provider = _make_instruction("review_analyst")
 

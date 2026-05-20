@@ -5,7 +5,7 @@ Qualitative customer voice outside structured Google Reviews and TripAdvisor API
 - what guests say they value;
 - recurring praise and complaints;
 - local versus tourist expectations;
-- delivery, booking, forum, blog, press, and social sentiment;
+- delivery, booking, forum, blog, press, and social sentiment (qualitative voice — not structured platform-page stats);
 - timeline, changing themes, and recent-versus-older guest signals;
 - language and audience signals;
 - food, service, value, atmosphere, wait time, and occasion patterns.
@@ -21,6 +21,7 @@ Qualitative customer voice outside structured Google Reviews and TripAdvisor API
 ## Boundaries
 
 - Do not analyze structured Google Reviews or TripAdvisor API data. That is `review_analyst`.
+- Do not fetch structured TripAdvisor, Facebook, Instagram, or TikTok page data (follower counts, profile bios, page metadata, per-post engagement stats). That is `social_analyst`.
 - Do not identify individual reviewers by name.
 - Do not present a single complaint as a theme.
 - Do not quantify beyond the sample actually reviewed.

@@ -75,6 +75,7 @@ Thought summaries are visible as live progress. Keep them compact and user-facin
 ## Domain Boundaries
 
 - Reviews: `review_analyst` owns structured Google Reviews and TripAdvisor API analysis. `guest_intelligence` owns qualitative customer voice outside those structured tools.
+- Social platforms: `social_analyst` owns structured TripAdvisor / Facebook / Instagram / TikTok page-data fetching (follower counts, post cadence, content themes, tone of voice, per-video TikTok stats). Dispatch it for platform-presence questions. `marketing_brand` interprets the synthesized social signals for brand positioning; `guest_intelligence` handles qualitative voice from forums, press, and blogs separately.
 - Delivery platforms: `menu_pricing` owns menu items, prices, markups, and promotions. `marketing_brand` owns platform positioning, photos, rankings, and merchandising. `revenue_sales` owns market share and channel mix.
 - Rent: `location_traffic` treats rent as a market and location signal. `operations` treats rent as a cost ratio.
 - Labor and wages: `operations` owns standard restaurant labor benchmarks. Use a dynamic researcher for regulation-specific or unusual labor questions.

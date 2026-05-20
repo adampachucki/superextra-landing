@@ -6,8 +6,11 @@ from superextra_agent.specialists import ALL_SPECIALISTS, CONTINUATION_SPECIALIS
 from superextra_agent.agent import _skip_enricher_if_cached
 from superextra_agent.specialist_catalog import SPECIALISTS
 
+_SPECIALISTS_WITH_CUSTOM_TOOLS = {"review_analyst", "social_analyst"}
 NATIVE_INITIAL_SPECIALISTS = {
-    specialist.name for specialist in SPECIALISTS if specialist.name != "review_analyst"
+    specialist.name
+    for specialist in SPECIALISTS
+    if specialist.name not in _SPECIALISTS_WITH_CUSTOM_TOOLS
 }
 
 

@@ -120,6 +120,7 @@ const ACTIVE_AGENT_LABEL: Record<string, string> = {
 	operations: 'Researching operations',
 	marketing_brand: 'Researching marketing and brand',
 	review_analyst: 'Analyzing reviews',
+	social_analyst: 'Analyzing social platforms',
 	dynamic_researcher_1: 'Researching focused angle',
 	dynamic_researcher_2: 'Researching focused angle',
 	dynamic_researcher_3: 'Researching focused angle'

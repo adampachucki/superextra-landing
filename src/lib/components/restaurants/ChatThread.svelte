@@ -125,7 +125,10 @@
 	const PROVIDER_LABELS: Partial<Record<ChatSourceProvider, string>> = {
 		google_maps: 'Google Maps',
 		google_reviews: 'Google Reviews',
-		tripadvisor: 'TripAdvisor'
+		tripadvisor: 'TripAdvisor',
+		facebook: 'Facebook',
+		instagram: 'Instagram',
+		tiktok: 'TikTok'
 	};
 	const ERROR_COPY: Record<string, string> = {
 		timeout: 'The analysis took longer than expected and was cut short.',

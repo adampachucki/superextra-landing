@@ -145,6 +145,11 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "fetch_web_content_batch": "source reading",
     "read_public_page": "source reading",
     "read_public_pages": "source reading",
+    "fetch_tripadvisor_page": "TripAdvisor page",
+    "fetch_facebook_page": "Facebook page",
+    "fetch_facebook_posts": "Facebook posts",
+    "fetch_instagram_profile": "Instagram profile",
+    "fetch_tiktok_video": "TikTok video",
 }
 _PROVIDER_TOOL_LABELS: dict[str, str] = {
     "google:search": "source search",
@@ -160,6 +165,7 @@ _SPECIALIST_PUBLIC_LABELS: dict[str, str] = {
     "operations": "operating signals",
     "marketing_brand": "marketing signals",
     "review_analyst": "review patterns",
+    "social_analyst": "social platform signals",
     "dynamic_researcher_1": "focused source check",
     "dynamic_researcher_2": "focused source check",
     "dynamic_researcher_3": "focused source check",
@@ -368,6 +374,17 @@ def map_tool_call(
         )
     if name == "get_tripadvisor_reviews":
         return _detail(row_id, "platform", "TripAdvisor", "Reading reviews")
+    if name in (
+        "fetch_tripadvisor_page",
+        "fetch_facebook_page",
+        "fetch_facebook_posts",
+        "fetch_instagram_profile",
+        "fetch_tiktok_video",
+    ):
+        url = str(args.get("url") or "").strip()
+        if url:
+            return _detail(row_id, "source", "Public sources", _short_url(url))
+        return None
     return None
 
 
@@ -470,6 +487,15 @@ def map_tool_result(
         return []
 
     if name in ("read_web_pages", "fetch_web_content", "read_public_page") and status == "error":
+        return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
+
+    if name in (
+        "fetch_tripadvisor_page",
+        "fetch_facebook_page",
+        "fetch_facebook_posts",
+        "fetch_instagram_profile",
+        "fetch_tiktok_video",
+    ) and status == "error":
         return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
 
     if name in ("fetch_web_content_batch", "read_public_pages"):
