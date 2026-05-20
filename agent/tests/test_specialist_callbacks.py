@@ -77,6 +77,17 @@ def test_continuation_public_web_specialists_use_native_search_and_url_context()
         assert specialist.tools == [google_search, url_context]
 
 
+def test_social_analyst_has_tripadvisor_resolver_in_both_turns():
+    """social_analyst must reach TripAdvisor via the verified resolver, not by
+    guessing URLs or relying on google_search alone (A/B-tested: search-only
+    discovery times out >70% of the time, resolver hits 90%+)."""
+    for specialists in (ALL_SPECIALISTS, CONTINUATION_SPECIALISTS):
+        social = next(s for s in specialists if s.name == "social_analyst")
+        names = _tool_names(social.tools)
+        assert "find_tripadvisor_restaurant" in names
+        assert "fetch_tripadvisor_page" in names
+
+
 def test_skip_enricher_returns_cached_context():
     """Enricher skips and returns cached places_context when it exists."""
     ctx = FakeCallbackContext(state={"places_context": "Cached restaurant data"})

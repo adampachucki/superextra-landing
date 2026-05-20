@@ -202,6 +202,7 @@ _THINKING_CONFIGS = {"high": THINKING_CONFIG, "medium": MEDIUM_THINKING_CONFIG}
 # `review_analyst` is not a public-web specialist; it owns structured review
 # provider tools.
 _SOCIAL_ANALYST_TOOLS = [
+    find_tripadvisor_restaurant,
     fetch_tripadvisor_page,
     fetch_facebook_page,
     fetch_facebook_posts,

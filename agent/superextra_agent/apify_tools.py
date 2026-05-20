@@ -197,13 +197,14 @@ async def fetch_tripadvisor_page(url: str, tool_context=None) -> dict:
     review count, cuisines, hours, address, contact info. Does NOT return
     review bodies — use review_analyst's `get_tripadvisor_reviews` for those.
 
-    To find the right URL, run `google_search` with a query like
-    `"<venue name> <city> tripadvisor restaurant review"` and pass the
-    resulting URL here. Do not construct TA URLs from venue names —
-    they include numeric IDs you can't guess.
+    The URL must come from `find_tripadvisor_restaurant`'s `tripadvisor_link`
+    (when its `status == "success"`). Do not pass a URL you guessed from a
+    venue name or surfaced from `google_search` — TA URLs include numeric
+    IDs that cannot be reliably constructed, and unverified URLs may point
+    at a same-name venue elsewhere.
 
     Args:
-        url: Full TripAdvisor restaurant/hotel page URL.
+        url: Full TripAdvisor restaurant/hotel page URL from a verified resolver.
     """
     result = await _run_actor_sync(
         TRIPADVISOR_PAGE_ACTOR,

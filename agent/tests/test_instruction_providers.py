@@ -173,6 +173,15 @@ class TestMakeInstruction:
         assert "fetch_tiktok_video" in result
         assert "review_analyst" in result  # boundary clause references review_analyst
         assert "Target data" in result      # places_context injection
+        # TripAdvisor flow must go through the verified resolver, not search-then-guess.
+        assert "find_tripadvisor_restaurant" in result
+        assert "google_place_id" in result
+        # Must not tell the model to fetch a TA page when the resolver failed.
+        assert 'status != "success"' in result or "status != 'success'" in result
+        # URL-discipline clause: model can only fetch URLs obtained from tool results.
+        assert "did not first obtain from a tool result" in result
+        # Scope-leak guard: sample_reviews from the resolver belongs to review_analyst.
+        assert "sample_reviews" in result
 
     def test_review_analyst_disclaims_web_fetch_tools(self):
         provider = _make_instruction("review_analyst")
