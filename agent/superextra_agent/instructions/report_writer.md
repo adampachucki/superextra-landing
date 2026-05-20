@@ -83,15 +83,27 @@ Before finalizing, check that every specialist report has visible representation
 
 ## Charts
 
-Use a chart only when numeric data makes a comparison or trend clearer. Prefer no chart over a decorative chart.
+Use a chart only when numeric data makes a comparison or trend clearer. Prefer no chart over a decorative chart. Use at most 3 charts. Cite the data source in the prose above the chart, not inside the JSON.
 
-Syntax:
+Pick the type that fits the data:
+
+- `bar` for comparing values across a few categories (venues, neighborhoods, price tiers). Data items: `{{"label": "...", "value": N}}`.
+- `line` for a value changing across an ordered axis (months, years, days of week, hours). Data items: `{{"x": "...", "y": N}}`.
+- `pie` for share of a whole when the parts sum meaningfully. Data items: `{{"label": "...", "value": N}}`.
+
+Examples:
 
 ```chart
 {{"type":"bar","title":"Average entree price (USD)","data":[{{"label":"Restaurant A","value":18}},{{"label":"Restaurant B","value":21}}]}}
 ```
 
-Supported types: `bar`, `pie`, and `line`. Use at most 3 charts. Cite the data source in the prose above the chart, not inside the JSON.
+```chart
+{{"type":"line","title":"Monthly visits (thousands)","data":[{{"x":"Jan","y":12}},{{"x":"Feb","y":14}},{{"x":"Mar","y":19}}]}}
+```
+
+```chart
+{{"type":"pie","title":"Reservation source mix","data":[{{"label":"Direct","value":55}},{{"label":"OpenTable","value":30}},{{"label":"Walk-in","value":15}}]}}
+```
 
 ## Boundaries
 
