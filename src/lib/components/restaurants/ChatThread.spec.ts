@@ -172,7 +172,7 @@ describe('ChatThread', () => {
 		vi.unstubAllGlobals();
 	});
 
-	it('hides low-count source and activity metadata', async () => {
+	it('shows low-count sources and hides low-count activity metadata', async () => {
 		const { obs, sid } = await primeCompleteTurn({
 			sourceCount: 1,
 			turnSummary: { startedAtMs: 0, finishedAtMs: 35_000, elapsedMs: 35_000 }
@@ -188,8 +188,8 @@ describe('ChatThread', () => {
 		expect(body).not.toContain('Analysis activity');
 		expect(body).not.toContain('35s total');
 		expect(body).not.toContain('Opened 1 source');
-		expect(body).not.toContain('Sources');
-		expect(body).not.toContain('Sources (1)');
+		expect(body).toContain('Sources (1)');
+		expect(body).toContain('https://example.com/1');
 	});
 
 	it('shows source and activity metadata once thresholds are met', async () => {

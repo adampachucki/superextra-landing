@@ -51,6 +51,7 @@ def _fake_event(
     text: str | None = None,
     grounding_chunks: list[dict] | None = None,
     author: str = "model",
+    partial: bool = False,
 ):
     """Compose a minimal stand-in for an ADK Event that the timeline +
     map_event helpers can read."""
@@ -86,6 +87,7 @@ def _fake_event(
         content=content,
         actions=actions,
         author=author,
+        partial=partial,
         grounding_metadata=grounding_metadata,
         is_final_response=lambda: False,
     )
@@ -226,27 +228,19 @@ async def test_stop_heartbeat_handles_already_finished():
 # ── observe_event / _capture_final ───────────────────────────────────────────
 
 
-def test_capture_final_uses_accumulated_and_grounding_sources():
+def test_capture_final_snapshots_accumulated_sources():
     state = _make_state()
     state.specialist_sources = [
         {"url": "https://a", "title": "A"},
         {"url": "https://b", "title": "B"},
     ]
     state.specialist_sources_seen = {"https://a", "https://b"}
-    state._capture_final(
-        {
-            "reply": "answer",
-            "sources": [
-                {"url": "https://a", "title": "A (mapper)"},  # dup
-                {"url": "https://c", "title": "C"},  # new
-            ],
-        }
-    )
+    state._capture_final({"reply": "answer"})
+
     urls = [s["url"] for s in state.final_sources]
-    assert urls == ["https://a", "https://b", "https://c"]
+    assert urls == ["https://a", "https://b"]
     titles = {s["url"]: s["title"] for s in state.final_sources}
     assert titles["https://a"] == "A"
-    assert titles["https://c"] == "C"
 
 
 def test_observe_event_returns_timeline_list():
@@ -293,6 +287,38 @@ def test_observe_event_merges_grounding_sources_into_drawer_candidates():
     state._capture_final({"reply": "answer"})
 
     assert state.final_sources == [{**drawer_source, "provider": "grounding"}]
+
+
+def test_partial_source_events_merge_once():
+    state = _make_state()
+    source = {"uri": "https://example.com/grounded", "title": "Grounded"}
+
+    state.observe_event(_fake_event(grounding_chunks=[source], partial=True))
+    state.observe_event(_fake_event(grounding_chunks=[source], partial=False))
+
+    assert state.specialist_sources == [
+        {
+            "url": "https://example.com/grounded",
+            "title": "Grounded",
+            "provider": "grounding",
+        }
+    ]
+
+
+def test_partial_source_event_is_not_lost_if_no_aggregate_repeats_it():
+    state = _make_state()
+    source = {"uri": "https://example.com/grounded", "title": "Grounded"}
+
+    state.observe_event(_fake_event(grounding_chunks=[source], partial=True))
+    state._capture_final({"reply": "answer"})
+
+    assert state.final_sources == [
+        {
+            "url": "https://example.com/grounded",
+            "title": "Grounded",
+            "provider": "grounding",
+        }
+    ]
 
 
 def test_observe_event_records_grounding_reader_candidates_by_author(monkeypatch):

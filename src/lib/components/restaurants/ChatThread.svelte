@@ -121,7 +121,6 @@
 	});
 
 	const SOURCES_LIMIT = 19;
-	const SOURCE_COUNT_MIN = 5;
 	const ACTIVITY_THOUGHT_MIN = 2;
 	const PROVIDER_LABELS: Partial<Record<ChatSourceProvider, string>> = {
 		google_maps: 'Google Maps',
@@ -307,7 +306,7 @@
 						</div>
 					{/if}
 
-					{#if msg.sources && msg.sources.length >= SOURCE_COUNT_MIN}
+					{#if msg.sources && msg.sources.length > 0}
 						{@const showAll = expandedSources[msg.turnIndex]}
 						{@const displaySources = varietyFirstSources(msg.sources, msg.turnIndex)}
 						{@const visible = showAll ? displaySources : displaySources.slice(0, SOURCES_LIMIT)}

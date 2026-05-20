@@ -95,6 +95,7 @@ class GearRunState:
         interleaving partial mutations.
         """
         mapped = map_event(event, self.mapping_state)
+        is_partial = getattr(event, "partial", False)
 
         # Filter detail events through accept_detail for dedupe.
         events_to_write: list[dict[str, Any]] = []
@@ -129,8 +130,13 @@ class GearRunState:
             for entry in mapped_sources:
                 self._merge_source(entry)
 
-        # Capture final reply + sources on first `complete` event.
-        if mapped.get("complete") is not None and self.final_reply is None:
+        # Capture final reply and snapshot accumulated sources on first
+        # `complete` event.
+        if (
+            not is_partial
+            and mapped.get("complete") is not None
+            and self.final_reply is None
+        ):
             self._capture_final(mapped["complete"])
 
         return events_to_write
@@ -176,26 +182,10 @@ class GearRunState:
         if not isinstance(reply, str):
             return
         self.final_reply = reply
-        for source in complete.get("sources") or []:
-            if isinstance(source, dict):
-                entry = dict(source)
-                entry.setdefault("provider", "grounding")
-                self._merge_source(entry)
 
-        # Final drawer sources are discovered grounding/search sources plus
-        # provider sources accumulated during the run. Page reads remain tool
-        # evidence for specialists, not separate source-drawer pills.
-        seen: set[str] = set()
-        merged: list[dict[str, Any]] = []
-        for s in self.specialist_sources:
-            if not isinstance(s, dict):
-                continue
-            key = self._source_dedupe_key(s)
-            if not key or key in seen:
-                continue
-            seen.add(key)
-            merged.append(s)
-        self.final_sources = merged
+        # `_merge_source` already accepted/deduped drawer candidates as events
+        # arrived. The only remaining transformation is redirect resolution.
+        self.final_sources = list(self.specialist_sources)
 
     async def _resolve_final_sources(self) -> None:
         if not self.final_sources:

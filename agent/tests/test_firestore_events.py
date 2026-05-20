@@ -290,7 +290,7 @@ def test_router_transfer_is_ignored():
 def test_router_text_reply_becomes_complete():
     ev = _event(author="router", texts=["Need clarification"], is_final=True)
     mapped = map_event(ev, {})
-    assert mapped["complete"] == {"reply": "Need clarification", "sources": []}
+    assert mapped["complete"] == {"reply": "Need clarification"}
 
 
 def test_map_event_ignores_tool_parts_after_typed_hook_migration():
@@ -441,7 +441,7 @@ def test_specialist_grounding_sources_are_exposed():
     assert research["grounding_sources"] == [{"title": "Review", "url": "https://maps.example/review"}]
 
 
-def test_report_writer_complete_uses_grounding_sources():
+def test_report_writer_complete_keeps_grounding_sources_on_event_channel():
     ev = _event(
         author="report_writer",
         is_final=True,
@@ -449,10 +449,10 @@ def test_report_writer_complete_uses_grounding_sources():
         grounding_chunks=[{"uri": "https://a.example", "title": "A", "domain": "a.example"}],
     )
     mapped = map_event(ev, {})
-    assert mapped["complete"] == {
-        "reply": "# Report",
-        "sources": [{"title": "A", "url": "https://a.example", "domain": "a.example"}],
-    }
+    assert mapped["grounding_sources"] == [
+        {"title": "A", "url": "https://a.example", "domain": "a.example"}
+    ]
+    assert mapped["complete"] == {"reply": "# Report"}
 
 
 def test_report_writer_empty_final_report_does_not_complete():
@@ -492,7 +492,6 @@ def test_continue_research_complete_reads_continue_research_reply_key():
     mapped = map_event(ev, {})
     assert mapped["complete"] == {
         "reply": "Short continuation answer.",
-        "sources": [],
     }
 
 
@@ -522,7 +521,6 @@ def test_legacy_followup_complete_still_reads_final_report_followup_key():
     mapped = map_event(ev, {})
     assert mapped["complete"] == {
         "reply": "Short follow-up answer.",
-        "sources": [],
     }
 
 

@@ -627,9 +627,9 @@ class FirestoreProgressPlugin(BasePlugin):
             )
 
         if is_partial:
-            # Partial ADK events are useful only for early thought text. Tool
-            # rows are emitted by typed tool callbacks, and terminal/source
-            # state should come from the final aggregated event.
+            # Partial ADK events are useful for early thought text and can
+            # carry source metadata. Keep those accumulator mutations, but
+            # only write thought rows to the live timeline.
             timeline_events = [
                 ev for ev in timeline_events if ev.get("kind") == "thought"
             ]

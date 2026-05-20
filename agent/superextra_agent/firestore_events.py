@@ -303,7 +303,7 @@ def _map_complete(event: Any) -> dict[str, Any] | None:
     if not reply:
         return None
 
-    return {"reply": reply, "sources": extract_sources_from_grounding(event)}
+    return {"reply": reply}
 
 
 def _tool_row_id(*, call_id: str | None, phase: str, name: str) -> str:
