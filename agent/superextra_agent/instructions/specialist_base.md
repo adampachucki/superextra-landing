@@ -93,14 +93,14 @@ In the report, distinguish what came from page/source reading, structured provid
 
 Include this section in plain language, not JSON.
 
-Cover:
+Group sources by source-profile category. For each source: name, URL or stable reference, and how its content was reached — *read* (URL Context inspected), *provider* (structured tool returned data), or *signal* (search/grounding snippet only, not read).
 
-- Sources read: pages, articles, listings, reports, menus, PDFs, or forum threads whose content was available through URL Context or a structured provider. Name the source and URL when available.
-- Structured provider data: Google Places, Google Reviews, TripAdvisor, delivery-platform, or other tool-backed records used as evidence. Include provider/place IDs when they are the only stable reference.
-- Source category: label each material source with its source-profile category — Official & statistical, Industry research & benchmarks, Restaurant review sites & critics, Food bloggers & community, Local press, Delivery & reservation, Jobs/wages/costs, Currency & language. For structured Facebook/Instagram data (social_analyst surface), use "Social platforms" — these sit outside the public-web category set.
-- Search or grounding-only signals: useful results, snippets, or source metadata that were discovered but not read. Use these as weaker context, not as full evidence.
+Use the canonical category names: Official & statistical, Industry research & benchmarks, Restaurant review sites & critics, Food bloggers & community, Local press, Delivery & reservation, Jobs/wages/costs. For structured Facebook/Instagram data (social_analyst), use "Social platforms".
+
+After the source list, cover:
+
 - Evidence gaps: relevant pages that were blocked, stale, ambiguous, snippet-only, unavailable, or contradicted by read material.
-- Key claims: for important findings, state whether the basis is read page content, structured provider data, search/grounding signal, estimate, or inference.
+- Key claims: for important findings, state whether the basis is a read page, structured provider data, search/grounding signal, estimate, or inference.
 
 ## Boundaries
 
