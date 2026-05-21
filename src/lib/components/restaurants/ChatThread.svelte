@@ -417,6 +417,18 @@
 		max-width: 700px;
 	}
 
+	:global(.chat-markdown code) {
+		font-family: inherit;
+		font-weight: inherit;
+		font-size: inherit;
+		color: inherit;
+	}
+
+	:global(.chat-markdown code::before),
+	:global(.chat-markdown code::after) {
+		content: none;
+	}
+
 	:global(.chat-markdown .markdown-table-scroll) {
 		margin: 2em 0;
 		overflow-x: auto;
