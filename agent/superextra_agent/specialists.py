@@ -22,7 +22,7 @@ from .specialist_catalog import (
     ROLE_TITLES,
     SPECIALISTS,
 )
-from .tripadvisor_tools import find_tripadvisor_restaurant, get_tripadvisor_reviews
+from .tripadvisor_tools import get_tripadvisor_reviews
 
 _dir_override = os.environ.get("SUPEREXTRA_INSTRUCTIONS_DIR")
 INSTRUCTIONS_DIR = Path(_dir_override) if _dir_override else Path(__file__).parent / "instructions"
@@ -211,13 +211,13 @@ _SOCIAL_ANALYST_TOOLS = [
 ]
 
 _INITIAL_SPECIALIST_TOOLS: dict[str, list] = {
-    "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
+    "review_analyst": [search_serpapi, get_tripadvisor_reviews, get_google_reviews],
     "social_analyst": _SOCIAL_ANALYST_TOOLS,
 }
 
 # Continuation helpers use the same native web research surface by default.
 _CONTINUATION_SPECIALIST_TOOLS: dict[str, list] = {
-    "review_analyst": [find_tripadvisor_restaurant, get_tripadvisor_reviews, get_google_reviews],
+    "review_analyst": [search_serpapi, get_tripadvisor_reviews, get_google_reviews],
     "social_analyst": _SOCIAL_ANALYST_TOOLS,
 }
 

@@ -97,16 +97,9 @@ def upsert_google_place(state: Any, place_id: str, place: dict[str, Any]) -> dic
     return record
 
 
-def get_place_record(state: Any, place_id: str) -> dict[str, Any] | None:
+def get_place_name(state: Any, place_id: str) -> str | None:
     record = _places_by_id(state).get(place_id)
     if isinstance(record, dict):
-        return dict(record)
-    return None
-
-
-def get_place_name(state: Any, place_id: str) -> str | None:
-    record = get_place_record(state, place_id)
-    if record:
         name = record.get("name")
         if isinstance(name, str) and name.strip():
             return name.strip()
@@ -114,23 +107,6 @@ def get_place_name(state: Any, place_id: str) -> str | None:
     legacy = _get_state(state, f"_place_name_{place_id}")
     if isinstance(legacy, str) and legacy.strip():
         return legacy.strip()
-    return None
-
-
-def get_place_coords(state: Any, place_id: str) -> tuple[float, float] | None:
-    record = get_place_record(state, place_id)
-    if record:
-        lat = record.get("lat")
-        lng = record.get("lng")
-        if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
-            return float(lat), float(lng)
-
-    original = get_original_target_place_id(state)
-    if original == place_id:
-        lat = _get_state(state, "_target_lat")
-        lng = _get_state(state, "_target_lng")
-        if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
-            return float(lat), float(lng)
     return None
 
 
@@ -161,27 +137,15 @@ def set_original_target_once(state: Any, place_id: str, place: dict[str, Any] | 
             _assign_state(state, "_target_lng", coords[1])
 
 
-def tool_source_key(provider: str, google_place_id: str) -> str:
-    """Bound source marker state to one key per provider/place."""
-    digest = hashlib.sha1(f"{provider}:{google_place_id}".encode("utf-8")).hexdigest()[:16]
+def tool_source_key(provider: str, anchor: str) -> str:
+    """Bound source marker state to one key per provider/anchor.
+
+    `anchor` is the stable per-source identifier: a Google Place ID for
+    Google-keyed providers (google_maps, google_reviews) and the source URL
+    for URL-keyed providers (tripadvisor, facebook, instagram).
+    """
+    digest = hashlib.sha1(f"{provider}:{anchor}".encode("utf-8")).hexdigest()[:16]
     return f"{TOOL_SOURCE_PREFIX}{provider}_{digest}"
-
-
-def upsert_tripadvisor_match(
-    state: Any,
-    google_place_id: str,
-    match: dict[str, Any],
-) -> dict[str, Any]:
-    places = _places_by_id(state)
-    record = dict(places.get(google_place_id, {"google_place_id": google_place_id}))
-    record["tripadvisor"] = {
-        key: value
-        for key, value in match.items()
-        if value is not None and value != ""
-    }
-    places[google_place_id] = record
-    _set_places_by_id(state, places)
-    return record
 
 
 def source_title(state: Any, google_place_id: str, provider_label: str) -> str:
@@ -212,8 +176,5 @@ def format_known_places_context(
         lng = record.get("lng")
         if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
             bits.append(f"coords: {lat}, {lng}")
-        tripadvisor = record.get("tripadvisor")
-        if isinstance(tripadvisor, dict) and tripadvisor.get("place_id"):
-            bits.append(f"TripAdvisor place ID: {tripadvisor['place_id']}")
         lines.append(f"- {name} ({'; '.join(bits)})")
     return "\n".join(lines)

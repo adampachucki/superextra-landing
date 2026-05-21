@@ -183,7 +183,10 @@ class TestMakeInstruction:
         assert "TikTok" not in result
         assert "fetch_tiktok_video" not in result
 
-    def test_review_analyst_disclaims_web_fetch_tools(self):
+    def test_review_analyst_unifies_tripadvisor_on_serpapi(self):
+        """review_analyst's TA discovery uses search_serpapi (URL-based),
+        not the deleted find_tripadvisor_restaurant resolver. The model
+        judges candidate fit from snippets — no prescribed verification."""
         provider = _make_instruction("review_analyst")
 
         result = provider(
@@ -200,11 +203,21 @@ class TestMakeInstruction:
             )
         )
 
-        assert "You do not have `google_search` or page-fetch tools" in result
+        # New unified flow
+        assert "search_serpapi" in result
+        assert "get_tripadvisor_reviews(url" in result
+        assert "Restaurant_Review page URL" in result
+        assert "clearly identifies the same venue" in result
+        assert "treat absence as a finding" in result
+        # Snippet usage: TA-rendered profile facts (rating/rank/total) are OK;
+        # not as review evidence.
+        assert "Do not treat search snippets as review evidence" in result
+        # Deleted resolver must not leak back into the prompt
+        assert "find_tripadvisor_restaurant" not in result
+        # Surface contracts preserved
         assert "ChIJtarget" in result
-        assert "For each requested place" in result
-        assert "In `Evidence Notes`, cite provider data" in result
         assert "Do not invent URLs" in result
+        assert "Do not guess" in result
 
     def test_specialists_have_source_reading_workflow(self):
         provider = _make_instruction("market_landscape")

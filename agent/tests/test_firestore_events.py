@@ -341,7 +341,7 @@ def test_multi_tool_call_emits_multiple_detail_rows_in_order():
             {},
             "call-jina",
         ),
-        map_tool_call("find_tripadvisor_restaurant", {"name": "Goldies", "area": "Berlin"}, {}, "call-3"),
+        map_tool_call("get_tripadvisor_reviews", {"url": "https://www.tripadvisor.com/Restaurant_Review-g187323-d6796040-Reviews-Umami_P_Berg-Berlin.html"}, {}, "call-3"),
     ]
     assert [row["family"] for row in rows] == [
         "Searching the web",
@@ -350,6 +350,9 @@ def test_multi_tool_call_emits_multiple_detail_rows_in_order():
         "Public sources",
         "TripAdvisor",
     ]
+    # Per-venue label so timeline dedup (group+family+text) keeps rows distinct
+    # across a multi-venue research run.
+    assert rows[4]["text"] == "Reading Umami P Berg-Berlin"
     assert rows[0]["text"] == "best burgers berlin"
     assert rows[1]["text"] == "new cafes gdynia"
 
@@ -379,21 +382,6 @@ def test_failed_fetch_batch_warning_preserves_failure_count():
     )
 
     assert rows[0]["text"] == "2/2 sources failed"
-
-
-def test_tripadvisor_unverified_becomes_warning():
-    """Unverified status (coord check failed or no coords available) renders
-    as a timeline warning row. On unverified the tool strips `name`, so the
-    mapper falls back to 'the venue'."""
-    rows = map_tool_result(
-        "find_tripadvisor_restaurant",
-        {"status": "unverified", "error_message": "coords didn't match"},
-        {},
-        "call-1",
-    )
-    assert rows[0]["family"] == "Warnings"
-    assert "not verified" in rows[0]["text"].lower()
-    assert "the venue" in rows[0]["text"].lower()
 
 
 def test_google_reviews_uses_saved_place_name():

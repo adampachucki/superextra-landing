@@ -92,12 +92,24 @@ def test_social_analyst_uses_serpapi_for_discovery_in_both_turns():
         assert "fetch_instagram_profile" in names
         # Native search is unreliable for TripAdvisor; SerpAPI replaces it here.
         assert "google_search" not in names
-        # find_tripadvisor_restaurant stays with review_analyst (needs TA
-        # place_id for reviews path); social_analyst does discovery via search.
-        assert "find_tripadvisor_restaurant" not in names
         # fetch_tiktok_video was dropped — discovery for per-video URLs is
         # unreliable on both backends; tool itself was removed.
         assert "fetch_tiktok_video" not in names
+
+
+def test_review_analyst_uses_serpapi_for_tripadvisor_discovery():
+    """review_analyst's TA discovery unified on SerpAPI: search_serpapi finds
+    the venue's Restaurant_Review URL, get_tripadvisor_reviews(url) pulls
+    reviews. find_tripadvisor_restaurant was deleted along with its name/coord
+    verification machinery — the model handles candidate fit via snippets."""
+    for specialists in (ALL_SPECIALISTS, CONTINUATION_SPECIALISTS):
+        review = next(s for s in specialists if s.name == "review_analyst")
+        names = _tool_names(review.tools)
+        assert "search_serpapi" in names
+        assert "get_tripadvisor_reviews" in names
+        assert "get_google_reviews" in names
+        assert "find_tripadvisor_restaurant" not in names
+        assert "google_search" not in names
 
 
 def test_skip_enricher_returns_cached_context():

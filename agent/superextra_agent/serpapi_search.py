@@ -1,4 +1,4 @@
-"""SerpAPI-backed Google search for social_analyst URL discovery.
+"""SerpAPI-backed Google search for specialist URL discovery.
 
 `google_search` (Gemini grounding) reliably finds IG/FB URLs but hangs
 or fails on TripAdvisor (controlled A/B 2026-05-21: 2/10 found, 8/10
@@ -7,9 +7,10 @@ Google engine returns the same TripAdvisor URLs as the specialized
 TA engine (9/10 agreement) and matches Gemini hit rate on IG/FB —
 all while running in 1-3s instead of 7-90s.
 
-Exposing it as a tool gives social_analyst one reliable discovery
-backend for all platforms instead of mixing grounding + specialized
-resolvers per platform.
+Used by social_analyst (IG/FB/TA URL discovery) and review_analyst
+(TripAdvisor Restaurant_Review URL discovery before pulling reviews
+via get_tripadvisor_reviews). One reliable discovery backend instead
+of mixing grounding + specialized resolvers per platform.
 """
 import atexit
 from urllib.parse import urlparse

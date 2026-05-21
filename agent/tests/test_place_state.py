@@ -2,11 +2,9 @@
 
 from superextra_agent.place_state import (
     format_known_places_context,
-    get_place_coords,
     get_place_name,
     set_original_target_once,
     upsert_google_place,
-    upsert_tripadvisor_match,
 )
 
 
@@ -49,31 +47,26 @@ def test_original_target_is_set_once():
     assert state["_target_lng"] == 2.0
 
 
-def test_get_place_coords_falls_back_to_legacy_target():
+def test_known_places_context_ignores_stale_tripadvisor_field():
+    """A legacy `tripadvisor` field persisted on a place record (e.g. from a
+    pre-unification Firestore session resumed today) must NOT inject a
+    `TripAdvisor place ID:` hint into the prompt. The unified flow only
+    accepts URLs; a numeric place_id hint would steer the model toward
+    malformed get_tripadvisor_reviews calls."""
     state = {
-        "_target_place_id": "ChIJtarget",
-        "_target_lat": 54.0,
-        "_target_lng": 18.0,
+        "places_by_id": {
+            "ChIJlegacy": {
+                "google_place_id": "ChIJlegacy",
+                "name": "Legacy Place",
+                "tripadvisor": {"place_id": "9999", "url": "https://tripadvisor.example/9999"},
+            }
+        }
     }
 
-    assert get_place_coords(state, "ChIJtarget") == (54.0, 18.0)
-    assert get_place_coords(state, "ChIJother") is None
+    text = format_known_places_context(state)
 
-
-def test_tripadvisor_match_stored_under_google_place():
-    state = {"places_by_id": {"ChIJcomp": {"google_place_id": "ChIJcomp", "name": "Comp"}}}
-
-    upsert_tripadvisor_match(
-        state,
-        "ChIJcomp",
-        {"place_id": "123", "url": "https://tripadvisor.example/123", "verified": True},
-    )
-
-    assert state["places_by_id"]["ChIJcomp"]["tripadvisor"] == {
-        "place_id": "123",
-        "url": "https://tripadvisor.example/123",
-        "verified": True,
-    }
+    assert "TripAdvisor place ID" not in text
+    assert "9999" not in text
 
 
 def test_known_places_context_is_compact_and_prompt_readable():

@@ -7,6 +7,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .specialist_catalog import SPECIALISTS
+from .tripadvisor_tools import _TA_REVIEW_RE
 
 
 def _place_name(state: dict[str, Any] | None, place_id: str | None) -> str | None:
@@ -135,7 +136,6 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "find_nearby_restaurants": "nearby venue data",
     "get_restaurant_details": "venue profile",
     "get_batch_restaurant_details": "venue profiles",
-    "find_tripadvisor_restaurant": "review source match",
     "get_tripadvisor_reviews": "structured reviews",
     "get_google_reviews": "structured reviews",
     "google_search": "source search",
@@ -355,14 +355,6 @@ def map_tool_call(
         if query:
             return _detail(row_id, "platform", "Google Maps", query)
         return _detail(row_id, "platform", "Google Maps", "Searching places")
-    if name == "find_tripadvisor_restaurant":
-        place = _normalize_space(str(args.get("name") or "")).strip()
-        return _detail(
-            row_id,
-            "platform",
-            "TripAdvisor",
-            f"Matching {place}" if place else "Matching venue",
-        )
     if name == "get_google_reviews":
         place_id = str(args.get("place_id") or "").strip()
         place = _place_name(state, place_id)
@@ -373,6 +365,11 @@ def map_tool_call(
             f"Checking {place}" if place else "Checking reviews",
         )
     if name == "get_tripadvisor_reviews":
+        url = str(args.get("url") or "").strip()
+        match = _TA_REVIEW_RE.search(url) if url else None
+        if match:
+            slug = match.group("slug").replace("_", " ").strip()
+            return _detail(row_id, "platform", "TripAdvisor", f"Reading {slug}")
         return _detail(row_id, "platform", "TripAdvisor", "Reading reviews")
     if name in (
         "fetch_tripadvisor_page",
@@ -429,32 +426,6 @@ def map_tool_result(
             return [_detail(row_id, "search", "Searching the web", f"{count} source results")]
         if status == "error":
             return [_detail(row_id, "warning", "Warnings", "Source search failed")]
-        return []
-
-    if name == "find_tripadvisor_restaurant":
-        display_name = str(response.get("name") or "").strip() or str(
-            response.get("title") or ""
-        ).strip()
-        if status == "unverified":
-            return [
-                _detail(
-                    row_id,
-                    "warning",
-                    "Warnings",
-                    f"TripAdvisor match not verified for {display_name or 'the venue'}",
-                )
-            ]
-        if status == "success":
-            return [
-                _detail(
-                    row_id,
-                    "platform",
-                    "TripAdvisor",
-                    f"Matched {display_name}" if display_name else "Matched venue",
-                )
-            ]
-        if status == "error":
-            return [_detail(row_id, "warning", "Warnings", "TripAdvisor lookup failed")]
         return []
 
     if name == "get_tripadvisor_reviews":
