@@ -123,7 +123,7 @@
 		'continue_research'
 	]);
 	const TOOL_PREVIEW_LIMIT = 5;
-	const THOUGHT_PREVIEW_CHARS = 700;
+	const THOUGHT_PREVIEW_CHARS = 450;
 	const leadRe = /^\s*\*\*([^*]+)\*\*\s*([\s\S]*)$/;
 
 	type StepThought = { id: string; text: string; open: boolean };
@@ -147,8 +147,8 @@
 		expandedTools = { ...expandedTools, [stepId]: !expandedTools[stepId] };
 	}
 
-	function toggleStepBody(stepId: string) {
-		expandedStepBodies = { ...expandedStepBodies, [stepId]: !expandedStepBodies[stepId] };
+	function expandStepBody(stepId: string) {
+		expandedStepBodies = { ...expandedStepBodies, [stepId]: true };
 	}
 
 	function normalizeNewlines(text: string): string {
@@ -246,12 +246,14 @@
 		const wordBoundary = trimmed.lastIndexOf(' ', clampedBudget);
 		const minBoundary = Math.floor(clampedBudget * 0.7);
 		const end = wordBoundary >= minBoundary ? wordBoundary : clampedBudget;
-		return `${trimmed.slice(0, end).trimEnd()}...`;
+		return trimmed.slice(0, end).trimEnd();
 	}
 
-	function visibleStepThoughts(step: Step): StepThought[] {
+	type VisibleStepThought = StepThought & { truncated?: boolean };
+
+	function visibleStepThoughts(step: Step): VisibleStepThought[] {
 		if (expandedStepBodies[step.id] || !stepNeedsTruncation(step)) return step.thoughts;
-		const out: StepThought[] = [];
+		const out: VisibleStepThought[] = [];
 		let budget = THOUGHT_PREVIEW_CHARS;
 		for (const thought of step.thoughts) {
 			const len = thought.text.trim().length;
@@ -260,7 +262,7 @@
 				budget -= len;
 				continue;
 			}
-			out.push({ ...thought, text: truncateToBudget(thought.text, budget) });
+			out.push({ ...thought, text: truncateToBudget(thought.text, budget), truncated: true });
 			break;
 		}
 		return out;
@@ -361,28 +363,24 @@
 							{/if}
 
 							{#each visibleStepThoughts(step) as thought (thought.id)}
+								{@const segments = thoughtSegments(thought)}
 								<div
 									in:fade={{ duration: 220 }}
 									class="prose-thought mt-1.5 text-[14px] leading-relaxed text-black/70 dark:text-white/72"
 								>
-									{#each thoughtSegments(thought) as segment (segment.key)}
+									{#each segments as segment, si (segment.key)}
 										<div in:fade={{ duration: 180 }} class="thought-segment" class:pending={segment.pending}>
 											{#each inlineSegments(segment.text) as inline (inline.key)}
 												<span class="thought-inline" class:strong={inline.strong}>{inline.text}</span>
-											{/each}
+											{/each}{#if thought.truncated && si === segments.length - 1}<button
+													type="button"
+													onclick={() => expandStepBody(step.id)}
+													class="inline cursor-pointer p-0 align-baseline text-black/38 transition-colors hover:text-black/64 hover:underline dark:text-white/38 dark:hover:text-white/64"
+												>…more</button>{/if}
 										</div>
 									{/each}
 								</div>
 							{/each}
-							{#if stepNeedsTruncation(step)}
-								<button
-									type="button"
-									onclick={() => toggleStepBody(step.id)}
-									class="mt-1.5 w-fit text-left text-[13px] leading-snug text-black/38 transition-colors hover:text-black/58 dark:text-white/38 dark:hover:text-white/58"
-								>
-									{expandedStepBodies[step.id] ? 'Show less' : 'Show more'}
-								</button>
-							{/if}
 
 							{#if step.tools.length}
 								<div

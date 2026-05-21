@@ -128,8 +128,7 @@ describe('LiveActivity', () => {
 		});
 
 		expect(body).toContain('Checking local market signals');
-		expect(body).toContain('...');
-		expect(body).toContain('Show more');
+		expect(body).toContain('…more');
 		expect(body).not.toContain(hiddenTail);
 	});
 });
