@@ -77,15 +77,27 @@ def test_continuation_public_web_specialists_use_native_search_and_url_context()
         assert specialist.tools == [google_search, url_context]
 
 
-def test_social_analyst_has_tripadvisor_resolver_in_both_turns():
-    """social_analyst must reach TripAdvisor via the verified resolver, not by
-    guessing URLs or relying on google_search alone (A/B-tested: search-only
-    discovery times out >70% of the time, resolver hits 90%+)."""
+def test_social_analyst_uses_serpapi_for_discovery_in_both_turns():
+    """social_analyst's discovery backend is SerpAPI (A/B-tested 2026-05-21:
+    Gemini google_search times out 8/10 on TripAdvisor; SerpAPI engine=google
+    hits 10/10 across TA + IG + FB). One unified search backend, no per-
+    platform resolvers. Native google_search is intentionally excluded for
+    this specialist."""
     for specialists in (ALL_SPECIALISTS, CONTINUATION_SPECIALISTS):
         social = next(s for s in specialists if s.name == "social_analyst")
         names = _tool_names(social.tools)
-        assert "find_tripadvisor_restaurant" in names
+        assert "search_serpapi" in names
         assert "fetch_tripadvisor_page" in names
+        assert "fetch_facebook_page" in names
+        assert "fetch_instagram_profile" in names
+        # Native search is unreliable for TripAdvisor; SerpAPI replaces it here.
+        assert "google_search" not in names
+        # find_tripadvisor_restaurant stays with review_analyst (needs TA
+        # place_id for reviews path); social_analyst does discovery via search.
+        assert "find_tripadvisor_restaurant" not in names
+        # fetch_tiktok_video was dropped — discovery for per-video URLs is
+        # unreliable on both backends; tool itself was removed.
+        assert "fetch_tiktok_video" not in names
 
 
 def test_skip_enricher_returns_cached_context():

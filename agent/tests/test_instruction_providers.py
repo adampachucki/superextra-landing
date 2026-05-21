@@ -166,22 +166,22 @@ class TestMakeInstruction:
         provider = _make_instruction("social_analyst")
         result = provider(MockCtx(state={"places_context": "Target data"}))
         # Specialist body's platform markers must survive instruction injection.
-        for marker in ("TripAdvisor", "Facebook", "Instagram", "TikTok"):
+        for marker in ("TripAdvisor", "Facebook", "Instagram"):
             assert marker in result, f"missing {marker!r} in rendered social_analyst prompt"
         assert "fetch_tripadvisor_page" in result
+        assert "fetch_facebook_page" in result
         assert "fetch_instagram_profile" in result
-        assert "fetch_tiktok_video" in result
         assert "review_analyst" in result  # boundary clause references review_analyst
         assert "Target data" in result      # places_context injection
-        # TripAdvisor flow must go through the verified resolver, not search-then-guess.
-        assert "find_tripadvisor_restaurant" in result
-        assert "google_place_id" in result
-        # Must not tell the model to fetch a TA page when the resolver failed.
-        assert 'status != "success"' in result or "status != 'success'" in result
-        # URL-discipline clause: model can only fetch URLs obtained from tool results.
-        assert "did not first obtain from a tool result" in result
-        # Scope-leak guard: sample_reviews from the resolver belongs to review_analyst.
-        assert "sample_reviews" in result
+        # Discovery goes through search_serpapi (unified backend across all
+        # platforms — Gemini google_search is unreliable for TripAdvisor).
+        assert "search_serpapi" in result
+        # URL-discipline: model can only fetch URLs obtained from search_serpapi.
+        assert "did not first obtain from a `search_serpapi` result" in result
+        # TikTok was dropped from v1 — neither discovery backend reliably
+        # surfaces per-video URLs that fetch_tiktok_video can consume.
+        assert "TikTok" not in result
+        assert "fetch_tiktok_video" not in result
 
     def test_review_analyst_disclaims_web_fetch_tools(self):
         provider = _make_instruction("review_analyst")

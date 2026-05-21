@@ -127,8 +127,7 @@
 		google_reviews: 'Google Reviews',
 		tripadvisor: 'TripAdvisor',
 		facebook: 'Facebook',
-		instagram: 'Instagram',
-		tiktok: 'TikTok'
+		instagram: 'Instagram'
 	};
 	const ERROR_COPY: Record<string, string> = {
 		timeout: 'The analysis took longer than expected and was cut short.',

@@ -8,7 +8,6 @@ from superextra_agent.apify_tools import (
     fetch_facebook_page,
     fetch_facebook_posts,
     fetch_instagram_profile,
-    fetch_tiktok_video,
     fetch_tripadvisor_page,
     get_google_reviews,
 )
@@ -412,35 +411,3 @@ class TestFetchInstagramProfile:
         assert "timed out" in result["error_message"]
 
 
-class TestFetchTiktokVideo:
-    @pytest.mark.asyncio
-    async def test_success_trims_nested_meta(self):
-        items = [{
-            "text": "Restaurant review",
-            "playCount": 41100,
-            "diggCount": 803,
-            "shareCount": 244,
-            "commentCount": 9,
-            "hashtags": [{"name": "food"}],
-            "createTimeISO": "2024-04-17T15:24:25.000Z",
-            "webVideoUrl": "https://www.tiktok.com/@x/video/y",
-            "authorMeta": {"id": "uid", "name": "x", "verified": False, "extra": "drop"},
-            "musicMeta": {"musicName": "song", "musicAuthor": "artist", "playUrl": "drop"},
-            "videoMeta": {"duration": 60, "format": "mp4", "coverUrl": "drop"},
-            "mediaUrls": ["drop"],  # should be dropped
-        }]
-        ctx = _Ctx()
-        mock_client = AsyncMock()
-        mock_client.post = AsyncMock(return_value=_mock_response(items))
-        with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
-             patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            result = await fetch_tiktok_video("https://www.tiktok.com/@x/video/y", tool_context=ctx)
-        assert result["status"] == "success"
-        item = result["items"][0]
-        assert item["playCount"] == 41100
-        assert item["authorMeta"] == {"id": "uid", "name": "x", "verified": False}
-        assert item["musicMeta"] == {"musicName": "song", "musicAuthor": "artist"}
-        assert item["videoMeta"] == {"duration": 60, "format": "mp4"}
-        assert "mediaUrls" not in item
-        keys = [k for k in ctx.state if k.startswith("_tool_src_")]
-        assert ctx.state[keys[0]]["provider"] == "tiktok"

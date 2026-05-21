@@ -15,7 +15,6 @@ export type ChatSourceProvider =
 	| 'tripadvisor'
 	| 'facebook'
 	| 'instagram'
-	| 'tiktok'
 	| 'grounding'
 	| 'public_search';
 

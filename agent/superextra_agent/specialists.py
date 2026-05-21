@@ -13,11 +13,11 @@ from .apify_tools import (
     fetch_facebook_page,
     fetch_facebook_posts,
     fetch_instagram_profile,
-    fetch_tiktok_video,
     fetch_tripadvisor_page,
     get_google_reviews,
 )
 from .place_state import format_known_places_context
+from .serpapi_search import search_serpapi
 from .specialist_catalog import (
     ROLE_TITLES,
     SPECIALISTS,
@@ -202,14 +202,12 @@ _THINKING_CONFIGS = {"high": THINKING_CONFIG, "medium": MEDIUM_THINKING_CONFIG}
 # `review_analyst` is not a public-web specialist; it owns structured review
 # provider tools.
 _SOCIAL_ANALYST_TOOLS = [
-    find_tripadvisor_restaurant,
+    search_serpapi,
+    url_context,
     fetch_tripadvisor_page,
     fetch_facebook_page,
     fetch_facebook_posts,
     fetch_instagram_profile,
-    fetch_tiktok_video,
-    google_search,
-    url_context,
 ]
 
 _INITIAL_SPECIALIST_TOOLS: dict[str, list] = {

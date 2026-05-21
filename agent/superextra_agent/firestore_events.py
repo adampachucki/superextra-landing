@@ -149,7 +149,7 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "fetch_facebook_page": "Facebook page",
     "fetch_facebook_posts": "Facebook posts",
     "fetch_instagram_profile": "Instagram profile",
-    "fetch_tiktok_video": "TikTok video",
+    "search_serpapi": "source search",
 }
 _PROVIDER_TOOL_LABELS: dict[str, str] = {
     "google:search": "source search",
@@ -326,7 +326,7 @@ def map_tool_call(
         if query:
             return _detail(row_id, "search", "Searching the web", query)
         return None
-    if name == "search_public_web":
+    if name in ("search_public_web", "search_serpapi"):
         query = _normalize_space(str(args.get("query") or "")).strip()
         if query:
             return _detail(row_id, "search", "Searching the web", query)
@@ -379,7 +379,6 @@ def map_tool_call(
         "fetch_facebook_page",
         "fetch_facebook_posts",
         "fetch_instagram_profile",
-        "fetch_tiktok_video",
     ):
         url = str(args.get("url") or "").strip()
         if url:
@@ -494,7 +493,6 @@ def map_tool_result(
         "fetch_facebook_page",
         "fetch_facebook_posts",
         "fetch_instagram_profile",
-        "fetch_tiktok_video",
     ) and status == "error":
         return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
 

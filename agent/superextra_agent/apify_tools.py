@@ -24,7 +24,6 @@ TRIPADVISOR_PAGE_ACTOR = "maxcopell~tripadvisor"
 FACEBOOK_PAGE_ACTOR = "apify~facebook-pages-scraper"
 FACEBOOK_POSTS_ACTOR = "apify~facebook-posts-scraper"
 INSTAGRAM_ACTOR = "apify~instagram-scraper"
-TIKTOK_VIDEO_ACTOR = "clockworks~tiktok-video-scraper"
 
 _client: httpx.AsyncClient | None = None
 
@@ -197,14 +196,13 @@ async def fetch_tripadvisor_page(url: str, tool_context=None) -> dict:
     review count, cuisines, hours, address, contact info. Does NOT return
     review bodies — use review_analyst's `get_tripadvisor_reviews` for those.
 
-    The URL must come from `find_tripadvisor_restaurant`'s `tripadvisor_link`
-    (when its `status == "success"`). Do not pass a URL you guessed from a
-    venue name or surfaced from `google_search` — TA URLs include numeric
-    IDs that cannot be reliably constructed, and unverified URLs may point
-    at a same-name venue elsewhere.
+    The URL must come from a `search_serpapi` result. Do not pass a URL
+    you guessed from a venue name — TA URLs include opaque numeric IDs
+    (`-g<geo>-d<place>-`) that cannot be reliably constructed, and an
+    unverified URL may point at a same-name venue elsewhere.
 
     Args:
-        url: Full TripAdvisor restaurant/hotel page URL from a verified resolver.
+        url: Full TripAdvisor restaurant/hotel page URL from search results.
     """
     result = await _run_actor_sync(
         TRIPADVISOR_PAGE_ACTOR,
@@ -365,68 +363,5 @@ async def fetch_instagram_profile(url: str, tool_context=None) -> dict:
         url=url,
         title="Instagram",
         domain="instagram.com",
-    )
-    return {"status": "success", "url": url, "items": items}
-
-
-def _trim_tiktok_video_item(item: dict) -> dict:
-    keep = (
-        "text", "playCount", "diggCount", "shareCount", "commentCount",
-        "hashtags", "createTimeISO", "webVideoUrl",
-    )
-    out = {k: item[k] for k in keep if k in item}
-    author = item.get("authorMeta")
-    if isinstance(author, dict):
-        out["authorMeta"] = {
-            k: author[k] for k in ("id", "name", "nickName", "verified", "signature")
-            if k in author
-        }
-    music = item.get("musicMeta")
-    if isinstance(music, dict):
-        out["musicMeta"] = {
-            k: music[k] for k in ("musicName", "musicAuthor", "musicOriginal")
-            if k in music
-        }
-    video = item.get("videoMeta")
-    if isinstance(video, dict):
-        out["videoMeta"] = {
-            k: video[k] for k in ("duration", "format")
-            if k in video
-        }
-    return out
-
-
-async def fetch_tiktok_video(url: str, tool_context=None) -> dict:
-    """Fetch a single TikTok video's metadata and engagement stats.
-
-    Returns the video's caption, view/like/share/comment counts, hashtags,
-    creator metadata (id, name, verified, signature), music info, and
-    upload timestamp. Per-video only — does NOT return creator-level
-    posting cadence or full profile history.
-
-    Args:
-        url: Full TikTok video URL (e.g. https://www.tiktok.com/@user/video/123).
-    """
-    result = await _run_actor_sync(
-        TIKTOK_VIDEO_ACTOR,
-        {
-            "postURLs": [url],
-            "shouldDownloadCovers": False,
-            "shouldDownloadSubtitles": False,
-            "shouldDownloadVideos": False,
-            "shouldDownloadSlideshowImages": False,
-        },
-    )
-    if result["status"] != "success":
-        return result
-    items = [_trim_tiktok_video_item(i) for i in result["items"] if isinstance(i, dict)]
-    if not items:
-        return {"status": "error", "error_message": f"No TikTok video data at {url}"}
-    _emit_source_pill(
-        tool_context,
-        provider="tiktok",
-        url=url,
-        title="TikTok",
-        domain="tiktok.com",
     )
     return {"status": "success", "url": url, "items": items}
