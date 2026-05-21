@@ -3,9 +3,11 @@
 Covers:
   - `_claim_logic` predicates: currentRunId match, session status='queued',
     turn status='pending'. Mismatch → OwnershipLost.
-  - `_fenced_logic` predicates: currentRunId match, session status='running'.
-    Mismatch on either → OwnershipLost. Skipping turn update when no
-    turn_ref is the heartbeat / lastEventAt path.
+  - `_fenced_logic` predicates: currentRunId match, session status ∈
+    `expected_statuses` (default `('running',)`; the title write widens
+    to `('running', 'complete')`). Mismatch on either → OwnershipLost.
+    Skipping turn update when no turn_ref is the heartbeat / lastEventAt
+    / title-metadata path.
   - `_retry_critical` retries transient errors, never retries OwnershipLost,
     surfaces final exception after max_attempts.
   - `_heartbeat_loop` exits cleanly on OwnershipLost; logs+continues on
@@ -34,10 +36,12 @@ from superextra_agent.firestore_progress import (
     OwnershipLost,
     _claim_logic,
     _fenced_logic,
+    _generate_and_write_title,
     _halt_content,
     _heartbeat_loop,
     _retry_critical,
 )
+from superextra_agent.gear_run_state import GearRunState
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -441,11 +445,17 @@ async def test_plugin_before_run_registers_state_and_spawns_heartbeat(monkeypatc
         run_start_calls.append((_state.turn_idx, _state.run_id))
 
     monkeypatch.setattr(firestore_progress, "write_run_started_event", _run_started)
-    # Block the title task too (it's a separate coroutine).
-    async def _no_title(_q):
-        return None
+    # Block the title task so it's still in flight when we assert on
+    # plugin._title_tasks. A fast-resolving mock would be discarded by the
+    # done-callback before the assertion ran.
+    title_can_exit = asyncio.Event()
 
-    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    async def _blocked_title(_fs, _state):
+        await title_can_exit.wait()
+
+    monkeypatch.setattr(
+        firestore_progress, "_generate_and_write_title", _blocked_title
+    )
 
     ctx = _mock_invocation_context(
         sid="abc", run_id="r-1", turn_idx=1, invocation_id="inv-1"
@@ -458,14 +468,19 @@ async def test_plugin_before_run_registers_state_and_spawns_heartbeat(monkeypatc
     assert "inv-1" in plugin._states
     state = plugin._states["inv-1"]
     assert state.heartbeat_task is not None
-    # First turn → title task spawned.
-    assert state.title_task is not None
+    # First turn → fire-and-forget title task tracked on the plugin.
+    assert len(plugin._title_tasks) == 1
+    title_task = next(iter(plugin._title_tasks))
 
     # Cleanup
     heartbeat_can_exit.set()
+    title_can_exit.set()
     await asyncio.gather(
-        state.heartbeat_task, state.title_task, return_exceptions=True
+        state.heartbeat_task, title_task, return_exceptions=True
     )
+    # Done-callback discards the completed task from the plugin set.
+    await asyncio.sleep(0)
+    assert plugin._title_tasks == set()
 
 
 @pytest.mark.asyncio
@@ -480,12 +495,12 @@ async def test_plugin_per_invocation_isolation(monkeypatch):
     async def _noop_hb(_fs, _state):
         await asyncio.sleep(60)
 
-    async def _no_title(_q):
+    async def _no_title(_fs, _state):
         return None
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _noop_claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _noop_hb)
-    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "_generate_and_write_title", _no_title)
 
     a = _mock_invocation_context(sid="abc", run_id="r-1", turn_idx=1, invocation_id="inv-A")
     b = _mock_invocation_context(sid="abc", run_id="r-2", turn_idx=2, invocation_id="inv-B")
@@ -532,7 +547,7 @@ async def test_plugin_after_run_cancels_heartbeat_before_terminal_write(monkeypa
     async def _claim(_fs, _state):
         return None
 
-    async def _no_title(_q):
+    async def _no_title(_fs, _state):
         return None
 
     async def _terminal_write(_fs, _state, _su, _tu):
@@ -545,7 +560,7 @@ async def test_plugin_after_run_cancels_heartbeat_before_terminal_write(monkeypa
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _hb)
-    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "_generate_and_write_title", _no_title)
     monkeypatch.setattr(
         firestore_progress, "fenced_session_and_turn_update", _terminal_write
     )
@@ -557,8 +572,8 @@ async def test_plugin_after_run_cancels_heartbeat_before_terminal_write(monkeypa
     state = plugin._states["inv-1"]
     state.final_reply = "answer"  # so finalize() returns complete payload
     state.timeline_writer.write_timeline = AsyncMock(return_value=None)
-    # Drain title task quickly — _no_title returns None immediately, so
-    # the title_task will have completed already.
+    # Drain the fire-and-forget title task — _no_title returns None
+    # immediately, and the done-callback discards it from plugin._title_tasks.
     await asyncio.sleep(0)
 
     await plugin.after_run_callback(invocation_context=ctx)
@@ -576,7 +591,7 @@ async def test_plugin_after_run_swallows_ownership_lost(monkeypatch):
     async def _claim(_fs, _state):
         return None
 
-    async def _no_title(_q):
+    async def _no_title(_fs, _state):
         return None
 
     async def _no_hb(_fs, _state):
@@ -587,7 +602,7 @@ async def test_plugin_after_run_swallows_ownership_lost(monkeypatch):
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
-    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "_generate_and_write_title", _no_title)
     monkeypatch.setattr(
         firestore_progress, "fenced_session_and_turn_update", _terminal_write
     )
@@ -619,7 +634,7 @@ async def test_plugin_after_run_writes_finalize_failed_terminal_on_finalize_cras
     async def _claim(_fs, _state):
         return None
 
-    async def _no_title(_q):
+    async def _no_title(_fs, _state):
         return None
 
     async def _no_hb(_fs, _state):
@@ -642,7 +657,7 @@ async def test_plugin_after_run_writes_finalize_failed_terminal_on_finalize_cras
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
-    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "_generate_and_write_title", _no_title)
     monkeypatch.setattr(firestore_progress, "fenced_session_and_turn_update", _fenced)
 
     ctx = _mock_invocation_context(
@@ -681,7 +696,7 @@ async def test_plugin_on_event_writes_timeline_events(monkeypatch):
     async def _claim(_fs, _state):
         return None
 
-    async def _no_title(_q):
+    async def _no_title(_fs, _state):
         return None
 
     async def _no_hb(_fs, _state):
@@ -692,7 +707,7 @@ async def test_plugin_on_event_writes_timeline_events(monkeypatch):
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
-    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "_generate_and_write_title", _no_title)
     monkeypatch.setattr(firestore_progress, "fenced_session_update", _no_fenced)
 
     ctx = _mock_invocation_context(
@@ -729,7 +744,7 @@ async def test_plugin_on_event_partial_streams_thought_only_and_bumps_last_event
     async def _claim(_fs, _state):
         return None
 
-    async def _no_title(_q):
+    async def _no_title(_fs, _state):
         return None
 
     async def _no_hb(_fs, _state):
@@ -742,7 +757,7 @@ async def test_plugin_on_event_partial_streams_thought_only_and_bumps_last_event
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
-    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "_generate_and_write_title", _no_title)
     monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
 
     ctx = _mock_invocation_context(
@@ -801,7 +816,7 @@ async def test_plugin_on_event_routes_agenttool_child_events_to_parent_state(mon
     async def _claim(_fs, _state):
         return None
 
-    async def _no_title(_q):
+    async def _no_title(_fs, _state):
         return None
 
     async def _no_hb(_fs, _state):
@@ -812,7 +827,7 @@ async def test_plugin_on_event_routes_agenttool_child_events_to_parent_state(mon
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
-    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "_generate_and_write_title", _no_title)
     monkeypatch.setattr(firestore_progress, "fenced_session_update", _no_fenced)
 
     parent_ctx = _mock_invocation_context(
@@ -846,7 +861,7 @@ async def test_plugin_on_event_swallows_lastEventAt_ownership_lost(monkeypatch):
     async def _claim(_fs, _state):
         return None
 
-    async def _no_title(_q):
+    async def _no_title(_fs, _state):
         return None
 
     async def _no_hb(_fs, _state):
@@ -861,7 +876,7 @@ async def test_plugin_on_event_swallows_lastEventAt_ownership_lost(monkeypatch):
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
-    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "_generate_and_write_title", _no_title)
     monkeypatch.setattr(
         firestore_progress, "fenced_session_update", _fenced_with_ownership_lost
     )
@@ -894,7 +909,7 @@ async def test_plugin_on_event_observe_event_failure_still_bumps_heartbeat(monke
     async def _claim(_fs, _state):
         return None
 
-    async def _no_title(_q):
+    async def _no_title(_fs, _state):
         return None
 
     async def _no_hb(_fs, _state):
@@ -909,7 +924,7 @@ async def test_plugin_on_event_observe_event_failure_still_bumps_heartbeat(monke
 
     monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
     monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
-    monkeypatch.setattr(firestore_progress, "_generate_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "_generate_and_write_title", _no_title)
     monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
 
     ctx = _mock_invocation_context(
@@ -929,6 +944,161 @@ async def test_plugin_on_event_observe_event_failure_still_bumps_heartbeat(monke
     assert state.timeline_writer.write_timeline.await_count == 0
     # lastEventAt still bumped — receiving an event = pipeline alive.
     assert fenced_calls == 1
+
+    # Cleanup
+    state.heartbeat_task.cancel()
+    await asyncio.gather(state.heartbeat_task, return_exceptions=True)
+
+
+# ── _generate_and_write_title ───────────────────────────────────────────────
+
+
+def _title_state(**overrides) -> GearRunState:
+    """Build a minimal GearRunState the wrapper can fence-write through."""
+    fs = MagicMock(name="fs")
+    defaults = dict(
+        sid="sid-test",
+        invocation_id="inv-test",
+        run_id="r-1",
+        turn_idx=1,
+        user_id="user-test",
+        query_text="Find pizza spots near me",
+        fs=fs,
+    )
+    defaults.update(overrides)
+    return GearRunState(**defaults)
+
+
+@pytest.mark.asyncio
+async def test_generate_and_write_title_uses_multistatus_fence(monkeypatch):
+    """The title write fences on ``('running', 'complete')`` so it can land
+    before OR after the terminal write — no coordination needed. A
+    single-status ``('running',)`` fence would lose the title on fast
+    turns where the terminal flip happens first."""
+
+    async def _ok_title(_q):
+        return "Pizza scouting"
+
+    monkeypatch.setattr(firestore_progress, "_generate_title", _ok_title)
+
+    calls: list[tuple[dict, tuple[str, ...] | None]] = []
+
+    async def _fenced(_fs, _state, updates, *, expected_statuses=("running",)):
+        calls.append((updates, expected_statuses))
+
+    monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
+
+    state = _title_state()
+    await _generate_and_write_title(state.fs, state)
+
+    assert calls == [({"title": "Pizza scouting"}, ("running", "complete"))]
+
+
+@pytest.mark.asyncio
+async def test_generate_and_write_title_swallows_ownership_lost(monkeypatch):
+    """If the run was flipped to ``error`` (watchdog) or taken over by a
+    newer turn (currentRunId drift), the fence raises ``OwnershipLost``.
+    The wrapper must swallow it — title just stays null on that session."""
+
+    async def _ok_title(_q):
+        return "Title"
+
+    async def _fenced(_fs, _state, _updates, *, expected_statuses=("running",)):
+        raise OwnershipLost("flipped to error")
+
+    monkeypatch.setattr(firestore_progress, "_generate_title", _ok_title)
+    monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
+
+    state = _title_state()
+    # Must not raise.
+    await _generate_and_write_title(state.fs, state)
+
+
+@pytest.mark.asyncio
+async def test_generate_and_write_title_swallows_firestore_errors(monkeypatch, caplog):
+    """Title is best-effort UI metadata. A transient Firestore error
+    (network blip, DeadlineExceeded) on the title write must be logged and
+    swallowed — the task is fire-and-forget, so unhandled exceptions would
+    surface as noisy ``Task exception was never retrieved`` warnings and
+    risk masking real failures elsewhere."""
+
+    async def _ok_title(_q):
+        return "Title"
+
+    async def _fenced(_fs, _state, _updates, *, expected_statuses=("running",)):
+        raise DeadlineExceeded("transient blip")
+
+    monkeypatch.setattr(firestore_progress, "_generate_title", _ok_title)
+    monkeypatch.setattr(firestore_progress, "fenced_session_update", _fenced)
+
+    state = _title_state()
+    # Must not raise.
+    await _generate_and_write_title(state.fs, state)
+    assert any("title write failed" in r.message for r in caplog.records)
+
+
+# ── _fenced_logic — multi-status fence ──────────────────────────────────────
+
+
+def test_fenced_logic_accepts_status_in_set():
+    """Multi-status fence: a status in ``expected_statuses`` writes through.
+    Used by the title write to land past the terminal flip."""
+    txn = MagicMock()
+    session = _mock_session_ref({"currentRunId": "r-1", "status": "complete"})
+
+    _fenced_logic(
+        txn, session, None, "r-1",
+        {"title": "Pizza"}, None,
+        expected_statuses=("running", "complete"),
+    )
+    assert txn.update.call_count == 1
+
+
+def test_fenced_logic_rejects_status_not_in_set():
+    """Multi-status fence still rejects 'error' — title can't resurrect a
+    watchdog-flipped session."""
+    txn = MagicMock()
+    session = _mock_session_ref({"currentRunId": "r-1", "status": "error"})
+
+    with pytest.raises(OwnershipLost):
+        _fenced_logic(
+            txn, session, None, "r-1",
+            {"title": "Pizza"}, None,
+            expected_statuses=("running", "complete"),
+        )
+    txn.update.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_plugin_skips_title_task_on_turn_2(monkeypatch):
+    """Title generation only spawns on turn 1 — turn 2+ inherits the
+    existing title. Verify no title task is created on a later turn."""
+    plugin = FirestoreProgressPlugin(project="superextra-site")
+    plugin._fs = MagicMock()
+
+    async def _claim(_fs, _state):
+        return None
+
+    async def _no_hb(_fs, _state):
+        await asyncio.sleep(60)
+
+    async def _no_title(_fs, _state):
+        return None
+
+    async def _run_started(_state):
+        return None
+
+    monkeypatch.setattr(firestore_progress, "claim_invocation", _claim)
+    monkeypatch.setattr(firestore_progress, "_heartbeat_loop", _no_hb)
+    monkeypatch.setattr(firestore_progress, "_generate_and_write_title", _no_title)
+    monkeypatch.setattr(firestore_progress, "write_run_started_event", _run_started)
+
+    ctx = _mock_invocation_context(
+        sid="abc", run_id="r-2", turn_idx=2, invocation_id="inv-2"
+    )
+    await plugin.before_run_callback(invocation_context=ctx)
+    state = plugin._states["inv-2"]
+    assert plugin._title_tasks == set()
 
     # Cleanup
     state.heartbeat_task.cancel()

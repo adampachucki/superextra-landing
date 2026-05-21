@@ -68,8 +68,9 @@ log = logging.getLogger(__name__)
 
 class OwnershipLost(Exception):
     """A fenced write detected the session has moved on (currentRunId
-    diverged, or status no longer 'running'/'queued'). The caller should
-    bail without retry — definitive ownership signal, not transient.
+    diverged, or status fell outside the caller's expected fence — see
+    ``expected_statuses`` on `_fenced_logic`). Bail without retry; this is
+    a definitive ownership signal, not transient.
     """
 
 
@@ -160,11 +161,13 @@ def _fenced_logic(
     expected_run_id: str,
     session_updates: dict,
     turn_updates: dict | None,
+    expected_statuses: tuple[str, ...] = ("running",),
 ) -> None:
     """Predicates: ``currentRunId == expected_run_id`` AND
-    ``status == 'running'``. The status predicate prevents resurrecting a
-    run that the watchdog or pre-handoff cleanup already flipped to
-    'error'.
+    ``status in expected_statuses``. The status predicate prevents
+    resurrecting a run that the watchdog or pre-handoff cleanup already
+    flipped to 'error'. Default is ``('running',)`` — callers that need
+    to write past the terminal flip (e.g. title metadata) widen the set.
     """
     snap = session_ref.get(transaction=txn)
     data = snap.to_dict() or {}
@@ -172,9 +175,10 @@ def _fenced_logic(
         raise OwnershipLost(
             f"runId: expected={expected_run_id} actual={data.get('currentRunId')!r}"
         )
-    if data.get("status") != "running":
+    if data.get("status") not in expected_statuses:
         raise OwnershipLost(
-            f"status: expected=running actual={data.get('status')!r}"
+            f"status: expected one of {expected_statuses} "
+            f"actual={data.get('status')!r}"
         )
     txn.update(session_ref, session_updates)
     if turn_ref is not None and turn_updates is not None:
@@ -191,7 +195,9 @@ async def fenced_session_and_turn_update(
     turn_updates: dict,
 ) -> None:
     """Two-doc fenced write — used for terminal complete/error transitions
-    so session metadata and turn content land atomically."""
+    so session metadata and turn content land atomically. Always fences on
+    ``status='running'`` (the terminal flip is the only legitimate writer
+    while a turn is in flight)."""
     session_ref = fs.collection("sessions").document(state.sid)
     turn_ref = session_ref.collection("turns").document(f"{state.turn_idx:04d}")
     await asyncio.to_thread(
@@ -209,9 +215,13 @@ async def fenced_session_update(
     fs: firestore.Client,
     state: GearRunState,
     session_updates: dict,
+    *,
+    expected_statuses: tuple[str, ...] = ("running",),
 ) -> None:
-    """Single-doc fenced write — used for heartbeat ticks and
-    ``lastEventAt`` bumps where the turn doc isn't touched."""
+    """Single-doc fenced write — used for heartbeat ticks, ``lastEventAt``
+    bumps, and the title metadata write. Default fence is
+    ``status='running'``; the title write widens to
+    ``('running', 'complete')`` so it doesn't race the terminal flip."""
     session_ref = fs.collection("sessions").document(state.sid)
     await asyncio.to_thread(
         _fenced_txn,
@@ -221,6 +231,7 @@ async def fenced_session_update(
         state.run_id,
         session_updates,
         None,
+        expected_statuses,
     )
 
 
@@ -288,6 +299,43 @@ async def _heartbeat_loop(fs: firestore.Client, state: GearRunState) -> None:
                 )
     except asyncio.CancelledError:
         pass
+
+
+# ── Title generation + write ─────────────────────────────────────────────────
+
+
+async def _generate_and_write_title(
+    fs: firestore.Client, state: GearRunState
+) -> None:
+    """Generate the session title and write it to Firestore as soon as the
+    Gemini call resolves, so the sidebar reflects the new chat ~1–3 s into
+    turn 1 instead of after the whole turn finishes.
+
+    ``_generate_title`` already bounds the Gemini call at ``TITLE_TIMEOUT_S``
+    and falls back to a deterministic string on any error, so this wrapper
+    just writes the result. Fire-and-forget: the multi-status fence
+    ``('running', 'complete')`` accepts the write whether or not the
+    terminal flip happened first, so the title task doesn't need to be
+    coordinated with the terminal write. The fence still blocks
+    resurrecting an error state or writing past a newer turn (currentRunId
+    drift).
+    """
+    title = await _generate_title(state.query_text)
+    try:
+        await fenced_session_update(
+            fs,
+            state,
+            {"title": title},
+            expected_statuses=("running", "complete"),
+        )
+    except OwnershipLost:
+        pass
+    except Exception:  # noqa: BLE001
+        # Title is best-effort UI metadata; a Firestore blip here must not
+        # take down the rest of the run.
+        log.exception(
+            "title write failed sid=%s runId=%s", state.sid, state.run_id
+        )
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -367,6 +415,10 @@ class FirestoreProgressPlugin(BasePlugin):
         self._fs: firestore.Client | None = None
         self._states: dict[str, GearRunState] = {}
         self._states_by_run_id: dict[str, GearRunState] = {}
+        # Strong refs to fire-and-forget title tasks. The asyncio docs warn
+        # that tasks without a strong reference may be GC'd mid-execution;
+        # the done-callback discards on completion so the set stays bounded.
+        self._title_tasks: set[asyncio.Task[None]] = set()
 
     def _client(self) -> firestore.Client:
         # Lazy-init inside the request context so per-request creds resolve
@@ -503,11 +555,15 @@ class FirestoreProgressPlugin(BasePlugin):
             )
             return _halt_content("claim_exhausted")
 
-        # On the first turn of the session, spawn the title task. We
-        # derive isFirstMessage from turnIdx == 1 (agentStream allocates
-        # turnIdx 1-based).
+        # On the first turn of the session, spawn the title task as
+        # fire-and-forget. The wrapper generates the title AND writes it
+        # to Firestore on the multi-status fence ``('running', 'complete')``,
+        # so it can land before OR after the terminal write — no
+        # coordination needed with after_run. turnIdx is 1-based.
         if state.turn_idx == 1:
-            state.title_task = asyncio.create_task(_generate_title(state.query_text))
+            task = asyncio.create_task(_generate_and_write_title(fs, state))
+            self._title_tasks.add(task)
+            task.add_done_callback(self._title_tasks.discard)
 
         self._states[invocation_context.invocation_id] = state
         self._states_by_run_id[state.run_id] = state
@@ -673,11 +729,13 @@ class FirestoreProgressPlugin(BasePlugin):
 
         # Order matters:
         #   1. stop_heartbeat — late ticks can't clobber the terminal write
-        #   2. finalize — closes writer, awaits title with timeout,
-        #      builds payload
+        #   2. finalize — closes writer, builds payload
         #   3. fenced terminal write with bounded retry on transient
         #      Firestore errors (the answer is in process memory only;
         #      losing it on a retry-exhausted blip is unrecoverable).
+        # The title task is fire-and-forget — it fences on
+        # ('running', 'complete'), so whether it lands before or after this
+        # write doesn't matter.
         await per.stop_heartbeat()
         annotate_current_span(corr)
         emit_cloud_log(

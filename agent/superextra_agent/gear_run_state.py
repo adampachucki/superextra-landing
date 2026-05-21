@@ -2,8 +2,11 @@
 
 Holds the mutable state for one run: ``final_reply``, ``final_sources``,
 ``specialist_sources``, ``specialist_sources_seen``, ``mapping_state``,
-``timeline_builder``, ``timeline_writer``, ``title_task``, and the
-heartbeat task.
+``timeline_builder``, ``timeline_writer``, and the heartbeat task.
+
+Title generation is owned by the plugin, not the per-run state — see
+``FirestoreProgressPlugin._title_tasks`` and
+``_generate_and_write_title``.
 
 Concurrency discipline (load-bearing): accumulator mutations on
 ``GearRunState`` and on ``TurnSummaryBuilder`` are synchronous and
@@ -23,7 +26,6 @@ from typing import Any
 from google.cloud import firestore
 
 from .firestore_events import map_event
-from .notes import TITLE_TIMEOUT_S
 from .place_state import TOOL_SOURCE_PREFIX
 from .timeline import TimelineWriter, TurnSummaryBuilder
 from .web_tools import resolve_source_display_url
@@ -55,7 +57,6 @@ class GearRunState:
     specialist_sources: list[dict[str, Any]] = field(default_factory=list)
     specialist_sources_seen: set[str] = field(default_factory=set)
     mapping_state: dict[str, Any] = field(default_factory=lambda: {"place_names": {}})
-    title_task: asyncio.Task[Any] | None = None
     partial_thought_pending: bool = False
 
     # Lifecycle
@@ -226,25 +227,11 @@ class GearRunState:
 
           1. Close ``timeline_writer`` after all thought and tool-detail
              rows observed during event mapping have been queued.
-          2. Await ``title_task`` with bounded ``TITLE_TIMEOUT_S``.
-             ``asyncio.wait_for`` cancels-on-timeout so no straggler
-             concern.
-          3. Empty-reply sanity check. Whitespace-only ``final_reply``
+          2. Empty-reply sanity check. Whitespace-only ``final_reply``
              returns the error payload, NOT a complete payload.
-          4. Build the two payloads from now-stable state.
+          3. Build the two payloads from now-stable state.
         """
         await self.timeline_writer.close()
-
-        title: str | None = None
-        if self.title_task is not None:
-            try:
-                title = await asyncio.wait_for(self.title_task, timeout=TITLE_TIMEOUT_S)
-            except (asyncio.TimeoutError, Exception):
-                # `Exception` does NOT catch `CancelledError` (BaseException
-                # subclass); explicitly NOT catching it here lets outer
-                # cancellation propagate through finalize() instead of
-                # being swallowed by the title-task wrapper.
-                title = None
 
         if not self.final_reply or not self.final_reply.strip():
             return (
@@ -267,8 +254,6 @@ class GearRunState:
             "status": "complete",
             "updatedAt": firestore.SERVER_TIMESTAMP,
         }
-        if title is not None:
-            session_update["title"] = title
 
         turn_update: dict[str, Any] = {
             "status": "complete",

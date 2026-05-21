@@ -5,7 +5,8 @@ Plan §4.6 verification matrix:
     statically by walking the AST of all mutation methods).
   - Empty final_reply → finalize() returns ('error', ...) not
     ('complete', ...) — empty-reply sanity check at plan §4.1.
-  - Title-task cancellation doesn't leak when cancel() is called.
+  - finalize() never sets title — the title write lives in the
+    plugin-owned fire-and-forget wrapper, not the terminal payload.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from superextra_agent import gear_run_state, notes
+from superextra_agent import gear_run_state
 from superextra_agent.gear_run_state import GearRunState
 
 
@@ -485,64 +486,20 @@ def test_observe_event_capture_final_short_circuits_after_first():
     assert isinstance(out, list)
 
 
-# ── Title-task cancellation hygiene ─────────────────────────────────────────
+# ── Title — finalize() never touches title (the wrapper owns the write) ──────
 
 
 @pytest.mark.asyncio
-async def test_finalize_handles_failing_title_task():
-    """Title task that raises must not break finalize()."""
+async def test_finalize_does_not_set_title():
+    """Regression guard: title is owned by the fire-and-forget wrapper
+    spawned in `FirestoreProgressPlugin.before_run_callback`, not by
+    finalize. A future change that resurrects 'set title in the terminal
+    payload' would re-introduce the old 'title only appears at the end'
+    behavior."""
     state = _make_state()
     state.final_reply = "answer"
     state.timeline_writer.write_timeline = AsyncMock(return_value=None)
 
-    async def _title_raises() -> str:
-        raise RuntimeError("title gen crashed")
-
-    state.title_task = asyncio.create_task(_title_raises())
-
     session_update, _t, status = await state.finalize()
     assert status == "complete"
-    # No title key when generation failed.
     assert "title" not in session_update
-
-
-@pytest.mark.asyncio
-async def test_finalize_uses_returned_title():
-    state = _make_state()
-    state.final_reply = "answer"
-    state.timeline_writer.write_timeline = AsyncMock(return_value=None)
-
-    async def _title() -> str:
-        return "Short Title"
-
-    state.title_task = asyncio.create_task(_title())
-    session_update, _t, status = await state.finalize()
-    assert status == "complete"
-    assert session_update.get("title") == "Short Title"
-
-
-@pytest.mark.asyncio
-async def test_finalize_propagates_cancellation():
-    """plan §Commit-3 + F2 P3 — the title-task except clause was tightened
-    from `(TimeoutError, CancelledError, Exception)` to
-    `(TimeoutError, Exception)`. `Exception` does NOT subclass
-    `CancelledError`, so cancellation now propagates out of finalize()
-    rather than being swallowed by the title-task wrapper.
-
-    Recipe (F2's simpler form): cancel the title_task directly and
-    assert finalize() re-raises CancelledError. No timing-sensitive
-    outer-task race.
-    """
-    state = _make_state()
-    state.final_reply = "answer"
-    state.timeline_writer.write_timeline = AsyncMock(return_value=None)
-
-    async def _hangs():
-        await asyncio.sleep(60)
-
-    title_task = asyncio.create_task(_hangs())
-    state.title_task = title_task
-    title_task.cancel()  # force CancelledError when finalize awaits it
-
-    with pytest.raises(asyncio.CancelledError):
-        await state.finalize()
