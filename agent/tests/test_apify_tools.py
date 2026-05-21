@@ -409,5 +409,3 @@ class TestFetchInstagramProfile:
             result = await fetch_instagram_profile("https://x.example", tool_context=_Ctx())
         assert result["status"] == "error"
         assert "timed out" in result["error_message"]
-
-

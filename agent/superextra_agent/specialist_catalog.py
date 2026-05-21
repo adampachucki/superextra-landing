@@ -151,11 +151,11 @@ SPECIALISTS: tuple[Specialist, ...] = (
         label="Social Media Analysis",
         description=(
             "Structured social-platform-page data from TripAdvisor, Facebook "
-            "(page + posts), Instagram, and TikTok via direct page fetches. "
-            "Reports follower stats, posting cadence, content themes, tone "
-            "of voice, and platform-exposed business info. Does not handle "
-            "review bodies (use review_analyst) or marketing-strategy "
-            "interpretation (use marketing_brand)."
+            "(page + posts), and Instagram via direct page fetches. Reports "
+            "follower stats, posting cadence, content themes, tone of voice, "
+            "and platform-exposed business info. Does not handle review "
+            "bodies (use review_analyst) or marketing-strategy interpretation "
+            "(use marketing_brand)."
         ),
         role_title="Social Media Analyst",
         thinking="medium",

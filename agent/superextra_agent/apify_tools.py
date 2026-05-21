@@ -246,8 +246,8 @@ async def fetch_facebook_page(url: str, tool_context=None) -> dict:
     info, categories, ad-running status, and Instagram cross-link if
     present. For recent posts use `fetch_facebook_posts` separately.
 
-    To find the right URL, run `google_search` with a query like
-    `"<venue name> facebook"` and pass the resulting facebook.com page URL.
+    The URL must come from a `search_serpapi` result — do not guess or
+    construct it from a venue name.
 
     Args:
         url: Full Facebook page URL (e.g. https://www.facebook.com/pagename/).
@@ -287,6 +287,9 @@ async def fetch_facebook_posts(url: str, tool_context=None) -> dict:
     counts, share counts, and timestamps. Use this for posting cadence,
     content themes, and tone-of-voice signals. For page metadata
     (bio, hours, follower count) use `fetch_facebook_page`.
+
+    The URL must come from a `search_serpapi` result — do not guess or
+    construct it from a venue name.
 
     Args:
         url: Full Facebook page URL (e.g. https://www.facebook.com/pagename/).
@@ -342,8 +345,8 @@ async def fetch_instagram_profile(url: str, tool_context=None) -> dict:
     Works for public business and personal accounts. Private accounts
     return limited data.
 
-    To find the right URL, run `google_search` with a query like
-    `"<venue name> instagram"` and pass the resulting instagram.com profile URL.
+    The URL must come from a `search_serpapi` result — do not guess or
+    construct it from a venue name.
 
     Args:
         url: Full Instagram profile URL (e.g. https://www.instagram.com/username/).

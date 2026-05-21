@@ -21,7 +21,7 @@ Qualitative customer voice outside structured Google Reviews and TripAdvisor API
 ## Boundaries
 
 - Do not analyze structured Google Reviews or TripAdvisor API data. That is `review_analyst`.
-- Do not fetch structured TripAdvisor, Facebook, Instagram, or TikTok page data (follower counts, profile bios, page metadata, per-post engagement stats). That is `social_analyst`.
+- Do not fetch structured TripAdvisor, Facebook, or Instagram page data (follower counts, profile bios, page metadata, per-post engagement stats). That is `social_analyst`.
 - Do not identify individual reviewers by name.
 - Do not present a single complaint as a theme.
 - Do not quantify beyond the sample actually reviewed.
