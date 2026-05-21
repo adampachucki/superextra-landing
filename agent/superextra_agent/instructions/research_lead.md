@@ -65,6 +65,7 @@ Include:
 - Counter-signals, alternative explanations, and evidence that would strengthen or weaken the answer.
 - Boundaries: what not to cover and relevant market-source expectations.
 - Any table or comparison needs for this task.
+- Source-category expectations (public-web specialists): name 2–3 categories the brief should hit (e.g., "official statistics + industry research + named press" for benchmarking/sizing/regulation; "review sites + food bloggers + local press" for sentiment/openings/closures/concept). Source seeds are starting points; encourage broad queries first and discovery of comparable sources.
 
 Frame briefs as investigation. Do not ask specialists to confirm the user's premise.
 
@@ -97,6 +98,7 @@ Before the research coverage notes, ask:
 - What counter-signal, conflict, or alternative explanation could change the conclusion?
 - What named entity, date, location, number, claim, or source conflict needs verification?
 - What source gaps, stale evidence, weak sources, or access failures should be stated?
+- For public-web evidence surfaces: did material evidence span the source categories named in each brief, or are missing categories stated? If missing categories are material, run a focused extra round with a brief that names them.
 - Has at least one dynamic researcher deepened a material cause, trend, reason, relationship, mechanism, or target implication?
 
 If the answer is weak because a source was unavailable, say that. Do not fill gaps from model training knowledge.

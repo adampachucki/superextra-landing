@@ -1,28 +1,84 @@
 ## Market Source Profiles
 
-Use this as source guidance, not a checklist. Source availability changes by city and by tool access. Mention only sources actually checked.
+Lists below are **search seeds**, not a closed set and not a checklist. Use them to spark queries; discover comparable local sources when better ones exist.
 
-## Source Order
+**Source variety matters.** For public-web research, draw from the source categories the Lead names in the brief. If a category turned up nothing material, say so.
 
-1. Direct tools and structured integrations available in this run.
-2. Official or primary sources for numbers, law, business facts, wages, and demographics.
-3. Venue-owned channels for menus, hours, booking, ordering, and positioning.
-4. Local firsthand sources for openings, closures, local sentiment, neighborhood dynamics, and weak signals.
-5. Public consumer, reservation, delivery, and social platforms when accessible.
-6. Industry reports and trade press for benchmarks.
+Source availability changes by city and by tool access — mention only sources actually checked.
 
-For qualitative local work, firsthand local evidence can beat generic national authority. Treat it as qualitative and label its limits.
+## Categories
 
-## Market Examples
+1. **Official & statistical** — national statistical offices, government open data, municipal portals, planning and transport authorities, business registries, food-safety/health inspection portals.
+2. **Industry research & benchmarks** — trade associations, market-research firms, industry trade press, published industry reports.
+3. **Restaurant review sites & critics** — editorial review platforms, named newspaper/magazine restaurant critics with byline credibility.
+4. **Food bloggers & community** — city-level food bloggers, Reddit/forums, Facebook groups, niche food newsletters.
+5. **Local press** — dailies, neighborhood publications, city magazines.
+6. **Delivery & reservation platforms** — public listings on platforms when accessible.
+7. **Jobs, wages & costs** — job boards, wage surveys, commercial property listings.
+8. **Currency & language** — local currency and language hints for source quality.
 
-| Market | Official and primary | Platforms to try when accessible | Jobs and costs | Local qualitative |
-| --- | --- | --- | --- | --- |
-| PL | GUS, BDL, CEIDG, KRS, REGON, city portals, transit and planning authorities | Google, TripAdvisor, TheFork, Pyszne.pl, Wolt, Glovo, Uber Eats, Bolt Food, venue sites, social | Pracuj.pl, OLX Praca, Indeed.pl, GoWork.pl, salary surveys, commercial property listings | local press, food writers, blogs, Reddit, forums, Facebook groups |
-| UK | ONS, Nomis, Companies House, local councils, Food Standards Agency, transport and planning bodies | Google, TripAdvisor, OpenTable, TheFork, DesignMyNight, Deliveroo, Uber Eats, Just Eat, venue sites, social | Indeed, Caterer.com, Reed, ONS wage data, UKHospitality, commercial property listings | local press, neighborhood publications, food writers, Reddit, forums, Facebook groups |
-| US | Census, ACS, BLS, BEA, state and city open data, health inspection portals, planning and transport agencies | Google, Yelp, TripAdvisor, OpenTable, Resy, DoorDash, Uber Eats, Grubhub, venue sites, social | Indeed, Poached, Culinary Agents, BLS wage data, state labor data, National Restaurant Association or local association material, commercial property listings | local press, Eater where relevant, city food writers, Reddit, neighborhood forums, social groups |
-| DE | Destatis, regional Statistikamt sources, Handelsregister, municipal portals, planning and transport bodies | Google, TripAdvisor, OpenTable, TheFork, Lieferando, Wolt, Uber Eats, venue sites, social | StepStone, Indeed, HOGAPAGE, Gastrojobs, DEHOGA material, Gehalt.de, commercial property listings | local press, city magazines, food writers, Reddit, forums, Facebook groups |
+## PL — Poland
 
-If the market is outside PL, UK, US, or DE, use the source order and discover local equivalents.
+| Category | Seeds |
+| --- | --- |
+| Official & statistical | GUS, CEIDG, KRS |
+| Industry research | PIH, GUS sector reports, Horecanet |
+| Review sites & critics | Gault&Millau Polska, Michelin Guide Polska, Time Out Warsaw |
+| Food bloggers & community | named city food bloggers, Reddit r/warszawa / r/krakow |
+| Local press | Gazeta Wyborcza local editions, city magazines |
+| Delivery & reservation | Pyszne.pl, Wolt, Glovo |
+| Jobs, wages & costs | Pracuj.pl, GUS wage data, Otodom Komercyjne |
+| Currency & language | PLN, Polish |
+
+## UK — United Kingdom
+
+| Category | Seeds |
+| --- | --- |
+| Official & statistical | ONS, Companies House, Food Standards Agency |
+| Industry research | CGA, UKHospitality, MCA Insight, Lumina Intelligence |
+| Review sites & critics | Time Out, Hardens, Observer/Guardian/Times restaurant critics |
+| Food bloggers & community | London Eats, named city food bloggers, Reddit r/london |
+| Local press | Evening Standard, neighborhood publications |
+| Delivery & reservation | OpenTable, Deliveroo, Just Eat |
+| Jobs, wages & costs | Caterer.com, ONS wage data, EG Radius |
+| Currency & language | GBP, English |
+
+## US — United States
+
+| Category | Seeds |
+| --- | --- |
+| Official & statistical | Census/ACS, BLS, county health inspection portals |
+| Industry research | National Restaurant Association, Technomic, Toast Industry Report |
+| Review sites & critics | Eater, The Infatuation, NYT/LA Times/SF Chronicle critics |
+| Food bloggers & community | city food Substacks, Reddit r/FoodNYC / r/AskNYC |
+| Local press | city alternative weeklies, neighborhood papers |
+| Delivery & reservation | OpenTable, Resy, DoorDash |
+| Jobs, wages & costs | Poached, BLS wage data, LoopNet |
+| Currency & language | USD, English |
+
+## DE — Germany
+
+| Category | Seeds |
+| --- | --- |
+| Official & statistical | Destatis, regional Statistikamt, Handelsregister |
+| Industry research | DEHOGA, Allegra DE, gv-praxis |
+| Review sites & critics | Michelin Guide DE, Falstaff DE, Mit Vergnügen |
+| Food bloggers & community | named city food bloggers, Reddit r/berlin / r/munich |
+| Local press | city dailies, Stadtmagazine |
+| Delivery & reservation | Lieferando, OpenTable, Quandoo |
+| Jobs, wages & costs | HOGAPAGE, Gehalt.de, ImmoScout24 Gewerbe |
+| Currency & language | EUR, German |
+
+## Global (always available alongside the detected market)
+
+| Category | Seeds |
+| --- | --- |
+| Industry research | Statista, Euromonitor, Michelin Guide |
+| Review media | Eater (international coverage), Time Out (international) |
+
+## Markets outside PL / UK / US / DE
+
+No named seeds. Use the eight-category structure: brief the specialist by category ("look for the national statistical office; look for industry trade press; look for named restaurant critics in city press") and ask the specialist to discover the local equivalents.
 
 Use local language and local currency where it improves source quality.
 

@@ -26,8 +26,8 @@ The brief may ask about one restaurant, a competitor set, or a market set. Analy
 - Follow any market or source guidance included in the brief.
 - `Evidence To Seek` points you in the right direction. It is not a checklist, limit, or exhaustive source list.
 - Treat Places data as context, not the whole answer, unless the brief asks only for Places data.
-- Prefer primary or official sources for numbers, laws, wages, business facts, and demographics.
-- Prefer local firsthand sources for local sentiment, openings, closures, neighborhood dynamics, and weak signals.
+- Prefer primary, official, statistical, and industry-research sources for laws, wages, demographics, sizing, and benchmarks.
+- Prefer named review sites, critics, and food bloggers for sentiment, openings, closures, and concept reception.
 - If a source is blocked, missing, stale, or ambiguous, state that plainly.
 - Keep access limits reader-facing. Do not include raw tool errors, HTTP/status messages, stack traces, or source-by-source failed attempts.
 - Separate observed facts from estimates and interpretations.
@@ -97,6 +97,7 @@ Cover:
 
 - Sources read: pages, articles, listings, reports, menus, PDFs, or forum threads whose content was available through URL Context or a structured provider. Name the source and URL when available.
 - Structured provider data: Google Places, Google Reviews, TripAdvisor, delivery-platform, or other tool-backed records used as evidence. Include provider/place IDs when they are the only stable reference.
+- Source category: label each material source with its source-profile category — Official & statistical, Industry research & benchmarks, Restaurant review sites & critics, Food bloggers & community, Local press, Delivery & reservation, Jobs/wages/costs, Currency & language. For structured Facebook/Instagram data (social_analyst surface), use "Social platforms" — these sit outside the public-web category set.
 - Search or grounding-only signals: useful results, snippets, or source metadata that were discovered but not read. Use these as weaker context, not as full evidence.
 - Evidence gaps: relevant pages that were blocked, stale, ambiguous, snippet-only, unavailable, or contradicted by read material.
 - Key claims: for important findings, state whether the basis is read page content, structured provider data, search/grounding signal, estimate, or inference.
