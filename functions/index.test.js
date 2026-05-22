@@ -468,6 +468,40 @@ describe('agentStream', () => {
 		assert.match(handoffArg.message, /^\[Date: /);
 	});
 
+	it('first turn injects selected focus context when provided', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({
+				body: {
+					message: 'What is changing nearby?',
+					sessionId: 'sess-1',
+					placeContext: {
+						name: 'Williamsburg',
+						secondary: 'Brooklyn, NY',
+						placeId: 'ChIJfocus'
+					}
+				}
+			}),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		const { sessionSets } = partitionWrites('sessions/sess-1');
+		assert.deepEqual(sessionSets[0].placeContext, {
+			name: 'Williamsburg',
+			secondary: 'Brooklyn, NY',
+			placeId: 'ChIJfocus'
+		});
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.match(
+			handoffArg.message,
+			/^\[Context: selected focus: Williamsburg, Brooklyn, NY \(Google Place ID: ChIJfocus\)\] \[Date: /
+		);
+		assert.ok(!handoffArg.message.includes('asking about'));
+	});
+
 	it('follow-up from the same user arrayUnion-keeps participants and increments lastTurnIndex', async () => {
 		mockDb.get.mock.mockImplementation(async () => ({
 			exists: true,

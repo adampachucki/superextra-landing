@@ -73,7 +73,7 @@
 	}
 
 	const FAMILY_LABEL: Record<DetailEvent['family'], string> = {
-		'Google Maps': 'Looking up venue data',
+		'Google Maps': 'Checking Google Maps',
 		'Google reviews': 'Reading reviews',
 		TripAdvisor: 'Cross-referencing TripAdvisor',
 		'Searching the web': 'Searching the web',
@@ -83,7 +83,7 @@
 	};
 	const AUTHOR_LABEL: Record<string, string> = {
 		router: 'Choosing next steps',
-		context_enricher: 'Looking up the venue',
+		context_enricher: 'Building context',
 		research_lead: 'Reasoning',
 		report_writer: 'Drafting final report',
 		continue_research: 'Continuing research',

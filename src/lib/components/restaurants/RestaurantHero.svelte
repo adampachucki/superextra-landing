@@ -18,12 +18,12 @@
 	let {
 		onleave
 	}: {
-		onleave?: (detail: { query: string; place: PlaceSuggestion }) => void;
+		onleave?: (detail: { query: string; place: PlaceSuggestion | null }) => void;
 	} = $props();
 
 	let leaving = $state(false);
 
-	function handleSubmit(detail: { query: string; place: PlaceSuggestion }) {
+	function handleSubmit(detail: { query: string; place: PlaceSuggestion | null }) {
 		if (leaving) return;
 		leaving = true;
 		onleave?.(detail);

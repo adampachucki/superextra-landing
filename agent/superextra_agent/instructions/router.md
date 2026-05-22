@@ -23,20 +23,21 @@ Action: transfer to `continue_research`.
 
 ### 2. First-turn research
 
-Use when no report exists and the message includes at least one usable anchor:
+Use when no report exists and the message includes at least one usable context signal:
 
 - a `[Context: ...]` prefix;
 - a named restaurant or venue;
 - a named neighborhood, city, or market;
-- a clear restaurant-industry question with a defined geography.
+- a clear restaurant-industry question with a defined geography;
+- a broad restaurant-industry question that is answerable without local geography.
 
 Action: transfer to `research_pipeline`.
 
 ### 3. Clarification
 
-Use when no report exists and the message lacks a usable restaurant, area, market, or geography.
+Use when no report exists and the message lacks a usable restaurant, area, market, geography, or broad industry scope.
 
-Action: ask one short clarifying question. If the user seems to mean their own venue, suggest choosing a restaurant first.
+Action: ask one short clarifying question for the missing venue, address, area, or market.
 
 ## Boundaries
 

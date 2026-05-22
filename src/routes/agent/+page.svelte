@@ -18,7 +18,7 @@
 		place
 	}: {
 		query: string;
-		place: { name: string; secondary: string; placeId: string };
+		place: { name: string; secondary: string; placeId: string } | null;
 	}) {
 		leaving = true;
 		chatState.startNewChat(query, place);

@@ -114,20 +114,45 @@ describe('createPlaceSearch', () => {
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
-	it('falls back to unfiltered fetch when type-filtered returns empty', async () => {
+	it('defaults to mixed place search', async () => {
+		const requests: Parameters<FetchFn>[0][] = [];
+		const fetchMock = vi.fn(async (opts: Parameters<FetchFn>[0]) => {
+			requests.push(opts);
+			return {
+				suggestions: [makeSuggestion('Williamsburg', 'Brooklyn, NY')]
+			};
+		});
+		stubGoogleMaps(fetchMock as unknown as FetchFn);
+		const place = createPlaceSearch({ debounceMs: 10 });
+		place.setQuery('Williamsburg');
+		await vi.advanceTimersByTimeAsync(20);
+		await Promise.resolve();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(requests[0]).not.toHaveProperty('includedPrimaryTypes');
+		expect(place.suggestions[0]).toMatchObject({
+			name: 'Williamsburg',
+			secondary: 'Brooklyn, NY'
+		});
+	});
+
+	it('falls back to unfiltered fetch when an explicit type filter returns empty', async () => {
 		let call = 0;
-		const fetch = vi.fn(async () => {
+		const requests: Parameters<FetchFn>[0][] = [];
+		const fetchMock = vi.fn(async (opts: Parameters<FetchFn>[0]) => {
+			requests.push(opts);
 			call++;
 			if (call === 1) return { suggestions: [] }; // first pass, type-filtered
 			return { suggestions: [makeSuggestion('X', 'Y')] };
-		}) as unknown as FetchFn;
-		stubGoogleMaps(fetch);
-		const place = createPlaceSearch({ debounceMs: 10 });
+		});
+		stubGoogleMaps(fetchMock as unknown as FetchFn);
+		const place = createPlaceSearch({ debounceMs: 10, types: ['restaurant'] });
 		place.setQuery('obscure name');
 		await vi.advanceTimersByTimeAsync(20);
 		await Promise.resolve();
 		await Promise.resolve();
-		expect(fetch).toHaveBeenCalledTimes(2);
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(requests[0]).toMatchObject({ includedPrimaryTypes: ['restaurant'] });
+		expect(requests[1]).not.toHaveProperty('includedPrimaryTypes');
 		expect(place.suggestions.length).toBe(1);
 		expect(place.suggestions[0].name).toBe('X');
 	});

@@ -1,5 +1,7 @@
 """Tests for instruction provider functions in agent.py."""
 
+from pathlib import Path
+
 from google.genai import types
 
 from superextra_agent.agent import (
@@ -11,6 +13,8 @@ from superextra_agent.agent import (
     _router_instruction,
 )
 from superextra_agent.specialists import _make_instruction
+
+INSTRUCTIONS_DIR = Path(__file__).resolve().parent.parent / "superextra_agent" / "instructions"
 
 
 class MockCtx:
@@ -61,6 +65,15 @@ class TestResearchLeadInstruction:
         assert "read page content, structured provider data, or clearly labeled search/grounding-only signals" in result
         assert "If no dynamic researcher has been used, run one" in result
 
+    def test_prompt_focus_and_benchmark_framing_render(self):
+        result = _research_lead_instruction(
+            MockCtx(state={"places_context": "Area focus: Williamsburg"})
+        )
+
+        assert "target venue, a site or area focus, or a broader market question" in result
+        assert "separate nearby competitors from destination-level or category-leading comparables" in result
+        assert "Do not force review or social analysis for an area/site prompt" in result
+
 
 class TestReportWriterInstruction:
     def test_injects_places_context_and_specialist_reports_only(self):
@@ -108,7 +121,7 @@ class TestReportWriterInstruction:
     def test_defaults_when_state_empty(self):
         result = _report_writer_instruction(MockCtx(state={}))
 
-        assert "No restaurant data available." in result
+        assert "No Google Places data available." in result
         assert "No specialist reports available." in result
 
     def test_handles_curly_braces_in_injected_material(self):
@@ -290,7 +303,7 @@ class TestContinueResearchInstruction:
         assert "No specialist notes available." in result
         assert "No research coverage notes available." in result
         assert "No continuation notes yet." in result
-        assert "No restaurant data available." in result
+        assert "No Google Places data available." in result
 
 class TestRecordContinuationNotes:
     def test_records_reply_in_session_state(self):
@@ -328,3 +341,22 @@ class TestRouterInstruction:
         result = _router_instruction(MockCtx(state={}))
 
         assert "No research has been done yet" in result
+
+    def test_prompt_focus_clarification_wording(self):
+        result = _router_instruction(MockCtx(state={}))
+
+        assert "selected focus" not in result
+        assert "broad restaurant-industry question that is answerable without local geography" in result
+        assert "missing venue, address, area, or market" in result
+        assert "choosing a restaurant first" not in result
+
+
+class TestContextEnricherInstruction:
+    def test_place_id_can_be_site_area_or_target_restaurant(self):
+        result = (INSTRUCTIONS_DIR / "context_enricher.md").read_text()
+
+        assert "target restaurant, proposed site, or area focus" in result
+        assert "Do not call it the target restaurant" in result
+        assert "Still build area or site context" in result
+        assert "Keep nearby competitors separate from broader comparables" in result
+        assert "Use Google Places tools only" in result

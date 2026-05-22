@@ -26,8 +26,7 @@
 		query = $bindable(''),
 		isMobile = false,
 		placeDirection = 'down',
-		placePlaceholder = 'Venue name...',
-		placeNudgeText = 'Select your venue so we can focus on the right area',
+		placePlaceholder = 'Restaurant, address, neighborhood, or city',
 		autofocusMode = false,
 		focusOnQueryChange = false,
 		onSubmit
@@ -36,10 +35,9 @@
 		isMobile?: boolean;
 		placeDirection?: 'down' | 'up';
 		placePlaceholder?: string;
-		placeNudgeText?: string;
 		autofocusMode?: 'desktop' | false;
 		focusOnQueryChange?: boolean;
-		onSubmit: (detail: { query: string; place: PlaceSuggestion }) => void;
+		onSubmit: (detail: { query: string; place: PlaceSuggestion | null }) => void;
 	} = $props();
 
 	const place = createPlaceSearch();
@@ -47,7 +45,6 @@
 	let placeInputEl: HTMLInputElement | undefined = $state();
 	let contextOpen = $state(false);
 	let contextVisible = $state(false);
-	let placeNudge = $state(false);
 	let display = $state(PREFIX);
 	let dictationBase = '';
 	let previousQuery = '';
@@ -84,14 +81,6 @@
 		inputEl.style.height = inputEl.scrollHeight + 'px';
 	}
 
-	function openContext() {
-		flushSync(() => {
-			contextOpen = true;
-			contextVisible = true;
-		});
-		focusPlaceInput();
-	}
-
 	function toggleContext() {
 		const nextOpen = !contextOpen;
 		flushSync(() => {
@@ -108,7 +97,6 @@
 	}
 
 	function handlePlaceSelect() {
-		placeNudge = false;
 		focusTextarea();
 		requestAnimationFrame(() => {
 			contextVisible = false;
@@ -121,13 +109,7 @@
 			focusTextarea();
 			return;
 		}
-		if (!selectedPlace) {
-			placeNudge = true;
-			openContext();
-			return;
-		}
 		if (dictation.active) dictation.stop();
-		placeNudge = false;
 		query = '';
 		resizeTextarea();
 		onSubmit({ query: trimmed, place: selectedPlace });
@@ -256,7 +238,7 @@
 				<button
 					type="button"
 					onclick={toggleContext}
-					aria-label="Add place"
+					aria-label="Add focus"
 					class="flex h-8 w-8 items-center justify-center rounded-full transition-colors {contextOpen ||
 					selectedPlace
 						? 'text-black/60 dark:text-white/60'
@@ -316,7 +298,7 @@
 						<button
 							type="button"
 							onclick={removePlace}
-							aria-label="Remove place"
+							aria-label="Remove focus"
 							class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
 						>
 							<svg
@@ -422,12 +404,6 @@
 				</button>
 			</div>
 		</div>
-
-		{#if placeNudge && !selectedPlace}
-			<p class="context-slide mx-5 mb-2 text-[12px] text-black/40 dark:text-white/40">
-				{placeNudgeText}
-			</p>
-		{/if}
 
 		{#if contextVisible}
 			<div

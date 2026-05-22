@@ -289,7 +289,8 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 	});
 	let queryText = `[Date: ${today}] ${message}`;
 	if (isFirstMessage && placeContext && placeContext.name) {
-		queryText = `[Context: asking about ${placeContext.name}, ${placeContext.secondary || ''} (Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
+		const focusLabel = [placeContext.name, placeContext.secondary].filter(Boolean).join(', ');
+		queryText = `[Context: selected focus: ${focusLabel} (Google Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
 	}
 
 	// 7. Direct handoff to Vertex AI Agent Engine. Cleanup on failure flips

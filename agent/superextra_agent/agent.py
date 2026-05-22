@@ -96,8 +96,8 @@ def _make_enricher(name="context_enricher"):
         model=SPECIALIST_GEMINI,
         instruction=_ENRICHER_INSTRUCTION,
         description=(
-            "Fetches structured Google Places context for a target restaurant "
-            "and competitive set when available."
+            "Fetches structured Google Places context for a target venue, "
+            "site or area, and competitive set when available."
         ),
         tools=_ENRICHER_TOOLS,
         output_key="places_context",
@@ -208,7 +208,7 @@ def _continue_research_instruction(ctx):
         "continuation_notes": ctx.state.get(
             _CONTINUATION_NOTES_KEY, "No continuation notes yet."
         ),
-        "places_context": ctx.state.get("places_context", "No restaurant data available."),
+        "places_context": ctx.state.get("places_context", "No Google Places data available."),
         "known_places_context": format_known_places_context(ctx.state),
     }
     return _CONTINUE_RESEARCH_TEMPLATE.format(**values)
@@ -217,7 +217,7 @@ def _continue_research_instruction(ctx):
 def _report_writer_instruction(ctx):
     """Inject the full research material into the final report writer."""
     values = {
-        "places_context": ctx.state.get("places_context", "No restaurant data available."),
+        "places_context": ctx.state.get("places_context", "No Google Places data available."),
         "specialist_reports": _format_specialist_reports(
             ctx.state,
             default="No specialist reports available.",

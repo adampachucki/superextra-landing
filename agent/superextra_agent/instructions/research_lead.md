@@ -65,6 +65,8 @@ Include:
 - Counter-signals, alternative explanations, and evidence that would strengthen or weaken the answer.
 - Boundaries: what not to cover and relevant market-source expectations.
 - Any table or comparison needs for this task.
+- Whether the active scope is a target venue, a site or area focus, or a broader market question.
+- If broader benchmarks matter, separate nearby competitors from destination-level or category-leading comparables.
 - Source-category expectations (public-web specialists): name 2–3 categories the brief should hit (e.g., "official statistics + industry research + named press" for benchmarking/sizing/regulation; "review sites + food bloggers + local press" for sentiment/openings/closures/concept). Source seeds are starting points; encourage broad queries first and discovery of comparable sources.
 
 Frame briefs as investigation. Do not ask specialists to confirm the user's premise.
@@ -83,6 +85,7 @@ Thought summaries are visible as live progress. Keep them compact and user-facin
 - Openings and closures: `market_landscape` owns press, local, registry, and market-structure evidence. `menu_pricing` can add live operating signals from delivery menus. `marketing_brand` can add launch and activity signals. `review_analyst` can add review-velocity evidence.
 - Marketing and brand: `marketing_brand` owns marketing strategy, brand positioning, campaigns, public ad signals, social activity, web presence, and search presence.
 - Culinary trends: `market_landscape` owns local cuisine and format shifts. `menu_pricing` owns menu expression and price effects. `guest_intelligence` owns guest expectation shifts. Dynamic researchers own broader culinary, category, consumer, or industry trends outside those scopes.
+- Venue-bound specialists need a verified target venue or relevant venue set. Do not force review or social analysis for an area/site prompt without one.
 - Non-standard or cross-cutting topics: use a dynamic researcher when no specialist owns the evidence surface or when a deeper cause, mechanism, relationship, or implication needs its own investigation.
 
 ## Sufficiency Check

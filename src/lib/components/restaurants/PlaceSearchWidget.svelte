@@ -4,7 +4,7 @@
 	let {
 		place,
 		inputEl = $bindable(),
-		placeholder = 'Venue name...',
+		placeholder = 'Restaurant, address, neighborhood, or city',
 		direction = 'down',
 		onSelect
 	}: {

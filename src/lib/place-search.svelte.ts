@@ -1,5 +1,5 @@
 /**
- * Google Places autocomplete for restaurant/venue search.
+ * Google Places autocomplete for prompt focus search.
  *
  * Factory pattern — each call returns an independent reactive store so the
  * hero and chat-page place inputs can coexist without sharing state. The
@@ -32,7 +32,7 @@ export interface PlaceSearchOptions {
 	debounceMs?: number;
 	/** Minimum characters before a fetch is attempted. Default 2. */
 	minChars?: number;
-	/** Primary type filter for first-pass fetch. Default restaurant-adjacent types. */
+	/** Optional primary type filter for specialized callers. Default is unfiltered. */
 	types?: string[];
 }
 
@@ -130,8 +130,6 @@ export function __resetPlaceSearchSingletons(): void {
 
 // --- Factory ---
 
-const DEFAULT_TYPES = ['restaurant', 'cafe', 'bar', 'hotel', 'food'];
-
 /**
  * Create an independent place-search store. Consumers bind to `.query`,
  * `.suggestions`, etc. — all reactive via Svelte runes.
@@ -139,7 +137,7 @@ const DEFAULT_TYPES = ['restaurant', 'cafe', 'bar', 'hotel', 'food'];
 export function createPlaceSearch(opts: PlaceSearchOptions = {}): PlaceSearch {
 	const debounceMs = opts.debounceMs ?? 300;
 	const minChars = opts.minChars ?? 2;
-	const types = opts.types ?? DEFAULT_TYPES;
+	const types = opts.types?.length ? opts.types : null;
 
 	let query = $state('');
 	let suggestions = $state<PlaceSuggestion[]>([]);
@@ -164,12 +162,13 @@ export function createPlaceSearch(opts: PlaceSearchOptions = {}): PlaceSearch {
 			await loadGoogleMaps();
 			const country = resolveBrowserCountry();
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AutocompleteSuggestion lacks types
-			const base: any = { input, includedPrimaryTypes: types };
+			const base: any = { input };
+			if (types) base.includedPrimaryTypes = types;
 			if (country) base.region = country;
 			let result = await // eslint-disable-next-line @typescript-eslint/no-explicit-any
 			(google.maps.places.AutocompleteSuggestion as any).fetchAutocompleteSuggestions(base);
-			// Fallback: retry without type filter when typed query (e.g. "name city") yields no results
-			if (result.suggestions.length === 0) {
+			// Specialized filtered searches can still fall back to mixed place search.
+			if (types && result.suggestions.length === 0) {
 				// eslint-disable-next-line @typescript-eslint/no-unused-vars
 				const { includedPrimaryTypes: _, ...fallback } = base;
 				result = await // eslint-disable-next-line @typescript-eslint/no-explicit-any

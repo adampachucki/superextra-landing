@@ -244,7 +244,13 @@
 		composerResetKey++;
 	}
 
-	function handleNewChatSubmit({ query, place }: { query: string; place: PlaceSuggestion }) {
+	function handleNewChatSubmit({
+		query,
+		place
+	}: {
+		query: string;
+		place: PlaceSuggestion | null;
+	}) {
 		sendError = null;
 		chatState.startNewChat(query, place);
 	}
@@ -772,8 +778,6 @@
 					bind:query
 					{isMobile}
 					placeDirection="up"
-					placePlaceholder="Restaurant name..."
-					placeNudgeText="Select your restaurant so we can focus on the right area"
 					onSubmit={handleNewChatSubmit}
 				/>
 			{/key}

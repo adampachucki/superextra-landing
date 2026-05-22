@@ -42,6 +42,7 @@ class TestGetRestaurantDetails:
         Lat/lng and _target_place_id stay target-scoped as before."""
         place_data = {
             "displayName": {"text": "Test Restaurant"},
+            "primaryType": "restaurant",
             "location": {"latitude": 52.5, "longitude": 13.4},
         }
         respx.get(f"{BASE_URL}/places/test123").mock(
@@ -69,6 +70,7 @@ class TestGetRestaurantDetails:
         maps_uri = "https://www.google.com/maps/place/?q=place_id:target123"
         place_data = {
             "displayName": {"text": "Target"},
+            "primaryType": "restaurant",
             "location": {"latitude": 55.68, "longitude": 12.61},
             "googleMapsUri": maps_uri,
         }
@@ -90,6 +92,26 @@ class TestGetRestaurantDetails:
 
     @respx.mock
     @pytest.mark.asyncio
+    async def test_food_drink_non_restaurant_type_initializes_target(self):
+        place_data = {
+            "displayName": {"text": "Neighborhood Pub"},
+            "primaryType": "pub",
+            "location": {"latitude": 51.5, "longitude": -0.12},
+        }
+        respx.get(f"{BASE_URL}/places/pub123").mock(
+            return_value=httpx.Response(200, json=place_data)
+        )
+
+        ctx = MockToolCtx()
+        await get_restaurant_details("pub123", tool_context=ctx)
+
+        assert ctx.state["_target_place_id"] == "pub123"
+        assert ctx.state["original_target_place_id"] == "pub123"
+        assert ctx.state["_target_lat"] == 51.5
+        assert ctx.state["_target_lng"] == -0.12
+
+    @respx.mock
+    @pytest.mark.asyncio
     async def test_target_identity_survives_missing_location(self):
         """Target identity (`_target_place_id`) is written on the first
         Places call regardless of whether `location` came back. Decoupled
@@ -98,6 +120,7 @@ class TestGetRestaurantDetails:
         maps_uri = "https://www.google.com/maps/place/?q=place_id:noloc"
         place_data = {
             "displayName": {"text": "No Location"},
+            "primaryType": "restaurant",
             "googleMapsUri": maps_uri,
             # No "location" field at all.
         }
@@ -123,6 +146,7 @@ class TestGetRestaurantDetails:
         place should initialize the new registry target key and legacy coords."""
         place_data = {
             "displayName": {"text": "Target"},
+            "primaryType": "restaurant",
             "location": {"latitude": 52.5, "longitude": 13.4},
         }
         respx.get(f"{BASE_URL}/places/legacy-target").mock(
@@ -149,6 +173,7 @@ class TestGetRestaurantDetails:
         respx.get(f"{BASE_URL}/places/target").mock(
             return_value=httpx.Response(200, json={
                 "displayName": {"text": "Target (no coords)"},
+                "primaryType": "restaurant",
                 "googleMapsUri": "https://maps.google.com/?cid=target",
             })
         )
@@ -156,6 +181,7 @@ class TestGetRestaurantDetails:
         respx.get(f"{BASE_URL}/places/comp").mock(
             return_value=httpx.Response(200, json={
                 "displayName": {"text": "Competitor"},
+                "primaryType": "restaurant",
                 "location": {"latitude": 55.6989, "longitude": 12.5896},
                 "googleMapsUri": "https://maps.google.com/?cid=comp",
             })
@@ -182,6 +208,37 @@ class TestGetRestaurantDetails:
             "https://maps.google.com/?cid=comp",
         }
         assert ctx.state["places_by_id"]["comp"]["lat"] == 55.6989
+
+    @respx.mock
+    @pytest.mark.asyncio
+    async def test_area_focus_and_competitor_batch_do_not_create_target_identity(self):
+        respx.get(f"{BASE_URL}/places/area").mock(
+            return_value=httpx.Response(200, json={
+                "displayName": {"text": "Williamsburg"},
+                "primaryType": "locality",
+                "types": ["locality", "political"],
+                "location": {"latitude": 40.7081, "longitude": -73.9571},
+                "googleMapsUri": "https://maps.google.com/?cid=area",
+            })
+        )
+        respx.get(f"{BASE_URL}/places/comp").mock(
+            return_value=httpx.Response(200, json={
+                "displayName": {"text": "Competitor"},
+                "primaryType": "restaurant",
+                "location": {"latitude": 40.709, "longitude": -73.958},
+                "googleMapsUri": "https://maps.google.com/?cid=comp",
+            })
+        )
+
+        ctx = MockToolCtx()
+        await get_restaurant_details("area", tool_context=ctx)
+        await get_batch_restaurant_details(["comp"], tool_context=ctx)
+
+        assert "original_target_place_id" not in ctx.state
+        assert "_target_place_id" not in ctx.state
+        assert ctx.state["_target_lat"] == 40.7081
+        assert ctx.state["_target_lng"] == -73.9571
+        assert set(ctx.state["places_by_id"]) == {"area", "comp"}
 
     @respx.mock
     @pytest.mark.asyncio
@@ -277,6 +334,7 @@ class TestGetBatchRestaurantDetails:
         respx.get(f"{BASE_URL}/places/target").mock(
             return_value=httpx.Response(200, json={
                 "displayName": {"text": "Target"},
+                "primaryType": "restaurant",
                 "location": target_coords,
                 "googleMapsUri": target_uri,
             })

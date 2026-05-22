@@ -50,7 +50,7 @@ describe('LiveActivity', () => {
 			}
 		});
 
-		expect(body).toContain('Looking up venue data');
+		expect(body).toContain('Checking Google Maps');
 		expect(body).not.toContain('Building context');
 	});
 
