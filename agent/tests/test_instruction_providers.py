@@ -62,9 +62,13 @@ class TestResearchLeadInstruction:
         )
 
         assert "Did specialists read material public pages" in result
+        assert "Use at least two specialists for every research report" in result
+        assert "A dynamic researcher can count when its brief owns a distinct deeper angle" in result
+        assert "Did at least two specialists cover distinct evidence surfaces or deeper angles" in result
         assert "read page content, structured provider data, or clearly labeled search/grounding-only signals" in result
         assert "Would one focused dynamic researcher materially improve" in result
         assert "Run one when it would materially improve the answer" in result
+        assert "Use at least two non-dynamic specialists" not in result
         assert "If no dynamic researcher has been used, run one" not in result
 
     def test_prompt_focus_and_benchmark_framing_render(self):

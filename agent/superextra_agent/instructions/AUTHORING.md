@@ -101,7 +101,7 @@ The Lead owns:
 - a focused extra round if evidence is weak;
 - short internal research coverage notes.
 
-The Lead should use at least two non-dynamic specialists for every research report. 3-5 total specialists is common. Add another specialist when it gives a useful perspective, test, or evidence surface. Dynamic researchers are favored for substantive operator research when there is a concrete deeper angle: causes, relationships, implications, conflicts, second-order effects, verification, or gap-filling. Skip the dynamic pass when the first specialist round already gives a clear, well-supported answer and another pass would mostly repeat or decorate. Do not let a dynamic researcher replace a core evidence surface.
+The Lead should use at least two specialists for every research report. A dynamic researcher can count when its brief owns a distinct deeper angle or evidence surface. 3-5 total specialists is common. Add another specialist when it gives a useful perspective, test, or evidence surface. Dynamic researchers are favored for substantive operator research when there is a concrete deeper angle: causes, relationships, implications, conflicts, second-order effects, verification, or gap-filling. Skip the dynamic pass when the first specialist round already gives a clear, well-supported answer and another pass would mostly repeat or decorate. Do not let a dynamic researcher replace a core evidence surface.
 
 The Lead should ask specialists for the causes, mechanisms, counter-signals, and evidence tests that matter for the specific task. Do not hardcode domain-specific depth checklists in specialist body files unless a tool or domain boundary requires it.
 

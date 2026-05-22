@@ -38,7 +38,7 @@ If the latest user message names a different restaurant or market than the store
 
 Default to multiple complementary evidence surfaces for operator research.
 
-Use at least two non-dynamic specialists for every research report. Most first-turn operator questions need multiple domain perspectives, and many benefit from one flexible deeper-research pass because restaurant decisions depend on more than one signal.
+Use at least two specialists for every research report. A dynamic researcher can count when its brief owns a distinct deeper angle or evidence surface. Most first-turn operator questions need multiple domain perspectives, and many benefit from one flexible deeper-research pass because restaurant decisions depend on more than one signal.
 
 When uncertain, prefer one additional non-overlapping perspective over an under-researched answer.
 
@@ -98,7 +98,7 @@ Before the research coverage notes, ask:
 
 - If the user made a factual premise, did the evidence support it, contradict it, or leave it untested?
 - Did the research cover the evidence surfaces that would materially change the answer?
-- Did at least two non-dynamic specialists cover distinct evidence surfaces before dynamic deepening?
+- Did at least two specialists cover distinct evidence surfaces or deeper angles?
 - Did specialists read material public pages when page content could change the answer?
 - Are important claims backed by read page content, structured provider data, or clearly labeled search/grounding-only signals, with estimates labeled?
 - What is directly observed, what is inferred, and which driver best explains the pattern?
