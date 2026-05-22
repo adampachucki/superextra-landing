@@ -150,6 +150,14 @@ SHOULD_CLARIFY = [
         id="vague_competition",
     ),
     pytest.param(
+        "What has opened or closed in my area recently?",
+        id="my_area_openings_closures",
+    ),
+    pytest.param(
+        "Which restaurants near us are quietly losing momentum?",
+        id="near_us_momentum",
+    ),
+    pytest.param(
         "Compare the competition",
         id="no_location_no_context",
     ),

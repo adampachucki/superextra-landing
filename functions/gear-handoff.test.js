@@ -175,7 +175,7 @@ describe('gearHandoff', () => {
 			turnIdx: 1,
 			userId: 'user1',
 			message: 'hello',
-			isFirstMessage: true
+			isEngineFirstMessage: true
 		});
 		assert.deepEqual(out, { ok: true });
 
@@ -202,7 +202,7 @@ describe('gearHandoff', () => {
 			turnIdx: 2,
 			userId: 'user1',
 			message: 'follow-up',
-			isFirstMessage: false
+			isEngineFirstMessage: false
 		});
 		const urls = fetchMock.mock.calls.map((c) => c.arguments[0]);
 		assert.equal(urls.length, 2);
@@ -232,7 +232,7 @@ describe('gearHandoff', () => {
 			turnIdx: 1,
 			userId: 'user1',
 			message: 'hello',
-			isFirstMessage: true
+			isEngineFirstMessage: true
 		});
 		assert.deepEqual(out, { ok: true });
 		assert.equal(fetchMock.mock.callCount(), 3);
@@ -253,7 +253,7 @@ describe('gearHandoff', () => {
 				turnIdx: 1,
 				userId: 'user1',
 				message: 'hello',
-				isFirstMessage: true
+				isEngineFirstMessage: true
 			}),
 			/createSession_failed:400/
 		);
@@ -274,7 +274,7 @@ describe('gearHandoff', () => {
 				turnIdx: 1,
 				userId: 'user1',
 				message: 'hello',
-				isFirstMessage: true
+				isEngineFirstMessage: true
 			}),
 			/appendEvent_failed:400/
 		);
@@ -296,7 +296,7 @@ describe('gearHandoff', () => {
 				turnIdx: 1,
 				userId: 'user1',
 				message: 'hello',
-				isFirstMessage: true
+				isEngineFirstMessage: true
 			}),
 			/streamQuery_not_ok:502/
 		);
@@ -318,7 +318,7 @@ describe('gearHandoff', () => {
 			turnIdx: 1,
 			userId: 'user1',
 			message: 'hi',
-			isFirstMessage: true
+			isEngineFirstMessage: true
 		});
 		const signals = fetchMock.mock.calls.map((c) => c.arguments[1]?.signal);
 		assert.equal(signals.length, 3);
@@ -366,7 +366,7 @@ describe('gearHandoff', () => {
 				turnIdx: 1,
 				userId: 'user1',
 				message: 'stuck',
-				isFirstMessage: true,
+				isEngineFirstMessage: true,
 				deadlineMs: 100
 			}),
 			/gearHandoff_deadline_exceeded:100ms/
@@ -393,7 +393,7 @@ describe('gearHandoff', () => {
 					turnIdx: 1,
 					userId: 'user1',
 					message: 'hi',
-					isFirstMessage: true
+					isEngineFirstMessage: true
 				}),
 				/GEAR_REASONING_ENGINE_RESOURCE env var is unset/
 			);

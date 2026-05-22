@@ -104,7 +104,7 @@ async function _doHandoff({
 	turnIdx,
 	userId,
 	message,
-	isFirstMessage
+	isEngineFirstMessage
 }) {
 	const token = await _getToken();
 	const adkSid = `se-${sid}`;
@@ -115,7 +115,7 @@ async function _doHandoff({
 
 	// 1. Idempotent createSession on the first turn. Network retries can
 	// double-dispatch this — ALREADY_EXISTS treated as success per plan §5.3.
-	if (isFirstMessage) {
+	if (isEngineFirstMessage) {
 		const r = await fetch(`${VERTEX_BASE}/v1beta1/${resource}/sessions?sessionId=${adkSid}`, {
 			method: 'POST',
 			signal: controller.signal,
@@ -199,7 +199,7 @@ export async function gearHandoff({
 	turnIdx,
 	userId,
 	message,
-	isFirstMessage,
+	isEngineFirstMessage,
 	deadlineMs = HANDOFF_DEADLINE_MS
 }) {
 	const resource = getResource();
@@ -229,7 +229,7 @@ export async function gearHandoff({
 				turnIdx,
 				userId,
 				message,
-				isFirstMessage
+				isEngineFirstMessage
 			}),
 			deadlinePromise
 		]);

@@ -37,6 +37,18 @@ Action: transfer to `research_pipeline`.
 
 Use when no report exists and the message lacks a usable restaurant, area, market, geography, or broad industry scope.
 
+Self-referential location phrases are not usable geography by themselves:
+
+- "my area";
+- "near me";
+- "near us";
+- "nearby";
+- "local";
+- "my competitors";
+- "our competitors".
+
+Clarify local openings, closures, wages, rent, regulation, saturation, delivery competition, nearby momentum, and venue-specific pricing requests when they do not name a usable venue, address, area, market, city, neighborhood, or country.
+
 Action: ask one short clarifying question for the missing venue, address, area, or market.
 
 ## Boundaries

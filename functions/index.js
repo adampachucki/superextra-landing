@@ -5,6 +5,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { gearHandoff, gearHandoffCleanup } from './gear-handoff.js';
+import { runClarificationGate, shouldRunClarificationGate } from './pre-router.js';
 import {
 	esc,
 	row,
@@ -117,6 +118,7 @@ const UID_RATE_LIMIT_MAX = 20; // per-UID pipeline runs per hour (plan default)
 
 // Plan §5 / §6 — shared 10-turn cap per chat, counted across all contributors.
 const MAX_TURNS_PER_SESSION = 10;
+const MAX_CONTEXT_SNIPPET_CHARS = 600;
 
 class AgentStreamError extends Error {
 	constructor(status, code) {
@@ -124,6 +126,79 @@ class AgentStreamError extends Error {
 		this.status = status;
 		this.code = code;
 	}
+}
+
+function compactSnippet(text) {
+	return text.trim().replace(/\s+/g, ' ').slice(0, MAX_CONTEXT_SNIPPET_CHARS);
+}
+
+function titleFromMessage(message) {
+	const words = message
+		.replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean)
+		.slice(0, 5);
+	if (!words.length) return null;
+	return words
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(' ')
+		.slice(0, 60);
+}
+
+async function completeDirectClarification({
+	sessionRef,
+	runId,
+	turnIdx,
+	reply,
+	startedAtMs,
+	title
+}) {
+	const turnKey = String(turnIdx).padStart(4, '0');
+	const turnRef = sessionRef.collection('turns').doc(turnKey);
+	const finishedAtMs = Date.now();
+	const elapsedMs = Math.max(0, finishedAtMs - startedAtMs);
+	await db.runTransaction(async (tx) => {
+		const snap = await tx.get(sessionRef);
+		if (!snap.exists) throw new Error('session_missing');
+		const data = snap.data() || {};
+		if (data.currentRunId !== runId) throw new Error('run_not_current');
+
+		const sessionUpdate = {
+			status: 'complete',
+			error: null,
+			activeAgent: null,
+			activeStage: null,
+			engineSessionStarted: false,
+			awaitingClarificationAnswer: true,
+			updatedAt: FieldValue.serverTimestamp()
+		};
+		if (!data.title && title) sessionUpdate.title = title;
+
+		tx.update(sessionRef, sessionUpdate);
+		tx.update(turnRef, {
+			status: 'complete',
+			reply,
+			sources: [],
+			error: null,
+			completedAt: FieldValue.serverTimestamp(),
+			turnSummary: { startedAtMs, finishedAtMs, elapsedMs }
+		});
+	});
+}
+
+async function markEngineSessionStarted({ sessionRef, runId }) {
+	await db.runTransaction(async (tx) => {
+		const snap = await tx.get(sessionRef);
+		if (!snap.exists) return;
+		const data = snap.data() || {};
+		if (data.currentRunId !== runId) return;
+		tx.update(sessionRef, {
+			engineSessionStarted: true,
+			awaitingClarificationAnswer: false,
+			updatedAt: FieldValue.serverTimestamp()
+		});
+	});
 }
 
 export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (req, res) => {
@@ -198,8 +273,10 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 	// Transactions can re-run on contention, so we capture decision signals
 	// into outer-scope vars on every attempt.
 	let isFirstMessage = false;
+	let isEngineFirstMessage = false;
 	let creatorUid = submitterUid;
 	let newTurnIdx = 1;
+	let originalQuestion = null;
 	try {
 		await db.runTransaction(async (t) => {
 			const snap = await t.get(sessionRef);
@@ -218,8 +295,23 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 			}
 
 			isFirstMessage = !existing;
+			const engineSessionStarted = existing ? existing.engineSessionStarted !== false : false;
+			isEngineFirstMessage = !engineSessionStarted;
 			creatorUid = existing?.userId || submitterUid;
 			newTurnIdx = lastTurnIndex + 1;
+
+			if (
+				existing?.engineSessionStarted === false &&
+				existing?.awaitingClarificationAnswer === true &&
+				lastTurnIndex >= 1
+			) {
+				const firstTurnRef = sessionRef.collection('turns').doc('0001');
+				const firstTurnSnap = await t.get(firstTurnRef);
+				const firstTurn = firstTurnSnap.exists ? firstTurnSnap.data() : null;
+				if (typeof firstTurn?.userMessage === 'string') {
+					originalQuestion = firstTurn.userMessage;
+				}
+			}
 
 			const perTurn = {
 				currentRunId: runId,
@@ -238,6 +330,8 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 					participants: [submitterUid],
 					createdAt: FieldValue.serverTimestamp(),
 					placeContext: placeContext || null,
+					engineSessionStarted: false,
+					awaitingClarificationAnswer: false,
 					title: null,
 					...perTurn
 				});
@@ -279,16 +373,54 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 		return;
 	}
 
+	const gateStartedAtMs = Date.now();
+	if (shouldRunClarificationGate({ isEngineFirstMessage, placeContext })) {
+		try {
+			const decision = await runClarificationGate({ message, originalQuestion });
+			if (decision.decision === 'clarify') {
+				await completeDirectClarification({
+					sessionRef,
+					runId,
+					turnIdx: newTurnIdx,
+					reply: decision.question,
+					startedAtMs: now,
+					title: titleFromMessage(originalQuestion || message)
+				});
+				console.info('agentStream direct clarification', {
+					sessionId,
+					runId,
+					turnIdx: newTurnIdx,
+					latencyMs: Date.now() - gateStartedAtMs,
+					reason: decision.reason
+				});
+				res.status(202).json({ ok: true, sessionId, runId, direct: 'clarification' });
+				return;
+			}
+		} catch (err) {
+			console.warn('clarification gate failed; falling back to Agent Engine:', err.message || err);
+		}
+	}
+
 	// 6. Build the query text the pipeline receives. `[Context: ...]` is only
-	// injected on the first message — after that the Reasoning Engine session
-	// holds the place context in state.
+	// injected on the first Engine message — after that the Reasoning Engine
+	// session holds the place context in state.
 	const today = new Date(now).toLocaleDateString('en-US', {
 		year: 'numeric',
 		month: 'long',
 		day: 'numeric'
 	});
 	let queryText = `[Date: ${today}] ${message}`;
-	if (isFirstMessage && placeContext && placeContext.name) {
+	if (isEngineFirstMessage && originalQuestion) {
+		const focusLabel =
+			placeContext && placeContext.name
+				? `Selected focus: ${[placeContext.name, placeContext.secondary].filter(Boolean).join(', ')} (Google Place ID: ${placeContext.placeId || 'unknown'}).`
+				: `Clarified focus: "${compactSnippet(message)}".`;
+		queryText = [
+			`[Date: ${today}]`,
+			`[Context: The user is answering a clarification. Original question: "${compactSnippet(originalQuestion)}" ${focusLabel}]`,
+			'Answer the original question using the clarified focus.'
+		].join(' ');
+	} else if (isEngineFirstMessage && placeContext && placeContext.name) {
 		const focusLabel = [placeContext.name, placeContext.secondary].filter(Boolean).join(', ');
 		queryText = `[Context: selected focus: ${focusLabel} (Google Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
 	}
@@ -303,8 +435,15 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 			turnIdx: newTurnIdx,
 			userId: creatorUid,
 			message: queryText,
-			isFirstMessage
+			isEngineFirstMessage
 		});
+		if (isEngineFirstMessage) {
+			try {
+				await markEngineSessionStarted({ sessionRef, runId });
+			} catch (markErr) {
+				console.error('engineSessionStarted marker failed:', markErr.message || markErr);
+			}
+		}
 		res.status(202).json({ ok: true, sessionId, runId });
 	} catch (err) {
 		console.error('gearHandoff failed:', err.message || err);

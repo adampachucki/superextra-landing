@@ -94,6 +94,17 @@ mock.module('./gear-handoff.js', {
 		gearHandoffCleanup: gearHandoffCleanupMock
 	}
 });
+const runClarificationGateMock = mock.fn(async () => ({ decision: 'research', question: null }));
+const shouldRunClarificationGateMock = mock.fn(
+	({ isEngineFirstMessage, placeContext }) =>
+		isEngineFirstMessage && !(placeContext && placeContext.name)
+);
+mock.module('./pre-router.js', {
+	namedExports: {
+		runClarificationGate: runClarificationGateMock,
+		shouldRunClarificationGate: shouldRunClarificationGateMock
+	}
+});
 
 const { intake, agentStream, agentDelete, sttToken, tts } = await import('./index.js');
 
@@ -161,12 +172,30 @@ beforeEach(() => {
 	authInstance.verifyIdToken.mock.resetCalls();
 	gearHandoffMock.mock.resetCalls();
 	gearHandoffCleanupMock.mock.resetCalls();
-	mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+	runClarificationGateMock.mock.resetCalls();
+	shouldRunClarificationGateMock.mock.resetCalls();
+	mockDb.get.mock.mockImplementation(async (ref) => {
+		const path = ref?._path;
+		if (!path) return { exists: false };
+		const setCall = mockDb.set.mock.calls.findLast((c) => c.arguments[0]?._path === path);
+		if (!setCall) return { exists: false };
+		const updateCalls = mockDb.update.mock.calls.filter((c) => c.arguments[0]?._path === path);
+		const data = Object.assign({}, setCall.arguments[1], ...updateCalls.map((c) => c.arguments[1]));
+		return { exists: true, data: () => data };
+	});
 	mockDb.recursiveDelete.mock.mockImplementation(async () => {});
 	// Reset mock IMPLEMENTATIONS too — a failed/interrupted
 	// `mockImplementationOnce` from a prior test could otherwise leak.
 	gearHandoffMock.mock.mockImplementation(async () => ({ ok: true }));
 	gearHandoffCleanupMock.mock.mockImplementation(async () => {});
+	runClarificationGateMock.mock.mockImplementation(async () => ({
+		decision: 'research',
+		question: null
+	}));
+	shouldRunClarificationGateMock.mock.mockImplementation(
+		({ isEngineFirstMessage, placeContext }) =>
+			isEngineFirstMessage && !(placeContext && placeContext.name)
+	);
 });
 
 afterEach(() => {
@@ -383,7 +412,10 @@ describe('agentStream', () => {
 		const turnSets = mockDb.set.mock.calls
 			.filter((c) => c.arguments[0]?._path?.startsWith(`${sessionPath}/turns/`))
 			.map((c) => ({ path: c.arguments[0]._path, data: c.arguments[1] }));
-		return { sessionSets, sessionUpdates, turnSets };
+		const turnUpdates = mockDb.update.mock.calls
+			.filter((c) => c.arguments[0]?._path?.startsWith(`${sessionPath}/turns/`))
+			.map((c) => ({ path: c.arguments[0]._path, data: c.arguments[1] }));
+		return { sessionSets, sessionUpdates, turnSets, turnUpdates };
 	}
 
 	it('rejects non-POST with 405', async () => {
@@ -410,8 +442,7 @@ describe('agentStream', () => {
 		assert.equal(res._status, 400);
 	});
 
-	it('first turn creates session + turns/0001 in one transaction', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+	it('first turn research creates session + turns/0001 and marks Engine started', async () => {
 		const res = mockRes();
 		await agentStream(authedReq(), res);
 
@@ -420,19 +451,17 @@ describe('agentStream', () => {
 		assert.equal(res._json.sessionId, 'sess-1');
 		assert.match(res._json.runId, /^[0-9a-f-]{36}$/);
 
-		// Exactly one transaction.
-		assert.equal(mockDb.runTransaction.mock.callCount(), 1);
-
 		const { sessionSets, sessionUpdates, turnSets } = partitionWrites('sessions/sess-1');
 
-		// First turn: set session (no update), set turn 0001.
-		assert.equal(sessionUpdates.length, 0);
+		// First turn: set session, set turn 0001, then mark the Engine session as started.
 		assert.equal(sessionSets.length, 1);
 		const sessionDoc = sessionSets[0];
 		assert.equal(sessionDoc.userId, 'user-good-token');
 		assert.deepEqual(sessionDoc.participants, ['user-good-token']);
 		assert.equal(sessionDoc.lastTurnIndex, 1);
 		assert.equal(sessionDoc.status, 'queued');
+		assert.equal(sessionDoc.engineSessionStarted, false);
+		assert.equal(sessionDoc.awaitingClarificationAnswer, false);
 		assert.equal(sessionDoc.title, null);
 		assert.equal(sessionDoc.updatedAt, '__server_timestamp__');
 		assert.equal(sessionDoc.queuedAt, '__server_timestamp__');
@@ -457,20 +486,21 @@ describe('agentStream', () => {
 		assert.equal(turnDoc.userMessage, 'What is the menu like?');
 		assert.equal(turnDoc.status, 'pending');
 
-		// agentStream always hands off to the Reasoning Engine.
+		// Research-ready turns hand off to the Reasoning Engine.
 		assert.equal(gearHandoffMock.mock.callCount(), 1);
 		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
 		assert.equal(handoffArg.sid, 'sess-1');
 		assert.equal(handoffArg.runId, res._json.runId);
 		assert.equal(handoffArg.userId, 'user-good-token');
 		assert.equal(handoffArg.turnIdx, 1);
-		assert.equal(handoffArg.isFirstMessage, true);
+		assert.equal(handoffArg.isEngineFirstMessage, true);
 		assert.match(handoffArg.message, /^\[Date: /);
+		assert.equal(runClarificationGateMock.mock.callCount(), 1);
+		assert.equal(sessionUpdates.at(-1).engineSessionStarted, true);
+		assert.equal(sessionUpdates.at(-1).awaitingClarificationAnswer, false);
 	});
 
 	it('first turn injects selected focus context when provided', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
-
 		const res = mockRes();
 		await agentStream(
 			authedReq({
@@ -495,11 +525,155 @@ describe('agentStream', () => {
 			placeId: 'ChIJfocus'
 		});
 		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.equal(runClarificationGateMock.mock.callCount(), 0);
 		assert.match(
 			handoffArg.message,
 			/^\[Context: selected focus: Williamsburg, Brooklyn, NY \(Google Place ID: ChIJfocus\)\] \[Date: /
 		);
 		assert.ok(!handoffArg.message.includes('asking about'));
+	});
+
+	it('directly completes no-context first turn when the gate asks for clarification', async () => {
+		runClarificationGateMock.mock.mockImplementationOnce(async () => ({
+			decision: 'clarify',
+			question: 'What area should I use?',
+			reason: 'missing_geography'
+		}));
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({
+				body: {
+					message: 'What has opened or closed in my area recently?',
+					sessionId: 'sess-1'
+				}
+			}),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(res._json.direct, 'clarification');
+		assert.equal(gearHandoffMock.mock.callCount(), 0);
+		const { sessionSets, sessionUpdates, turnSets, turnUpdates } =
+			partitionWrites('sessions/sess-1');
+		assert.equal(sessionSets[0].engineSessionStarted, false);
+		assert.equal(turnSets[0].data.status, 'pending');
+		assert.equal(sessionUpdates.at(-1).status, 'complete');
+		assert.equal(sessionUpdates.at(-1).engineSessionStarted, false);
+		assert.equal(sessionUpdates.at(-1).awaitingClarificationAnswer, true);
+		assert.equal(sessionUpdates.at(-1).title, 'What Has Opened Or Closed');
+		assert.equal(turnUpdates.length, 1);
+		assert.equal(turnUpdates[0].path, 'sessions/sess-1/turns/0001');
+		assert.equal(turnUpdates[0].data.status, 'complete');
+		assert.equal(turnUpdates[0].data.reply, 'What area should I use?');
+		assert.deepEqual(turnUpdates[0].data.sources, []);
+		assert.equal(typeof turnUpdates[0].data.turnSummary.elapsedMs, 'number');
+	});
+
+	it('turn after direct clarification creates the first Engine session and preserves intent', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token'],
+						status: 'complete',
+						lastTurnIndex: 1,
+						engineSessionStarted: false,
+						awaitingClarificationAnswer: true,
+						currentRunId: 'prior-run'
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0001') {
+				return {
+					exists: true,
+					data: () => ({
+						userMessage: 'What has opened or closed in my area recently?'
+					})
+				};
+			}
+			return { exists: false };
+		});
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({ body: { message: 'Williamsburg, Brooklyn', sessionId: 'sess-1' } }),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(runClarificationGateMock.mock.callCount(), 1);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.equal(handoffArg.turnIdx, 2);
+		assert.equal(handoffArg.isEngineFirstMessage, true);
+		assert.match(handoffArg.message, /Original question: "What has opened or closed/);
+		assert.match(handoffArg.message, /Clarified focus: "Williamsburg, Brooklyn"/);
+		assert.match(handoffArg.message, /Answer the original question/);
+	});
+
+	it('does not treat engineSessionStarted=false as a clarification answer by itself', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token'],
+						status: 'complete',
+						lastTurnIndex: 1,
+						engineSessionStarted: false,
+						awaitingClarificationAnswer: false,
+						currentRunId: 'prior-run'
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0001') {
+				return {
+					exists: true,
+					data: () => ({
+						userMessage: 'What has opened in Williamsburg?'
+					})
+				};
+			}
+			return { exists: false };
+		});
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({ body: { message: 'What about Greenpoint?', sessionId: 'sess-1' } }),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.equal(handoffArg.isEngineFirstMessage, true);
+		assert.ok(!handoffArg.message.includes('Original question:'));
+		assert.ok(!handoffArg.message.includes('Answer the original question'));
+	});
+
+	it('falls back to Agent Engine when the clarification gate fails', async () => {
+		runClarificationGateMock.mock.mockImplementationOnce(async () => {
+			throw new Error('gate unavailable');
+		});
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({
+				body: {
+					message: 'What has opened or closed in Williamsburg recently?',
+					sessionId: 'sess-1'
+				}
+			}),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		assert.equal(gearHandoffMock.mock.calls[0].arguments[0].isEngineFirstMessage, true);
 	});
 
 	it('follow-up from the same user arrayUnion-keeps participants and increments lastTurnIndex', async () => {
@@ -541,7 +715,7 @@ describe('agentStream', () => {
 		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
 		assert.equal(handoffArg.turnIdx, 2);
 		assert.equal(handoffArg.userId, 'user-good-token');
-		assert.equal(handoffArg.isFirstMessage, false);
+		assert.equal(handoffArg.isEngineFirstMessage, false);
 		// Follow-up must NOT re-inject [Context: ...] — Reasoning Engine state holds it.
 		assert.ok(!handoffArg.message.includes('[Context:'));
 	});
@@ -583,7 +757,7 @@ describe('agentStream', () => {
 		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
 		assert.equal(handoffArg.turnIdx, 3);
 		assert.equal(handoffArg.userId, 'user-creator-token');
-		assert.equal(handoffArg.isFirstMessage, false);
+		assert.equal(handoffArg.isEngineFirstMessage, false);
 	});
 
 	it('returns 409 turn_cap_reached when lastTurnIndex is already 10', async () => {
