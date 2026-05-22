@@ -316,7 +316,7 @@
 		</p>
 
 		<div class="grid grid-cols-3 gap-2.5 {shakeFields.has('type-grid') ? 'shake' : ''}">
-			{#each businessTypes as type}
+			{#each businessTypes as type (type)}
 				<button
 					onclick={() => (selectedType = selectedType === type ? '' : type)}
 					class="rounded-xl border px-3 py-3 text-sm transition-all duration-200
@@ -351,7 +351,7 @@
 					bind:value={selectedCountry}
 					class="w-full appearance-none rounded-xl border border-black/[0.12] bg-white px-4 py-3 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55]"
 				>
-					{#each countries as c}
+					{#each countries as c (c.code)}
 						<option value={c.code}>{c.name}</option>
 					{/each}
 				</select>
@@ -412,7 +412,7 @@
 							role="listbox"
 							class="absolute top-full right-0 left-0 z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-black/[0.12] bg-white py-1 shadow-lg dark:border-white/[0.12] dark:bg-cream-50"
 						>
-							{#each placeSuggestions as s}
+							{#each placeSuggestions as s (s.placeId)}
 								<li role="option" aria-selected="false">
 									<button
 										type="button"
@@ -627,7 +627,7 @@
 					{:else}
 						<!-- Step indicator -->
 						<div class="mb-8 flex items-center justify-center gap-2">
-							{#each [1, 2, 3] as s}
+							{#each [1, 2, 3] as s (s)}
 								<div
 									class="h-1 rounded-full transition-all duration-300 {s === step
 										? 'w-8 bg-black dark:bg-white'

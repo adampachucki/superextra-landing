@@ -110,7 +110,7 @@
 		<div class="chart-activity">
 			<div class="activity-col">
 				<span class="section-label">ACTIVITY BY CATEGORY</span>
-				{#each categories as c}
+				{#each categories as c (c.name)}
 					<div class="category-row">
 						<div class="category-dot bg-gradient-to-br {c.grad}"></div>
 						<span class="category-name">{c.name}</span>
@@ -138,7 +138,7 @@
 				</div>
 				<svg class="line-chart" viewBox="0 0 {viewW} {viewH}">
 					<!-- horizontal grid + y-axis labels -->
-					{#each yTicks as tick}
+					{#each yTicks as tick (tick)}
 						{@const y = padT + (1 - (tick - minVal) / range) * plotH}
 						<line
 							x1={padL}
@@ -177,7 +177,7 @@
 					/>
 
 					<!-- x-axis labels -->
-					{#each xTickIndices as idx}
+					{#each xTickIndices as idx (idx)}
 						{@const x = padL + (idx / (months.length - 1)) * plotW}
 						<text
 							{x}

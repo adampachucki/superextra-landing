@@ -47,7 +47,7 @@
 </MockupBar>
 
 <div class="summary">
-	{#each segments as seg}
+	{#each segments as seg (seg.name)}
 		<div class="stat">
 			<span class="stat-dot" style="background: {seg.color}"></span>
 			<div class="stat-text">
@@ -60,7 +60,7 @@
 
 <div class="chart-area">
 	<svg viewBox="0 0 200 108" fill="none">
-		{#each arcs as arc}
+		{#each arcs as arc (arc.name)}
 			<path
 				d={arc.path}
 				stroke={arc.color}

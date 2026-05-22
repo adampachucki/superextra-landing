@@ -106,15 +106,6 @@
 		margin-right: 1.5rem;
 	}
 
-	.avatar {
-		width: 1.75rem;
-		height: 1.75rem;
-		border-radius: 50%;
-		background: linear-gradient(135deg, #60a5fa, #38bdf8, #06b6d4);
-		flex-shrink: 0;
-		margin-top: 0.1rem;
-	}
-
 	.bubble {
 		font-size: 0.75rem;
 		line-height: 1.3;

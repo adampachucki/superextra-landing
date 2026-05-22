@@ -84,7 +84,7 @@
 			</linearGradient>
 		</defs>
 
-		{#each gridLines as line}
+		{#each gridLines as line (line.label)}
 			<line
 				x1={padL}
 				y1={line.y}
@@ -119,7 +119,7 @@
 			stroke-width="1"
 		/>
 
-		{#each xLabels as tick}
+		{#each xLabels as tick (tick.label)}
 			<text x={tick.x} y={viewH - 2} text-anchor="middle" class="axis-label">{tick.label}</text>
 		{/each}
 	</svg>

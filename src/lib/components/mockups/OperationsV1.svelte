@@ -64,7 +64,7 @@
 	</div>
 
 	<div class="stat-list">
-		{#each stats as s, i}
+		{#each stats as s, i (s.label)}
 			<div class="stat-row" class:first={i === 0}>
 				<div class="stat-name">
 					<span class="stat-label">{s.label}</span>

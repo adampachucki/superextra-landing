@@ -2,6 +2,7 @@
 	import { flushSync, onDestroy, onMount } from 'svelte';
 	import { dictation } from '$lib/dictation.svelte';
 	import { createPlaceSearch, type PlaceSuggestion } from '$lib/place-search.svelte';
+	import PromptIcon from './PromptIcon.svelte';
 	import PlaceSearchWidget from './PlaceSearchWidget.svelte';
 
 	const PREFIX = 'Ask Superextra ';
@@ -244,25 +245,7 @@
 						? 'text-black/60 dark:text-white/60'
 						: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
 				>
-					<svg
-						class="h-[19px] w-[19px]"
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="1.75"
-					>
-						<path
-							stroke-linecap="square"
-							stroke-linejoin="miter"
-							d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
-						/>
-						<path
-							stroke-linecap="square"
-							stroke-linejoin="miter"
-							d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
-						/>
-					</svg>
+					<PromptIcon name="location" class="h-[19px] w-[19px]" />
 				</button>
 				<button
 					type="button"
@@ -270,20 +253,7 @@
 					aria-label="Attach file"
 					class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 				>
-					<svg
-						class="h-[18px] w-[18px] translate-y-px"
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="1.75"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
-						/>
-					</svg>
+					<PromptIcon name="attach" class="h-[18px] w-[18px] translate-y-px" />
 				</button>
 				{#if selectedPlace}
 					<span
@@ -301,16 +271,7 @@
 							aria-label="Remove focus"
 							class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
 						>
-							<svg
-								class="h-3 w-3 text-black/30 dark:text-white/30"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								stroke-width="2"
-							>
-								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-							</svg>
+							<PromptIcon name="close" class="h-3 w-3 text-black/30 dark:text-white/30" />
 						</button>
 					</span>
 				{/if}
@@ -333,25 +294,7 @@
 									dictation.volume * 0.6};"
 							></span>
 						{/if}
-						<svg
-							class="relative h-[18px] w-[18px]"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="1.75"
-						>
-							<path
-								stroke-linecap="square"
-								stroke-linejoin="miter"
-								d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
-							/>
-							<path
-								stroke-linecap="square"
-								stroke-linejoin="miter"
-								d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"
-							/>
-						</svg>
+						<PromptIcon name="mic" class="relative h-[18px] w-[18px]" />
 					</button>
 				{:else}
 					<button
@@ -360,25 +303,7 @@
 						aria-label="Voice input not supported"
 						class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 					>
-						<svg
-							class="h-[18px] w-[18px]"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="1.75"
-						>
-							<path
-								stroke-linecap="square"
-								stroke-linejoin="miter"
-								d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
-							/>
-							<path
-								stroke-linecap="square"
-								stroke-linejoin="miter"
-								d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"
-							/>
-						</svg>
+						<PromptIcon name="mic" class="h-[18px] w-[18px]" />
 					</button>
 				{/if}
 				<button
@@ -387,20 +312,7 @@
 					aria-label="Explore"
 					class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
 				>
-					<svg
-						class="h-4 w-4 text-white dark:text-black"
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2.5"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
-						/>
-					</svg>
+					<PromptIcon name="send" class="h-4 w-4 text-white dark:text-black" />
 				</button>
 			</div>
 		</div>

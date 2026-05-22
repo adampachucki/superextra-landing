@@ -179,6 +179,7 @@
 		{#each useCases as useCase, i (useCase.title)}
 			<div
 				data-card
+				role="presentation"
 				class="w-[min(75vw,380px)] flex-shrink-0"
 				style="{i === 0 ? 'margin-left: var(--content-inset)' : ''}{i === useCases.length - 1
 					? 'margin-right: var(--content-inset)'

@@ -55,7 +55,7 @@
 		<div
 			class="grid grid-cols-3 gap-px overflow-hidden border-t border-cream-200 bg-cream-200 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"
 		>
-			{#each sources as source}
+			{#each sources as source (source.logo)}
 				<div
 					class="group flex items-center justify-center bg-cream px-3 py-5 sm:px-5 sm:py-8"
 					title={source.name}

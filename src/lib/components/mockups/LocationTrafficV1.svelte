@@ -45,8 +45,8 @@
 <div class="outer">
 	<div class="body">
 		<div class="grid-map">
-			{#each grid as row, rowIdx}
-				{#each row as level, colIdx}
+			{#each grid as row, rowIdx (rowIdx)}
+				{#each row as level, colIdx (colIdx)}
 					<div class="cell" style="background: {cellBg(level)}">
 						{#if markerSet.has(`${rowIdx}-${colIdx}`)}
 							<span class="dot" style="background: {dotColor(level)}"></span>

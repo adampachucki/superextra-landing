@@ -242,6 +242,7 @@
 							{#if seg.kind === 'chart'}
 								<ChartBlock spec={seg.spec} />
 							{:else}
+								<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 								{@html renderMarkdown(seg.text)}
 							{/if}
 						{/each}

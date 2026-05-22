@@ -62,7 +62,7 @@
 			</div>
 
 			<div class="divide-y divide-cream-200 border-t border-cream-200">
-				{#each faqs as faq, i}
+				{#each faqs as faq, i (faq.question)}
 					<div>
 						<button
 							class="group flex w-full items-center justify-between py-5 text-left"

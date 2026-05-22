@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import ChatThread from '$lib/components/restaurants/ChatThread.svelte';
+	import PromptIcon from '$lib/components/restaurants/PromptIcon.svelte';
 	import RestaurantPromptComposer from '$lib/components/restaurants/RestaurantPromptComposer.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { theme } from '$lib/theme.svelte';
@@ -315,9 +316,9 @@
 </button>
 
 {#if !isDesktop && sidebarOpen}
-	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
 		class="fixed inset-0 z-40 touch-none bg-[var(--color-cream)]/60"
+		role="presentation"
 		onclick={() => (sidebarOpen = false)}
 	></div>
 {/if}
@@ -641,7 +642,6 @@
 </div>
 
 <!-- Input bar (fixed, outside chat-enter) -->
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div
 	bind:this={promptBarEl}
 	class="fixed right-0 bottom-0 left-0 z-20 bg-[var(--color-cream)] transition-[left] duration-300 ease-out {isDesktop &&
@@ -661,7 +661,7 @@
 		{#if chatState.active}
 			<div
 				onclick={focusPromptFromCardClick}
-				aria-disabled={activePromptInactive}
+				role="presentation"
 				class="prompt-card rounded-2xl border border-black/[0.12] bg-white transition-colors focus-within:border-black/[0.55] dark:border-white/[0.12] dark:bg-cream-50 dark:focus-within:border-white/[0.55] {activePromptInactive
 					? 'cursor-not-allowed'
 					: 'cursor-text'}"
@@ -702,25 +702,7 @@
 										dictation.volume * 0.6};"
 								></span>
 							{/if}
-							<svg
-								class="relative h-[18px] w-[18px]"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								stroke-width="1.75"
-							>
-								<path
-									stroke-linecap="square"
-									stroke-linejoin="miter"
-									d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
-								/>
-								<path
-									stroke-linecap="square"
-									stroke-linejoin="miter"
-									d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"
-								/>
-							</svg>
+							<PromptIcon name="mic" class="relative h-[18px] w-[18px]" />
 						</button>
 					{:else}
 						<button
@@ -728,25 +710,7 @@
 							aria-label="Voice input not supported"
 							class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 						>
-							<svg
-								class="h-[18px] w-[18px]"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								stroke-width="1.75"
-							>
-								<path
-									stroke-linecap="square"
-									stroke-linejoin="miter"
-									d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
-								/>
-								<path
-									stroke-linecap="square"
-									stroke-linejoin="miter"
-									d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"
-								/>
-							</svg>
+							<PromptIcon name="mic" class="h-[18px] w-[18px]" />
 						</button>
 					{/if}
 					<button
@@ -755,20 +719,7 @@
 						aria-label="Send"
 						class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
 					>
-						<svg
-							class="h-4 w-4 text-white dark:text-black"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2.5"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
-							/>
-						</svg>
+						<PromptIcon name="send" class="h-4 w-4 text-white dark:text-black" />
 					</button>
 				</div>
 			</div>
