@@ -78,10 +78,10 @@ describe('buildClarificationGatePrompt', () => {
 		assert.match(prompt, /market-level salary, wage, rent, regulation, saturation/);
 		assert.match(prompt, /Branch-proximity requests need branch-level scope/);
 		assert.match(prompt, /chain or brand name plus only a broad city/);
-		assert.match(prompt, /exact address or street-level location is enough/);
+		assert.match(prompt, /exact address, street name, or street-level location is enough/);
 		assert.match(prompt, /Do not pick or infer one branch/);
 		assert.match(prompt, /answering a missing-area clarification/);
-		assert.match(prompt, /missing branch, address, area, or market/);
+		assert.match(prompt, /missing restaurant, street, neighborhood, city, area, or market/);
 		assert.doesNotMatch(prompt, /Do not ask which one just because/);
 		assert.doesNotMatch(prompt, /any ordinary city/);
 	});
@@ -95,7 +95,7 @@ describe('buildClarificationGatePrompt', () => {
 		assert.match(prompt, /Original question/);
 		assert.match(prompt, /Latest message/);
 		assert.match(prompt, /proposed restaurant or venue focus/);
-		assert.match(prompt, /exact address or street-level location/);
+		assert.match(prompt, /exact address, street name, street-level location/);
 		assert.match(prompt, /return clarify even when the answer includes a city/);
 	});
 });
@@ -153,6 +153,7 @@ describe('runClarificationGate', () => {
 		assert.equal(init.headers.Authorization, 'Bearer test-token');
 		const body = JSON.parse(init.body);
 		assert.equal(body.generationConfig.responseMimeType, 'application/json');
+		assert.deepEqual(body.generationConfig.responseSchema.required, ['decision', 'reason']);
 		assert.equal(body.generationConfig.thinkingConfig.thinkingBudget, 0);
 		assert.equal(body.generationConfig.maxOutputTokens, 180);
 	});

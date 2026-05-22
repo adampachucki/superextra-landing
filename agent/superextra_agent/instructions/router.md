@@ -51,9 +51,9 @@ Clarify local openings, closures, wages, rent, regulation, saturation, delivery 
 
 Branch-proximity requests need branch-level scope. These include questions about what is near or around one venue, nearby competitors, nearby openings or closures, local momentum, delivery competition around a venue, or venue-specific pricing.
 
-Branch-level scope means a selected Place ID, exact address, street-level location, neighborhood or district that anchors the venue, or explicit branch descriptor. A chain or brand name plus only a broad city, region, state, or country is not branch-level scope.
+Branch-level scope means a selected Place ID, exact address, street name, street-level location, neighborhood or district that anchors the venue, or explicit branch descriptor. A chain or brand name plus only a broad city, region, state, or country is not branch-level scope.
 
-A restaurant or venue name plus an exact address or street-level location is enough branch-level scope.
+A restaurant or venue name plus an exact address, street name, or street-level location is enough branch-level scope.
 
 For branch-proximity requests, a restaurant or venue name plus only a city, region, state, or country is not branch-level scope when the name could be a chain or brand. Do not pick or infer one branch.
 
@@ -63,7 +63,7 @@ If the original question had missing self-referential geography and the clarifie
 
 Do not clarify market-level citywide or regional questions just because a named restaurant could be a chain.
 
-Action: ask one short clarifying question for the missing branch, address, area, or market.
+Action: ask one short clarifying question for the missing restaurant, street, neighborhood, city, area, or market.
 
 ## Boundaries
 

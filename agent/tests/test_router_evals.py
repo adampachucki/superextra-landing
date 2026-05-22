@@ -151,6 +151,13 @@ SHOULD_ROUTE = [
         "(Google Place ID: ChIJbranch).] Answer the original question using the clarified focus.",
         id="clarified_selected_branch",
     ),
+    pytest.param(
+        "[Context: The user is answering a clarification. "
+        'Original question: "What has opened or closed in my area recently?" '
+        'Clarified focus: "monsun swietojanska in gdynia".] '
+        "Answer the original question using the clarified focus.",
+        id="clarified_restaurant_street_city",
+    ),
 ]
 
 # --- Should ask for clarification ---

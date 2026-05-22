@@ -94,6 +94,12 @@ mock.module('./gear-handoff.js', {
 		gearHandoffCleanup: gearHandoffCleanupMock
 	}
 });
+const resolveClarificationFocusMock = mock.fn(async () => null);
+mock.module('./place-resolver.js', {
+	namedExports: {
+		resolveClarificationFocus: resolveClarificationFocusMock
+	}
+});
 const runClarificationGateMock = mock.fn(async () => ({ decision: 'research', question: null }));
 const shouldRunClarificationGateMock = mock.fn(
 	({ isEngineFirstMessage, placeContext }) =>
@@ -172,6 +178,7 @@ beforeEach(() => {
 	authInstance.verifyIdToken.mock.resetCalls();
 	gearHandoffMock.mock.resetCalls();
 	gearHandoffCleanupMock.mock.resetCalls();
+	resolveClarificationFocusMock.mock.resetCalls();
 	runClarificationGateMock.mock.resetCalls();
 	shouldRunClarificationGateMock.mock.resetCalls();
 	mockDb.get.mock.mockImplementation(async (ref) => {
@@ -188,6 +195,7 @@ beforeEach(() => {
 	// `mockImplementationOnce` from a prior test could otherwise leak.
 	gearHandoffMock.mock.mockImplementation(async () => ({ ok: true }));
 	gearHandoffCleanupMock.mock.mockImplementation(async () => {});
+	resolveClarificationFocusMock.mock.mockImplementation(async () => null);
 	runClarificationGateMock.mock.mockImplementation(async () => ({
 		decision: 'research',
 		question: null
@@ -612,6 +620,65 @@ describe('agentStream', () => {
 		assert.match(handoffArg.message, /Original question: "What has opened or closed/);
 		assert.match(handoffArg.message, /Clarified focus: "Williamsburg, Brooklyn"/);
 		assert.match(handoffArg.message, /Answer the original question/);
+	});
+
+	it('turn after direct clarification resolves a typed place before asking again', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				const updateCalls = mockDb.update.mock.calls.filter(
+					(c) => c.arguments[0]?._path === ref._path
+				);
+				const base = {
+					userId: 'user-good-token',
+					participants: ['user-good-token'],
+					status: 'complete',
+					lastTurnIndex: 1,
+					engineSessionStarted: false,
+					awaitingClarificationAnswer: true,
+					currentRunId: 'prior-run'
+				};
+				const data = Object.assign({}, base, ...updateCalls.map((c) => c.arguments[1]));
+				return {
+					exists: true,
+					data: () => data
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0001') {
+				return {
+					exists: true,
+					data: () => ({
+						userMessage: 'What has opened or closed in my area recently?'
+					})
+				};
+			}
+			return { exists: false };
+		});
+		resolveClarificationFocusMock.mock.mockImplementationOnce(async () => ({
+			name: 'Monsun Gdynia',
+			secondary: 'Świętojańska 69b, Gdynia',
+			placeId: 'ChIJmonsun'
+		}));
+
+		const res = mockRes();
+		await agentStream(authedReq({ body: { message: 'monsun gdynia', sessionId: 'sess-1' } }), res);
+
+		assert.equal(res._status, 202);
+		assert.equal(resolveClarificationFocusMock.mock.callCount(), 1);
+		assert.equal(runClarificationGateMock.mock.callCount(), 0);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		const { sessionUpdates } = partitionWrites('sessions/sess-1');
+		assert.deepEqual(sessionUpdates.find((update) => update.placeContext)?.placeContext, {
+			name: 'Monsun Gdynia',
+			secondary: 'Świętojańska 69b, Gdynia',
+			placeId: 'ChIJmonsun'
+		});
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.match(handoffArg.message, /Original question: "What has opened or closed/);
+		assert.match(
+			handoffArg.message,
+			/Selected focus: Monsun Gdynia, Świętojańska 69b, Gdynia \(Google Place ID: ChIJmonsun\)\./
+		);
+		assert.ok(!handoffArg.message.includes('Clarified focus: "monsun gdynia"'));
 	});
 
 	it('turn after direct clarification uses selected focus when provided', async () => {

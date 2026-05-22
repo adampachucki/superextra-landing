@@ -5,6 +5,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { gearHandoff, gearHandoffCleanup } from './gear-handoff.js';
+import { resolveClarificationFocus } from './place-resolver.js';
 import { runClarificationGate, shouldRunClarificationGate } from './pre-router.js';
 import {
 	esc,
@@ -21,6 +22,7 @@ const db = getFirestore();
 
 const relayKey = defineSecret('RELAY_KEY');
 const elevenlabsKey = defineSecret('ELEVENLABS_API_KEY');
+const googlePlacesKey = defineSecret('GOOGLE_PLACES_API_KEY');
 const DEST = 'hello@superextra.ai';
 
 export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req, res) => {
@@ -201,7 +203,22 @@ async function markEngineSessionStarted({ sessionRef, runId }) {
 	});
 }
 
-export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (req, res) => {
+async function recordResolvedPlaceContext({ sessionRef, runId, placeContext }) {
+	await db.runTransaction(async (tx) => {
+		const snap = await tx.get(sessionRef);
+		if (!snap.exists) return;
+		const data = snap.data() || {};
+		if (data.currentRunId !== runId) return;
+		tx.update(sessionRef, {
+			placeContext,
+			updatedAt: FieldValue.serverTimestamp()
+		});
+	});
+}
+
+const agentStreamOptions = { cors: true, timeoutSeconds: 90, secrets: [googlePlacesKey] };
+
+export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	if (req.method !== 'POST') {
 		res.status(405).json({ ok: false, error: 'Method not allowed' });
 		return;
@@ -248,7 +265,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 
 	// 3. Input validation.
 	const { message, sessionId } = req.body || {};
-	const placeContext = validatePlaceContext(req.body?.placeContext);
+	const submittedPlaceContext = validatePlaceContext(req.body?.placeContext);
 	if (!message || typeof message !== 'string' || !sessionId) {
 		res.status(400).json({ ok: false, error: 'message and sessionId are required' });
 		return;
@@ -257,6 +274,7 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 		res.status(400).json({ ok: false, error: 'Message too long' });
 		return;
 	}
+	let placeContext = submittedPlaceContext;
 
 	// 4. Server-generated runId — never trust a client-supplied one.
 	const runId = crypto.randomUUID();
@@ -374,6 +392,28 @@ export const agentStream = onRequest({ cors: true, timeoutSeconds: 90 }, async (
 	}
 
 	const gateStartedAtMs = Date.now();
+	if (isEngineFirstMessage && originalQuestion && !placeContext) {
+		try {
+			const resolvedPlace = await resolveClarificationFocus({
+				message,
+				apiKey: googlePlacesKey.value()
+			});
+			if (resolvedPlace) {
+				placeContext = resolvedPlace;
+				await recordResolvedPlaceContext({ sessionRef, runId, placeContext });
+				console.info('agentStream resolved clarification focus', {
+					sessionId,
+					runId,
+					turnIdx: newTurnIdx,
+					placeId: resolvedPlace.placeId,
+					name: resolvedPlace.name
+				});
+			}
+		} catch (err) {
+			console.warn('clarification focus resolution failed; continuing gate:', err.message || err);
+		}
+	}
+
 	if (shouldRunClarificationGate({ isEngineFirstMessage, placeContext })) {
 		try {
 			const decision = await runClarificationGate({ message, originalQuestion });
