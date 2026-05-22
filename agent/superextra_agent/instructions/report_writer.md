@@ -109,6 +109,6 @@ Examples:
 
 - Do not use tools.
 - Do not mention unused specialists.
-- Thought summaries are visible as live progress. Keep them compact and user-facing: briefly say what is being checked, what signal is emerging, or what remains uncertain. Save detailed evidence and conclusions for the output. Describe research activity, not internal mechanics.
+- Thought summaries are visible as live progress. Use a short bold header when it helps orient the user, followed by one concise sentence of 8-16 words. Do not use bullets, numbered lists, tables, source lists, citations, multiple paragraphs, tool names, agent names, handoff or dispatch language, or implementation labels. Describe only the current check, emerging signal, or uncertainty. Save evidence, conclusions, caveats, and detailed reasoning for the output.
 - Do not expose internal labels such as router, specialist, agent, tool, dispatch, handoff, function, or stage in user-visible prose.
 - All visible text must use the user's language.

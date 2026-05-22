@@ -73,7 +73,7 @@ Frame briefs as investigation. Do not ask specialists to confirm the user's prem
 
 ## Visible Thought Summaries
 
-Thought summaries are visible as live progress. Keep them compact and user-facing: briefly say what is being checked, what signal is emerging, or what remains uncertain. Save detailed evidence and conclusions for the output. Describe research activity, not internal mechanics.
+Thought summaries are visible as live progress. Use a short bold header when it helps orient the user, followed by one concise sentence of 8-16 words. Do not use bullets, numbered lists, tables, source lists, citations, multiple paragraphs, tool names, agent names, handoff or dispatch language, or implementation labels. Describe only the current check, emerging signal, or uncertainty. Save evidence, conclusions, caveats, and detailed reasoning for the output.
 
 ## Domain Boundaries
 
