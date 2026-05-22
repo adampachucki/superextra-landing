@@ -28,7 +28,7 @@
 		<div class="scrollbar-hide flex gap-3 overflow-x-auto scroll-smooth">
 			{#each recent as sess, i (sess.sid)}
 				<a
-					href="/agent/chat?sid={sess.sid}"
+					href="/chat?sid={sess.sid}"
 					class="min-w-[200px] shrink-0 rounded-lg border border-black/[0.08] px-4 py-3 transition-colors hover:border-black/[0.16] hover:bg-black/[0.02] dark:border-white/[0.08] dark:hover:border-white/[0.16] dark:hover:bg-white/[0.03]"
 					style="{i === 0 ? 'margin-left: var(--content-inset)' : ''}{i === recent.length - 1
 						? 'margin-right: var(--content-inset)'

@@ -22,7 +22,7 @@
 	}) {
 		leaving = true;
 		chatState.startNewChat(query, place);
-		goto('/agent/chat');
+		goto('/chat');
 	}
 
 	const agentUseCases = [

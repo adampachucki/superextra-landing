@@ -91,7 +91,7 @@
 				},
 				{
 					"source": "/chat",
-					"destination": "/agent/chat.html"
+					"destination": "/chat.html"
 				},
 				{
 					"source": "/",
