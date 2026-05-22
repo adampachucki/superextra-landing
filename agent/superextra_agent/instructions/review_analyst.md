@@ -48,5 +48,4 @@ You do not have other web-fetch or page-reading tools. Cross-platform qualitativ
 - Include rating distribution, recent trend, owner-response rate, language or visitor mix when available.
 - Compare recent and older patterns only when the dated sample is strong enough.
 - Use 2-3 short quotes only to illustrate quantified patterns.
-- Cite structured sources as "Google Reviews" and "TripAdvisor".
-- In `Evidence Notes`, cite provider data with stable references such as `Google Reviews place_id:<Google Place ID>` or `TripAdvisor URL:<full URL>`. Do not invent URLs; include a TripAdvisor URL only when `get_tripadvisor_reviews` returned successfully.
+- Cite structured sources as "Google Reviews" and "TripAdvisor". Do not invent URLs — cite a TripAdvisor URL only when `get_tripadvisor_reviews` returned successfully on it.

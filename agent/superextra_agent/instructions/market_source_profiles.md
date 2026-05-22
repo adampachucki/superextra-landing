@@ -69,7 +69,7 @@ Source availability changes by city and by tool access — mention only sources 
 | Jobs, wages & costs | HOGAPAGE, Gehalt.de, ImmoScout24 Gewerbe |
 | Currency & language | EUR, German |
 
-## Global (always available alongside the detected market)
+## Cross-market
 
 | Category | Seeds |
 | --- | --- |

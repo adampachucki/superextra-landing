@@ -109,7 +109,7 @@ The Lead does not summarize findings or draft report sections. Its research cove
 
 ## Market Source Profiles
 
-`market_source_profiles.md` is a compact source guide for PL, UK, US, and DE plus a general source order.
+`market_source_profiles.md` lists eight source categories (Official & statistical, Industry research & benchmarks, Restaurant review sites & critics, Food bloggers & community, Local press, Delivery & reservation, Jobs/wages/costs, Currency & language) and 2-4 named seeds per category per market (PL, UK, US, DE), plus a Cross-market block.
 
 These profiles are starting points, not checklists. They should name source families and examples that help search. They must not imply that every source exists, is accessible, or was checked.
 

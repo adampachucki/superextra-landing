@@ -62,4 +62,3 @@ Returns the Instagram profile (bio, followers, posts count, business category) p
 - Show sample sizes (e.g., "5 most recent IG posts", "10 most recent FB posts").
 - Cite each platform source with its URL.
 - State plainly when a platform was not located via search or could not be fetched — that absence is itself a finding.
-- In `Evidence Notes`, list every fetched URL with its provider label (e.g., `Instagram: https://www.instagram.com/...`, `Facebook page: https://www.facebook.com/...`). Do not invent URLs.
