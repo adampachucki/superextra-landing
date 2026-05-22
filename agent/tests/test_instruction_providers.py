@@ -63,7 +63,9 @@ class TestResearchLeadInstruction:
 
         assert "Did specialists read material public pages" in result
         assert "read page content, structured provider data, or clearly labeled search/grounding-only signals" in result
-        assert "If no dynamic researcher has been used, run one" in result
+        assert "Would one focused dynamic researcher materially improve" in result
+        assert "Run one when it would materially improve the answer" in result
+        assert "If no dynamic researcher has been used, run one" not in result
 
     def test_prompt_focus_and_benchmark_framing_render(self):
         result = _research_lead_instruction(
