@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import { browser } from '$app/environment';
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
@@ -33,7 +34,7 @@
 </script>
 
 {@render children()}
-{#if page.url.pathname.startsWith('/landing')}
+{#if browser && !page.url.hostname.startsWith('agent.')}
 	<div class="fixed bottom-5 left-5 z-50 hidden md:block">
 		<PreviewBadge />
 	</div>

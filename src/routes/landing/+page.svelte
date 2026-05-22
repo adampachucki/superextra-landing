@@ -25,7 +25,8 @@
 		content="Super local intelligence and competitor benchmarking platform for the restaurant industry. The extra advantage behind smarter decisions."
 	/>
 	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://landing.superextra.ai/landing" />
+	<meta property="og:url" content="https://landing.superextra.ai/" />
+	<link rel="canonical" href="https://landing.superextra.ai/" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content="Superextra - Super Local Intelligence for Restaurants" />
 	<meta
