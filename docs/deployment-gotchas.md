@@ -42,7 +42,7 @@ Data shape and listeners are documented in CLAUDE.md's "Transport architecture" 
 
 Ad-hoc real-prompt monitoring — drive the real UI against the real backend and stitch the signals together. Runs cost real Gemini/Places/SerpAPI/Apify tokens and leave a permanent session + per-turn doc until the creator deletes it via `agentDelete`; use sparingly, not as a CI gate.
 
-1. **Navigate.** Chrome MCP `new_page` → `http://localhost:5199/agent/chat`. Anonymous Firebase auth bootstraps silently.
+1. **Navigate.** Chrome MCP `new_page` → `http://localhost:5199/chat`. Anonymous Firebase auth bootstraps silently.
 2. **Submit.** `fill` the textarea, `press_key` Enter (Shift+Enter is multiline — use Enter). Poll the page URL; once `?sid=<sid>` appears, the session id is yours.
 3. **Watch the user's view.** Periodic `take_screenshot` + `take_snapshot` while `chatState.loading` would be true. `list_console_messages` and `list_network_requests` give client-side signal for free.
 4. **Backend logs.** Reasoning Engine logs carry the structured `sid`/`runId` payload; query via `gcloud logging read 'resource.type="aiplatform.googleapis.com/ReasoningEngine"' --project=superextra-site --limit=500 --format=json --freshness=10m`.

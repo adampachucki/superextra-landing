@@ -3,7 +3,7 @@
 		{
 			"target": "landing",
 			"public": "build",
-			"ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+			"ignore": ["firebase.json", "**/.*", "**/node_modules/**", "index.html", "chat.html"],
 			"cleanUrls": true,
 			"headers": [
 				{
@@ -26,6 +26,11 @@
 					"source": "/agent{,/**}",
 					"destination": "https://agent.superextra.ai",
 					"type": 301
+				},
+				{
+					"source": "/chat{,/**}",
+					"destination": "https://agent.superextra.ai/chat",
+					"type": 301
 				}
 			],
 			"rewrites": [
@@ -40,13 +45,17 @@
 				{
 					"source": "/api/tts",
 					"function": "tts"
+				},
+				{
+					"source": "/",
+					"destination": "/landing.html"
 				}
 			]
 		},
 		{
 			"target": "agent",
 			"public": "build",
-			"ignore": ["firebase.json", "**/.*", "**/node_modules/**", "index.html"],
+			"ignore": ["firebase.json", "**/.*", "**/node_modules/**", "landing.html"],
 			"cleanUrls": true,
 			"headers": [
 				{
@@ -88,14 +97,6 @@
 				{
 					"source": "/api/tts",
 					"function": "tts"
-				},
-				{
-					"source": "/chat",
-					"destination": "/chat.html"
-				},
-				{
-					"source": "/",
-					"destination": "/agent.html"
 				}
 			]
 		}

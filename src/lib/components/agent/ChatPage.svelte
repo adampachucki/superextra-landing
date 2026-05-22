@@ -333,7 +333,7 @@
 		class:visible={sidebarContentVisible}
 	>
 		<a
-			href="/agent"
+			href="/"
 			class="group flex items-center gap-0.5 text-black no-underline dark:text-white"
 		>
 			<svg

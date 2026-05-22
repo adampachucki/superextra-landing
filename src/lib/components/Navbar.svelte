@@ -59,7 +59,7 @@
 >
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
 		<a
-			href="/"
+			href={minimal ? '/' : '/landing'}
 			onclick={(e) => {
 				if (!minimal) return;
 				e.preventDefault();
@@ -84,7 +84,7 @@
 		{#if !minimal}
 			<div class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
 				<a
-					href="/#intelligence"
+					href="/landing#intelligence"
 					onclick={smoothScroll}
 					class="text-sm transition-colors {over
 						? 'text-white/60 hover:text-white'
@@ -92,7 +92,7 @@
 					>Intelligence</a
 				>
 				<a
-					href="/#use-cases"
+					href="/landing#use-cases"
 					onclick={smoothScroll}
 					class="text-sm transition-colors {over
 						? 'text-white/60 hover:text-white'
@@ -100,7 +100,7 @@
 					>Use Cases</a
 				>
 				<a
-					href="/#faq"
+					href="/landing#faq"
 					onclick={smoothScroll}
 					class="text-sm transition-colors {over
 						? 'text-white/60 hover:text-white'
@@ -175,7 +175,7 @@
 				<div class="border-t border-cream-100 bg-cream">
 					<div class="flex flex-col gap-4 px-6 py-6">
 						<a
-							href="/#intelligence"
+							href="/landing#intelligence"
 							class="text-sm text-black/60 dark:text-white/60"
 							onclick={(e) => {
 								mobileOpen = false;
@@ -183,7 +183,7 @@
 							}}>Intelligence</a
 						>
 						<a
-							href="/#use-cases"
+							href="/landing#use-cases"
 							class="text-sm text-black/60 dark:text-white/60"
 							onclick={(e) => {
 								mobileOpen = false;
@@ -191,7 +191,7 @@
 							}}>Use Cases</a
 						>
 						<a
-							href="/#faq"
+							href="/landing#faq"
 							class="text-sm text-black/60 dark:text-white/60"
 							onclick={(e) => {
 								mobileOpen = false;
