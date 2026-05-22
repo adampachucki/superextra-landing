@@ -245,7 +245,7 @@
 						: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
 				>
 					<svg
-						class="h-[18px] w-[18px]"
+						class="h-[19px] w-[19px]"
 						xmlns="http://www.w3.org/2000/svg"
 						fill="none"
 						viewBox="0 0 24 24"
@@ -267,11 +267,11 @@
 				<button
 					type="button"
 					disabled
-					aria-label="Map view"
+					aria-label="Attach file"
 					class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 				>
 					<svg
-						class="h-[18px] w-[18px]"
+						class="h-[18px] w-[18px] translate-y-px"
 						xmlns="http://www.w3.org/2000/svg"
 						fill="none"
 						viewBox="0 0 24 24"
@@ -279,9 +279,9 @@
 						stroke-width="1.75"
 					>
 						<path
-							stroke-linecap="square"
-							stroke-linejoin="miter"
-							d="M3 7l6-3 6 3 6-3v14l-6 3-6-3-6 3V7zM9 4v14M15 7v14"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
 						/>
 					</svg>
 				</button>
