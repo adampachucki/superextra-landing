@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { afterNavigate } from '$app/navigation';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import PreviewBadge from '$lib/components/PreviewBadge.svelte';
 	import CookieBanner from '$lib/components/CookieBanner.svelte';
@@ -29,10 +30,13 @@
 	});
 
 	let { children } = $props();
+	let showPreviewBadge = $derived(!page.url.pathname.startsWith('/chat'));
 </script>
 
 {@render children()}
-<div class="fixed bottom-5 left-5 z-50 hidden md:block">
-	<PreviewBadge />
-</div>
+{#if showPreviewBadge}
+	<div class="fixed bottom-5 left-5 z-50 hidden md:block">
+		<PreviewBadge />
+	</div>
+{/if}
 <CookieBanner />
