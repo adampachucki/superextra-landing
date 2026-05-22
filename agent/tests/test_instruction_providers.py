@@ -345,9 +345,16 @@ class TestRouterInstruction:
     def test_prompt_focus_clarification_wording(self):
         result = _router_instruction(MockCtx(state={}))
 
-        assert "selected focus" not in result
+        assert "`[Context: ...]` prefix with selected focus, Place ID, or address details" in result
         assert "broad restaurant-industry question that is answerable without local geography" in result
-        assert "missing venue, address, area, or market" in result
+        assert "missing branch, address, area, or market" in result
+        assert "Branch-proximity requests need branch-level scope" in result
+        assert "chain or brand name plus only a broad city" in result
+        assert "exact address or street-level location is enough branch-level scope" in result
+        assert "Do not pick or infer one branch" in result
+        assert "Apply the same scope test to the original question and clarified focus" in result
+        assert "proposed restaurant or venue focus" in result
+        assert "without branch-level scope, ask for clarification even when the focus includes a city" in result
         assert "choosing a restaurant first" not in result
 
 
@@ -359,4 +366,6 @@ class TestContextEnricherInstruction:
         assert "Do not call it the target restaurant" in result
         assert "Still build area or site context" in result
         assert "Keep nearby competitors separate from broader comparables" in result
+        assert "multiple same-brand or same-chain candidates" in result
+        assert "do not choose a target by prominence, rating, review count, or result order" in result
         assert "Use Google Places tools only" in result

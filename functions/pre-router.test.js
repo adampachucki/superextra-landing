@@ -71,6 +71,21 @@ describe('buildClarificationGatePrompt', () => {
 		assert.match(prompt, /not usable geography/);
 	});
 
+	it('distinguishes market-level geography from branch-proximity scope', () => {
+		const prompt = buildClarificationGatePrompt({
+			message: 'What opened near Zeit fur Brot in Berlin?'
+		});
+		assert.match(prompt, /market-level salary, wage, rent, regulation, saturation/);
+		assert.match(prompt, /Branch-proximity requests need branch-level scope/);
+		assert.match(prompt, /chain or brand name plus only a broad city/);
+		assert.match(prompt, /exact address or street-level location is enough/);
+		assert.match(prompt, /Do not pick or infer one branch/);
+		assert.match(prompt, /answering a missing-area clarification/);
+		assert.match(prompt, /missing branch, address, area, or market/);
+		assert.doesNotMatch(prompt, /Do not ask which one just because/);
+		assert.doesNotMatch(prompt, /any ordinary city/);
+	});
+
 	it('includes the original question for clarification follow-ups', () => {
 		const prompt = buildClarificationGatePrompt({
 			message: 'Williamsburg, Brooklyn',
@@ -79,6 +94,9 @@ describe('buildClarificationGatePrompt', () => {
 		assert.match(prompt, /answering a prior clarification/);
 		assert.match(prompt, /Original question/);
 		assert.match(prompt, /Latest message/);
+		assert.match(prompt, /proposed restaurant or venue focus/);
+		assert.match(prompt, /exact address or street-level location/);
+		assert.match(prompt, /return clarify even when the answer includes a city/);
 	});
 });
 

@@ -2,7 +2,7 @@ import { GoogleAuth } from 'google-auth-library';
 
 const VERTEX_BASE = 'https://aiplatform.googleapis.com';
 const MODEL = 'gemini-2.5-flash';
-const FALLBACK_QUESTION = 'What restaurant, address, area, or market should I use?';
+const FALLBACK_QUESTION = 'What branch, address, area, or market should I use?';
 
 let _auth = null;
 
@@ -32,7 +32,10 @@ export function buildClarificationGatePrompt({ message, originalQuestion = null 
 				'The user is answering a prior clarification.',
 				`Original question: ${JSON.stringify(originalQuestion)}`,
 				`Latest message: ${JSON.stringify(message)}`,
-				'Decide whether the latest message supplies enough restaurant, address, area, market, or geography to research the original question.'
+				'Decide whether the latest message supplies enough restaurant, address, area, market, or geography to research the original question.',
+				'If the latest message names a restaurant or venue plus broad geography, treat it as a proposed restaurant or venue focus, not as a pure geography answer.',
+				'If the latest message includes an exact address or street-level location, treat that as enough branch-level scope.',
+				'If the original question had missing self-referential geography and the latest answer names a restaurant or venue without branch-level scope, return clarify even when the answer includes a city.'
 			].join('\n')
 		: [
 				'Input is the first user message in a new chat.',
@@ -48,13 +51,19 @@ export function buildClarificationGatePrompt({ message, originalQuestion = null 
 		'Return JSON only: {"decision":"clarify"|"research","question":"...","reason":"..."}.',
 		'',
 		'Decision rules:',
-		'- Research when the message names any ordinary city, neighborhood, borough, district, country, address, restaurant, venue, or market. Do not ask which one just because a place name could be ambiguous.',
+		'- Research when the message supplies a usable scope for the question: exact address, branch or venue, neighborhood, district, borough, city, region, country, market, or broad industry scope.',
 		'- Research broad restaurant-industry questions that do not depend on a specific local market, such as format shifts, consumer behavior, concept trends, channel trends, or category-level strategy. Do not ask for geography only because geography could make the answer more specific.',
-		'- For salary, wage, rent, regulation, saturation, delivery, and local competition questions, a named city, region, state, or country is enough geography to research. Do not ask for a narrower area inside the named geography.',
+		'- For market-level salary, wage, rent, regulation, saturation, delivery, local competition, openings, and closures questions, a named city, region, state, or country is enough geography to research.',
+		'- Branch-proximity requests need branch-level scope. These include questions about what is near or around one venue, nearby competitors, nearby openings or closures, local momentum, delivery competition around a venue, or venue-specific pricing.',
+		'- Branch-level scope means a selected Google Place ID, exact address, street-level location, neighborhood or district that anchors the venue, or explicit branch descriptor. A chain or brand name plus only a broad city, region, state, or country is not branch-level scope.',
+		'- A restaurant or venue name plus an exact address or street-level location is enough branch-level scope.',
+		'- For branch-proximity requests, a restaurant or venue name plus only a city, region, state, or country is not branch-level scope when the name could be a chain or brand. Do not pick or infer one branch.',
+		'- When the user is answering a missing-area clarification, a restaurant or venue answer makes local openings, closures, nearby competitors, or nearby momentum a branch-proximity request around that venue. Do not reinterpret that answer as citywide geography.',
+		'- Do not clarify just because a named city, neighborhood, venue, or market could have multiple interpretations. Clarify only when the missing distinction is needed to answer the question.',
 		'- Clarify by default when the request depends on place, restaurant identity, local market, nearby competitors, wages/labor costs, rent, regulation, openings/closures, pricing for a specific operation, delivery competition, or customer sentiment, and no usable place, area, market, city, neighborhood, venue, address, or country is named.',
 		'- Self-referential phrases like "my", "our", "my area", "in my area", "near me", "near us", "nearby", "local", "competitors", "recent openings", and "recent closures" are not usable geography by themselves.',
 		'- Salary/wage, rent, regulation, saturation, and local competition questions are not broad enough when no geography is named.',
-		'- The question must be one short question asking for the missing restaurant, address, area, or market.'
+		'- The question must be one short question asking for the missing branch, address, area, or market.'
 	].join('\n');
 }
 

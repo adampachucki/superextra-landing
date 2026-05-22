@@ -614,6 +614,62 @@ describe('agentStream', () => {
 		assert.match(handoffArg.message, /Answer the original question/);
 	});
 
+	it('turn after direct clarification uses selected focus when provided', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token'],
+						status: 'complete',
+						lastTurnIndex: 1,
+						engineSessionStarted: false,
+						awaitingClarificationAnswer: true,
+						currentRunId: 'prior-run'
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0001') {
+				return {
+					exists: true,
+					data: () => ({
+						userMessage: 'What has opened or closed in my area recently?'
+					})
+				};
+			}
+			return { exists: false };
+		});
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({
+				body: {
+					message: 'Use this branch',
+					sessionId: 'sess-1',
+					placeContext: {
+						name: 'Zeit fur Brot',
+						secondary: 'Alte Schonhauser Str. 4, Berlin',
+						placeId: 'ChIJbranch'
+					}
+				}
+			}),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(runClarificationGateMock.mock.callCount(), 0);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.equal(handoffArg.turnIdx, 2);
+		assert.match(handoffArg.message, /Original question: "What has opened or closed/);
+		assert.match(
+			handoffArg.message,
+			/Selected focus: Zeit fur Brot, Alte Schonhauser Str\. 4, Berlin \(Google Place ID: ChIJbranch\)\./
+		);
+		assert.match(handoffArg.message, /Answer the original question/);
+	});
+
 	it('does not treat engineSessionStarted=false as a clarification answer by itself', async () => {
 		mockDb.get.mock.mockImplementation(async (ref) => {
 			if (ref._path === 'sessions/sess-1') {

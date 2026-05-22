@@ -140,6 +140,17 @@ SHOULD_ROUTE = [
         "What's the competitive landscape for fine dining in Manhattan?",
         id="competitive_landscape_area",
     ),
+    pytest.param(
+        "How is Zeit fur Brot performing across Berlin?",
+        id="citywide_brand_performance",
+    ),
+    pytest.param(
+        "[Context: The user is answering a clarification. "
+        'Original question: "What has opened or closed in my area recently?" '
+        "Selected focus: Zeit fur Brot, Alte Schonhauser Str. 4, Berlin "
+        "(Google Place ID: ChIJbranch).] Answer the original question using the clarified focus.",
+        id="clarified_selected_branch",
+    ),
 ]
 
 # --- Should ask for clarification ---
@@ -172,6 +183,17 @@ SHOULD_CLARIFY = [
     pytest.param(
         "How profitable is my restaurant?",
         id="needs_specific_restaurant",
+    ),
+    pytest.param(
+        "What opened near Zeit fur Brot in Berlin?",
+        id="chain_city_branch_proximity",
+    ),
+    pytest.param(
+        "[Context: The user is answering a clarification. "
+        'Original question: "What has opened or closed in my area recently?" '
+        'Clarified focus: "zeit fur Brot in berlin".] '
+        "Answer the original question using the clarified focus.",
+        id="clarified_chain_city_branch_proximity",
     ),
 ]
 
