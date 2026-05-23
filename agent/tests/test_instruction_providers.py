@@ -164,6 +164,14 @@ class TestReportWriterInstruction:
         assert "Prefer markdown tables for multi-entity, multi-metric comparisons" in result
         assert "Do not use custom HTML tables" in result
 
+    def test_preserves_absence_caveats_and_source_quality_notes(self):
+        result = _report_writer_instruction(MockCtx(state={"market_result": "Report"}))
+
+        assert "Do not convert a checked absence into confirmed non-use" in result
+        assert "not visible in checked public surfaces" in result
+        assert "include a concise `Evidence Notes` section" in result
+        assert "read`, `provider`, and `signal`" in result
+
     def test_retention_contract_preserves_all_findings(self):
         result = _report_writer_instruction(
             MockCtx(
@@ -180,7 +188,7 @@ class TestReportWriterInstruction:
         assert "Err on the side of a long, detailed report" in result
         assert "especially its `Writer Material` section, as must-carry research material" in result
         assert "Search or grounding-only signals are weaker context" in result
-        assert "Do not reproduce internal evidence-note scaffolding" in result
+        assert "Do not reproduce raw internal evidence-note scaffolding" in result
         assert "Do not collapse several concrete findings" in result
         assert "2-4 suggested follow-up research prompts" in result
         assert "Zolza closed" in result
