@@ -80,6 +80,21 @@ describe('resolveClarificationFocus', () => {
 		assert.equal(result?.placeId, 'ChIJtest');
 	});
 
+	it('resolves conversational place answers with proximity filler', async () => {
+		const result = await resolveClarificationFocus({
+			message: 'Around monsun in Gdynia',
+			apiKey: 'key',
+			fetchImpl: fetchPlaces([
+				place({
+					name: 'Monsun Gdynia',
+					address: 'Świętojańska 69b, 81-389 Gdynia, Poland'
+				})
+			])
+		});
+
+		assert.equal(result?.placeId, 'ChIJtest');
+	});
+
 	it('does not choose among multiple strong same-query matches', async () => {
 		const result = await resolveClarificationFocus({
 			message: 'zeit fur brot berlin',

@@ -32,6 +32,7 @@ const STOP_WORDS = new Set([
 	'an',
 	'and',
 	'area',
+	'around',
 	'at',
 	'branch',
 	'city',
