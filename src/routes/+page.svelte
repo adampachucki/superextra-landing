@@ -54,18 +54,18 @@
 		{
 			title: 'Sentiment analysis',
 			graphicIndex: 5,
-			description: `Connect review signals across venues. Find the themes growing, fading, or unique to a single location.`
+			description: `Connect review signals across venues. See which themes are growing, fading, or unique to a single location before they become ratings.`
 		},
 		{
 			title: 'Competitor tracking',
 			graphicIndex: 6,
 			description:
-				'Monitor competitor moves as they happen: menu changes, price shifts, launches, and format pivots.'
+				'Monitor competitor moves as they happen — menu changes, price shifts, new launches, and format pivots. Stay current without relying on word of mouth.'
 		},
 		{
 			title: 'Market shifts',
 			graphicIndex: 0,
-			description: `Track openings, closures, and format changes. Spot white space where demand meets thin competition.`
+			description: `Track openings, closures, and format changes across the local market. Spot white spaces where demand meets thin competition early.`
 		}
 	];
 </script>
