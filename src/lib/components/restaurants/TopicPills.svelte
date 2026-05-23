@@ -10,7 +10,7 @@
 	} = $props();
 
 	const PILL_POOL: TopicPillItem[] = [
-		// Market context
+		// Market trends
 		{
 			label: 'Market sales shifts',
 			mobile: 'Sales shifts',
@@ -105,7 +105,7 @@
 			color: '#fbbf24',
 			query: 'How do my cocktail and wine prices compare to similar bars in the area?'
 		},
-		// Sentiment trends
+		// Sentiment analysis
 		{
 			label: 'What guests are saying',
 			mobile: 'Guest reviews',

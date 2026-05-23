@@ -27,45 +27,45 @@
 
 	const agentUseCases = [
 		{
-			title: 'Market context',
+			title: 'Market trends',
 			graphicIndex: 2,
-			description: `Track local market dynamics, demand cycles, and competitor momentum. Separate venue performance from the market trend — so every decision starts from signal, not noise.`
+			description: `Track local demand cycles and competitor momentum. Separate venue performance from market movement, so decisions start from signal.`
 		},
 		{
 			title: 'Expansion strategy',
 			graphicIndex: 1,
-			description: `Evaluate locations with foot traffic, demographics, competition density, and rent data mapped around every site. De-risk every expansion decision.`
+			description: `Evaluate locations with foot traffic, demographics, competition density, and rent data mapped around each site.`
 		},
 		{
 			title: 'Concept validation',
 			graphicIndex: 7,
-			description: `Validate new concepts against real local signals. See what's working nearby and whether demand supports the idea — before committing to a buildout.`
+			description: `Validate new concepts against local signals. See what's working nearby and whether demand supports the idea before buildout.`
 		},
 		{
 			title: 'Financial planning',
 			graphicIndex: 3,
-			description: `Project revenue, occupancy, and labor costs against real local benchmarks. Track how spend and staffing compare to the market — and spot inefficiencies before they hit margins.`
+			description: `Project revenue, occupancy, and labor costs against local benchmarks. Spot spend and staffing gaps before they hit margins.`
 		},
 		{
 			title: 'Price positioning',
 			graphicIndex: 4,
-			description: `Benchmark pricing against local competitors on the price curve. Know which price points, channels, and promos are driving results — and adjust with confidence.`
+			description: `Benchmark pricing against nearby competitors. See which price points, channels, and promos are driving results.`
 		},
 		{
-			title: 'Sentiment trends',
+			title: 'Sentiment analysis',
 			graphicIndex: 5,
-			description: `Connect review signals across venues. See which themes are growing, fading, or unique to a single location — and catch shifts before they become ratings.`
+			description: `Connect review signals across venues. Find the themes growing, fading, or unique to a single location.`
 		},
 		{
 			title: 'Competitor tracking',
 			graphicIndex: 6,
 			description:
-				'Monitor competitor moves as they happen — menu changes, price shifts, new launches, and format pivots. Stay current without relying on word of mouth.'
+				'Monitor competitor moves as they happen: menu changes, price shifts, launches, and format pivots.'
 		},
 		{
 			title: 'Market shifts',
 			graphicIndex: 0,
-			description: `Track openings, closures, and format changes across the local market. Spot white spaces where demand meets thin competition — flagged early, with time to respond.`
+			description: `Track openings, closures, and format changes. Spot white space where demand meets thin competition.`
 		}
 	];
 </script>
