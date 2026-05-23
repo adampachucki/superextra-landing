@@ -6,7 +6,7 @@
 	},
 	"main": "index.js",
 	"scripts": {
-		"test": "node --test utils.test.js place-resolver.test.js && node --experimental-test-module-mocks --test pre-router.test.js index.test.js watchdog.test.js gear-handoff.test.js"
+		"test": "node --test utils.test.js intake-agent.test.js && node --experimental-test-module-mocks --test index.test.js watchdog.test.js gear-handoff.test.js"
 	},
 	"dependencies": {
 		"firebase-admin": "^13.0.0",

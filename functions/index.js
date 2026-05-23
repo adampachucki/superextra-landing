@@ -5,8 +5,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { gearHandoff, gearHandoffCleanup } from './gear-handoff.js';
-import { resolveClarificationFocus } from './place-resolver.js';
-import { runClarificationGate, shouldRunClarificationGate } from './pre-router.js';
+import { runIntakeConversation } from './intake-agent.js';
 import {
 	esc,
 	row,
@@ -120,7 +119,6 @@ const UID_RATE_LIMIT_MAX = 20; // per-UID pipeline runs per hour (plan default)
 
 // Plan §5 / §6 — shared 10-turn cap per chat, counted across all contributors.
 const MAX_TURNS_PER_SESSION = 10;
-const MAX_CONTEXT_SNIPPET_CHARS = 600;
 
 class AgentStreamError extends Error {
 	constructor(status, code) {
@@ -128,10 +126,6 @@ class AgentStreamError extends Error {
 		this.status = status;
 		this.code = code;
 	}
-}
-
-function compactSnippet(text) {
-	return text.trim().replace(/\s+/g, ' ').slice(0, MAX_CONTEXT_SNIPPET_CHARS);
 }
 
 function titleFromMessage(message) {
@@ -148,11 +142,12 @@ function titleFromMessage(message) {
 		.slice(0, 60);
 }
 
-async function completeDirectClarification({
+async function completeDirectIntake({
 	sessionRef,
 	runId,
 	turnIdx,
 	reply,
+	intakeState,
 	startedAtMs,
 	title
 }) {
@@ -172,7 +167,7 @@ async function completeDirectClarification({
 			activeAgent: null,
 			activeStage: null,
 			engineSessionStarted: false,
-			awaitingClarificationAnswer: true,
+			intakeState: intakeState || null,
 			updatedAt: FieldValue.serverTimestamp()
 		};
 		if (!data.title && title) sessionUpdate.title = title;
@@ -197,13 +192,13 @@ async function markEngineSessionStarted({ sessionRef, runId }) {
 		if (data.currentRunId !== runId) return;
 		tx.update(sessionRef, {
 			engineSessionStarted: true,
-			awaitingClarificationAnswer: false,
+			intakeState: null,
 			updatedAt: FieldValue.serverTimestamp()
 		});
 	});
 }
 
-async function recordResolvedPlaceContext({ sessionRef, runId, placeContext }) {
+async function recordPlaceContext({ sessionRef, runId, placeContext }) {
 	await db.runTransaction(async (tx) => {
 		const snap = await tx.get(sessionRef);
 		if (!snap.exists) return;
@@ -214,6 +209,23 @@ async function recordResolvedPlaceContext({ sessionRef, runId, placeContext }) {
 			updatedAt: FieldValue.serverTimestamp()
 		});
 	});
+}
+
+async function readIntakeHistory(sessionRef, latestTurnIdx) {
+	const history = [];
+	for (let idx = 1; idx < latestTurnIdx; idx += 1) {
+		const turnKey = String(idx).padStart(4, '0');
+		const turnSnap = await sessionRef.collection('turns').doc(turnKey).get();
+		if (!turnSnap.exists) continue;
+		const turn = turnSnap.data() || {};
+		if (typeof turn.userMessage === 'string' && turn.userMessage.trim()) {
+			history.push({ role: 'user', text: turn.userMessage });
+		}
+		if (typeof turn.reply === 'string' && turn.reply.trim()) {
+			history.push({ role: 'assistant', text: turn.reply });
+		}
+	}
+	return history;
 }
 
 const agentStreamOptions = { cors: true, timeoutSeconds: 90, secrets: [googlePlacesKey] };
@@ -294,8 +306,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	let isEngineFirstMessage = false;
 	let creatorUid = submitterUid;
 	let newTurnIdx = 1;
-	let originalQuestion = null;
-	let clarificationQuestion = null;
+	let intakeState = null;
 	try {
 		await db.runTransaction(async (t) => {
 			const snap = await t.get(sessionRef);
@@ -318,30 +329,9 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 			isEngineFirstMessage = !engineSessionStarted;
 			creatorUid = existing?.userId || submitterUid;
 			newTurnIdx = lastTurnIndex + 1;
-
-			if (
-				existing?.engineSessionStarted === false &&
-				existing?.awaitingClarificationAnswer === true &&
-				lastTurnIndex >= 1
-			) {
-				const firstTurnRef = sessionRef.collection('turns').doc('0001');
-				const firstTurnSnap = await t.get(firstTurnRef);
-				const firstTurn = firstTurnSnap.exists ? firstTurnSnap.data() : null;
-				if (typeof firstTurn?.userMessage === 'string') {
-					originalQuestion = firstTurn.userMessage;
-				}
-				if (typeof firstTurn?.reply === 'string' && firstTurn.reply.trim()) {
-					clarificationQuestion = firstTurn.reply;
-				}
-				if (lastTurnIndex > 1) {
-					const previousTurnKey = String(lastTurnIndex).padStart(4, '0');
-					const previousTurnRef = sessionRef.collection('turns').doc(previousTurnKey);
-					const previousTurnSnap = await t.get(previousTurnRef);
-					const previousTurn = previousTurnSnap.exists ? previousTurnSnap.data() : null;
-					if (typeof previousTurn?.reply === 'string' && previousTurn.reply.trim()) {
-						clarificationQuestion = previousTurn.reply;
-					}
-				}
+			intakeState = existing?.intakeState || null;
+			if (!placeContext && existing?.placeContext) {
+				placeContext = validatePlaceContext(existing.placeContext);
 			}
 
 			const perTurn = {
@@ -362,7 +352,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 					createdAt: FieldValue.serverTimestamp(),
 					placeContext: placeContext || null,
 					engineSessionStarted: false,
-					awaitingClarificationAnswer: false,
+					intakeState: null,
 					title: null,
 					...perTurn
 				});
@@ -404,77 +394,56 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 		return;
 	}
 
-	const gateStartedAtMs = Date.now();
-	if (isEngineFirstMessage && !placeContext) {
+	const intakeStartedAtMs = Date.now();
+	let researchQuestion = null;
+	if (isEngineFirstMessage) {
 		try {
-			const resolvedPlace = await resolveClarificationFocus({
+			const history = await readIntakeHistory(sessionRef, newTurnIdx);
+			const decision = await runIntakeConversation({
+				history,
 				message,
-				originalQuestion,
-				clarificationQuestion,
+				intakeState,
+				selectedPlaceContext: placeContext,
 				apiKey: googlePlacesKey.value()
 			});
-			if (resolvedPlace?.name) {
-				placeContext = resolvedPlace;
-				await recordResolvedPlaceContext({ sessionRef, runId, placeContext });
-				console.info('agentStream resolved clarification focus', {
-					sessionId,
-					runId,
-					turnIdx: newTurnIdx,
-					placeId: resolvedPlace.placeId,
-					name: resolvedPlace.name
-				});
-			} else if (resolvedPlace?.question) {
-				await completeDirectClarification({
-					sessionRef,
-					runId,
-					turnIdx: newTurnIdx,
-					reply: resolvedPlace.question,
-					startedAtMs: now,
-					title: titleFromMessage(originalQuestion || message)
-				});
-				console.info('agentStream place resolution clarification', {
-					sessionId,
-					runId,
-					turnIdx: newTurnIdx,
-					latencyMs: Date.now() - gateStartedAtMs,
-					reason: resolvedPlace.reason
-				});
-				res.status(202).json({ ok: true, sessionId, runId, direct: 'clarification' });
-				return;
-			}
-		} catch (err) {
-			console.warn('clarification focus resolution failed; continuing gate:', err.message || err);
-		}
-	}
+			intakeState = decision.state || null;
 
-	if (shouldRunClarificationGate({ isEngineFirstMessage, placeContext })) {
-		try {
-			const decision = await runClarificationGate({
-				message,
-				originalQuestion,
-				clarificationQuestion
-			});
-			if (decision.decision === 'clarify') {
-				await completeDirectClarification({
+			if (decision.action === 'reply') {
+				await completeDirectIntake({
 					sessionRef,
 					runId,
 					turnIdx: newTurnIdx,
-					reply: decision.question,
+					reply: decision.reply,
+					intakeState,
 					startedAtMs: now,
-					title: titleFromMessage(originalQuestion || message)
+					title: titleFromMessage(intakeState?.originalIntent || message)
 				});
-				console.info('agentStream direct clarification', {
+				console.info('agentStream direct intake reply', {
 					sessionId,
 					runId,
 					turnIdx: newTurnIdx,
-					latencyMs: Date.now() - gateStartedAtMs,
+					latencyMs: Date.now() - intakeStartedAtMs,
 					reason: decision.reason
 				});
-				res.status(202).json({ ok: true, sessionId, runId, direct: 'clarification' });
+				res.status(202).json({ ok: true, sessionId, runId, direct: 'intake' });
 				return;
 			}
+
+			if (decision.action === 'start_research') {
+				researchQuestion = decision.researchQuestion || message;
+				placeContext = decision.placeContext || null;
+				await recordPlaceContext({ sessionRef, runId, placeContext });
+				console.info('agentStream intake ready for research', {
+					sessionId,
+					runId,
+					turnIdx: newTurnIdx,
+					latencyMs: Date.now() - intakeStartedAtMs,
+					placeId: placeContext?.placeId || null,
+					reason: decision.reason
+				});
+			}
 		} catch (err) {
-			console.warn('clarification gate failed; falling back to Agent Engine:', err.message || err);
+			console.warn('intake failed; falling back to Agent Engine:', err.message || err);
 		}
 	}
 
@@ -486,21 +455,8 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 		month: 'long',
 		day: 'numeric'
 	});
-	let queryText = `[Date: ${today}] ${message}`;
-	if (isEngineFirstMessage && originalQuestion) {
-		const clarificationLabel = clarificationQuestion
-			? `Latest clarification: "${compactSnippet(clarificationQuestion)}" `
-			: '';
-		const focusLabel =
-			placeContext && placeContext.name
-				? `Selected focus: ${[placeContext.name, placeContext.secondary].filter(Boolean).join(', ')} (Google Place ID: ${placeContext.placeId || 'unknown'}).`
-				: `Clarified focus: "${compactSnippet(message)}".`;
-		queryText = [
-			`[Date: ${today}]`,
-			`[Context: The user is answering a clarification. Original question: "${compactSnippet(originalQuestion)}" ${clarificationLabel}${focusLabel}]`,
-			'Answer the original question using the clarified focus.'
-		].join(' ');
-	} else if (isEngineFirstMessage && placeContext && placeContext.name) {
+	let queryText = `[Date: ${today}] ${researchQuestion || message}`;
+	if (isEngineFirstMessage && placeContext && placeContext.name) {
 		const focusLabel = [placeContext.name, placeContext.secondary].filter(Boolean).join(', ');
 		queryText = `[Context: selected focus: ${focusLabel} (Google Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
 	}
