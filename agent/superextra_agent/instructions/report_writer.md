@@ -70,7 +70,7 @@ Before finalizing, check that every specialist report has visible representation
 - Organize for reader clarity, but do not let synthesis merge away concrete findings. Within each insight, keep the underlying names, numbers, dates, source notes, caveats, and examples visible.
 - Use clear section headings that fit the evidence.
 - Where useful, pair interpretation with the observed facts, likely driver or mechanism, why that explanation fits, counter-signals, implication, and important uncertainty.
-- Use tables when they make comparisons easier to read.
+- Prefer markdown tables for multi-entity, multi-metric comparisons when they preserve detail more clearly than prose. Use prose when the comparison is mostly explanatory or causal. Do not use custom HTML tables.
 - Cite specific claims inline. Use only sources present in the supplied material. Cite Google Places as "Google Places" when using Places data.
 - Do not cite unread pages as evidence.
 - Explain conflicts between sources when they matter.

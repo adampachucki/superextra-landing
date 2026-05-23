@@ -80,6 +80,16 @@ class TestResearchLeadInstruction:
         assert "separate nearby competitors from destination-level or category-leading comparables" in result
         assert "Do not force review or social analysis for an area/site prompt" in result
 
+    def test_comparison_tables_and_brand_group_briefing_render(self):
+        result = _research_lead_instruction(
+            MockCtx(state={"places_context": "Target venue: Umami"})
+        )
+
+        assert "ask specialists for table-ready comparable dimensions" in result
+        assert "used/not used" in result
+        assert "multi-location brand or group" in result
+        assert "separate location-level facts from brand-level activity" in result
+
 
 class TestReportWriterInstruction:
     def test_injects_places_context_and_specialist_reports_only(self):
@@ -147,6 +157,12 @@ class TestReportWriterInstruction:
         result = _report_writer_instruction(MockCtx(state={"market_result": "Report"}))
 
         assert '```chart\n{"type":"bar"' in result
+
+    def test_report_shape_prefers_markdown_tables_for_comparisons(self):
+        result = _report_writer_instruction(MockCtx(state={"market_result": "Report"}))
+
+        assert "Prefer markdown tables for multi-entity, multi-metric comparisons" in result
+        assert "Do not use custom HTML tables" in result
 
     def test_retention_contract_preserves_all_findings(self):
         result = _report_writer_instruction(
@@ -269,6 +285,20 @@ class TestMakeInstruction:
         assert "`Writer Material` section" in result
         assert "Include an `Evidence Notes` section" in result
         assert "implications for the target venue" in result
+
+    def test_marketing_brand_visibility_inventory_renders(self):
+        provider = _make_instruction("marketing_brand")
+
+        result = provider(MockCtx(state={"places_context": "Target data"}))
+
+        assert "wider brand or group" in result
+        assert "separate brand-level marketing assets from location-specific evidence" in result
+        assert "visible owned, discovery, reservation, delivery, PR, and social surfaces" in result
+        assert "not definitive private channel usage" in result
+        assert "Label search-only findings as `signal` in Evidence Notes" in result
+        assert "visible owned-funnel features" in result
+        assert "not visible in checked public surfaces" in result
+        assert "guide listings, awards, critic recognition, platform badges, and local press honors" in result
 
 
 class TestContinueResearchInstruction:

@@ -69,7 +69,9 @@ Include:
 - Counter-signals, alternative explanations, and evidence that would strengthen or weaken the answer.
 - Boundaries: what not to cover and relevant market-source expectations.
 - Any table or comparison needs for this task.
+- For explicit "which", "used/not used", "vs", "compared", popularity, ranking, platform, or competitor comparisons, ask specialists for table-ready comparable dimensions, not only narrative.
 - Whether the active scope is a target venue, a site or area focus, or a broader market question.
+- If evidence suggests a verified target venue is part of a multi-location brand or group, brief relevant specialists to separate location-level facts from brand-level activity. Treat group context as relevant only when it changes marketing, platform, reputation, pricing, or competitor interpretation.
 - If broader benchmarks matter, separate nearby competitors from destination-level or category-leading comparables.
 - Source-category expectations (public-web specialists): name 2–3 categories the brief should hit (e.g., "official statistics + industry research + named press" for benchmarking/sizing/regulation; "review sites + food bloggers + local press" for sentiment/openings/closures/concept). Source seeds are starting points; encourage broad queries first and discovery of comparable sources.
 

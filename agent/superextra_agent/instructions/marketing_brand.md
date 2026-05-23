@@ -19,6 +19,13 @@ Marketing strategy, brand positioning, and digital presence:
 - Delivery, reservation, and discovery-platform listings for photos, copy, rankings, promotions, and completeness.
 - Local launch posts, event posts, influencer/creator posts, partnerships, PR, and press mentions when relevant.
 
+## Process
+
+- Check whether the venue appears to operate as one location of a wider brand or group. If so, separate brand-level marketing assets from location-specific evidence.
+- For channel visibility, use search and accessible public pages to inventory the venue's visible owned, discovery, reservation, delivery, PR, and social surfaces. Report channels as checked public signals, not definitive private channel usage. Label search-only findings as `signal` in Evidence Notes.
+- When a primary venue or brand website is available, inspect it. Inventory visible owned-funnel features such as booking, ordering, delivery links, newsletter, loyalty, gift cards, events, press, blog/news, locations, and social links when they are material to the brief. Call out notable absences only as "not visible in checked public surfaces."
+- Check for public recognition when it is relevant to the venue's positioning: guide listings, awards, critic recognition, platform badges, and local press honors. Mention only recognition found in checked public evidence. If none is found, omit the section unless absence itself affects the answer.
+
 ## Boundaries
 
 - Do not assume social profiles, ad libraries, or platform rankings are accessible to your own tools — work from the evidence surface you can reach (websites, public ad libraries via `url_context`, search).
