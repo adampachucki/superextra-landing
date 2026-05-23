@@ -69,7 +69,6 @@ describe('resolveClarificationFocus', () => {
 			modelJson({
 				scopeType: 'place',
 				placesQuery: 'Monsun Gdynia',
-				relationship: 'around',
 				needsPlacesLookup: true,
 				reason: 'restaurant_city_anchor'
 			}),
@@ -112,6 +111,70 @@ describe('resolveClarificationFocus', () => {
 		});
 	});
 
+	it('resolves a place from the first-turn research question', async () => {
+		const result = await resolveClarificationFocus({
+			message: 'What has opened or closed around monsun in gdynia recently?',
+			apiKey: 'key',
+			fetchImpl: fetchSequence([
+				modelJson({
+					scopeType: 'place',
+					placesQuery: 'Monsun Gdynia',
+					needsPlacesLookup: true,
+					reason: 'venue_anchor_in_question'
+				}),
+				placesJson([
+					place({
+						name: 'Monsun Gdynia',
+						address: 'Świętojańska 69b, 81-389 Gdynia, Poland'
+					})
+				]),
+				modelJson({
+					action: 'accept_place',
+					candidateIndex: 0,
+					reason: 'single_clear_candidate'
+				})
+			]),
+			getToken: async () => 'token'
+		});
+
+		assert.deepEqual(result, {
+			name: 'Monsun Gdynia',
+			secondary: 'Świętojańska 69b, 81-389 Gdynia, Poland',
+			placeId: 'ChIJtest'
+		});
+	});
+
+	it('uses the original question place when the latest answer pushes back', async () => {
+		const result = await resolveClarificationFocus({
+			message: 'search for it, you will figure',
+			originalQuestion: 'What has opened or closed around monsun in gdynia recently?',
+			clarificationQuestion: 'Which Monsun in Gdynia are you referring to?',
+			apiKey: 'key',
+			fetchImpl: fetchSequence([
+				modelJson({
+					scopeType: 'place',
+					placesQuery: 'Monsun Gdynia',
+					needsPlacesLookup: true,
+					reason: 'recover_anchor_from_original_question'
+				}),
+				placesJson([
+					place({
+						name: 'Monsun Gdynia',
+						address: 'Świętojańska 69b, 81-389 Gdynia, Poland'
+					})
+				]),
+				modelJson({
+					action: 'accept_place',
+					candidateIndex: 0,
+					reason: 'single_clear_candidate'
+				})
+			]),
+			getToken: async () => 'token'
+		});
+
+		assert.equal(result?.placeId, 'ChIJtest');
+	});
+
 	it('lets the model handle non-English relationship wording', async () => {
 		const result = await resolveClarificationFocus({
 			message: 'Wokół Monsun w Gdyni',
@@ -121,7 +184,6 @@ describe('resolveClarificationFocus', () => {
 				modelJson({
 					scopeType: 'place',
 					placesQuery: 'Monsun Gdynia',
-					relationship: 'around',
 					needsPlacesLookup: true,
 					reason: 'restaurant_city_anchor'
 				}),
@@ -152,7 +214,6 @@ describe('resolveClarificationFocus', () => {
 				modelJson({
 					scopeType: 'place',
 					placesQuery: 'Zeit für Brot Berlin',
-					relationship: 'near',
 					needsPlacesLookup: true,
 					reason: 'restaurant_city_anchor'
 				}),
@@ -188,7 +249,6 @@ describe('resolveClarificationFocus', () => {
 			modelJson({
 				scopeType: 'area',
 				placesQuery: '',
-				relationship: 'in',
 				needsPlacesLookup: false,
 				reason: 'neighborhood_answer'
 			})
@@ -215,7 +275,6 @@ describe('resolveClarificationFocus', () => {
 				modelJson({
 					scopeType: 'place',
 					placesQuery: 'Made Up Restaurant Gdynia',
-					relationship: 'around',
 					needsPlacesLookup: true,
 					reason: 'restaurant_city_anchor'
 				}),

@@ -405,7 +405,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	}
 
 	const gateStartedAtMs = Date.now();
-	if (isEngineFirstMessage && originalQuestion && !placeContext) {
+	if (isEngineFirstMessage && !placeContext) {
 		try {
 			const resolvedPlace = await resolveClarificationFocus({
 				message,

@@ -541,6 +541,49 @@ describe('agentStream', () => {
 		assert.ok(!handoffArg.message.includes('asking about'));
 	});
 
+	it('first turn resolves a named venue before the generic clarification gate', async () => {
+		resolveClarificationFocusMock.mock.mockImplementationOnce(async () => ({
+			name: 'Monsun Gdynia',
+			secondary: 'Świętojańska 69b, Gdynia',
+			placeId: 'ChIJmonsun'
+		}));
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({
+				body: {
+					message: 'What has opened or closed around monsun in gdynia recently?',
+					sessionId: 'sess-1'
+				}
+			}),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(resolveClarificationFocusMock.mock.callCount(), 1);
+		const resolverArg = resolveClarificationFocusMock.mock.calls[0].arguments[0];
+		assert.equal(
+			resolverArg.message,
+			'What has opened or closed around monsun in gdynia recently?'
+		);
+		assert.equal(resolverArg.originalQuestion, null);
+		assert.equal(resolverArg.clarificationQuestion, null);
+		assert.equal(runClarificationGateMock.mock.callCount(), 0);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		const { sessionUpdates } = partitionWrites('sessions/sess-1');
+		assert.deepEqual(sessionUpdates.find((update) => update.placeContext)?.placeContext, {
+			name: 'Monsun Gdynia',
+			secondary: 'Świętojańska 69b, Gdynia',
+			placeId: 'ChIJmonsun'
+		});
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.match(
+			handoffArg.message,
+			/^\[Context: selected focus: Monsun Gdynia, Świętojańska 69b, Gdynia \(Google Place ID: ChIJmonsun\)\] \[Date: /
+		);
+		assert.ok(!handoffArg.message.includes('Original question:'));
+	});
+
 	it('directly completes no-context first turn when the gate asks for clarification', async () => {
 		runClarificationGateMock.mock.mockImplementationOnce(async () => ({
 			decision: 'clarify',

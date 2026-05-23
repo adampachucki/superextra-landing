@@ -1,7 +1,5 @@
-import { GoogleAuth } from 'google-auth-library';
+import { generateGeminiJson } from './gemini-json.js';
 
-const VERTEX_BASE = 'https://aiplatform.googleapis.com';
-const MODEL = 'gemini-2.5-flash';
 const PLACES_TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
 const TEXT_SEARCH_FIELDS = [
 	'places.id',
@@ -11,91 +9,16 @@ const TEXT_SEARCH_FIELDS = [
 	'places.types'
 ].join(',');
 
-let _auth = null;
-
-async function _getToken() {
-	if (_auth === null) {
-		_auth = new GoogleAuth({
-			scopes: ['https://www.googleapis.com/auth/cloud-platform']
-		});
-	}
-	const client = await _auth.getClient();
-	const { token } = await client.getAccessToken();
-	if (!token) throw new Error('failed to obtain access token');
-	return token;
-}
-
-function _projectId() {
-	return process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'superextra-site';
-}
-
-function modelUrl() {
-	return `${VERTEX_BASE}/v1/projects/${_projectId()}/locations/global/publishers/google/models/${MODEL}:generateContent`;
-}
-
-function extractText(payload) {
-	return (
-		payload?.candidates?.[0]?.content?.parts
-			?.map((part) => (typeof part.text === 'string' ? part.text : ''))
-			.join('')
-			.trim() || ''
-	);
-}
-
-async function generateJson({
-	prompt,
-	responseSchema,
-	maxOutputTokens,
-	fetchImpl,
-	getToken = _getToken
-}) {
-	const token = await getToken();
-	const response = await fetchImpl(modelUrl(), {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${token}`,
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify({
-			contents: [
-				{
-					role: 'user',
-					parts: [{ text: prompt }]
-				}
-			],
-			generationConfig: {
-				temperature: 0,
-				maxOutputTokens,
-				responseMimeType: 'application/json',
-				responseSchema,
-				thinkingConfig: { thinkingBudget: 0 }
-			}
-		})
-	});
-	if (!response.ok) {
-		const body = await response.text().catch(() => '');
-		throw new Error(`clarification_scope_model_failed:${response.status}:${body.slice(0, 200)}`);
-	}
-
-	const text = extractText(await response.json());
-	try {
-		return JSON.parse(text);
-	} catch {
-		throw new Error('clarification_scope_model_invalid_json');
-	}
-}
-
 const SCOPE_SCHEMA = {
 	type: 'OBJECT',
 	properties: {
 		scopeType: { type: 'STRING', enum: ['place', 'area', 'market', 'none'] },
 		placesQuery: { type: 'STRING' },
-		relationship: { type: 'STRING' },
 		needsPlacesLookup: { type: 'BOOLEAN' },
 		reason: { type: 'STRING' }
 	},
 	required: ['scopeType', 'needsPlacesLookup', 'reason'],
-	propertyOrdering: ['scopeType', 'placesQuery', 'relationship', 'needsPlacesLookup', 'reason']
+	propertyOrdering: ['scopeType', 'placesQuery', 'needsPlacesLookup', 'reason']
 };
 
 const CANDIDATE_SCHEMA = {
@@ -116,9 +39,10 @@ export function buildScopePrompt({
 	clarificationQuestion = null
 }) {
 	return [
-		'You interpret a user answer to a prior Superextra location clarification.',
+		'You interpret a Superextra user message or a user answer to a prior location clarification.',
 		'Work in the user language. Do not translate names unless the user already did.',
 		'Extract the intended research scope; do not answer the research question.',
+		'Use the latest answer first. If it is pushback, asks the system to infer or search, repeats earlier place wording, or otherwise does not introduce a new scope, inspect the original question and clarification question to recover the intended scope.',
 		'',
 		`Original question: ${JSON.stringify(originalQuestion || '')}`,
 		`Clarification question: ${JSON.stringify(clarificationQuestion || '')}`,
@@ -127,11 +51,12 @@ export function buildScopePrompt({
 		'Return JSON only.',
 		'',
 		'Rules:',
-		'- If the answer identifies a restaurant, venue, address, landmark, or branch to use as the anchor, return scopeType="place" and needsPlacesLookup=true.',
+		'- If the latest answer or original question identifies a restaurant, venue, address, landmark, or branch to use as the anchor, return scopeType="place" and needsPlacesLookup=true.',
+		'- For questions about what is around, near, nearby, opened, closed, competing with, delivering around, or changing around a named venue, treat the named venue as the intended place anchor.',
 		'- placesQuery should be the clean Google Places lookup query: keep the venue/name/address/city/street/branch hints, remove conversational relationship words in any language such as "around", "near", or "in" unless they are part of the name.',
-		'- relationship should preserve the user intent, such as around, near, in, citywide, or unspecified.',
 		'- If the answer is only a city, neighborhood, region, country, or market, return scopeType="area" or "market" and needsPlacesLookup=false.',
-		'- If the answer is still self-referential or unusable, return scopeType="none" and needsPlacesLookup=false.',
+		'- Return scopeType="none" only when neither the latest answer nor original question provides a usable place, area, market, or geography.',
+		'- reason must be a short snake_case reason code, not a sentence.',
 		'- Never invent a Google Place ID.'
 	].join('\n');
 }
@@ -156,9 +81,11 @@ export function buildCandidatePrompt({
 		'Rules:',
 		'- action="accept_place" only when one candidate clearly matches the intended restaurant, venue, branch, address, or landmark.',
 		'- Accept a single clearly matching branch even when the user used relationship wording like around/near/in.',
+		'- If the Places query came from the original question because the latest answer confirms, repeats, questions the need for clarification, or asks the system to infer, accept one clear candidate and ask only when multiple candidates remain plausible.',
 		'- action="ask_user" when candidates contain multiple plausible branches or chain locations and the answer does not identify which one.',
 		'- action="ask_user" when a specific branch is required but the candidates do not provide enough confidence.',
 		'- action="no_match" when none of the candidates fit the user answer.',
+		'- reason must be a short snake_case reason code, not a sentence.',
 		'- If asking, write one short clarification question in the user language.'
 	].join('\n');
 }
@@ -219,15 +146,16 @@ export async function resolveClarificationFocus({
 	clarificationQuestion = null,
 	apiKey,
 	fetchImpl = fetch,
-	getToken = _getToken
+	getToken
 }) {
 	const latestAnswer = String(message || '').trim();
 	if (!latestAnswer || !apiKey) return null;
 
-	const scope = await generateJson({
+	const scope = await generateGeminiJson({
 		prompt: buildScopePrompt({ message: latestAnswer, originalQuestion, clarificationQuestion }),
 		responseSchema: SCOPE_SCHEMA,
 		maxOutputTokens: 220,
+		errorName: 'clarification_scope_model',
 		fetchImpl,
 		getToken
 	});
@@ -246,7 +174,7 @@ export async function resolveClarificationFocus({
 		.filter(({ context }) => context);
 	if (!candidates.length) return null;
 
-	const selection = await generateJson({
+	const selection = await generateGeminiJson({
 		prompt: buildCandidatePrompt({
 			message: latestAnswer,
 			originalQuestion,
@@ -256,6 +184,7 @@ export async function resolveClarificationFocus({
 		}),
 		responseSchema: CANDIDATE_SCHEMA,
 		maxOutputTokens: 220,
+		errorName: 'clarification_candidate_model',
 		fetchImpl,
 		getToken
 	});
