@@ -664,6 +664,10 @@ describe('agentStream', () => {
 
 		assert.equal(res._status, 202);
 		assert.equal(resolveClarificationFocusMock.mock.callCount(), 1);
+		assert.equal(
+			resolveClarificationFocusMock.mock.calls[0].arguments[0].originalQuestion,
+			'What has opened or closed in my area recently?'
+		);
 		assert.equal(runClarificationGateMock.mock.callCount(), 0);
 		assert.equal(gearHandoffMock.mock.callCount(), 1);
 		const { sessionUpdates } = partitionWrites('sessions/sess-1');
@@ -679,6 +683,136 @@ describe('agentStream', () => {
 			/Selected focus: Monsun Gdynia, Świętojańska 69b, Gdynia \(Google Place ID: ChIJmonsun\)\./
 		);
 		assert.ok(!handoffArg.message.includes('Clarified focus: "monsun gdynia"'));
+	});
+
+	it('turn after direct clarification can ask a place disambiguation question', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				const updateCalls = mockDb.update.mock.calls.filter(
+					(c) => c.arguments[0]?._path === ref._path
+				);
+				const base = {
+					userId: 'user-good-token',
+					participants: ['user-good-token'],
+					status: 'complete',
+					lastTurnIndex: 1,
+					engineSessionStarted: false,
+					awaitingClarificationAnswer: true,
+					currentRunId: 'prior-run'
+				};
+				const data = Object.assign({}, base, ...updateCalls.map((c) => c.arguments[1]));
+				return {
+					exists: true,
+					data: () => data
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0001') {
+				return {
+					exists: true,
+					data: () => ({
+						userMessage: 'What has opened or closed in my area recently?'
+					})
+				};
+			}
+			return { exists: false };
+		});
+		resolveClarificationFocusMock.mock.mockImplementationOnce(async () => ({
+			question: 'Which Zeit für Brot location in Berlin do you mean?',
+			reason: 'multiple_plausible_branches'
+		}));
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({ body: { message: 'near Zeit fur Brot in Berlin', sessionId: 'sess-1' } }),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(res._json.direct, 'clarification');
+		assert.equal(runClarificationGateMock.mock.callCount(), 0);
+		assert.equal(gearHandoffMock.mock.callCount(), 0);
+		const { sessionUpdates, turnUpdates } = partitionWrites('sessions/sess-1');
+		assert.equal(sessionUpdates.at(-1).awaitingClarificationAnswer, true);
+		assert.equal(turnUpdates.at(-1).path, 'sessions/sess-1/turns/0002');
+		assert.equal(turnUpdates.at(-1).data.status, 'complete');
+		assert.equal(
+			turnUpdates.at(-1).data.reply,
+			'Which Zeit für Brot location in Berlin do you mean?'
+		);
+	});
+
+	it('turn after place disambiguation gives the resolver the latest clarification question', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				const updateCalls = mockDb.update.mock.calls.filter(
+					(c) => c.arguments[0]?._path === ref._path
+				);
+				const base = {
+					userId: 'user-good-token',
+					participants: ['user-good-token'],
+					status: 'complete',
+					lastTurnIndex: 2,
+					engineSessionStarted: false,
+					awaitingClarificationAnswer: true,
+					currentRunId: 'prior-run'
+				};
+				const data = Object.assign({}, base, ...updateCalls.map((c) => c.arguments[1]));
+				return {
+					exists: true,
+					data: () => data
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0001') {
+				return {
+					exists: true,
+					data: () => ({
+						userMessage: 'What has opened or closed in my area recently?',
+						reply: 'What area should I use?'
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0002') {
+				return {
+					exists: true,
+					data: () => ({
+						userMessage: 'near Zeit fur Brot in Berlin',
+						reply: 'Which Zeit für Brot location in Berlin do you mean?'
+					})
+				};
+			}
+			return { exists: false };
+		});
+		resolveClarificationFocusMock.mock.mockImplementationOnce(async () => ({
+			name: 'Zeit für Brot',
+			secondary: 'Alte Schönhauser Str. 4, Berlin',
+			placeId: 'ChIJzeit'
+		}));
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({ body: { message: 'the one on Alte Schönhauser', sessionId: 'sess-1' } }),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		const resolverArg = resolveClarificationFocusMock.mock.calls[0].arguments[0];
+		assert.equal(resolverArg.originalQuestion, 'What has opened or closed in my area recently?');
+		assert.equal(
+			resolverArg.clarificationQuestion,
+			'Which Zeit für Brot location in Berlin do you mean?'
+		);
+		assert.equal(runClarificationGateMock.mock.callCount(), 0);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.equal(handoffArg.turnIdx, 3);
+		assert.match(
+			handoffArg.message,
+			/Latest clarification: "Which Zeit für Brot location in Berlin do you mean\?"/
+		);
+		assert.match(
+			handoffArg.message,
+			/Selected focus: Zeit für Brot, Alte Schönhauser Str\. 4, Berlin \(Google Place ID: ChIJzeit\)\./
+		);
 	});
 
 	it('turn after direct clarification uses selected focus when provided', async () => {

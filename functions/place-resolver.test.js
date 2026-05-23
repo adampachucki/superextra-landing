@@ -1,7 +1,7 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { normalizePlaceText, resolveClarificationFocus } from './place-resolver.js';
+import { buildScopePrompt, resolveClarificationFocus } from './place-resolver.js';
 
 function place({
 	id = 'ChIJtest',
@@ -19,40 +19,84 @@ function place({
 	};
 }
 
-function fetchPlaces(places) {
-	return mock.fn(async () => ({
+function modelJson(data) {
+	return {
 		ok: true,
-		json: async () => ({ places })
-	}));
+		json: async () => ({
+			candidates: [
+				{
+					content: {
+						parts: [{ text: JSON.stringify(data) }]
+					}
+				}
+			]
+		})
+	};
 }
 
-describe('normalizePlaceText', () => {
-	it('folds accents and punctuation for place matching', () => {
-		assert.equal(
-			normalizePlaceText('Monsun, Świętojańska 69b — Gdynia'),
-			'monsun swietojanska 69b gdynia'
-		);
+function placesJson(places) {
+	return {
+		ok: true,
+		json: async () => ({ places })
+	};
+}
+
+function fetchSequence(responses) {
+	const pending = [...responses];
+	return mock.fn(async () => {
+		const response = pending.shift();
+		if (!response) throw new Error('unexpected fetch call');
+		return response;
 	});
-});
+}
 
 describe('resolveClarificationFocus', () => {
-	it('resolves a restaurant and city when Places has one strong match', async () => {
-		const fetchImpl = fetchPlaces([
-			place({
-				name: 'Monsun Gdynia',
-				address: 'Świętojańska 69b, 81-389 Gdynia, Poland'
+	it('includes the active clarification question in the model scope prompt', () => {
+		const prompt = buildScopePrompt({
+			message: 'the one on Alte Schönhauser',
+			originalQuestion: 'What has opened or closed in my area recently?',
+			clarificationQuestion: 'Which Zeit für Brot location in Berlin do you mean?'
+		});
+
+		assert.match(prompt, /Original question/);
+		assert.match(prompt, /Clarification question/);
+		assert.match(prompt, /Which Zeit für Brot location in Berlin/);
+		assert.match(prompt, /the one on Alte Schönhauser/);
+	});
+
+	it('uses the model Places query and accepts a selected candidate', async () => {
+		const fetchImpl = fetchSequence([
+			modelJson({
+				scopeType: 'place',
+				placesQuery: 'Monsun Gdynia',
+				relationship: 'around',
+				needsPlacesLookup: true,
+				reason: 'restaurant_city_anchor'
 			}),
-			place({
-				id: 'other',
-				name: 'Monsun Warszawa',
-				address: 'Warsaw, Poland'
+			placesJson([
+				place({
+					name: 'Monsun Gdynia',
+					address: 'Świętojańska 69b, 81-389 Gdynia, Poland'
+				}),
+				place({
+					id: 'other',
+					name: 'Monsun Warszawa',
+					address: 'Warsaw, Poland'
+				})
+			]),
+			modelJson({
+				action: 'accept_place',
+				candidateIndex: 0,
+				reason: 'clear_branch_match'
 			})
 		]);
 
 		const result = await resolveClarificationFocus({
-			message: 'monsun gdynia',
+			message: 'Around monsun in Gdynia',
+			originalQuestion: 'What has opened or closed in my area recently?',
 			apiKey: 'key',
-			fetchImpl
+			fetchImpl,
+			getToken: async () => 'token'
 		});
 
 		assert.deepEqual(result, {
@@ -60,90 +104,124 @@ describe('resolveClarificationFocus', () => {
 			secondary: 'Świętojańska 69b, 81-389 Gdynia, Poland',
 			placeId: 'ChIJtest'
 		});
-		const [, init] = fetchImpl.mock.calls[0].arguments;
-		assert.equal(init.headers['X-Goog-Api-Key'], 'key');
-		assert.equal(JSON.parse(init.body).textQuery, 'monsun gdynia');
-	});
-
-	it('resolves restaurant plus street and city without requiring a house number', async () => {
-		const result = await resolveClarificationFocus({
-			message: 'monsun swietojanska in gdynia',
-			apiKey: 'key',
-			fetchImpl: fetchPlaces([
-				place({
-					name: 'Monsun Gdynia',
-					address: 'Świętojańska 69b, 81-389 Gdynia, Poland'
-				})
-			])
+		const [, placesInit] = fetchImpl.mock.calls[1].arguments;
+		assert.equal(placesInit.headers['X-Goog-Api-Key'], 'key');
+		assert.deepEqual(JSON.parse(placesInit.body), {
+			textQuery: 'Monsun Gdynia',
+			pageSize: 5
 		});
-
-		assert.equal(result?.placeId, 'ChIJtest');
 	});
 
-	it('resolves conversational place answers with proximity filler', async () => {
+	it('lets the model handle non-English relationship wording', async () => {
 		const result = await resolveClarificationFocus({
-			message: 'Around monsun in Gdynia',
+			message: 'Wokół Monsun w Gdyni',
+			originalQuestion: 'Co otworzyło się albo zamknęło w mojej okolicy?',
 			apiKey: 'key',
-			fetchImpl: fetchPlaces([
-				place({
-					name: 'Monsun Gdynia',
-					address: 'Świętojańska 69b, 81-389 Gdynia, Poland'
-				})
-			])
-		});
-
-		assert.equal(result?.placeId, 'ChIJtest');
-	});
-
-	it('does not choose among multiple strong same-query matches', async () => {
-		const result = await resolveClarificationFocus({
-			message: 'zeit fur brot berlin',
-			apiKey: 'key',
-			fetchImpl: fetchPlaces([
-				place({
-					id: 'a',
-					name: 'Zeit für Brot',
-					address: 'Alte Schönhauser Str. 4, Berlin, Germany'
+			fetchImpl: fetchSequence([
+				modelJson({
+					scopeType: 'place',
+					placesQuery: 'Monsun Gdynia',
+					relationship: 'around',
+					needsPlacesLookup: true,
+					reason: 'restaurant_city_anchor'
 				}),
-				place({
-					id: 'b',
-					name: 'Zeit für Brot',
-					address: 'Konstanzer Str. 1, Berlin, Germany'
+				placesJson([
+					place({
+						name: 'Monsun Gdynia',
+						address: 'Świętojańska 69b, 81-389 Gdynia, Poland'
+					})
+				]),
+				modelJson({
+					action: 'accept_place',
+					candidateIndex: 0,
+					reason: 'clear_branch_match'
 				})
-			])
+			]),
+			getToken: async () => 'token'
 		});
 
-		assert.equal(result, null);
+		assert.equal(result?.placeId, 'ChIJtest');
 	});
 
-	it('does not resolve self-referential answers', async () => {
-		const fetchImpl = fetchPlaces([
-			place({
-				name: 'Nearby Cafe',
-				address: 'Gdynia, Poland'
+	it('returns a clarification question when candidates are ambiguous', async () => {
+		const result = await resolveClarificationFocus({
+			message: 'near Zeit fur Brot in Berlin',
+			originalQuestion: 'What has opened or closed in my area recently?',
+			apiKey: 'key',
+			fetchImpl: fetchSequence([
+				modelJson({
+					scopeType: 'place',
+					placesQuery: 'Zeit für Brot Berlin',
+					relationship: 'near',
+					needsPlacesLookup: true,
+					reason: 'restaurant_city_anchor'
+				}),
+				placesJson([
+					place({
+						id: 'a',
+						name: 'Zeit für Brot',
+						address: 'Alte Schönhauser Str. 4, Berlin, Germany'
+					}),
+					place({
+						id: 'b',
+						name: 'Zeit für Brot',
+						address: 'Konstanzer Str. 1, Berlin, Germany'
+					})
+				]),
+				modelJson({
+					action: 'ask_user',
+					question: 'Which Zeit für Brot location in Berlin do you mean?',
+					reason: 'multiple_plausible_branches'
+				})
+			]),
+			getToken: async () => 'token'
+		});
+
+		assert.deepEqual(result, {
+			question: 'Which Zeit für Brot location in Berlin do you mean?',
+			reason: 'multiple_plausible_branches'
+		});
+	});
+
+	it('does not call Places when the model interprets the answer as an area', async () => {
+		const fetchImpl = fetchSequence([
+			modelJson({
+				scopeType: 'area',
+				placesQuery: '',
+				relationship: 'in',
+				needsPlacesLookup: false,
+				reason: 'neighborhood_answer'
 			})
 		]);
 
 		const result = await resolveClarificationFocus({
-			message: 'near me',
+			message: 'Williamsburg, Brooklyn',
+			originalQuestion: 'What has opened or closed in my area recently?',
 			apiKey: 'key',
-			fetchImpl
+			fetchImpl,
+			getToken: async () => 'token'
 		});
 
 		assert.equal(result, null);
-		assert.equal(fetchImpl.mock.callCount(), 0);
+		assert.equal(fetchImpl.mock.callCount(), 1);
 	});
 
-	it('does not resolve a one-token restaurant name without geography', async () => {
+	it('returns null when Places has no usable candidates', async () => {
 		const result = await resolveClarificationFocus({
-			message: 'monsun',
+			message: 'around made up restaurant in Gdynia',
+			originalQuestion: 'What has opened or closed in my area recently?',
 			apiKey: 'key',
-			fetchImpl: fetchPlaces([
-				place({
-					name: 'Monsun Gdynia',
-					address: 'Świętojańska 69b, Gdynia, Poland'
-				})
-			])
+			fetchImpl: fetchSequence([
+				modelJson({
+					scopeType: 'place',
+					placesQuery: 'Made Up Restaurant Gdynia',
+					relationship: 'around',
+					needsPlacesLookup: true,
+					reason: 'restaurant_city_anchor'
+				}),
+				placesJson([])
+			]),
+			getToken: async () => 'token'
 		});
 
 		assert.equal(result, null);

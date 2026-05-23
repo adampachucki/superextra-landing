@@ -295,6 +295,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	let creatorUid = submitterUid;
 	let newTurnIdx = 1;
 	let originalQuestion = null;
+	let clarificationQuestion = null;
 	try {
 		await db.runTransaction(async (t) => {
 			const snap = await t.get(sessionRef);
@@ -328,6 +329,18 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				const firstTurn = firstTurnSnap.exists ? firstTurnSnap.data() : null;
 				if (typeof firstTurn?.userMessage === 'string') {
 					originalQuestion = firstTurn.userMessage;
+				}
+				if (typeof firstTurn?.reply === 'string' && firstTurn.reply.trim()) {
+					clarificationQuestion = firstTurn.reply;
+				}
+				if (lastTurnIndex > 1) {
+					const previousTurnKey = String(lastTurnIndex).padStart(4, '0');
+					const previousTurnRef = sessionRef.collection('turns').doc(previousTurnKey);
+					const previousTurnSnap = await t.get(previousTurnRef);
+					const previousTurn = previousTurnSnap.exists ? previousTurnSnap.data() : null;
+					if (typeof previousTurn?.reply === 'string' && previousTurn.reply.trim()) {
+						clarificationQuestion = previousTurn.reply;
+					}
 				}
 			}
 
@@ -396,9 +409,11 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 		try {
 			const resolvedPlace = await resolveClarificationFocus({
 				message,
+				originalQuestion,
+				clarificationQuestion,
 				apiKey: googlePlacesKey.value()
 			});
-			if (resolvedPlace) {
+			if (resolvedPlace?.name) {
 				placeContext = resolvedPlace;
 				await recordResolvedPlaceContext({ sessionRef, runId, placeContext });
 				console.info('agentStream resolved clarification focus', {
@@ -408,6 +423,24 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 					placeId: resolvedPlace.placeId,
 					name: resolvedPlace.name
 				});
+			} else if (resolvedPlace?.question) {
+				await completeDirectClarification({
+					sessionRef,
+					runId,
+					turnIdx: newTurnIdx,
+					reply: resolvedPlace.question,
+					startedAtMs: now,
+					title: titleFromMessage(originalQuestion || message)
+				});
+				console.info('agentStream place resolution clarification', {
+					sessionId,
+					runId,
+					turnIdx: newTurnIdx,
+					latencyMs: Date.now() - gateStartedAtMs,
+					reason: resolvedPlace.reason
+				});
+				res.status(202).json({ ok: true, sessionId, runId, direct: 'clarification' });
+				return;
 			}
 		} catch (err) {
 			console.warn('clarification focus resolution failed; continuing gate:', err.message || err);
@@ -416,7 +449,11 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 
 	if (shouldRunClarificationGate({ isEngineFirstMessage, placeContext })) {
 		try {
-			const decision = await runClarificationGate({ message, originalQuestion });
+			const decision = await runClarificationGate({
+				message,
+				originalQuestion,
+				clarificationQuestion
+			});
 			if (decision.decision === 'clarify') {
 				await completeDirectClarification({
 					sessionRef,
@@ -451,13 +488,16 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	});
 	let queryText = `[Date: ${today}] ${message}`;
 	if (isEngineFirstMessage && originalQuestion) {
+		const clarificationLabel = clarificationQuestion
+			? `Latest clarification: "${compactSnippet(clarificationQuestion)}" `
+			: '';
 		const focusLabel =
 			placeContext && placeContext.name
 				? `Selected focus: ${[placeContext.name, placeContext.secondary].filter(Boolean).join(', ')} (Google Place ID: ${placeContext.placeId || 'unknown'}).`
 				: `Clarified focus: "${compactSnippet(message)}".`;
 		queryText = [
 			`[Date: ${today}]`,
-			`[Context: The user is answering a clarification. Original question: "${compactSnippet(originalQuestion)}" ${focusLabel}]`,
+			`[Context: The user is answering a clarification. Original question: "${compactSnippet(originalQuestion)}" ${clarificationLabel}${focusLabel}]`,
 			'Answer the original question using the clarified focus.'
 		].join(' ');
 	} else if (isEngineFirstMessage && placeContext && placeContext.name) {

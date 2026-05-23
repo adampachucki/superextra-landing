@@ -89,10 +89,13 @@ describe('buildClarificationGatePrompt', () => {
 	it('includes the original question for clarification follow-ups', () => {
 		const prompt = buildClarificationGatePrompt({
 			message: 'Williamsburg, Brooklyn',
-			originalQuestion: 'What has opened or closed in my area recently?'
+			originalQuestion: 'What has opened or closed in my area recently?',
+			clarificationQuestion: 'What area should I use?'
 		});
 		assert.match(prompt, /answering a prior clarification/);
 		assert.match(prompt, /Original question/);
+		assert.match(prompt, /Clarification question/);
+		assert.match(prompt, /What area should I use/);
 		assert.match(prompt, /Latest message/);
 		assert.match(prompt, /proposed restaurant or venue focus/);
 		assert.match(prompt, /exact address, street name, street-level location/);

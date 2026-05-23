@@ -26,11 +26,16 @@ export function shouldRunClarificationGate({ isEngineFirstMessage, placeContext 
 	return isEngineFirstMessage && !(placeContext && placeContext.name);
 }
 
-export function buildClarificationGatePrompt({ message, originalQuestion = null }) {
+export function buildClarificationGatePrompt({
+	message,
+	originalQuestion = null,
+	clarificationQuestion = null
+}) {
 	const mode = originalQuestion
 		? [
 				'The user is answering a prior clarification.',
 				`Original question: ${JSON.stringify(originalQuestion)}`,
+				`Clarification question: ${JSON.stringify(clarificationQuestion || '')}`,
 				`Latest message: ${JSON.stringify(message)}`,
 				'Decide whether the latest message supplies enough restaurant, address, area, market, or geography to research the original question.',
 				'If the latest message names a restaurant or venue plus broad geography, treat it as a proposed restaurant or venue focus, not as a pure geography answer.',
@@ -96,7 +101,11 @@ export function parseClarificationGateResponse(text) {
 	};
 }
 
-export async function runClarificationGate({ message, originalQuestion = null }) {
+export async function runClarificationGate({
+	message,
+	originalQuestion = null,
+	clarificationQuestion = null
+}) {
 	const token = await _getToken();
 	const url = `${VERTEX_BASE}/v1/projects/${_projectId()}/locations/global/publishers/google/models/${MODEL}:generateContent`;
 	const response = await fetch(url, {
@@ -109,7 +118,15 @@ export async function runClarificationGate({ message, originalQuestion = null })
 			contents: [
 				{
 					role: 'user',
-					parts: [{ text: buildClarificationGatePrompt({ message, originalQuestion }) }]
+					parts: [
+						{
+							text: buildClarificationGatePrompt({
+								message,
+								originalQuestion,
+								clarificationQuestion
+							})
+						}
+					]
 				}
 			],
 			generationConfig: {
