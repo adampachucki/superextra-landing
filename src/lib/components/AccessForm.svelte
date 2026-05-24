@@ -334,10 +334,10 @@
 {#snippet step2()}
 	<div class="step-content">
 		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
-			Add the business context
+			Add business details
 		</h2>
 		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
-			These details shape the demo around the right market.
+			Help us understand your needs.
 		</p>
 
 		<div class="space-y-4">
@@ -495,10 +495,10 @@
 {#snippet step3()}
 	<div class="step-content">
 		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
-			Demo contact
+			Your contact details
 		</h2>
 		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
-			A confirmation email will be sent immediately.
+			Available time slots will arrive by email.
 		</p>
 
 		<div class="space-y-4">
