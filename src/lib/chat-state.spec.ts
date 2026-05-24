@@ -428,15 +428,90 @@ describe('chatState (Firestore-driven)', () => {
 			expect(msgs).toHaveLength(2);
 			expect(msgs[0]).toMatchObject({
 				role: 'user',
+				kind: 'user',
 				text: 'hello',
 				timestamp: 1000
 			});
 			expect(msgs[1]).toMatchObject({
 				role: 'agent',
+				kind: 'final',
 				text: 'hi there',
 				timestamp: 2000
 			});
 			expect(msgs[1].sources).toEqual([{ url: 'https://e.com', title: 'e' }]);
+		});
+
+		it('flattens in-flight acknowledgement turns into user + acknowledgement messages', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.turns('sid-1'));
+
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'open a taco shop near Pike Place?',
+							status: 'running',
+							reply: null,
+							acknowledgement:
+								"I have enough context to start on Pike Place; I'll prepare the report in a few minutes.",
+							acknowledgedAt: { toMillis: () => 1500 },
+							createdAt: { toMillis: () => 1000 }
+						}
+					}
+				])
+			);
+
+			expect(chatState.messages).toEqual([
+				expect.objectContaining({
+					role: 'user',
+					kind: 'user',
+					text: 'open a taco shop near Pike Place?'
+				}),
+				expect.objectContaining({
+					role: 'agent',
+					kind: 'acknowledgement',
+					text: "I have enough context to start on Pike Place; I'll prepare the report in a few minutes.",
+					timestamp: 1500
+				})
+			]);
+		});
+
+		it('keeps acknowledgement before the final answer when the turn completes', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.turns('sid-1'));
+
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'compare salad pricing in FiDi',
+							status: 'complete',
+							reply: 'Final report',
+							acknowledgement:
+								"I have enough scope for salad pricing around FiDi; I'll prepare the report in a few minutes.",
+							createdAt: { toMillis: () => 1000 },
+							acknowledgedAt: { toMillis: () => 1500 },
+							completedAt: { toMillis: () => 2000 }
+						}
+					}
+				])
+			);
+
+			expect(chatState.messages.map((msg) => [msg.role, msg.kind, msg.text])).toEqual([
+				['user', 'user', 'compare salad pricing in FiDi'],
+				[
+					'agent',
+					'acknowledgement',
+					"I have enough scope for salad pricing around FiDi; I'll prepare the report in a few minutes."
+				],
+				['agent', 'final', 'Final report']
+			]);
 		});
 
 		it('does not animate turns that arrive already complete', async () => {
@@ -586,7 +661,7 @@ describe('chatState (Firestore-driven)', () => {
 			expect(msgs[0]).toMatchObject({ role: 'user', text: 'working?' });
 		});
 
-		it('error turns render only the user message (no agent row)', async () => {
+		it('error turns without acknowledgement render only the user message', async () => {
 			const obs = captureObservers();
 			chatState.selectSession('sid-1');
 			await waitUntil(() => !!obs.turns('sid-1'));
@@ -609,6 +684,41 @@ describe('chatState (Firestore-driven)', () => {
 
 			expect(chatState.messages).toHaveLength(1);
 			expect(chatState.error).toBe('pipeline_error');
+		});
+
+		it('error turns keep an acknowledgement that was already shown', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.turns('sid-1'));
+
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'can this market support another cafe?',
+							status: 'error',
+							reply: null,
+							acknowledgement:
+								"I have enough context to start on the cafe market; I'll prepare the report in a few minutes.",
+							error: 'handoff_failed',
+							createdAt: { toMillis: () => 1000 },
+							acknowledgedAt: { toMillis: () => 1500 }
+						}
+					}
+				])
+			);
+
+			expect(chatState.messages.map((msg) => [msg.role, msg.kind, msg.text])).toEqual([
+				['user', 'user', 'can this market support another cafe?'],
+				[
+					'agent',
+					'acknowledgement',
+					"I have enough context to start on the cafe market; I'll prepare the report in a few minutes."
+				]
+			]);
+			expect(chatState.error).toBe('handoff_failed');
 		});
 	});
 

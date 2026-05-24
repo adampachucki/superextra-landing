@@ -43,6 +43,7 @@ function uuid(): string {
 
 export interface ChatMessage {
 	role: 'user' | 'agent';
+	kind: 'user' | 'acknowledgement' | 'final';
 	text: string;
 	timestamp: number;
 	turnIndex: number;
@@ -92,9 +93,11 @@ export interface Turn {
 	userMessage: string;
 	status: 'pending' | 'running' | 'complete' | 'error';
 	reply: string | null;
+	acknowledgement: string | null;
 	sources: ChatSource[] | null;
 	turnSummary: TurnSummary | null;
 	createdAtMs: number | null;
+	acknowledgedAtMs: number | null;
 	completedAtMs: number | null;
 	error: string | null;
 }
@@ -219,14 +222,25 @@ function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
 	for (const turn of turnList) {
 		msgs.push({
 			role: 'user',
+			kind: 'user',
 			text: turn.userMessage,
 			timestamp: turn.createdAtMs ?? Date.now(),
 			turnIndex: turn.turnIndex
 		});
+		if (turn.acknowledgement) {
+			msgs.push({
+				role: 'agent',
+				kind: 'acknowledgement',
+				text: turn.acknowledgement,
+				timestamp: turn.acknowledgedAtMs ?? turn.createdAtMs ?? Date.now(),
+				turnIndex: turn.turnIndex
+			});
+		}
 		if (turn.status === 'complete' && turn.reply) {
 			const activityEvents = completedActivityByTurn.get(turn.turnIndex);
 			msgs.push({
 				role: 'agent',
+				kind: 'final',
 				text: turn.reply,
 				timestamp: turn.completedAtMs ?? Date.now(),
 				turnIndex: turn.turnIndex,
@@ -333,9 +347,11 @@ function makeOptimisticTurn(turnIndex: number, userMessage: string, startedAtMs:
 		userMessage,
 		status: 'pending',
 		reply: null,
+		acknowledgement: null,
 		sources: null,
 		turnSummary: null,
 		createdAtMs: startedAtMs,
+		acknowledgedAtMs: null,
 		completedAtMs: null,
 		error: null
 	};
@@ -469,9 +485,11 @@ async function attachActiveListeners(sid: string) {
 					userMessage: (data.userMessage as string | undefined) ?? '',
 					status,
 					reply: (data.reply as string | null | undefined) ?? null,
+					acknowledgement: (data.acknowledgement as string | null | undefined) ?? null,
 					sources: Array.isArray(sourcesRaw) ? sourcesRaw : null,
 					turnSummary: (data.turnSummary as TurnSummary | null | undefined) ?? null,
 					createdAtMs: toMillis(data.createdAt),
+					acknowledgedAtMs: toMillis(data.acknowledgedAt),
 					completedAtMs: toMillis(data.completedAt),
 					error: (data.error as string | null | undefined) ?? null
 				};

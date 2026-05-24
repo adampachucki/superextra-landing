@@ -78,6 +78,10 @@ describe('buildIntakePrompt', () => {
 		assert.match(prompt, /avoid filler or reassurance/i);
 		assert.match(prompt, /newline characters/i);
 		assert.match(prompt, /1\. Name - address/);
+		assert.match(prompt, /acknowledgementOptions/);
+		assert.match(prompt, /report will take a few minutes/);
+		assert.match(prompt, /first-person sentence/);
+		assert.match(prompt, /I have enough context/);
 		assert.doesNotMatch(prompt, /first round/i);
 		assert.doesNotMatch(prompt, /second round/i);
 	});
@@ -126,6 +130,11 @@ describe('runIntakeConversation', () => {
 				modelJson({
 					action: 'reply',
 					reply: 'What area should I check?',
+					acknowledgementOptions: {
+						primary: 'Should not be used.',
+						alternate: '',
+						brief: ''
+					},
 					reason: 'missing_scope',
 					state: {
 						...emptyState,
@@ -147,6 +156,14 @@ describe('runIntakeConversation', () => {
 			modelJson({
 				action: 'start_research',
 				researchQuestion: 'What has opened or closed in Williamsburg, Brooklyn recently?',
+				acknowledgementOptions: {
+					primary:
+						"I have enough context to start on Williamsburg, Brooklyn; I'll review local market movement and prepare the report in a few minutes.",
+					alternate:
+						'I have enough scope for Williamsburg, Brooklyn; the report will take a few minutes to prepare.',
+					brief:
+						'I can start the Williamsburg, Brooklyn openings and closures analysis now; it will take a few minutes.'
+				},
 				reason: 'area_scope_ready',
 				state: {
 					...emptyState,
@@ -176,7 +193,53 @@ describe('runIntakeConversation', () => {
 			result.researchQuestion,
 			'What has opened or closed in Williamsburg, Brooklyn recently?'
 		);
+		assert.deepEqual(result.acknowledgements.slice(0, 2), [
+			"I have enough context to start on Williamsburg, Brooklyn; I'll review local market movement and prepare the report in a few minutes.",
+			'I have enough scope for Williamsburg, Brooklyn; the report will take a few minutes to prepare.'
+		]);
+		assert.ok(result.acknowledgements.length > 2);
+		assert.match(result.acknowledgements.at(-1), /Williamsburg, Brooklyn/);
 		assert.equal(result.placeContext, null);
+	});
+
+	it('replaces vague model acknowledgements with scoped options that meet the product contract', async () => {
+		const result = await runIntakeConversation({
+			message: 'Should we open a second taco shop near Pike Place, or is that area too saturated?',
+			fetchImpl: fetchSequence([
+				modelJson({
+					action: 'start_research',
+					researchQuestion:
+						'Market saturation analysis for taco shops near Pike Place Market in Seattle.',
+					acknowledgementOptions: {
+						primary:
+							'There is enough context to analyze the taco shop market near Pike Place Market. The report will be ready in a few minutes.',
+						alternate:
+							'Research on the taco shop market around Pike Place Market is underway. Expect the report shortly.',
+						brief:
+							'Analyzing taco shop market saturation near Pike Place Market. Report coming soon.'
+					},
+					reason: 'market_scope_ready',
+					state: {
+						...emptyState,
+						originalIntent:
+							'Should we open a second taco shop near Pike Place, or is that area too saturated?',
+						scopeSummary: 'Pike Place taco-shop expansion and saturation analysis'
+					}
+				})
+			]),
+			getToken: async () => 'token'
+		});
+
+		assert.equal(result.action, 'start_research');
+		assert.equal(result.acknowledgements.length, 6);
+		for (const acknowledgement of result.acknowledgements) {
+			assert.match(acknowledgement, /Pike Place taco-shop/);
+			assert.match(acknowledgement, /\bI\b|I['’](ll|ve|m)\b/);
+			assert.match(acknowledgement, /few minutes/);
+			assert.doesNotMatch(acknowledgement, /Superextra|the models/i);
+			assert.doesNotMatch(acknowledgement, /\b(you|your)\b/i);
+			assert.doesNotMatch(acknowledgement, /\?/);
+		}
 	});
 
 	it('uses Places and accepts a model-selected place by Place ID', async () => {

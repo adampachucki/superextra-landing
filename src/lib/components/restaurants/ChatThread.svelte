@@ -24,7 +24,7 @@
 
 	const revealTurnIndex = $derived.by(() => {
 		const latest = chatState.messages[chatState.messages.length - 1];
-		return latest?.role === 'agent' && latest.animateReveal ? latest.turnIndex : null;
+		return latest?.kind === 'final' && latest.animateReveal ? latest.turnIndex : null;
 	});
 	const scrollKey = $derived(
 		[
@@ -218,7 +218,7 @@
 
 <div bind:this={scrollEl} class="px-5 py-6 md:px-6">
 	<div bind:this={contentEl} class="flex flex-col gap-5">
-		{#each chatState.messages as msg, i (`${chatState.activeSid ?? 'local'}:${msg.turnIndex}:${msg.role}`)}
+		{#each chatState.messages as msg, i (`${chatState.activeSid ?? 'local'}:${msg.turnIndex}:${msg.role}:${msg.kind}`)}
 			{#if msg.role === 'user'}
 				<div
 					class="mx-auto flex w-full max-w-[700px] scroll-mt-6 justify-end"
@@ -229,6 +229,12 @@
 					>
 						{msg.text}
 					</div>
+				</div>
+			{:else if msg.kind === 'acknowledgement'}
+				<div class="assistant-row max-w-[700px] min-w-0 px-1 py-1">
+					<p class="text-[15px] leading-relaxed text-black/55 dark:text-white/55">
+						{msg.text}
+					</p>
 				</div>
 			{:else}
 				<div class="assistant-row min-w-0 px-1 py-1">

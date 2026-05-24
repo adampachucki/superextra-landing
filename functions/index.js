@@ -142,6 +142,33 @@ function titleFromMessage(message) {
 		.slice(0, 60);
 }
 
+function hashString(value) {
+	let hash = 2166136261;
+	for (let i = 0; i < value.length; i += 1) {
+		hash ^= value.charCodeAt(i);
+		hash = Math.imul(hash, 16777619);
+	}
+	return hash >>> 0;
+}
+
+function chooseAcknowledgement(options, seed) {
+	if (!Array.isArray(options) || options.length === 0) return null;
+	const seen = new Set();
+	const choices = [];
+	for (const option of options) {
+		const text = String(option || '')
+			.trim()
+			.replace(/\s+/g, ' ')
+			.slice(0, 320);
+		const key = text.toLocaleLowerCase();
+		if (!text || seen.has(key)) continue;
+		seen.add(key);
+		choices.push(text);
+	}
+	if (!choices.length) return null;
+	return choices[hashString(seed) % choices.length];
+}
+
 async function completeDirectIntake({
 	sessionRef,
 	runId,
@@ -198,7 +225,9 @@ async function markEngineSessionStarted({ sessionRef, runId }) {
 	});
 }
 
-async function recordPlaceContext({ sessionRef, runId, placeContext }) {
+async function recordResearchStart({ sessionRef, runId, turnIdx, placeContext, acknowledgement }) {
+	const turnKey = String(turnIdx).padStart(4, '0');
+	const turnRef = sessionRef.collection('turns').doc(turnKey);
 	await db.runTransaction(async (tx) => {
 		const snap = await tx.get(sessionRef);
 		if (!snap.exists) return;
@@ -208,6 +237,12 @@ async function recordPlaceContext({ sessionRef, runId, placeContext }) {
 			placeContext,
 			updatedAt: FieldValue.serverTimestamp()
 		});
+		if (acknowledgement) {
+			tx.update(turnRef, {
+				acknowledgement,
+				acknowledgedAt: FieldValue.serverTimestamp()
+			});
+		}
 	});
 }
 
@@ -377,6 +412,8 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				userMessage: message,
 				status: 'pending',
 				reply: null,
+				acknowledgement: null,
+				acknowledgedAt: null,
 				sources: null,
 				turnSummary: null,
 				createdAt: FieldValue.serverTimestamp(),
@@ -432,12 +469,20 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 			if (decision.action === 'start_research') {
 				researchQuestion = decision.researchQuestion || message;
 				placeContext = decision.placeContext || null;
-				await recordPlaceContext({ sessionRef, runId, placeContext });
+				const acknowledgement = chooseAcknowledgement(decision.acknowledgements, runId);
+				await recordResearchStart({
+					sessionRef,
+					runId,
+					turnIdx: newTurnIdx,
+					placeContext,
+					acknowledgement
+				});
 				console.info('agentStream intake ready for research', {
 					sessionId,
 					runId,
 					turnIdx: newTurnIdx,
 					latencyMs: Date.now() - intakeStartedAtMs,
+					hasAcknowledgement: !!acknowledgement,
 					placeId: placeContext?.placeId || null,
 					reason: decision.reason
 				});

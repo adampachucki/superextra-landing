@@ -98,6 +98,10 @@ const runIntakeConversationMock = mock.fn(async ({ message, selectedPlaceContext
 	action: 'start_research',
 	researchQuestion: message,
 	placeContext: selectedPlaceContext,
+	acknowledgements: [
+		"I have enough context to start; I'll prepare the report in a few minutes.",
+		'I have enough scope to start; the report will take a few minutes.'
+	],
 	state: null,
 	reason: 'test_default'
 }));
@@ -193,6 +197,10 @@ beforeEach(() => {
 			action: 'start_research',
 			researchQuestion: message,
 			placeContext: selectedPlaceContext,
+			acknowledgements: [
+				"I have enough context to start; I'll prepare the report in a few minutes.",
+				'I have enough scope to start; the report will take a few minutes.'
+			],
 			state: null,
 			reason: 'test_default'
 		})
@@ -452,7 +460,8 @@ describe('agentStream', () => {
 		assert.equal(res._json.sessionId, 'sess-1');
 		assert.match(res._json.runId, /^[0-9a-f-]{36}$/);
 
-		const { sessionSets, sessionUpdates, turnSets } = partitionWrites('sessions/sess-1');
+		const { sessionSets, sessionUpdates, turnSets, turnUpdates } =
+			partitionWrites('sessions/sess-1');
 
 		// First turn: set session, set turn 0001, then mark the Engine session as started.
 		assert.equal(sessionSets.length, 1);
@@ -486,6 +495,13 @@ describe('agentStream', () => {
 		assert.equal(turnDoc.runId, res._json.runId);
 		assert.equal(turnDoc.userMessage, 'What is the menu like?');
 		assert.equal(turnDoc.status, 'pending');
+		assert.equal(turnDoc.acknowledgement, null);
+		assert.equal(turnDoc.acknowledgedAt, null);
+		const ackUpdate = turnUpdates.find((update) => update.data.acknowledgement);
+		assert.ok(ackUpdate);
+		assert.equal(ackUpdate.path, 'sessions/sess-1/turns/0001');
+		assert.match(ackUpdate.data.acknowledgement, /few minutes/);
+		assert.equal(ackUpdate.data.acknowledgedAt, '__server_timestamp__');
 
 		// Research-ready turns hand off to the Reasoning Engine.
 		assert.equal(gearHandoffMock.mock.callCount(), 1);
@@ -631,20 +647,25 @@ describe('agentStream', () => {
 	it('later intake turn creates the first Engine session from model-synthesized intent', async () => {
 		mockDb.get.mock.mockImplementation(async (ref) => {
 			if (ref._path === 'sessions/sess-1') {
+				const updateCalls = mockDb.update.mock.calls.filter(
+					(c) => c.arguments[0]?._path === ref._path
+				);
+				const base = {
+					userId: 'user-good-token',
+					participants: ['user-good-token'],
+					status: 'complete',
+					lastTurnIndex: 1,
+					engineSessionStarted: false,
+					intakeState: {
+						originalIntent: 'What has opened or closed in my area recently?',
+						pendingQuestion: 'What area should I use?'
+					},
+					currentRunId: 'prior-run'
+				};
+				const data = Object.assign({}, base, ...updateCalls.map((c) => c.arguments[1]));
 				return {
 					exists: true,
-					data: () => ({
-						userId: 'user-good-token',
-						participants: ['user-good-token'],
-						status: 'complete',
-						lastTurnIndex: 1,
-						engineSessionStarted: false,
-						intakeState: {
-							originalIntent: 'What has opened or closed in my area recently?',
-							pendingQuestion: 'What area should I use?'
-						},
-						currentRunId: 'prior-run'
-					})
+					data: () => data
 				};
 			}
 			if (ref._path === 'sessions/sess-1/turns/0001') {
@@ -661,6 +682,9 @@ describe('agentStream', () => {
 			action: 'start_research',
 			researchQuestion: 'What has opened or closed in Williamsburg, Brooklyn recently?',
 			placeContext: null,
+			acknowledgements: [
+				"I have enough context to start on Williamsburg, Brooklyn; I'll prepare the report in a few minutes."
+			],
 			state: {
 				originalIntent: 'What has opened or closed in my area recently?',
 				scopeSummary: 'Williamsburg, Brooklyn'
@@ -689,6 +713,11 @@ describe('agentStream', () => {
 		assert.equal(handoffArg.turnIdx, 2);
 		assert.equal(handoffArg.isEngineFirstMessage, true);
 		assert.match(handoffArg.message, /What has opened or closed in Williamsburg, Brooklyn/);
+		const { turnUpdates } = partitionWrites('sessions/sess-1');
+		assert.equal(
+			turnUpdates.find((update) => update.data.acknowledgement)?.data.acknowledgement,
+			"I have enough context to start on Williamsburg, Brooklyn; I'll prepare the report in a few minutes."
+		);
 	});
 
 	it('later intake turn can start research with a typed place', async () => {

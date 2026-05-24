@@ -192,6 +192,45 @@ describe('ChatThread', () => {
 		expect(body).toContain('https://example.com/1');
 	});
 
+	it('renders research acknowledgements as plain assistant text', async () => {
+		const obs = captureObservers();
+		const sid = 'sid-ack';
+		chatState.selectSession(sid);
+		await waitUntil(() => !!obs.turns(sid));
+
+		obs.session(sid)!.onNext(
+			sessionSnap({
+				userId: 'uid-test',
+				participants: ['uid-test'],
+				status: 'running',
+				currentRunId: 'run-ack',
+				lastTurnIndex: 1
+			})
+		);
+		obs.turns(sid)!.onNext(
+			turnsSnap([
+				{
+					data: {
+						turnIndex: 1,
+						runId: 'run-ack',
+						userMessage: 'open a taco shop near Pike Place?',
+						status: 'running',
+						reply: null,
+						acknowledgement:
+							"I have enough context to start on Pike Place; I'll prepare the report in a few minutes.",
+						createdAt: { toMillis: () => 1000 },
+						acknowledgedAt: { toMillis: () => 1500 }
+					}
+				}
+			])
+		);
+
+		const { body } = render(ChatThread, { props: {} });
+		expect(body).toContain('I have enough context to start on Pike Place');
+		expect(body).not.toContain('Read aloud');
+		expect(body).not.toContain('Sources');
+	});
+
 	it('shows source and activity metadata once thresholds are met', async () => {
 		const { obs, sid } = await primeCompleteTurn({
 			sourceCount: 5,
