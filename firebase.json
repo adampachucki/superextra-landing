@@ -3,7 +3,15 @@
 		{
 			"target": "landing",
 			"public": "build",
-			"ignore": ["firebase.json", "**/.*", "**/node_modules/**", "index.html", "chat.html"],
+			"ignore": [
+				"firebase.json",
+				"**/.*",
+				"**/node_modules/**",
+				"index.html",
+				"chat.html",
+				"robots-agent.txt",
+				"sitemap.xml"
+			],
 			"cleanUrls": true,
 			"headers": [
 				{
@@ -12,6 +20,7 @@
 						{ "key": "X-Content-Type-Options", "value": "nosniff" },
 						{ "key": "X-Frame-Options", "value": "DENY" },
 						{ "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+						{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet" },
 						{ "key": "Permissions-Policy", "value": "camera=(), microphone=(self), geolocation=()" }
 					]
 				}
@@ -35,6 +44,10 @@
 			],
 			"rewrites": [
 				{
+					"source": "/robots.txt",
+					"destination": "/robots-landing.txt"
+				},
+				{
 					"source": "/api/intake",
 					"function": "intake"
 				},
@@ -55,16 +68,29 @@
 		{
 			"target": "agent",
 			"public": "build",
-			"ignore": ["firebase.json", "**/.*", "**/node_modules/**", "landing.html"],
+			"ignore": [
+				"firebase.json",
+				"**/.*",
+				"**/node_modules/**",
+				"landing.html",
+				"robots-landing.txt"
+			],
 			"cleanUrls": true,
 			"headers": [
+				{
+					"source": "/chat{,/**}",
+					"headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet" }]
+				},
+				{
+					"source": "/chat.html",
+					"headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet" }]
+				},
 				{
 					"source": "**",
 					"headers": [
 						{ "key": "X-Content-Type-Options", "value": "nosniff" },
 						{ "key": "X-Frame-Options", "value": "DENY" },
 						{ "key": "Referrer-Policy", "value": "no-referrer" },
-						{ "key": "X-Robots-Tag", "value": "noindex, nofollow" },
 						{ "key": "Permissions-Policy", "value": "camera=(), microphone=(self), geolocation=()" }
 					]
 				}
@@ -82,6 +108,10 @@
 				}
 			],
 			"rewrites": [
+				{
+					"source": "/robots.txt",
+					"destination": "/robots-agent.txt"
+				},
 				{
 					"source": "/api/agent/stream",
 					"function": "agentStream"

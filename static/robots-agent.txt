@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /chat
+Disallow: /agent/chat
+Disallow: /api/
+
+Sitemap: https://agent.superextra.ai/sitemap.xml

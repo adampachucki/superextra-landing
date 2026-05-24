@@ -4,6 +4,7 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import AccessForm from '$lib/components/AccessForm.svelte';
+	import Seo from '$lib/components/Seo.svelte';
 	import RestaurantHero from '$lib/components/restaurants/RestaurantHero.svelte';
 	import About from '$lib/components/About.svelte';
 
@@ -70,19 +71,10 @@
 	];
 </script>
 
-<svelte:head>
-	<title>Restaurant Intelligence - Superextra</title>
-	<meta
-		name="description"
-		content="AI-powered market intelligence that shows you where you stand against the competition and where to go next."
-	/>
-	<meta property="og:title" content="Restaurant Intelligence - Superextra" />
-	<meta
-		property="og:description"
-		content="See what's happening outside your four walls. Market analyst for every restaurant."
-	/>
-	<meta property="og:url" content="https://agent.superextra.ai" />
-</svelte:head>
+<Seo
+	title="Superextra - Restaurant Market Intelligence"
+	description="AI market intelligence for restaurants, synthesizing competitor, pricing, guest, delivery, and local market signals into operator-ready answers."
+/>
 
 <div class="page-exit" class:is-leaving={leaving}>
 	<Navbar minimal />

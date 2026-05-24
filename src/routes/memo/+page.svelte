@@ -2,15 +2,14 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import HeroCanvas from '$lib/components/HeroCanvas.svelte';
+	import Seo from '$lib/components/Seo.svelte';
 </script>
 
-<svelte:head>
-	<title>Memo - Superextra</title>
-	<meta
-		name="description"
-		content="Superextra — the market intelligence layer restaurants have been missing."
-	/>
-</svelte:head>
+<Seo
+	title="Memo - Superextra"
+	description="Superextra memo on the market intelligence layer restaurants have been missing."
+	canonicalPath="/memo"
+/>
 
 <Navbar transparent />
 

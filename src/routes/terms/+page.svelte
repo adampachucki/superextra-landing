@@ -1,15 +1,14 @@
 <script lang="ts">
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
+	import Seo from '$lib/components/Seo.svelte';
 </script>
 
-<svelte:head>
-	<title>Terms & Conditions - Superextra</title>
-	<meta
-		name="description"
-		content="Superextra Terms & Conditions — the rules governing use of our platform."
-	/>
-</svelte:head>
+<Seo
+	title="Terms & Conditions - Superextra"
+	description="Superextra Terms & Conditions governing access to and use of the platform."
+	canonicalPath="/terms"
+/>
 
 <Navbar />
 

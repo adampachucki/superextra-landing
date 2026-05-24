@@ -3,6 +3,7 @@
 	import ChatThread from '$lib/components/restaurants/ChatThread.svelte';
 	import PromptIcon from '$lib/components/restaurants/PromptIcon.svelte';
 	import RestaurantPromptComposer from '$lib/components/restaurants/RestaurantPromptComposer.svelte';
+	import Seo from '$lib/components/Seo.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { theme } from '$lib/theme.svelte';
 	import { dictation } from '$lib/dictation.svelte';
@@ -286,13 +287,12 @@
 
 <svelte:window onclick={handleWindowClick} />
 
-<svelte:head>
-	<title>Chat - Superextra</title>
-	<meta
-		name="description"
-		content="Ask questions about your restaurant market. Powered by Superextra."
-	/>
-</svelte:head>
+<Seo
+	title="Chat - Superextra"
+	description="Restaurant market research chat powered by Superextra."
+	canonicalPath="/chat"
+	robots="noindex, nofollow, noarchive, nosnippet"
+/>
 
 <!-- Floating sidebar toggle (outside chat-enter to avoid transform containing block) -->
 <button

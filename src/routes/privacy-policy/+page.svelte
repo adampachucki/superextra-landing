@@ -1,15 +1,14 @@
 <script lang="ts">
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
+	import Seo from '$lib/components/Seo.svelte';
 </script>
 
-<svelte:head>
-	<title>Privacy Policy - Superextra</title>
-	<meta
-		name="description"
-		content="Superextra Privacy Policy — how we collect, use, and protect your data."
-	/>
-</svelte:head>
+<Seo
+	title="Privacy Policy - Superextra"
+	description="Superextra Privacy Policy covering data collection, usage, protection, and retention."
+	canonicalPath="/privacy-policy"
+/>
 
 <Navbar />
 
