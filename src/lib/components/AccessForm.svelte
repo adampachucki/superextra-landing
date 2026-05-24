@@ -311,7 +311,7 @@
 {#snippet step1()}
 	<div class="step-content">
 		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
-			What kind of business is the demo for?
+			What kind of business do you run?
 		</h2>
 		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">Choose the closest fit.</p>
 
@@ -334,7 +334,7 @@
 {#snippet step2()}
 	<div class="step-content">
 		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
-			Add business details
+			Add your business details
 		</h2>
 		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
 			Help us understand your needs.
@@ -710,7 +710,7 @@
 								</svg>
 								Submitting...
 							{:else}
-								Book a demo
+								Request demo
 							{/if}
 						</button>
 					{/if}
