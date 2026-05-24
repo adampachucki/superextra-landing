@@ -1,7 +1,7 @@
 import { GoogleAuth } from 'google-auth-library';
 
 const VERTEX_BASE = 'https://aiplatform.googleapis.com';
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-2.5-flash-lite';
 
 let _auth = null;
 
