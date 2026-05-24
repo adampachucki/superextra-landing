@@ -217,7 +217,7 @@ describe('ChatThread', () => {
 						status: 'running',
 						reply: null,
 						acknowledgement:
-							"I have enough context to start on Pike Place; I'll prepare the report in a few minutes.",
+							'Reviewing recent restaurant openings and closures near Pike Place. The report will take a few minutes.',
 						createdAt: { toMillis: () => 1000 },
 						acknowledgedAt: { toMillis: () => 1500 }
 					}
@@ -226,7 +226,7 @@ describe('ChatThread', () => {
 		);
 
 		const { body } = render(ChatThread, { props: {} });
-		expect(body).toContain('I have enough context to start on Pike Place');
+		expect(body).toContain('Reviewing recent restaurant openings and closures near Pike Place');
 		expect(body).not.toContain('Read aloud');
 		expect(body).not.toContain('Sources');
 	});

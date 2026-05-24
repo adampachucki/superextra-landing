@@ -94,13 +94,14 @@ describe('buildIntakePrompt', () => {
 		assert.match(prompt, /food\/drink brand/);
 		assert.match(prompt, /Do not select a candidate just because the street/);
 		assert.match(prompt, /selected place context is relevant/i);
-		assert.match(prompt, /avoid filler or reassurance/i);
-		assert.match(prompt, /newline characters/i);
-		assert.match(prompt, /1\. Name - address/);
-		assert.match(prompt, /acknowledgementOptions/);
+		assert.match(prompt, /put each option on its own line/i);
+		assert.match(prompt, /acknowledgement/);
 		assert.match(prompt, /report will take a few minutes/);
-		assert.match(prompt, /first-person sentence/);
-		assert.match(prompt, /I have enough context/);
+		assert.match(prompt, /plain and direct/);
+		assert.doesNotMatch(prompt, /acknowledgementOptions/);
+		assert.doesNotMatch(prompt, /first-person sentence/);
+		assert.doesNotMatch(prompt, /I have enough context/);
+		assert.doesNotMatch(prompt, /avoid filler or reassurance/i);
 		assert.doesNotMatch(prompt, /first round/i);
 		assert.doesNotMatch(prompt, /second round/i);
 	});
@@ -149,11 +150,7 @@ describe('runIntakeConversation', () => {
 				modelJson({
 					action: 'reply',
 					reply: 'What area should I check?',
-					acknowledgementOptions: {
-						primary: 'Should not be used.',
-						alternate: '',
-						brief: ''
-					},
+					acknowledgement: '',
 					reason: 'missing_scope',
 					state: {
 						...emptyState,
@@ -175,14 +172,8 @@ describe('runIntakeConversation', () => {
 			modelJson({
 				action: 'start_research',
 				researchQuestion: 'What has opened or closed in Williamsburg, Brooklyn recently?',
-				acknowledgementOptions: {
-					primary:
-						"I have enough context to start on Williamsburg, Brooklyn; I'll review local market movement and prepare the report in a few minutes.",
-					alternate:
-						'I have enough scope for Williamsburg, Brooklyn; the report will take a few minutes to prepare.',
-					brief:
-						'I can start the Williamsburg, Brooklyn openings and closures analysis now; it will take a few minutes.'
-				},
+				acknowledgement:
+					'Reviewing recent restaurant openings and closures in Williamsburg, Brooklyn. The report will take a few minutes.',
 				reason: 'area_scope_ready',
 				state: {
 					...emptyState,
@@ -212,16 +203,41 @@ describe('runIntakeConversation', () => {
 			result.researchQuestion,
 			'What has opened or closed in Williamsburg, Brooklyn recently?'
 		);
-		assert.deepEqual(result.acknowledgements.slice(0, 2), [
-			"I have enough context to start on Williamsburg, Brooklyn; I'll review local market movement and prepare the report in a few minutes.",
-			'I have enough scope for Williamsburg, Brooklyn; the report will take a few minutes to prepare.'
-		]);
-		assert.ok(result.acknowledgements.length > 2);
-		assert.match(result.acknowledgements.at(-1), /Williamsburg, Brooklyn/);
+		assert.equal(
+			result.acknowledgement,
+			'Reviewing recent restaurant openings and closures in Williamsburg, Brooklyn. The report will take a few minutes.'
+		);
 		assert.equal(result.placeContext, null);
 	});
 
-	it('replaces vague model acknowledgements with scoped options that meet the product contract', async () => {
+	it('keeps a localized model acknowledgement without English phrase checks', async () => {
+		const result = await runIntakeConversation({
+			message: 'Co otworzyło się lub zamknęło ostatnio w centrum Gdyni?',
+			fetchImpl: fetchSequence([
+				modelJson({
+					action: 'start_research',
+					researchQuestion: 'Co otworzyło się lub zamknęło ostatnio w centrum Gdyni?',
+					acknowledgement:
+						'Sprawdzam otwarcia i zamknięcia w centrum Gdyni. Raport zajmie kilka minut.',
+					reason: 'market_scope_ready',
+					state: {
+						...emptyState,
+						originalIntent: 'Co otworzyło się lub zamknęło ostatnio w centrum Gdyni?',
+						scopeSummary: 'centrum Gdyni'
+					}
+				})
+			]),
+			getToken: async () => 'token'
+		});
+
+		assert.equal(result.action, 'start_research');
+		assert.equal(
+			result.acknowledgement,
+			'Sprawdzam otwarcia i zamknięcia w centrum Gdyni. Raport zajmie kilka minut.'
+		);
+	});
+
+	it('uses a simple fallback acknowledgement when the model acknowledgement is unusable', async () => {
 		const result = await runIntakeConversation({
 			message: 'Should we open a second taco shop near Pike Place, or is that area too saturated?',
 			fetchImpl: fetchSequence([
@@ -229,14 +245,7 @@ describe('runIntakeConversation', () => {
 					action: 'start_research',
 					researchQuestion:
 						'Market saturation analysis for taco shops near Pike Place Market in Seattle.',
-					acknowledgementOptions: {
-						primary:
-							'There is enough context to analyze the taco shop market near Pike Place Market. The report will be ready in a few minutes.',
-						alternate:
-							'Research on the taco shop market around Pike Place Market is underway. Expect the report shortly.',
-						brief:
-							'Analyzing taco shop market saturation near Pike Place Market. Report coming soon.'
-					},
+					acknowledgement: 'scopeKind says this is ready.',
 					reason: 'market_scope_ready',
 					state: {
 						...emptyState,
@@ -250,15 +259,10 @@ describe('runIntakeConversation', () => {
 		});
 
 		assert.equal(result.action, 'start_research');
-		assert.equal(result.acknowledgements.length, 6);
-		for (const acknowledgement of result.acknowledgements) {
-			assert.match(acknowledgement, /Pike Place taco-shop/);
-			assert.match(acknowledgement, /\bI\b|I['’](ll|ve|m)\b/);
-			assert.match(acknowledgement, /few minutes/);
-			assert.doesNotMatch(acknowledgement, /Superextra|the models/i);
-			assert.doesNotMatch(acknowledgement, /\b(you|your)\b/i);
-			assert.doesNotMatch(acknowledgement, /\?/);
-		}
+		assert.match(result.acknowledgement, /Pike Place taco-shop/);
+		assert.match(result.acknowledgement, /few minutes/);
+		assert.doesNotMatch(result.acknowledgement, /scopeKind|tool result|placesQuery|the models/i);
+		assert.doesNotMatch(result.acknowledgement, /\?/);
 	});
 
 	it('uses Places and accepts a model-selected place by Place ID', async () => {
@@ -371,7 +375,8 @@ describe('runIntakeConversation', () => {
 		assert.equal(result.state.candidates.length, 2);
 		assert.equal(result.state.candidates[0].optionNumber, 1);
 		assert.equal(result.state.candidates[0].placeId, 'a');
-		assert.match(result.reply, /Alte Schönhauser/);
+		assert.match(result.reply, /\n1\. Alte Schönhauser/);
+		assert.match(result.reply, /\n2\. Eberswalder/);
 	});
 
 	it('starts research from a later user pick using remembered candidates', async () => {

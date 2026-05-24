@@ -456,7 +456,7 @@ describe('chatState (Firestore-driven)', () => {
 							status: 'running',
 							reply: null,
 							acknowledgement:
-								"I have enough context to start on Pike Place; I'll prepare the report in a few minutes.",
+								'Reviewing recent restaurant openings and closures near Pike Place. The report will take a few minutes.',
 							acknowledgedAt: { toMillis: () => 1500 },
 							createdAt: { toMillis: () => 1000 }
 						}
@@ -473,7 +473,7 @@ describe('chatState (Firestore-driven)', () => {
 				expect.objectContaining({
 					role: 'agent',
 					kind: 'acknowledgement',
-					text: "I have enough context to start on Pike Place; I'll prepare the report in a few minutes.",
+					text: 'Reviewing recent restaurant openings and closures near Pike Place. The report will take a few minutes.',
 					timestamp: 1500
 				})
 			]);
@@ -494,7 +494,7 @@ describe('chatState (Firestore-driven)', () => {
 							status: 'complete',
 							reply: 'Final report',
 							acknowledgement:
-								"I have enough scope for salad pricing around FiDi; I'll prepare the report in a few minutes.",
+								'Reviewing salad pricing around FiDi. The report will take a few minutes.',
 							createdAt: { toMillis: () => 1000 },
 							acknowledgedAt: { toMillis: () => 1500 },
 							completedAt: { toMillis: () => 2000 }
@@ -508,7 +508,7 @@ describe('chatState (Firestore-driven)', () => {
 				[
 					'agent',
 					'acknowledgement',
-					"I have enough scope for salad pricing around FiDi; I'll prepare the report in a few minutes."
+					'Reviewing salad pricing around FiDi. The report will take a few minutes.'
 				],
 				['agent', 'final', 'Final report']
 			]);
@@ -700,8 +700,7 @@ describe('chatState (Firestore-driven)', () => {
 							userMessage: 'can this market support another cafe?',
 							status: 'error',
 							reply: null,
-							acknowledgement:
-								"I have enough context to start on the cafe market; I'll prepare the report in a few minutes.",
+							acknowledgement: 'Reviewing the cafe market. The report will take a few minutes.',
 							error: 'handoff_failed',
 							createdAt: { toMillis: () => 1000 },
 							acknowledgedAt: { toMillis: () => 1500 }
@@ -715,7 +714,7 @@ describe('chatState (Firestore-driven)', () => {
 				[
 					'agent',
 					'acknowledgement',
-					"I have enough context to start on the cafe market; I'll prepare the report in a few minutes."
+					'Reviewing the cafe market. The report will take a few minutes.'
 				]
 			]);
 			expect(chatState.error).toBe('handoff_failed');

@@ -98,10 +98,7 @@ const runIntakeConversationMock = mock.fn(async ({ message, selectedPlaceContext
 	action: 'start_research',
 	researchQuestion: message,
 	placeContext: selectedPlaceContext,
-	acknowledgements: [
-		"I have enough context to start; I'll prepare the report in a few minutes.",
-		'I have enough scope to start; the report will take a few minutes.'
-	],
+	acknowledgement: 'Preparing the report. This will take a few minutes.',
 	state: null,
 	reason: 'test_default'
 }));
@@ -197,10 +194,7 @@ beforeEach(() => {
 			action: 'start_research',
 			researchQuestion: message,
 			placeContext: selectedPlaceContext,
-			acknowledgements: [
-				"I have enough context to start; I'll prepare the report in a few minutes.",
-				'I have enough scope to start; the report will take a few minutes.'
-			],
+			acknowledgement: 'Preparing the report. This will take a few minutes.',
 			state: null,
 			reason: 'test_default'
 		})
@@ -685,9 +679,8 @@ describe('agentStream', () => {
 			action: 'start_research',
 			researchQuestion: 'What has opened or closed in Williamsburg, Brooklyn recently?',
 			placeContext: null,
-			acknowledgements: [
-				"I have enough context to start on Williamsburg, Brooklyn; I'll prepare the report in a few minutes."
-			],
+			acknowledgement:
+				'Reviewing recent restaurant openings and closures in Williamsburg, Brooklyn. The report will take a few minutes.',
 			state: {
 				originalIntent: 'What has opened or closed in my area recently?',
 				scopeSummary: 'Williamsburg, Brooklyn'
@@ -719,7 +712,7 @@ describe('agentStream', () => {
 		const { turnUpdates } = partitionWrites('sessions/sess-1');
 		assert.equal(
 			turnUpdates.find((update) => update.data.acknowledgement)?.data.acknowledgement,
-			"I have enough context to start on Williamsburg, Brooklyn; I'll prepare the report in a few minutes."
+			'Reviewing recent restaurant openings and closures in Williamsburg, Brooklyn. The report will take a few minutes.'
 		);
 	});
 

@@ -11,7 +11,6 @@ const TEXT_SEARCH_FIELDS = [
 
 const MAX_TEXT = 900;
 const MAX_CANDIDATES = 5;
-const MAX_ACKNOWLEDGEMENTS = 6;
 const ACKNOWLEDGEMENT_TEXT_LIMIT = 320;
 const FALLBACK_REPLY = 'Which restaurant, street, neighborhood, city, or market should I check?';
 
@@ -28,17 +27,6 @@ const INTAKE_STATE_SCHEMA = {
 	propertyOrdering: ['summary', 'originalIntent', 'scopeSummary', 'pendingQuestion', 'candidateSet']
 };
 
-const ACKNOWLEDGEMENT_OPTIONS_SCHEMA = {
-	type: 'OBJECT',
-	properties: {
-		primary: { type: 'STRING' },
-		alternate: { type: 'STRING' },
-		brief: { type: 'STRING' }
-	},
-	required: ['primary', 'alternate', 'brief'],
-	propertyOrdering: ['primary', 'alternate', 'brief']
-};
-
 const SCOPE_KINDS = ['research_scope', 'anchor_place', 'candidate_selection', 'insufficient_scope'];
 
 const INTAKE_SCHEMA = {
@@ -50,7 +38,7 @@ const INTAKE_SCHEMA = {
 		placesQuery: { type: 'STRING' },
 		researchQuestion: { type: 'STRING' },
 		placeId: { type: 'STRING' },
-		acknowledgementOptions: ACKNOWLEDGEMENT_OPTIONS_SCHEMA,
+		acknowledgement: { type: 'STRING' },
 		reason: { type: 'STRING' },
 		state: INTAKE_STATE_SCHEMA
 	},
@@ -61,7 +49,7 @@ const INTAKE_SCHEMA = {
 		'placesQuery',
 		'researchQuestion',
 		'placeId',
-		'acknowledgementOptions',
+		'acknowledgement',
 		'reason',
 		'state'
 	],
@@ -72,7 +60,7 @@ const INTAKE_SCHEMA = {
 		'placesQuery',
 		'researchQuestion',
 		'placeId',
-		'acknowledgementOptions',
+		'acknowledgement',
 		'reason',
 		'state'
 	]
@@ -82,6 +70,16 @@ function compact(text, max = MAX_TEXT) {
 	return String(text || '')
 		.trim()
 		.replace(/\s+/g, ' ')
+		.slice(0, max);
+}
+
+function compactReply(text, max = MAX_TEXT) {
+	return String(text || '')
+		.trim()
+		.replace(/\r\n/g, '\n')
+		.replace(/[ \t\f\v]+/g, ' ')
+		.replace(/[ \t]*\n[ \t]*/g, '\n')
+		.replace(/\n{3,}/g, '\n\n')
 		.slice(0, max);
 }
 
@@ -101,18 +99,8 @@ function compactUnique(values, max) {
 function isUsableAcknowledgement(text) {
 	const normalized = compact(text, ACKNOWLEDGEMENT_TEXT_LIMIT).toLocaleLowerCase();
 	if (!normalized || normalized.includes('?')) return false;
-	if (/[.!]\s+\S/.test(normalized.replace(/[.!]+$/, ''))) return false;
-	if (/\b(you|your)\b/i.test(normalized)) return false;
-	if (/\b(superextra|the models)\b/i.test(normalized)) return false;
-	const usesFirstPerson = /\bi\b/i.test(normalized) || /\bi['’](ll|ve|m)\b/i.test(normalized);
-	const saysEnough =
-		/\benough (context|scope)\b/i.test(normalized) ||
-		/\benough to (start|begin|work with)\b/i.test(normalized) ||
-		/\bclear enough\b/i.test(normalized) ||
-		/\bscope is clear\b/i.test(normalized) ||
-		/\bhas enough\b/i.test(normalized);
-	const saysMinutes = /\b(a few minutes|few minutes|minutes)\b/i.test(normalized);
-	return usesFirstPerson && saysEnough && saysMinutes;
+	if (/\b(scopekind|tool result|placesquery|the models)\b/i.test(normalized)) return false;
+	return true;
 }
 
 function acknowledgementFocus({ state, researchQuestion, placeContext, message }) {
@@ -129,30 +117,16 @@ function acknowledgementFocus({ state, researchQuestion, placeContext, message }
 	);
 }
 
-function fallbackAcknowledgements(context) {
+function fallbackAcknowledgement(context) {
 	const focus = acknowledgementFocus(context);
-	return [
-		`I have enough context to start: ${focus}; I'll prepare the report in a few minutes.`,
-		`I have enough to work with: ${focus}; I'll review the relevant market signals and prepare the report in a few minutes.`,
-		`I have enough scope for the research: ${focus}; the report will take a few minutes to prepare.`,
-		`I have enough context to start reviewing ${focus}; it will take a few minutes to prepare the report.`,
-		`I have enough context for the research: ${focus}; I'll need a few minutes to prepare the report.`,
-		`I have enough to begin analysis: ${focus}; the report will take a few minutes.`
-	];
+	return `Reviewing ${focus}. The report will take a few minutes.`;
 }
 
-function normalizeAcknowledgements(options, context) {
-	const modelOptions =
-		options && typeof options === 'object'
-			? compactUnique(
-					[options.primary, options.alternate, options.brief],
-					ACKNOWLEDGEMENT_TEXT_LIMIT
-				)
-			: [];
-	return compactUnique(
-		[...modelOptions.filter(isUsableAcknowledgement), ...fallbackAcknowledgements(context)],
-		ACKNOWLEDGEMENT_TEXT_LIMIT
-	).slice(0, MAX_ACKNOWLEDGEMENTS);
+function normalizeAcknowledgement(acknowledgement, context) {
+	const modelAcknowledgement = compact(acknowledgement, ACKNOWLEDGEMENT_TEXT_LIMIT);
+	return isUsableAcknowledgement(modelAcknowledgement)
+		? modelAcknowledgement
+		: fallbackAcknowledgement(context);
 }
 
 function placeName(place) {
@@ -317,15 +291,15 @@ export function buildIntakePrompt({
 		'If known candidates exist and the user asks to see them, asks whether there are multiple, or picks by number, street, branch, name, or Place ID, use those candidates.',
 		'If selected place context is relevant, set placeId to its Place ID.',
 		'Never invent a Place ID. start_research.placeId must be the selected Place ID or one of the known candidate Place IDs.',
-		'Write user-visible replies in the user language. Keep replies concise and direct; avoid filler or reassurance. When listing candidates, include newline characters between options, like "Which one?\\n1. Name - address\\n2. Name - address".',
+		'Write user-visible replies in the user language. For missing-detail replies, output only the clarification question or candidate list. Keep wording plain and direct. When listing candidates, put each option on its own line with an option number, name, and address.',
 		'When starting research, researchQuestion must be a complete standalone request preserving the business intent and resolved scope.',
-		'For start_research only, write three distinct acknowledgementOptions in the user language. Each option must be one concise first-person sentence from the agent, not product voice. It must say there is enough context to start, name the resolved scope or focus, and say the report will take a few minutes. In English, use wording like "I have enough context..." and "I will need a few minutes...". Do not include findings, citations, certainty claims, questions, "you"/"your", "Superextra", or "the models". Use empty acknowledgementOptions strings for reply and lookup_place.',
+		'For start_research only, write a brief acknowledgement in the user language. Start with the work or focus, not a conversational opener. Say the report will take a few minutes. Use an empty acknowledgement for reply and lookup_place.',
 		'',
 		'Return JSON only with one action:',
 		'- reply: write reply and updated state.',
 		'- lookup_place: write placesQuery and updated state.',
-		'- start_research: write researchQuestion, optional placeId, acknowledgementOptions, and updated state.',
-		'Always include scopeKind and every string field. Use an empty string when a field or acknowledgement option is not relevant to the selected action.',
+		'- start_research: write researchQuestion, optional placeId, acknowledgement, and updated state.',
+		'Always include scopeKind and every string field. Use an empty string when a field or acknowledgement is not relevant to the selected action.',
 		'',
 		`Conversation before latest message: ${JSON.stringify(compactHistory(history))}`,
 		`Latest user message: ${JSON.stringify(compact(message))}`,
@@ -399,7 +373,7 @@ function normalizeDecision({
 		return {
 			action,
 			scopeKind,
-			reply: compact(raw.reply, 1400) || FALLBACK_REPLY,
+			reply: compactReply(raw.reply, 1400) || FALLBACK_REPLY,
 			state,
 			reason: compact(raw.reason, 120)
 		};
@@ -437,7 +411,7 @@ function normalizeDecision({
 		scopeKind,
 		researchQuestion: compact(raw.researchQuestion, 1600) || compact(message, 1600),
 		placeContext,
-		acknowledgements: normalizeAcknowledgements(raw.acknowledgementOptions, {
+		acknowledgement: normalizeAcknowledgement(raw.acknowledgement, {
 			state,
 			researchQuestion: raw.researchQuestion,
 			placeContext,

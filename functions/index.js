@@ -142,33 +142,6 @@ function titleFromMessage(message) {
 		.slice(0, 60);
 }
 
-function hashString(value) {
-	let hash = 2166136261;
-	for (let i = 0; i < value.length; i += 1) {
-		hash ^= value.charCodeAt(i);
-		hash = Math.imul(hash, 16777619);
-	}
-	return hash >>> 0;
-}
-
-function chooseAcknowledgement(options, seed) {
-	if (!Array.isArray(options) || options.length === 0) return null;
-	const seen = new Set();
-	const choices = [];
-	for (const option of options) {
-		const text = String(option || '')
-			.trim()
-			.replace(/\s+/g, ' ')
-			.slice(0, 320);
-		const key = text.toLocaleLowerCase();
-		if (!text || seen.has(key)) continue;
-		seen.add(key);
-		choices.push(text);
-	}
-	if (!choices.length) return null;
-	return choices[hashString(seed) % choices.length];
-}
-
 async function completeDirectIntake({
 	sessionRef,
 	runId,
@@ -469,7 +442,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 			if (decision.action === 'start_research') {
 				researchQuestion = decision.researchQuestion || message;
 				placeContext = decision.placeContext || null;
-				const acknowledgement = chooseAcknowledgement(decision.acknowledgements, runId);
+				const acknowledgement = decision.acknowledgement || null;
 				await recordResearchStart({
 					sessionRef,
 					runId,
