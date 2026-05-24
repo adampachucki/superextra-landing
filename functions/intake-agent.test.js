@@ -20,13 +20,24 @@ function place({
 }
 
 function modelJson(data) {
+	const payload = { ...data };
+	if (!payload.scopeKind) {
+		payload.scopeKind =
+			payload.action === 'lookup_place'
+				? 'anchor_place'
+				: payload.action === 'reply'
+					? 'insufficient_scope'
+					: payload.placeId
+						? 'candidate_selection'
+						: 'research_scope';
+	}
 	return {
 		ok: true,
 		json: async () => ({
 			candidates: [
 				{
 					content: {
-						parts: [{ text: JSON.stringify(data) }]
+						parts: [{ text: JSON.stringify(payload) }]
 					}
 				}
 			]
@@ -73,7 +84,15 @@ describe('buildIntakePrompt', () => {
 
 		assert.match(prompt, /fast conversation layer/);
 		assert.match(prompt, /Do not assume fixed rounds/);
-		assert.match(prompt, /Google Places lookup/);
+		assert.match(prompt, /scopeKind/);
+		assert.match(prompt, /research_scope/);
+		assert.match(prompt, /anchor_place/);
+		assert.match(prompt, /candidate_selection/);
+		assert.match(prompt, /insufficient_scope/);
+		assert.match(prompt, /Google Places candidates/);
+		assert.match(prompt, /bare generic area descriptor/);
+		assert.match(prompt, /food\/drink brand/);
+		assert.match(prompt, /Do not select a candidate just because the street/);
 		assert.match(prompt, /selected place context is relevant/i);
 		assert.match(prompt, /avoid filler or reassurance/i);
 		assert.match(prompt, /newline characters/i);

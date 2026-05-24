@@ -39,10 +39,13 @@ const ACKNOWLEDGEMENT_OPTIONS_SCHEMA = {
 	propertyOrdering: ['primary', 'alternate', 'brief']
 };
 
+const SCOPE_KINDS = ['research_scope', 'anchor_place', 'candidate_selection', 'insufficient_scope'];
+
 const INTAKE_SCHEMA = {
 	type: 'OBJECT',
 	properties: {
 		action: { type: 'STRING', enum: ['reply', 'lookup_place', 'start_research'] },
+		scopeKind: { type: 'STRING', enum: SCOPE_KINDS },
 		reply: { type: 'STRING' },
 		placesQuery: { type: 'STRING' },
 		researchQuestion: { type: 'STRING' },
@@ -53,6 +56,7 @@ const INTAKE_SCHEMA = {
 	},
 	required: [
 		'action',
+		'scopeKind',
 		'reply',
 		'placesQuery',
 		'researchQuestion',
@@ -63,6 +67,7 @@ const INTAKE_SCHEMA = {
 	],
 	propertyOrdering: [
 		'action',
+		'scopeKind',
 		'reply',
 		'placesQuery',
 		'researchQuestion',
@@ -297,8 +302,18 @@ export function buildIntakePrompt({
 		'Help the user reach a research-ready request. Do not research, browse, or answer the business question.',
 		'Use the conversation naturally. Do not assume fixed rounds or that the latest message only answers the previous question.',
 		'Ask only when the missing detail is needed. If the user gives enough restaurant, address, area, market, or broad industry scope, start research.',
-		'Use Google Places lookup when a restaurant, venue, branch, address, or landmark should be validated or disambiguated.',
-		'Do not ask the user to choose a branch before using Places when a lookup can reveal the real candidates.',
+		'First set scopeKind to the model-owned semantic role of the latest usable scope:',
+		'- research_scope: enough named geography, market, catchment, non-food-service landmark-as-geographic-shorthand, or broad industry scope to research directly in search queries without resolving a Place ID.',
+		'- anchor_place: a specific restaurant, cafe, bar, bakery, food hall vendor, food/drink brand, chain branch, venue, or exact address where the exact entity is the research target or branch identity matters.',
+		'- candidate_selection: the user is choosing from remembered candidates.',
+		'- insufficient_scope: the request still lacks enough usable scope.',
+		'For openings, closures, saturation, local momentum, nearby competition, or market movement, near/around/in + a named public place, station, district, mall, hotel, tourist attraction, or landmark is usually research_scope when it names the surrounding market rather than a food-service business or exact branch.',
+		'A bare generic area descriptor without a named place, city, neighborhood, market, address, or other anchor is insufficient_scope.',
+		'A named restaurant, cafe, bakery, bar, food/drink brand, or chain is anchor_place when the request is about what is near or around it, because branch identity matters.',
+		'Action must follow scopeKind: research_scope -> start_research with no placeId; anchor_place -> lookup_place unless selected or known context already resolves it; candidate_selection -> start_research with a candidate placeId; insufficient_scope -> reply.',
+		'When Tool result contains Google Places candidates for an anchor_place: use one clear matching candidate to start research with its Place ID; ask the user to choose only when multiple plausible branches remain.',
+		'A clear matching candidate must match the requested establishment or brand name and the important location cues. Do not select a candidate just because the street, neighborhood, or city matches if its name is a different establishment.',
+		'If there is no clear matching candidate for the requested establishment, ask a short clarification instead of guessing.',
 		'If known candidates exist and the user asks to see them, asks whether there are multiple, or picks by number, street, branch, name, or Place ID, use those candidates.',
 		'If selected place context is relevant, set placeId to its Place ID.',
 		'Never invent a Place ID. start_research.placeId must be the selected Place ID or one of the known candidate Place IDs.',
@@ -310,7 +325,7 @@ export function buildIntakePrompt({
 		'- reply: write reply and updated state.',
 		'- lookup_place: write placesQuery and updated state.',
 		'- start_research: write researchQuestion, optional placeId, acknowledgementOptions, and updated state.',
-		'Always include every string field. Use an empty string when a field or acknowledgement option is not relevant to the selected action.',
+		'Always include scopeKind and every string field. Use an empty string when a field or acknowledgement option is not relevant to the selected action.',
 		'',
 		`Conversation before latest message: ${JSON.stringify(compactHistory(history))}`,
 		`Latest user message: ${JSON.stringify(compact(message))}`,
@@ -375,6 +390,7 @@ function normalizeDecision({
 }) {
 	const state = mergeState({ modelState: raw?.state, previousState, candidates });
 	const action = raw?.action;
+	const scopeKind = SCOPE_KINDS.includes(raw?.scopeKind) ? raw.scopeKind : '';
 	if (!['reply', 'lookup_place', 'start_research'].includes(action)) {
 		throw new Error('intake_model_invalid_action');
 	}
@@ -382,6 +398,7 @@ function normalizeDecision({
 	if (action === 'reply') {
 		return {
 			action,
+			scopeKind,
 			reply: compact(raw.reply, 1400) || FALLBACK_REPLY,
 			state,
 			reason: compact(raw.reason, 120)
@@ -393,6 +410,7 @@ function normalizeDecision({
 		if (!placesQuery) throw new Error('intake_model_missing_places_query');
 		return {
 			action,
+			scopeKind,
 			placesQuery,
 			state,
 			reason: compact(raw.reason, 120)
@@ -408,6 +426,7 @@ function normalizeDecision({
 	if (compact(raw.placeId) && !placeContext) {
 		return {
 			action: 'reply',
+			scopeKind,
 			reply: FALLBACK_REPLY,
 			state: resolutionState,
 			reason: 'invalid_place_id'
@@ -415,6 +434,7 @@ function normalizeDecision({
 	}
 	return {
 		action,
+		scopeKind,
 		researchQuestion: compact(raw.researchQuestion, 1600) || compact(message, 1600),
 		placeContext,
 		acknowledgements: normalizeAcknowledgements(raw.acknowledgementOptions, {
@@ -488,6 +508,7 @@ export async function runIntakeConversation({
 	return decision.action === 'lookup_place'
 		? {
 				action: 'reply',
+				scopeKind: decision.scopeKind,
 				reply: FALLBACK_REPLY,
 				state: stateWithCandidates,
 				reason: 'lookup_loop_limit'
