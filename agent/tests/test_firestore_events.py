@@ -144,7 +144,7 @@ def test_thought_text_strips_specialist_tool_names_without_rewriting_common_pros
         thoughts=[
             "Use review_analyst for hard numbers, then `dynamic_researcher_1` "
             "for niche sources. Restaurant operations should stay normal prose, "
-            "but `operations` is a tool label."
+            "but `operations` should become a public label."
         ],
     )
     rows = map_event(ev, {})["timeline_events"]
@@ -155,7 +155,7 @@ def test_thought_text_strips_specialist_tool_names_without_rewriting_common_pros
     assert "review patterns" in text
     assert "focused source check" in text
     assert "Restaurant operations" in text
-    assert "operating signals is a tool label" in text
+    assert "operating signals should become a public label" in text
 
 
 def test_thought_text_strips_provider_tool_aliases():
@@ -175,6 +175,44 @@ def test_thought_text_strips_provider_tool_aliases():
     assert text.count("source reading") == 2
     assert "Google search" not in text
     assert "page fetch" not in text
+
+
+def test_thought_text_replaces_place_id_leak_with_public_summary():
+    ev = _event(
+        author="context_enricher",
+        thoughts=[
+            "**Fetching Restaurant Details**\n\n"
+            "I'm retrieving details for the provided Place ID "
+            "`ChIJ48HwEQCn_UYRmVqYQULc9pM`."
+        ],
+    )
+
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+
+    assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+    assert "Place ID" not in text
+    assert "ChIJ" not in text
+    assert "provided" not in text
+
+
+def test_thought_text_replaces_internal_process_terms_and_ids():
+    ev = _event(
+        author="research_lead",
+        thoughts=[
+            "Using runId `run_0123456789abcdef` and state_delta before "
+            "dispatching the next helper."
+        ],
+    )
+
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+
+    assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+    assert "runId" not in text
+    assert "run_0123456789abcdef" not in text
+    assert "state_delta" not in text
+    assert "helper" not in text
 
 
 def test_grounding_search_queries_become_searching_the_web_rows():

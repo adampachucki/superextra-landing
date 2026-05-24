@@ -115,8 +115,9 @@ def _collect_thought_text(event: Any) -> str:
 
     Internal tool identifiers (`get_restaurant_details`, `search_restaurants`,
     …) sometimes leak into Gemini's thought summaries even after the prompt
-    nudge. Replace them with user-facing labels so the activity panel never
-    surfaces internal names.
+    nudge. Replace tool names with user-facing labels, and replace ID/process
+    leaks with a generic progress line so the activity panel never surfaces
+    internal names or raw identifiers.
     """
     pieces: list[str] = []
     for part in _iter_parts(event):
@@ -125,7 +126,8 @@ def _collect_thought_text(event: Any) -> str:
         text = _get(part, "text")
         if isinstance(text, str) and text.strip():
             pieces.append(text)
-    return _strip_tool_names(_normalize_newlines("".join(pieces))).strip()
+    cleaned = _strip_tool_names(_normalize_newlines("".join(pieces))).strip()
+    return _safe_thought_text(cleaned)
 
 
 # Map internal function-tool identifiers to public research-language labels.
@@ -193,6 +195,28 @@ def _tool_name_pattern(labels: dict[str, str]) -> str:
 
 _BACKTICKED_TOOL_NAME_RE = re.compile(r"`(" + _tool_name_pattern(_TOOL_LABELS) + r")`")
 _BARE_TOOL_NAME_RE = re.compile(r"\b(" + _tool_name_pattern(_BARE_TOOL_LABELS) + r")\b")
+_SAFE_THOUGHT_FALLBACK = (
+    "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+)
+_OPAQUE_ID_RE = re.compile(
+    r"\b(?=[A-Za-z0-9_-]{16,}\b)(?=[A-Za-z0-9_-]*[A-Za-z])"
+    r"(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{16,}\b"
+)
+_UUID_RE = re.compile(
+    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+)
+_COORDINATE_PAIR_RE = re.compile(r"\b-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}\b")
+_RAW_URL_RE = re.compile(r"\b(?:https?://|www\.)\S+", re.IGNORECASE)
+_INTERNAL_THOUGHT_TERM_RE = re.compile(
+    r"\b(?:"
+    r"agent|agenttool|api|api field|appendEvent|context prefix|dispatch|firestore|"
+    r"function|function call|function response|handoff|helper|implementation|"
+    r"invocation|output key|place id|place_id|reasoning engine|run id|runId|"
+    r"session id|state key|state_delta|stage|tool|tool_context|vertex"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def _strip_tool_names(text: str) -> str:
@@ -205,6 +229,21 @@ def _strip_tool_names(text: str) -> str:
     """
     stripped = _BACKTICKED_TOOL_NAME_RE.sub(lambda m: _TOOL_LABELS[m.group(1)], text)
     return _BARE_TOOL_NAME_RE.sub(lambda m: _BARE_TOOL_LABELS[m.group(1)], stripped)
+
+
+def _safe_thought_text(text: str) -> str:
+    """Return a public progress line when a streamed thought leaks internals."""
+    if not text:
+        return ""
+    if (
+        _RAW_URL_RE.search(text)
+        or _UUID_RE.search(text)
+        or _OPAQUE_ID_RE.search(text)
+        or _COORDINATE_PAIR_RE.search(text)
+        or _INTERNAL_THOUGHT_TERM_RE.search(text)
+    ):
+        return _SAFE_THOUGHT_FALLBACK
+    return text
 
 
 def _extract_search_queries(event: Any) -> list[str]:

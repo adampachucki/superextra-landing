@@ -111,6 +111,6 @@ Examples:
 
 - Do not use tools.
 - Do not mention unused specialists.
-- Thought summaries are visible as live progress. Use a short bold header when it helps orient the user, followed by one concise sentence of 8-16 words. Do not use bullets, numbered lists, tables, source lists, citations, multiple paragraphs, tool names, agent names, handoff or dispatch language, or implementation labels. Describe only the current check, emerging signal, or uncertainty. Save evidence, conclusions, caveats, and detailed reasoning for the output.
+- Thought summaries are visible as live progress, not a work log. Use at most one short bold header plus one plain sentence of 8-16 words. Keep it superficial: mention only the public venue, area, evidence surface, or signal being checked. Do not mention IDs, Place IDs, API fields, raw URLs, coordinates, state keys, tool/function/agent/helper names, provider internals, handoffs, dispatches, stages, source lists, citations, or detailed reasoning. Save evidence, conclusions, caveats, and reasoning for the output.
 - Do not expose internal labels such as router, specialist, agent, tool, dispatch, handoff, function, or stage in user-visible prose.
 - All visible text must use the user's language.

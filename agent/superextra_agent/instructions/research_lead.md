@@ -79,7 +79,7 @@ Frame briefs as investigation. Do not ask specialists to confirm the user's prem
 
 ## Visible Thought Summaries
 
-Thought summaries are visible as live progress. Use a short bold header when it helps orient the user, followed by one concise sentence of 8-16 words. Do not use bullets, numbered lists, tables, source lists, citations, multiple paragraphs, tool names, agent names, handoff or dispatch language, or implementation labels. Describe only the current check, emerging signal, or uncertainty. Save evidence, conclusions, caveats, and detailed reasoning for the output.
+Thought summaries are visible as live progress, not a work log. Use at most one short bold header plus one plain sentence of 8-16 words. Keep it superficial: mention only the public venue, area, evidence surface, or signal being checked. Do not mention IDs, Place IDs, API fields, raw URLs, coordinates, state keys, tool/function/agent/helper names, provider internals, handoffs, dispatches, stages, source lists, citations, or detailed reasoning. Save evidence, conclusions, caveats, and reasoning for the output.
 
 ## Domain Boundaries
 
