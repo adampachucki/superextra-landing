@@ -5,8 +5,8 @@
 <section id="get-onboard" class="border-t border-cream-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<SectionHeader
-			subtitle="Get Onboard"
-			title="Request access and start making informed decisions"
+			subtitle="Book a demo"
+			title="See Superextra on a real restaurant decision"
 			titleClass="mb-16 max-w-2xl"
 		/>
 
@@ -15,26 +15,25 @@
 		>
 			<div class="border-b border-cream-200 p-8 md:border-b-0 md:py-10 md:pr-10">
 				<div class="mb-6 text-5xl font-black text-black/10 dark:text-white/10">1.</div>
-				<h3 class="mb-3 text-lg font-medium text-black dark:text-white">Get in touch</h3>
+				<h3 class="mb-3 text-lg font-medium text-black dark:text-white">Share business context</h3>
 				<p class="text-sm leading-snug text-black/60 dark:text-white/60">
-					We're onboarding a limited number of customers. Apply for early access and tell us about
-					your business.
+					A few details set the demo around the right market, format, and decision.
 				</p>
 			</div>
 			<div class="border-b border-cream-200 p-8 md:border-b-0 md:px-10 md:py-10">
 				<div class="mb-6 text-5xl font-black text-black/10 dark:text-white/10">2.</div>
-				<h3 class="mb-3 text-lg font-medium text-black dark:text-white">Talk to experts</h3>
+				<h3 class="mb-3 text-lg font-medium text-black dark:text-white">Talk through the market</h3>
 				<p class="text-sm leading-snug text-black/60 dark:text-white/60">
-					We'll map out the intelligence that matters most for your market and competitive
-					landscape.
+					The team maps the competitor, pricing, guest, delivery, and location signals that matter
+					for the demo.
 				</p>
 			</div>
 			<div class="p-8 md:py-10 md:pl-10">
 				<div class="mb-6 text-5xl font-black text-black/10 dark:text-white/10">3.</div>
-				<h3 class="mb-3 text-lg font-medium text-black dark:text-white">Uncover insights</h3>
+				<h3 class="mb-3 text-lg font-medium text-black dark:text-white">Leave with next steps</h3>
 				<p class="text-sm leading-snug text-black/60 dark:text-white/60">
-					Receive dedicated deep research reports and AI agents to work with for further analysis
-					and monitoring.
+					Review a focused intelligence workflow and the reports or agent setup needed for ongoing
+					monitoring.
 				</p>
 			</div>
 		</div>

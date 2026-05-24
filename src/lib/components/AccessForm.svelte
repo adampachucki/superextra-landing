@@ -293,9 +293,11 @@
 				<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 			</svg>
 		</div>
-		<h2 class="mb-2 text-xl font-medium tracking-tight text-black dark:text-white">Request sent</h2>
+		<h2 class="mb-2 text-xl font-medium tracking-tight text-black dark:text-white">
+			Demo request sent
+		</h2>
 		<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40 dark:text-white/40">
-			We'll get back to you within 24 hours
+			A confirmation email has been sent. The team will follow up with available times.
 		</p>
 		<button
 			onclick={close}
@@ -309,11 +311,9 @@
 {#snippet step1()}
 	<div class="step-content">
 		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
-			What kind of business do you run?
+			What kind of business is the demo for?
 		</h2>
-		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
-			Select the option that best describes you
-		</p>
+		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">Choose the closest fit.</p>
 
 		<div class="grid grid-cols-3 gap-2.5 {shakeFields.has('type-grid') ? 'shake' : ''}">
 			{#each businessTypes as type (type)}
@@ -334,10 +334,10 @@
 {#snippet step2()}
 	<div class="step-content">
 		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
-			Tell us about your business
+			Add the business context
 		</h2>
 		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
-			Help us tailor the experience to your needs
+			These details shape the demo around the right market.
 		</p>
 
 		<div class="space-y-4">
@@ -495,10 +495,10 @@
 {#snippet step3()}
 	<div class="step-content">
 		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
-			How can we reach you?
+			Demo contact
 		</h2>
 		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
-			We'll get back to you within 24 hours
+			A confirmation email will be sent immediately.
 		</p>
 
 		<div class="space-y-4">
@@ -591,7 +591,7 @@
 			bind:this={modalEl}
 			role="dialog"
 			aria-modal="true"
-			aria-label="Request access"
+			aria-label="Book a demo"
 			tabindex="-1"
 			class="relative mx-4 w-full max-w-[560px] rounded-2xl bg-white p-8 shadow-2xl shadow-black/10 transition-all duration-300 focus:outline-none md:p-10 dark:bg-cream-50
 				{modalVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}"
@@ -710,7 +710,7 @@
 								</svg>
 								Submitting...
 							{:else}
-								Request Access
+								Book a demo
 							{/if}
 						</button>
 					{/if}

@@ -35,16 +35,16 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 
 	const html = `
 		<div style="font-family:sans-serif;max-width:520px">
-			<h2 style="margin:0 0 16px">New access request</h2>
+			<h2 style="margin:0 0 16px">New demo request</h2>
 			<table style="border-collapse:collapse;width:100%">
-				${row('Category', data.type)}
+				${row('Business type', data.type)}
 				${row('Country', data.country)}
-				${row('Name', data.businessName)}
+				${row('Business / venue', data.businessName)}
 				${data.placeId ? row('Google Maps', `<a href="https://www.google.com/maps/place/?q=place_id:${esc(data.placeId)}">View on Maps</a>`, true) : ''}
 				${data.locations ? row('Locations', data.locations) : ''}
 				${data.webUrl ? row('URL', data.webUrl) : ''}
-				${row('Contact', data.fullName)}
-				${row('Email', data.email)}
+				${row('Demo contact', data.fullName)}
+				${row('Work email', data.email)}
 				${data.phone ? row('Phone', data.phone) : ''}
 			</table>
 		</div>
@@ -67,7 +67,7 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 			body: JSON.stringify({
 				from: 'Superextra <notify@superextra.ai>',
 				to: DEST,
-				subject: `Access request – ${data.businessName || data.type}`,
+				subject: `Demo request - ${data.businessName || data.type}`,
 				html
 			})
 		});
@@ -97,7 +97,7 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 			body: JSON.stringify({
 				from: 'Adam Pachucki <ap@superextra.ai>',
 				to: data.email,
-				subject: "You've signed up for Superextra",
+				subject: 'Superextra demo request received',
 				html: confirmationHtml(data.fullName)
 			})
 		});

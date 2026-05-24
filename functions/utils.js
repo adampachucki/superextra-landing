@@ -35,13 +35,13 @@ export function confirmationHtml(name) {
 	return `<div style="font-family:sans-serif;max-width:520px;color:#1a1a1a;font-size:14px;line-height:1.6">
 <p>Hey ${firstName},</p>
 <p>I'm Adam, co-founder of Superextra.</p>
-<p>We believe the restaurant industry deserves better access to reliable information, and we're building Superextra to make that happen.</p>
-<p>This is an automated message, but I'll follow up personally soon.</p>
+<p>Thanks for requesting a Superextra demo.</p>
+<p>This is an automated confirmation. I'll follow up personally with scheduling details soon.</p>
 <p>In the meantime, it would help to know:</p>
 <ol>
-<li>What challenges can we help you solve?</li>
-<li>What information would make the biggest difference?</li>
-<li>How did you find us?</li>
+<li>What business decision should the demo focus on?</li>
+<li>Which locations, formats, or competitors should we understand?</li>
+<li>Which pricing, guest, delivery, or expansion signals would be most useful?</li>
 </ol>
 <p>Just hit reply and let me know.</p>
 <p>Best,<br>Adam</p>

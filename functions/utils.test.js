@@ -47,6 +47,7 @@ describe('confirmationHtml', () => {
 	it('extracts first name', () => {
 		const html = confirmationHtml('John Doe');
 		assert.ok(html.includes('Hey John,'));
+		assert.ok(html.includes('Thanks for requesting a Superextra demo.'));
 	});
 
 	it('falls back to "there" when name is empty', () => {

@@ -114,7 +114,7 @@
 				{@render chatIcon()}
 			{/if}
 			<button onclick={() => formState.open()} class="btn-primary px-5 py-2 text-sm"
-				>Contact Us</button
+				>Book a demo</button
 			>
 		</div>
 
@@ -123,7 +123,7 @@
 				{@render chatIcon()}
 			{/if}
 			<button onclick={() => formState.open()} class="btn-primary px-4 py-1.5 text-sm"
-				>Contact Us</button
+				>Book a demo</button
 			>
 			{#if !minimal}
 				<button

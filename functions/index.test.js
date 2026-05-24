@@ -223,10 +223,10 @@ describe('intake', () => {
 		assert.equal(res._json.ok, false);
 	});
 
-	it('sends email and returns ok on success', async () => {
+	it('sends demo request emails and returns ok on success', async () => {
 		const calls = [];
-		globalThis.fetch = mock.fn(async (url) => {
-			calls.push(url);
+		globalThis.fetch = mock.fn(async (url, init) => {
+			calls.push({ url, body: JSON.parse(init.body) });
 			return { ok: true, status: 200 };
 		});
 
@@ -246,8 +246,11 @@ describe('intake', () => {
 		assert.equal(res._json.ok, true);
 		// Should call Resend twice (notification + confirmation)
 		assert.equal(globalThis.fetch.mock.callCount(), 2);
-		assert.ok(calls[0].includes('resend.com'));
-		assert.ok(calls[1].includes('resend.com'));
+		assert.ok(calls[0].url.includes('resend.com'));
+		assert.equal(calls[0].body.subject, 'Demo request - Test Bistro');
+		assert.ok(calls[0].body.html.includes('New demo request'));
+		assert.ok(calls[1].url.includes('resend.com'));
+		assert.equal(calls[1].body.subject, 'Superextra demo request received');
 	});
 
 	it('returns 502 when Resend fails', async () => {

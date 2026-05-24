@@ -7,11 +7,11 @@
 		class="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-6 px-6 md:flex-row"
 	>
 		<p class="text-center text-lg font-medium text-black md:text-left dark:text-white">
-			Early access is now open. Limited spots available.
+			See Superextra on a real market question.
 		</p>
 		<div class="flex items-center">
 			<button onclick={() => formState.open()} class="btn-primary px-6 py-2.5 text-sm"
-				>Contact Us</button
+				>Book a demo</button
 			>
 		</div>
 	</div>
