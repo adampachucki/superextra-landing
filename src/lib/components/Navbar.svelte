@@ -38,7 +38,13 @@
 
 {#snippet chatIcon()}
 	<a href="/chat" class={chatIconClass} aria-label="Chat history">
-		<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+		<svg
+			class="h-6 w-6 translate-y-0.5"
+			fill="none"
+			viewBox="0 0 24 24"
+			stroke="currentColor"
+			stroke-width="1.5"
+		>
 			<path d="M2 2h20v14H10l-2 4-2-4H2z" />
 		</svg>
 		{#if chatCount > 0}
