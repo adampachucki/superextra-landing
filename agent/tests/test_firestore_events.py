@@ -80,7 +80,7 @@ def _event(
 def test_thought_parts_become_thought_timeline_row():
     ev = _event(
         author="research_lead",
-        thoughts=["**Planning Research**\n\nI'll start by checking platform reviews."],
+        thoughts=["**Planning Research**\n\nChecking platform review patterns."],
         event_id="evt-thought-1",
     )
     rows = map_event(ev, {})["timeline_events"]
@@ -107,20 +107,20 @@ def test_thought_with_blank_text_is_ignored():
 def test_thought_text_normalizes_escaped_newlines():
     ev = _event(
         author="research_lead",
-        thoughts=["**Planning**\n\n\\n\\n\n\nFirst paragraph.\\n\\nSecond paragraph."],
+        thoughts=["**Planning**\\n\\nChecking nearby venue context."],
     )
     rows = map_event(ev, {})["timeline_events"]
     text = next(r["text"] for r in rows if r["kind"] == "thought")
     assert "\\n" not in text
-    assert text == "**Planning**\n\nFirst paragraph.\n\nSecond paragraph."
+    assert text == "**Planning**\n\nChecking nearby venue context."
 
 
 def test_thought_text_strips_bare_and_backticked_tool_names():
     ev = _event(
         author="research_lead",
         thoughts=[
-            "I'll call `get_restaurant_details` to fetch the venue, then "
-            "search_restaurants for nearby competitors and finally "
+            "Checking `get_restaurant_details`, then "
+            "search_restaurants for nearby competitors, then "
             "get_tripadvisor_reviews for sentiment."
         ],
     )
@@ -213,6 +213,45 @@ def test_thought_text_replaces_internal_process_terms_and_ids():
     assert "run_0123456789abcdef" not in text
     assert "state_delta" not in text
     assert "helper" not in text
+
+
+def test_thought_text_replaces_long_process_log_with_public_summary():
+    ev = _event(
+        author="research_lead",
+        thoughts=[
+            "**My Thought Process on Gdynia's Gastronomic Landscape Near Monsun**\n\n"
+            "Here is how I am approaching this query about Monsun Gdynia. "
+            "My primary objective is to understand recent shifts in the local dining scene.\n\n"
+            "1. **market signals**: This is my go-to for gaining a broad overview.\n"
+            "2. **focused source check**: I will brief it for local media."
+        ],
+    )
+
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+
+    assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+    assert "Thought Process" not in text
+    assert "objective" not in text
+    assert "brief" not in text
+
+
+def test_thought_text_replaces_overlong_progress_with_public_summary():
+    ev = _event(
+        author="context_enricher",
+        thoughts=[
+            "**Gathering Location Data**\n\n"
+            "I've identified several nearby establishments and am expanding the comparison "
+            "to collect enough surrounding detail for a comprehensive neighborhood overview "
+            "before narrowing the answer to the most relevant operators and recent changes."
+        ],
+    )
+
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+
+    assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+    assert "comprehensive neighborhood overview" not in text
 
 
 def test_grounding_search_queries_become_searching_the_web_rows():

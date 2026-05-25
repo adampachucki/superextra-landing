@@ -213,10 +213,20 @@ _INTERNAL_THOUGHT_TERM_RE = re.compile(
     r"agent|agenttool|api|api field|appendEvent|context prefix|dispatch|firestore|"
     r"function|function call|function response|handoff|helper|implementation|"
     r"invocation|output key|place id|place_id|reasoning engine|run id|runId|"
-    r"session id|state key|state_delta|stage|tool|tool_context|vertex"
+    r"session id|state key|state_delta|stage|tool|tools|tool_context|vertex"
     r")\b",
     re.IGNORECASE,
 )
+_PROCESS_LOG_RE = re.compile(
+    r"\b(?:"
+    r"thought process|my current plan|my plan|i(?:'|’)ll|i will|i am going to|"
+    r"i(?:'|’)m going to|i plan to|i need to|i want to|my objective|"
+    r"to tackle this|i(?:'|’)ll brief|i will brief"
+    r")\b",
+    re.IGNORECASE,
+)
+_LIST_LINE_RE = re.compile(r"(?m)^\s*(?:[-*•]|\d+[.)])\s+")
+_PUBLIC_THOUGHT_MAX_CHARS = 220
 
 
 def _strip_tool_names(text: str) -> str:
@@ -235,12 +245,18 @@ def _safe_thought_text(text: str) -> str:
     """Return a public progress line when a streamed thought leaks internals."""
     if not text:
         return ""
+    compact = _normalize_space(text)
+    paragraphs = [part for part in re.split(r"\n\s*\n", text.strip()) if part.strip()]
     if (
-        _RAW_URL_RE.search(text)
+        len(compact) > _PUBLIC_THOUGHT_MAX_CHARS
+        or len(paragraphs) > 2
+        or _RAW_URL_RE.search(text)
         or _UUID_RE.search(text)
         or _OPAQUE_ID_RE.search(text)
         or _COORDINATE_PAIR_RE.search(text)
         or _INTERNAL_THOUGHT_TERM_RE.search(text)
+        or _PROCESS_LOG_RE.search(text)
+        or _LIST_LINE_RE.search(text)
     ):
         return _SAFE_THOUGHT_FALLBACK
     return text
