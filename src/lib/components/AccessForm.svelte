@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formState } from '$lib/form-state.svelte';
+	import { resolveSupportedBrowserCountry } from '$lib/browser-country';
 	import { fetchPlaceSuggestions, type PlaceSuggestion } from '$lib/google-places';
 
 	// --- Shared constants ---
@@ -26,6 +27,12 @@
 		{ code: 'gb', name: 'United Kingdom', dial: '+44' },
 		{ code: 'us', name: 'United States', dial: '+1' }
 	];
+	const fallbackCountryCode = countries[0].code;
+	const supportedCountryCodes = countries.map((c) => c.code);
+
+	function resolveDefaultCountry(): string {
+		return resolveSupportedBrowserCountry(supportedCountryCodes, fallbackCountryCode);
+	}
 
 	// --- Modal state ---
 
@@ -48,7 +55,7 @@
 	let selectedType = $state('');
 
 	// Step 2
-	let selectedCountry = $state('de');
+	let selectedCountry = $state(fallbackCountryCode);
 	let placeName = $state('');
 	let selectedPlaceId = $state('');
 	let businessName = $state('');
@@ -106,6 +113,7 @@
 
 	$effect(() => {
 		if (formState.visible) {
+			selectedCountry = resolveDefaultCountry();
 			requestAnimationFrame(() => {
 				backdropVisible = true;
 				requestAnimationFrame(() => {
@@ -154,7 +162,7 @@
 				formState.close();
 				step = 1;
 				selectedType = '';
-				selectedCountry = 'de';
+				selectedCountry = resolveDefaultCountry();
 				placeName = '';
 				selectedPlaceId = '';
 				businessName = '';

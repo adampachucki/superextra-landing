@@ -8,6 +8,9 @@
  */
 
 import { PUBLIC_GOOGLE_PLACES_KEY } from '$env/static/public';
+import { __resetBrowserCountryCache, resolveBrowserCountry } from '$lib/browser-country';
+
+export { resolveBrowserCountry } from '$lib/browser-country';
 
 export interface PlaceSuggestion {
 	name: string;
@@ -39,7 +42,6 @@ export interface PlaceSearchOptions {
 // --- Module-level singletons (shared across instances) ---
 
 let mapsPromise: Promise<void> | null = null;
-let cachedCountry: string | null = null;
 
 /** Lazy-load Google Maps JS API with the `places` library. */
 export function loadGoogleMaps(): Promise<void> {
@@ -62,70 +64,10 @@ export function loadGoogleMaps(): Promise<void> {
 	return mapsPromise;
 }
 
-const TZ_COUNTRY_MAP: Record<string, string> = {
-	'America/': 'us',
-	'US/': 'us',
-	'Europe/London': 'gb',
-	'Europe/Berlin': 'de',
-	'Europe/Warsaw': 'pl',
-	'Europe/Paris': 'fr',
-	'Europe/Rome': 'it',
-	'Europe/Madrid': 'es',
-	'Europe/Amsterdam': 'nl',
-	'Europe/Brussels': 'be',
-	'Europe/Vienna': 'at',
-	'Europe/Zurich': 'ch',
-	'Europe/Prague': 'cz',
-	'Europe/Stockholm': 'se',
-	'Europe/Copenhagen': 'dk',
-	'Europe/Oslo': 'no',
-	'Europe/Helsinki': 'fi',
-	'Europe/Dublin': 'ie',
-	'Europe/Lisbon': 'pt',
-	'Europe/Bucharest': 'ro',
-	'Europe/Budapest': 'hu',
-	'Europe/Athens': 'gr',
-	'Australia/': 'au',
-	'Pacific/Auckland': 'nz',
-	'Asia/Tokyo': 'jp',
-	'Asia/Seoul': 'kr',
-	'Asia/Singapore': 'sg'
-};
-
-/**
- * Derive a 2-letter region code from the browser timezone or locale.
- * Memoized after first call.
- */
-export function resolveBrowserCountry(): string {
-	if (cachedCountry !== null) return cachedCountry;
-	try {
-		const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-		for (const [prefix, code] of Object.entries(TZ_COUNTRY_MAP)) {
-			if (tz.startsWith(prefix) || tz === prefix) {
-				cachedCountry = code;
-				return code;
-			}
-		}
-	} catch {
-		// ignore
-	}
-	const locales =
-		typeof navigator !== 'undefined' ? navigator.languages || [navigator.language || ''] : [''];
-	for (const locale of locales) {
-		const parts = locale.split('-');
-		if (parts.length > 1) {
-			cachedCountry = parts[parts.length - 1].toLowerCase();
-			return cachedCountry;
-		}
-	}
-	cachedCountry = '';
-	return cachedCountry;
-}
-
 /** Reset module-level singletons. Test-only. */
 export function __resetPlaceSearchSingletons(): void {
 	mapsPromise = null;
-	cachedCountry = null;
+	__resetBrowserCountryCache();
 }
 
 // --- Factory ---
