@@ -206,27 +206,22 @@ _UUID_RE = re.compile(
     r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
     r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
 )
-_COORDINATE_PAIR_RE = re.compile(r"\b-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}\b")
+_COORDINATE_PAIR_RE = re.compile(
+    r"\b-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}\b"
+    r"|\b(?:lat|latitude|lng|long|longitude)\s*[:=]?\s*-?\d{1,3}\.\d{4,}\b",
+    re.IGNORECASE,
+)
 _RAW_URL_RE = re.compile(r"\b(?:https?://|www\.)\S+", re.IGNORECASE)
 _INTERNAL_THOUGHT_TERM_RE = re.compile(
     r"\b(?:"
-    r"agent|agenttool|api|api field|appendEvent|context prefix|dispatch|firestore|"
-    r"function|function call|function response|handoff|helper|implementation|"
-    r"invocation|output key|place id|place_id|reasoning engine|run id|runId|"
-    r"session id|state key|state_delta|stage|tool|tools|tool_context|vertex"
+    r"agenttool|api field|appendEvent|context prefix|firestore|"
+    r"function call|function response|handoff|invocation|output key|"
+    r"place id|place_id|reasoning engine|run id|runId|session id|"
+    r"state key|state_delta|tool_context|vertex"
     r")\b",
     re.IGNORECASE,
 )
-_PROCESS_LOG_RE = re.compile(
-    r"\b(?:"
-    r"thought process|my current plan|my plan|i(?:'|’)ll|i will|i am going to|"
-    r"i(?:'|’)m going to|i plan to|i need to|i want to|my objective|"
-    r"to tackle this|i(?:'|’)ll brief|i will brief"
-    r")\b",
-    re.IGNORECASE,
-)
-_LIST_LINE_RE = re.compile(r"(?m)^\s*(?:[-*•]|\d+[.)])\s+")
-_PUBLIC_THOUGHT_MAX_CHARS = 220
+_MAX_THOUGHT_CHARS = 16_000
 
 
 def _strip_tool_names(text: str) -> str:
@@ -242,23 +237,24 @@ def _strip_tool_names(text: str) -> str:
 
 
 def _safe_thought_text(text: str) -> str:
-    """Return a public progress line when a streamed thought leaks internals."""
+    """Return a public progress line when a streamed thought leaks internals.
+
+    Truncates at `_MAX_THOUGHT_CHARS` to stay well under Firestore's
+    1 MiB field-value limit — timeline writes are best-effort and a runaway
+    thought would otherwise silently fail to persist.
+    """
     if not text:
         return ""
-    compact = _normalize_space(text)
-    paragraphs = [part for part in re.split(r"\n\s*\n", text.strip()) if part.strip()]
     if (
-        len(compact) > _PUBLIC_THOUGHT_MAX_CHARS
-        or len(paragraphs) > 2
-        or _RAW_URL_RE.search(text)
+        _RAW_URL_RE.search(text)
         or _UUID_RE.search(text)
         or _OPAQUE_ID_RE.search(text)
         or _COORDINATE_PAIR_RE.search(text)
         or _INTERNAL_THOUGHT_TERM_RE.search(text)
-        or _PROCESS_LOG_RE.search(text)
-        or _LIST_LINE_RE.search(text)
     ):
         return _SAFE_THOUGHT_FALLBACK
+    if len(text) > _MAX_THOUGHT_CHARS:
+        return text[:_MAX_THOUGHT_CHARS]
     return text
 
 

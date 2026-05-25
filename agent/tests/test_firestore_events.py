@@ -196,62 +196,93 @@ def test_thought_text_replaces_place_id_leak_with_public_summary():
     assert "provided" not in text
 
 
-def test_thought_text_replaces_internal_process_terms_and_ids():
+def test_thought_text_replaces_internal_platform_terms_and_ids():
     ev = _event(
         author="research_lead",
-        thoughts=[
-            "Using runId `run_0123456789abcdef` and state_delta before "
-            "dispatching the next helper."
-        ],
+        thoughts=["Writing state_delta with runId `run_0123456789abcdef`."],
     )
 
     rows = map_event(ev, {})["timeline_events"]
     text = next(r["text"] for r in rows if r["kind"] == "thought")
 
     assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
-    assert "runId" not in text
-    assert "run_0123456789abcdef" not in text
-    assert "state_delta" not in text
-    assert "helper" not in text
 
 
-def test_thought_text_replaces_long_process_log_with_public_summary():
+def test_thought_text_replaces_raw_url_with_public_summary():
     ev = _event(
         author="research_lead",
-        thoughts=[
-            "**My Thought Process on Gdynia's Gastronomic Landscape Near Monsun**\n\n"
-            "Here is how I am approaching this query about Monsun Gdynia. "
-            "My primary objective is to understand recent shifts in the local dining scene.\n\n"
-            "1. **market signals**: This is my go-to for gaining a broad overview.\n"
-            "2. **focused source check**: I will brief it for local media."
-        ],
+        thoughts=["Checking the listing at https://example.com/r/cudne-manowce for hours."],
     )
 
     rows = map_event(ev, {})["timeline_events"]
     text = next(r["text"] for r in rows if r["kind"] == "thought")
 
     assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
-    assert "Thought Process" not in text
-    assert "objective" not in text
-    assert "brief" not in text
 
 
-def test_thought_text_replaces_overlong_progress_with_public_summary():
+def test_thought_text_replaces_uuid_with_public_summary():
     ev = _event(
-        author="context_enricher",
-        thoughts=[
-            "**Gathering Location Data**\n\n"
-            "I've identified several nearby establishments and am expanding the comparison "
-            "to collect enough surrounding detail for a comprehensive neighborhood overview "
-            "before narrowing the answer to the most relevant operators and recent changes."
-        ],
+        author="research_lead",
+        thoughts=["Reviewing run e-b926ce5b-99cc-49ef-a4df-75eff13155b4 progress."],
     )
 
     rows = map_event(ev, {})["timeline_events"]
     text = next(r["text"] for r in rows if r["kind"] == "thought")
 
     assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
-    assert "comprehensive neighborhood overview" not in text
+
+
+def test_thought_text_replaces_bare_coordinate_pair_with_public_summary():
+    ev = _event(
+        author="research_lead",
+        thoughts=["Anchoring search at 53.7758233, 20.4758495 for the Olsztyn area."],
+    )
+
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+
+    assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+
+
+def test_thought_text_replaces_labeled_coordinates_with_public_summary():
+    ev = _event(
+        author="research_lead",
+        thoughts=["Centering on latitude 53.7758233, longitude 20.4758495 for nearby venues."],
+    )
+
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+
+    assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+
+
+def test_thought_text_truncates_oversized_text_for_firestore_safety():
+    body = "Comparing accessibility across venues. " * 1000
+    ev = _event(author="research_lead", thoughts=[body])
+
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+
+    assert len(text) == 16_000
+    assert text == body[:16_000]
+
+
+def test_thought_text_passes_through_narrative_planning():
+    narrative = (
+        "**My Plan for Olsztyn**\n\n"
+        "I'll check accessibility for these 5 restaurants and compare ambiance "
+        "for a 40th birthday. My objective is a venue that handles a wheelchair "
+        "guest and a party of 10.\n\n"
+        "1. Verify step-free entrances and adapted restrooms.\n"
+        "2. Confirm ground-floor seating availability.\n"
+        "3. Compare review sentiment for celebrations."
+    )
+    ev = _event(author="research_lead", thoughts=[narrative])
+
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+
+    assert text == narrative
 
 
 def test_grounding_search_queries_become_searching_the_web_rows():
