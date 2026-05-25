@@ -1,22 +1,16 @@
 <script lang="ts">
 	const origin = 'https://agent.superextra.ai';
-	const defaultImage = `${origin}/landscape.webp`;
-	const defaultImageAlt = 'Superextra restaurant market intelligence workspace';
 
 	let {
 		title,
 		description,
 		canonicalPath = '/',
-		robots = 'index, follow',
-		image = defaultImage,
-		imageAlt = defaultImageAlt
+		robots = 'index, follow'
 	}: {
 		title: string;
 		description: string;
 		canonicalPath?: string;
 		robots?: string;
-		image?: string;
-		imageAlt?: string;
 	} = $props();
 
 	let canonicalUrl = $derived(`${origin}${canonicalPath}`);
@@ -34,17 +28,9 @@
 	<meta property="og:title" content={title} />
 	<meta property="og:description" content={description} />
 	<meta property="og:url" content={canonicalUrl} />
-	<meta property="og:image" content={image} />
-	<meta property="og:image:secure_url" content={image} />
-	<meta property="og:image:type" content="image/webp" />
-	<meta property="og:image:width" content="1707" />
-	<meta property="og:image:height" content="1583" />
-	<meta property="og:image:alt" content={imageAlt} />
 
-	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:card" content="summary" />
 	<meta name="twitter:title" content={title} />
 	<meta name="twitter:description" content={description} />
-	<meta name="twitter:image" content={image} />
-	<meta name="twitter:image:alt" content={imageAlt} />
 	<meta name="theme-color" content="#f8f6f1" />
 </svelte:head>
