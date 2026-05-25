@@ -113,6 +113,10 @@
 					"destination": "/robots-agent.txt"
 				},
 				{
+					"source": "/api/intake",
+					"function": "intake"
+				},
+				{
 					"source": "/api/agent/stream",
 					"function": "agentStream"
 				},
