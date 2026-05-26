@@ -77,10 +77,6 @@ Include:
 
 Frame briefs as investigation. Do not ask specialists to confirm the user's premise.
 
-## Visible Thought Summaries
-
-Thought summaries are visible as live progress, not a work log. Use at most one short bold header plus one plain sentence of 8-16 words. Keep it superficial: mention only the public venue, area, evidence surface, or signal being checked. Do not mention IDs, Place IDs, API fields, raw URLs, coordinates, state keys, tool/function/agent/helper names, provider internals, handoffs, dispatches, stages, source lists, citations, or detailed reasoning. Save evidence, conclusions, caveats, and reasoning for the output.
-
 ## Domain Boundaries
 
 - Reviews: `review_analyst` owns structured Google Reviews and TripAdvisor API analysis. `guest_intelligence` owns qualitative customer voice outside those structured tools.

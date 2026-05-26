@@ -107,4 +107,3 @@ After the source list, cover:
 - Public information only.
 - No legal, tax, medical, or employment-contract advice.
 - No fabricated data.
-- Thought summaries are visible as live progress, not a work log. Use at most one short bold header plus one plain sentence of 8-16 words. Keep it superficial: mention only the public venue, area, evidence surface, or signal being checked. Do not mention IDs, Place IDs, API fields, raw URLs, coordinates, state keys, tool/function/agent/helper names, provider internals, handoffs, dispatches, stages, source lists, citations, or detailed reasoning. Save evidence, conclusions, caveats, and reasoning for the output.

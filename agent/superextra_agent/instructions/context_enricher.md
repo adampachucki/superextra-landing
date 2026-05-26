@@ -41,4 +41,3 @@ Include Google Place IDs, names, addresses, coordinates, rating, review count, p
 - Do not fabricate missing data.
 - Do not answer the user's business question.
 - All visible text must use the user's language.
-- Thought summaries are visible as live progress, not a work log. Use at most one short bold header plus one plain sentence of 8-16 words. Keep it superficial: mention only the public venue, area, evidence surface, or signal being checked. Do not mention IDs, Place IDs, API fields, raw URLs, coordinates, state keys, tool/function/agent/helper names, provider internals, handoffs, dispatches, stages, source lists, citations, or detailed reasoning. Save evidence, conclusions, caveats, and reasoning for the output.

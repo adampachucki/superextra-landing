@@ -111,14 +111,7 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
 
 
 def _collect_thought_text(event: Any) -> str:
-    """Concatenate text from parts where `part.thought` is True.
-
-    Internal tool identifiers (`get_restaurant_details`, `search_restaurants`,
-    …) sometimes leak into Gemini's thought summaries even after the prompt
-    nudge. Replace tool names with user-facing labels, and replace ID/process
-    leaks with a generic progress line so the activity panel never surfaces
-    internal names or raw identifiers.
-    """
+    """Concatenate `thought` parts and run them through the sanitizer."""
     pieces: list[str] = []
     for part in _iter_parts(event):
         if not _get(part, "thought"):
@@ -183,9 +176,7 @@ _TOOL_LABELS: dict[str, str] = {
 }
 
 _BARE_TOOL_LABELS: dict[str, str] = {
-    name: label
-    for name, label in _TOOL_LABELS.items()
-    if "_" in name or ":" in name or name in _FUNCTION_TOOL_LABELS
+    name: label for name, label in _TOOL_LABELS.items() if "_" in name or ":" in name
 }
 
 
