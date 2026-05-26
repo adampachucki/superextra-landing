@@ -103,6 +103,17 @@ Tailnet traffic between Mac/iPhone and the VM is encapsulated:
 
 The `allow-tailscale-direct` GCP firewall rule allows UDP 41641 inbound for direct WG. Without it, Tailscale silently falls back to DERP — works but slower.
 
+### Why clipboard needs `allow-passthrough on` + Ms override
+
+Copying text from Claude/Codex to the Mac clipboard requires two non-default tmux options. Without both, drag-select-copy in Claude shows "Copied to clipboard" but the Mac clipboard is unchanged.
+
+The chain is Claude → tmux → mosh → Cursor's xterm.js → Mac pasteboard. Two distinct failures sit on it:
+
+1. **`set -wg allow-passthrough on`** — Claude wraps its OSC 52 in tmux DCS passthrough (`\ePtmux;\e]52;c;BASE64\e\\`) so it can escape tmux to the outer terminal. tmux 3.3 changed the default from `on` to `off`, which silently drops the wrapped sequence. Verified by reading the Claude binary: its copy path emits exactly this DCS-wrapped form after `tmux load-buffer -w` (which also doesn't reach the outer clipboard on its own).
+2. **`Ms` terminal-override forcing `c;`** — covers the non-DCS path used by other inner programs (vim, etc.). tmux's default Ms emits OSC 52 without the `c;` destination character; mosh requires `c;` to forward, and silently drops the rest. The `%p1%.0s` discards whatever destination the inner program sent and substitutes a literal `c`.
+
+Verified end-to-end 2026-05-25 by spawning a pane that emits the exact DCS-wrapped escape Claude uses and confirming `pbpaste` returns the test token on the Mac. Don't remove either line without re-verifying both paths.
+
 ### Why `CLAUDE_CODE_NO_FLICKER=1`
 
 Always on. Without it, every SIGWINCH-triggered repaint Claude emits gets captured into tmux's scrollback, producing 2× doubling on every reconnect. With it, Claude wraps each TUI frame in DECSET 2026 (synchronized output), tmux treats the frame as atomic, and scrollback stays clean. Tested unsetting on 2026-05-06: artifacts return immediately. Don't unset.
@@ -324,6 +335,11 @@ set -g set-clipboard on
 set -g default-terminal "tmux-256color"
 set -ga terminal-overrides ",*256col*:RGB,*256col*:Tc"
 set -g history-limit 100000
+
+# Clipboard from Claude/Codex (and other inner programs) to Mac clipboard.
+# Both lines are required; see "Why clipboard needs allow-passthrough + Ms override" below.
+set -ga terminal-overrides ",xterm*:Ms=\E]52;c%p1%.0s;%p2%s\7"
+set -wg allow-passthrough on
 
 # Override default $ session-rename binding to start with empty prompt.
 bind '$' command-prompt -p 'Name:' 'rename-session -- "%%"
