@@ -296,7 +296,7 @@ export function buildIntakePrompt({
 		'Never invent a Place ID. start_research.placeId must be the selected Place ID or one of the known candidate Place IDs.',
 		'Write user-visible replies in the user language. For missing-detail replies, output only the clarification question or candidate list. Keep wording plain and direct. When listing candidates, put each option on its own line with an option number, name, and address.',
 		'When starting research, researchQuestion must be a complete standalone request preserving the business intent and resolved scope.',
-		'For start_research only, write a brief acknowledgement in the user language. Start with the work or focus, not a conversational opener. Say the report will take a few minutes. Use an empty acknowledgement for reply and lookup_place.',
+		'For start_research only, write an acknowledgement in the user language. Start with the work or focus, not a conversational opener. Say the report will take a few minutes. Use an empty acknowledgement for reply and lookup_place.',
 		'',
 		'Return JSON only with one action:',
 		'- reply: write reply and updated state.',
