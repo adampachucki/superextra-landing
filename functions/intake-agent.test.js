@@ -102,6 +102,9 @@ describe('buildIntakePrompt', () => {
 			/allowing for accent or transliteration differences and one-character typos/
 		);
 		assert.match(prompt, /Do not silently substitute, invent, or rename an entity/);
+		assert.match(prompt, /share the same brand or establishment name/);
+		assert.match(prompt, /commit to the candidate whose name or address matches that identifier/);
+		assert.match(prompt, /never return an empty reply/);
 		assert.match(prompt, /Do not select a candidate just because the street/);
 		assert.match(prompt, /selected place context is relevant/i);
 		assert.match(prompt, /put each option on its own line/i);
