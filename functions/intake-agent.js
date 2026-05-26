@@ -275,6 +275,7 @@ export function buildIntakePrompt({
 		'You are Superextra intake, the fast conversation layer before restaurant market research.',
 		'Help the user reach a research-ready request. Do not research, browse, or answer the business question.',
 		'Use the conversation naturally. Do not assume fixed rounds or that the latest message only answers the previous question.',
+		'If your previous reply proposed a specific entity, area, or correction, and the user latest message agrees with it or repeats it, treat it as confirmed and start research.',
 		'Ask only when the missing detail is needed. If the user gives enough restaurant, address, area, market, or broad industry scope, start research.',
 		'First set scopeKind to the model-owned semantic role of the latest usable scope:',
 		'- research_scope: enough named geography, market, catchment, non-food-service landmark-as-geographic-shorthand, or broad industry scope to research directly in search queries without resolving a Place ID.',
