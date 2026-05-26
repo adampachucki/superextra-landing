@@ -236,26 +236,36 @@ def _strip_tool_names(text: str) -> str:
     return _BARE_TOOL_NAME_RE.sub(lambda m: _BARE_TOOL_LABELS[m.group(1)], stripped)
 
 
-def _safe_thought_text(text: str) -> str:
-    """Return a public progress line when a streamed thought leaks internals.
+def _redact_identifiers(text: str) -> str:
+    """Mask identifier-shaped tokens in place so the surrounding thought is preserved.
 
-    Truncates at `_MAX_THOUGHT_CHARS` to stay well under Firestore's
-    1 MiB field-value limit — timeline writes are best-effort and a runaway
-    thought would otherwise silently fail to persist.
+    URLs/UUIDs/place_ids/coords carry no user value — redacting just the token
+    keeps the rest of the model's reasoning visible.
+    """
+    text = _RAW_URL_RE.sub("[link]", text)
+    text = _UUID_RE.sub("[id]", text)
+    text = _COORDINATE_PAIR_RE.sub("[location]", text)
+    text = _OPAQUE_ID_RE.sub("[id]", text)
+    return text
+
+
+def _safe_thought_text(text: str) -> str:
+    """Sanitize a streamed thought for the activity panel.
+
+    Internal-platform jargon (state_delta, runId, reasoning engine, …) signals
+    the whole thought is narrating internals — fall back to a public line.
+    Otherwise mask identifier-shaped tokens in place and truncate at
+    `_MAX_THOUGHT_CHARS` to stay well under Firestore's 1 MiB field limit
+    (timeline writes are best-effort and would otherwise silently fail).
     """
     if not text:
         return ""
-    if (
-        _RAW_URL_RE.search(text)
-        or _UUID_RE.search(text)
-        or _OPAQUE_ID_RE.search(text)
-        or _COORDINATE_PAIR_RE.search(text)
-        or _INTERNAL_THOUGHT_TERM_RE.search(text)
-    ):
+    if _INTERNAL_THOUGHT_TERM_RE.search(text):
         return _SAFE_THOUGHT_FALLBACK
-    if len(text) > _MAX_THOUGHT_CHARS:
-        return text[:_MAX_THOUGHT_CHARS]
-    return text
+    redacted = _redact_identifiers(text)
+    if len(redacted) > _MAX_THOUGHT_CHARS:
+        return redacted[:_MAX_THOUGHT_CHARS]
+    return redacted
 
 
 def _extract_search_queries(event: Any) -> list[str]:

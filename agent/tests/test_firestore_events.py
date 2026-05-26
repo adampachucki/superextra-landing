@@ -208,7 +208,7 @@ def test_thought_text_replaces_internal_platform_terms_and_ids():
     assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
 
 
-def test_thought_text_replaces_raw_url_with_public_summary():
+def test_thought_text_redacts_raw_url_in_place():
     ev = _event(
         author="research_lead",
         thoughts=["Checking the listing at https://example.com/r/cudne-manowce for hours."],
@@ -217,10 +217,10 @@ def test_thought_text_replaces_raw_url_with_public_summary():
     rows = map_event(ev, {})["timeline_events"]
     text = next(r["text"] for r in rows if r["kind"] == "thought")
 
-    assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+    assert text == "Checking the listing at [link] for hours."
 
 
-def test_thought_text_replaces_uuid_with_public_summary():
+def test_thought_text_redacts_uuid_in_place():
     ev = _event(
         author="research_lead",
         thoughts=["Reviewing run e-b926ce5b-99cc-49ef-a4df-75eff13155b4 progress."],
@@ -229,10 +229,10 @@ def test_thought_text_replaces_uuid_with_public_summary():
     rows = map_event(ev, {})["timeline_events"]
     text = next(r["text"] for r in rows if r["kind"] == "thought")
 
-    assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+    assert text == "Reviewing run e-[id] progress."
 
 
-def test_thought_text_replaces_bare_coordinate_pair_with_public_summary():
+def test_thought_text_redacts_bare_coordinate_pair_in_place():
     ev = _event(
         author="research_lead",
         thoughts=["Anchoring search at 53.7758233, 20.4758495 for the Olsztyn area."],
@@ -241,10 +241,10 @@ def test_thought_text_replaces_bare_coordinate_pair_with_public_summary():
     rows = map_event(ev, {})["timeline_events"]
     text = next(r["text"] for r in rows if r["kind"] == "thought")
 
-    assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+    assert text == "Anchoring search at [location] for the Olsztyn area."
 
 
-def test_thought_text_replaces_labeled_coordinates_with_public_summary():
+def test_thought_text_redacts_labeled_coordinates_in_place():
     ev = _event(
         author="research_lead",
         thoughts=["Centering on latitude 53.7758233, longitude 20.4758495 for nearby venues."],
@@ -253,7 +253,34 @@ def test_thought_text_replaces_labeled_coordinates_with_public_summary():
     rows = map_event(ev, {})["timeline_events"]
     text = next(r["text"] for r in rows if r["kind"] == "thought")
 
-    assert text == "**Checking Context**\n\nReviewing public venue information and nearby market signals."
+    assert text == "Centering on [location], [location] for nearby venues."
+
+
+def test_thought_text_redacts_opaque_place_id_in_place():
+    ev = _event(
+        author="context_enricher",
+        thoughts=["Fetching menu for ChIJ48HwEQCn_UYRmVqYQULc9pM from the directory."],
+    )
+
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+
+    assert text == "Fetching menu for [id] from the directory."
+
+
+def test_thought_text_redacts_multiple_identifiers_in_one_thought():
+    ev = _event(
+        author="research_lead",
+        thoughts=[
+            "Comparing https://example.com/x against ChIJ48HwEQCn_UYRmVqYQULc9pM "
+            "near 53.7758233, 20.4758495."
+        ],
+    )
+
+    rows = map_event(ev, {})["timeline_events"]
+    text = next(r["text"] for r in rows if r["kind"] == "thought")
+
+    assert text == "Comparing [link] against [id] near [location]."
 
 
 def test_thought_text_truncates_oversized_text_for_firestore_safety():
