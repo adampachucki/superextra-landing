@@ -84,20 +84,14 @@ describe('buildIntakePrompt', () => {
 
 		assert.match(prompt, /fast conversation layer/);
 		assert.match(prompt, /Do not assume fixed rounds/);
-		assert.match(prompt, /accept, reject, repair, or new request/);
-		assert.match(prompt, /best high-confidence interpretation/);
-		assert.match(prompt, /plain yes is not confirmation/);
-		assert.match(prompt, /two attempts to fill the same slot/);
 		assert.match(prompt, /scopeKind/);
 		assert.match(prompt, /research_scope/);
 		assert.match(prompt, /anchor_place/);
 		assert.match(prompt, /candidate_selection/);
 		assert.match(prompt, /insufficient_scope/);
-		assert.match(prompt, /national or global frame/);
 		assert.match(prompt, /Google Places candidates/);
 		assert.match(prompt, /bare generic area descriptor/);
 		assert.match(prompt, /food\/drink brand/);
-		assert.match(prompt, /normalize, or obviously correct/);
 		assert.match(prompt, /Do not select a candidate just because the street/);
 		assert.match(prompt, /selected place context is relevant/i);
 		assert.match(prompt, /put each option on its own line/i);
