@@ -16,6 +16,15 @@ This bit one in production on 2026-04-27. `firebase deploy` reads `functions/.en
 
 The GHA workflow writes the file fresh on each run (see `.github/workflows/deploy.yml` step "Write functions .env"). Adding a new env var means appending it to the workflow's heredoc.
 
+## GitHub Actions deploy — push trigger can silently drop
+
+The `Deploy to Firebase` workflow runs on `push` to `main`. During a GitHub Actions outage on 2026-05-26, four consecutive pushes registered (visible in the repo's PushEvent feed) but produced zero workflow runs — `workflow_dispatch` returned HTTP 500, and `gh run list` showed nothing new for the affected SHAs. Check `https://www.githubstatus.com/api/v2/components.json` for the `Actions` component when this happens.
+
+Two unblock paths once you confirm GHA is the problem:
+
+- **Manual re-trigger** (preferred once Actions recovers): `gh workflow run deploy.yml --ref main` — workflow_dispatch is wired up for exactly this case. Re-runs the full workflow against the current HEAD of `main`.
+- **Manual deploy from the VM** (last resort, bypasses CI test gate): get a CI token from a desktop via `firebase login:ci` (interactive, browser-paste), then on the VM run `FIREBASE_TOKEN=<token> GOOGLE_CLOUD_QUOTA_PROJECT=superextra-site npx firebase-tools deploy --only hosting,functions,firestore:rules,firestore:indexes --project superextra-site --force --token "$FIREBASE_TOKEN"`. Build the frontend first with `npm run build`, and overwrite `functions/.env.superextra-site` to match what the GHA workflow writes (single `GEAR_REASONING_ENGINE_RESOURCE=...` line) — anything else gets deployed as a function env var.
+
 ## Firestore
 
 Data shape and listeners are documented in CLAUDE.md's "Transport architecture" section — this section covers only what isn't there.
