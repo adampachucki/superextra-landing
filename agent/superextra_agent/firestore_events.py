@@ -349,7 +349,10 @@ def _map_complete(event: Any) -> dict[str, Any] | None:
             candidate = _state_delta(event).get(key)
             if isinstance(candidate, str) and candidate.strip():
                 reply = candidate
+                reply_key = key
                 break
+    else:
+        reply_key = None
 
     if reply is None:
         text = _collect_text(event).strip()
@@ -359,7 +362,10 @@ def _map_complete(event: Any) -> dict[str, Any] | None:
     if not reply:
         return None
 
-    return {"reply": reply}
+    complete = {"reply": reply}
+    if reply_key:
+        complete["reply_key"] = reply_key
+    return complete
 
 
 def _tool_row_id(*, call_id: str | None, phase: str, name: str) -> str:

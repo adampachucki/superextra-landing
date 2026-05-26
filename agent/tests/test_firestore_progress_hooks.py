@@ -5,9 +5,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from google.cloud import firestore
+from google.adk.models.llm_response import LlmResponse
 from superextra_agent import firestore_progress
 from superextra_agent.firestore_progress import FirestoreProgressPlugin
 from superextra_agent.gear_run_state import GearRunState
+from superextra_agent.timeline import TimelineOwnershipLost
 
 
 def _make_plugin_state() -> tuple[FirestoreProgressPlugin, GearRunState]:
@@ -39,6 +41,17 @@ def _tool_context(*, invocation_id: str = "inv-parent", call_id: str = "call-1")
         agent_name="research_lead",
         session=SimpleNamespace(id="se-sid-test", state={"runId": "run-test"}),
     )
+
+
+def _session_snapshot(plugin: FirestoreProgressPlugin, data: dict):
+    snap = MagicMock()
+    snap.exists = True
+    snap.to_dict.return_value = data
+    doc = MagicMock()
+    doc.get.return_value = snap
+    collection = MagicMock()
+    collection.document.return_value = doc
+    plugin._fs.collection.return_value = collection
 
 
 def test_active_stage_updates_are_model_scoped():
@@ -84,6 +97,26 @@ async def test_before_model_writes_active_stage(monkeypatch):
     assert cloud_logs[0][1]["turn_idx"] == 1
     assert cloud_logs[0][1]["root_invocation_id"] == "inv-parent"
     assert cloud_logs[0][1]["invocation_id"] == "inv-parent"
+
+
+@pytest.mark.asyncio
+async def test_before_model_stops_when_run_no_longer_owns_session():
+    plugin, state = _make_plugin_state()
+    _session_snapshot(plugin, {"status": "error", "currentRunId": None})
+    callback_context = SimpleNamespace(
+        invocation_id="inv-parent",
+        agent_name="report_writer",
+        session=SimpleNamespace(id="se-sid-test", state={"runId": "run-test"}),
+    )
+    llm_request = SimpleNamespace(model="gemini-3.1-pro")
+
+    result = await plugin.before_model_callback(
+        callback_context=callback_context,
+        llm_request=llm_request,
+    )
+
+    assert isinstance(result, LlmResponse)
+    assert state.cancelled is True
 
 
 @pytest.mark.asyncio
@@ -144,6 +177,46 @@ async def test_before_tool_google_search_writes_search_pill():
             "text": "pizza Gdynia",
         }
     )
+
+
+@pytest.mark.asyncio
+async def test_before_tool_returns_cancelled_result_when_run_no_longer_owns_session():
+    plugin, state = _make_plugin_state()
+    _session_snapshot(plugin, {"status": "error", "currentRunId": None})
+
+    result = await plugin.before_tool_callback(
+        tool=_tool("google_search"),
+        tool_args={"query": "pizza Gdynia"},
+        tool_context=_tool_context(call_id="call-search"),
+    )
+
+    assert result == {"status": "cancelled", "error": "user_cancelled"}
+    assert state.cancelled is True
+    state.timeline_writer.write_timeline.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_on_event_stops_when_timeline_writer_loses_ownership(monkeypatch):
+    plugin, state = _make_plugin_state()
+    state.observe_event = MagicMock(return_value=[{"kind": "detail", "text": "late"}])
+    state.timeline_writer.write_timeline.side_effect = TimelineOwnershipLost()
+    fenced_session_update = AsyncMock()
+    monkeypatch.setattr(
+        firestore_progress, "fenced_session_update", fenced_session_update
+    )
+    invocation_context = SimpleNamespace(
+        invocation_id="inv-parent",
+        agent_name="research_lead",
+        session=SimpleNamespace(id="se-sid-test", state={"runId": "run-test"}),
+    )
+
+    await plugin.on_event_callback(
+        invocation_context=invocation_context, event=SimpleNamespace(partial=False)
+    )
+
+    assert state.cancelled is True
+    state.timeline_writer.write_timeline.assert_awaited_once()
+    fenced_session_update.assert_not_awaited()
 
 
 @pytest.mark.asyncio

@@ -23,6 +23,7 @@
 	let relativeNow = $state(Date.now());
 	let sidebarContentVisible = $derived(sidebarOpen && mounted);
 	let activePromptPosting = $state(false);
+	let cancelPosting = $state(false);
 	let activePromptPostMessageCount = $state(0);
 	let activePromptInactive = $derived(
 		chatState.active && (chatState.loading || activePromptPosting)
@@ -49,6 +50,10 @@
 		) {
 			activePromptPosting = false;
 		}
+	});
+
+	$effect(() => {
+		if (!chatState.canCancel) cancelPosting = false;
 	});
 
 	$effect(() => {
@@ -185,6 +190,20 @@
 		}
 	}
 
+	async function handleCancel() {
+		if (!chatState.canCancel || cancelPosting) return;
+		sendError = null;
+		if (dictation.active) dictation.stop();
+		cancelPosting = true;
+		try {
+			await chatState.cancelActiveTurn();
+		} catch (err) {
+			sendError = err instanceof Error ? err.message : 'Could not stop research. Please try again.';
+		} finally {
+			cancelPosting = false;
+		}
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
@@ -285,6 +304,12 @@
 		if (!target.closest('.sb-item')) confirmDeleteId = null;
 	}
 
+	function handleWindowKeydown(e: KeyboardEvent) {
+		if (e.key !== 'Escape' || !chatState.canCancel) return;
+		e.preventDefault();
+		void handleCancel();
+	}
+
 	async function performDelete(sid: string) {
 		if (deletingId) return;
 		deleteError = null;
@@ -300,7 +325,7 @@
 	}
 </script>
 
-<svelte:window onclick={handleWindowClick} />
+<svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
 
 <Seo
 	title="Chat - Superextra"
@@ -728,16 +753,27 @@
 							<PromptIcon name="mic" class="h-[18px] w-[18px]" />
 						</button>
 					{/if}
-					<button
-						onclick={handleSend}
-						disabled={!query.trim() || activePromptInactive}
-						aria-label="Send"
-						class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
-					>
-						<PromptIcon name="send" class="h-4 w-4 text-white dark:text-black" />
-					</button>
+						{#if chatState.canCancel}
+							<button
+								onclick={handleCancel}
+								disabled={cancelPosting}
+								aria-label="Stop research"
+								class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:opacity-40 dark:bg-white dark:hover:bg-white/80"
+							>
+								<PromptIcon name="stop" class="h-4 w-4 text-white dark:text-black" />
+							</button>
+						{:else}
+							<button
+								onclick={handleSend}
+								disabled={!query.trim() || activePromptInactive}
+								aria-label="Send"
+								class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
+							>
+								<PromptIcon name="send" class="h-4 w-4 text-white dark:text-black" />
+							</button>
+						{/if}
+					</div>
 				</div>
-			</div>
 		{:else}
 			{#key composerResetKey}
 				<RestaurantPromptComposer

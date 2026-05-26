@@ -36,6 +36,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events.event import Event
+from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
 from google.api_core.exceptions import DeadlineExceeded, GoogleAPICallError, RetryError
 from google.cloud import firestore
@@ -58,6 +59,7 @@ from .firestore_events import (
 )
 from .gear_run_state import GearRunState
 from .notes import _generate_title
+from .timeline import TimelineOwnershipLost
 from .web_tools import (
     clear_fetch_cache_for_run,
     set_fetch_run_id,
@@ -146,6 +148,8 @@ async def write_run_started_event(state: GearRunState) -> None:
                 "text": text,
             }
         )
+    except TimelineOwnershipLost:
+        pass
     except Exception:  # noqa: BLE001
         log.exception(
             "run-start timeline write failed sid=%s runId=%s; continuing",
@@ -386,10 +390,16 @@ def _build_state(
         log.error("session.state missing/invalid turnIdx; cannot build GearRunState")
         return None
     sid = (session.id if hasattr(session, "id") else None) or ""
-    # ADK creates the session under id `se-{sid}` (plan §"Verified-not-working":
-    # sessionId regex disallows underscores, so agentStream prepends `se-`).
-    # Strip the prefix to recover the Firestore session id.
-    firestore_sid = normalize_firestore_sid(sid) or sid
+    state = getattr(session, "state", None) or {}
+    state_firestore_sid = (
+        state.get("firestoreSid") if isinstance(state, dict) else None
+    )
+    if isinstance(state_firestore_sid, str) and state_firestore_sid:
+        firestore_sid = state_firestore_sid
+    else:
+        # Backward-compatible fallback for sessions created before the explicit
+        # firestoreSid state key.
+        firestore_sid = normalize_firestore_sid(sid) or sid
     user_id = getattr(invocation_context, "user_id", None) or ""
     return GearRunState(
         sid=firestore_sid,
@@ -443,11 +453,52 @@ class FirestoreProgressPlugin(BasePlugin):
             return None
         return self._states_by_run_id.get(run_id)
 
+    async def _mark_cancelled(self, per: GearRunState) -> None:
+        if per.cancelled:
+            return
+        per.cancelled = True
+        await per.timeline_writer.close()
+        await per.stop_heartbeat()
+
+    async def _still_owns_running_turn(self, per: GearRunState) -> bool:
+        if per.cancelled:
+            return False
+
+        def _read() -> tuple[str | None, str | None]:
+            snap = self._client().collection("sessions").document(per.sid).get()
+            if getattr(snap, "exists", None) is False:
+                return None, None
+            data = snap.to_dict()
+            if not isinstance(data, dict):
+                # Unexpected client shapes should not synthesize cancellation.
+                return per.run_id, "running"
+            return data.get("currentRunId"), data.get("status")
+
+        try:
+            current_run_id, status = await asyncio.to_thread(_read)
+        except Exception:  # noqa: BLE001
+            log.exception(
+                "cancel ownership check failed sid=%s runId=%s; continuing",
+                per.sid,
+                per.run_id,
+            )
+            return True
+
+        if current_run_id == per.run_id and status in ("queued", "running"):
+            return True
+
+        await self._mark_cancelled(per)
+        return False
+
     async def _observe_typed_pill(
         self, per: GearRunState, pill: dict[str, Any]
     ) -> None:
+        if not await self._still_owns_running_turn(per):
+            return
         try:
             await per.observe_typed_pill(pill)
+        except TimelineOwnershipLost:
+            await self._mark_cancelled(per)
         except Exception:  # noqa: BLE001
             log.exception(
                 "typed timeline write failed sid=%s runId=%s; continuing",
@@ -479,6 +530,8 @@ class FirestoreProgressPlugin(BasePlugin):
         model: str | None = None,
         invocation_id: str | None = None,
     ) -> None:
+        if not await self._still_owns_running_turn(per):
+            return
         corr = build_run_correlation(
             per, invocation_id=invocation_id, agent=agent_name
         )
@@ -585,6 +638,8 @@ class FirestoreProgressPlugin(BasePlugin):
         per = self._state_for_context(callback_context, allow_run_id_fallback=True)
         if per is None:
             return None
+        if not await self._still_owns_running_turn(per):
+            return LlmResponse()
         await self._write_active_stage(
             per,
             agent_name=callback_context.agent_name,
@@ -594,10 +649,21 @@ class FirestoreProgressPlugin(BasePlugin):
         return None
 
     @override
+    async def after_model_callback(self, *, callback_context, llm_response):
+        per = self._state_for_context(callback_context, allow_run_id_fallback=True)
+        if per is None:
+            return None
+        if not await self._still_owns_running_turn(per):
+            return LlmResponse()
+        return None
+
+    @override
     async def before_tool_callback(self, *, tool, tool_args, tool_context):
         per = self._state_for_context(tool_context, allow_run_id_fallback=True)
         if per is None:
             return None
+        if not await self._still_owns_running_turn(per):
+            return {"status": "cancelled", "error": "user_cancelled"}
         pill = map_tool_call(
             tool.name,
             tool_args,
@@ -615,6 +681,8 @@ class FirestoreProgressPlugin(BasePlugin):
         per = self._state_for_context(tool_context, allow_run_id_fallback=True)
         if per is None:
             return None
+        if not await self._still_owns_running_turn(per):
+            return None
         for pill in map_tool_result(
             tool.name,
             result if isinstance(result, dict) else {},
@@ -628,6 +696,8 @@ class FirestoreProgressPlugin(BasePlugin):
     async def on_tool_error_callback(self, *, tool, tool_args, tool_context, error):
         per = self._state_for_context(tool_context, allow_run_id_fallback=True)
         if per is None:
+            return None
+        if not await self._still_owns_running_turn(per):
             return None
         for pill in map_tool_error(
             tool.name,
@@ -651,6 +721,9 @@ class FirestoreProgressPlugin(BasePlugin):
             # before_run must have short-circuited, or an AgentTool child
             # event arrived after the parent run had already finalized.
             # Ignore.
+            return None
+
+        if not await self._still_owns_running_turn(per):
             return None
 
         timeline_events = []
@@ -689,6 +762,9 @@ class FirestoreProgressPlugin(BasePlugin):
         for ev in timeline_events:
             try:
                 await per.timeline_writer.write_timeline(ev)
+            except TimelineOwnershipLost:
+                await self._mark_cancelled(per)
+                return None
             except Exception:  # noqa: BLE001
                 log.exception(
                     "timeline write failed sid=%s runId=%s; continuing",

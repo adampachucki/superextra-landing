@@ -44,6 +44,26 @@ const mockDb = {
 	})
 };
 
+function readMockWrittenDoc(ref) {
+	const path = ref?._path;
+	if (!path) return { exists: false };
+	const setCall = mockDb.set.mock.calls.findLast((c) => c.arguments[0]?._path === path);
+	const updateCalls = mockDb.update.mock.calls.filter((c) => c.arguments[0]?._path === path);
+	if (!setCall && updateCalls.length === 0) return { exists: false };
+	const data = Object.assign(
+		{},
+		setCall?.arguments[1] || {},
+		...updateCalls.map((c) => c.arguments[1])
+	);
+	return { exists: true, data: () => data };
+}
+
+function readWrittenFirst(ref, fallback) {
+	const written = readMockWrittenDoc(ref);
+	if (written.exists) return written;
+	return typeof fallback === 'function' ? fallback(ref) : fallback;
+}
+
 // Firebase Auth mock — verifyIdToken returns { uid: 'user-<token>' } so tests
 // can pass different tokens to simulate different users.
 const authInstance = {
@@ -61,7 +81,8 @@ mock.module('firebase-admin/firestore', {
 		getFirestore: mock.fn(() => mockDb),
 		FieldValue: {
 			serverTimestamp: () => '__server_timestamp__',
-			arrayUnion: (...values) => ({ __arrayUnion: values })
+			arrayUnion: (...values) => ({ __arrayUnion: values }),
+			delete: () => ({ __delete: true })
 		}
 	}
 });
@@ -108,7 +129,7 @@ mock.module('./intake-agent.js', {
 	}
 });
 
-const { intake, agentStream, agentDelete, sttToken, tts } = await import('./index.js');
+const { intake, agentStream, agentCancel, agentDelete, sttToken, tts } = await import('./index.js');
 
 // ── Test helpers ──
 
@@ -176,13 +197,7 @@ beforeEach(() => {
 	gearHandoffCleanupMock.mock.resetCalls();
 	runIntakeConversationMock.mock.resetCalls();
 	mockDb.get.mock.mockImplementation(async (ref) => {
-		const path = ref?._path;
-		if (!path) return { exists: false };
-		const setCall = mockDb.set.mock.calls.findLast((c) => c.arguments[0]?._path === path);
-		if (!setCall) return { exists: false };
-		const updateCalls = mockDb.update.mock.calls.filter((c) => c.arguments[0]?._path === path);
-		const data = Object.assign({}, setCall.arguments[1], ...updateCalls.map((c) => c.arguments[1]));
-		return { exists: true, data: () => data };
+		return readMockWrittenDoc(ref);
 	});
 	mockDb.recursiveDelete.mock.mockImplementation(async () => {});
 	// Reset mock IMPLEMENTATIONS too — a failed/interrupted
@@ -468,6 +483,8 @@ describe('agentStream', () => {
 		assert.equal(sessionDoc.lastTurnIndex, 1);
 		assert.equal(sessionDoc.status, 'queued');
 		assert.equal(sessionDoc.engineSessionStarted, false);
+		assert.equal(sessionDoc.engineSessionId, 'se-sess-1');
+		assert.equal(sessionDoc.engineSessionGeneration, 1);
 		assert.equal(sessionDoc.intakeState, null);
 		assert.equal(sessionDoc.title, null);
 		assert.equal(sessionDoc.updatedAt, '__server_timestamp__');
@@ -508,6 +525,9 @@ describe('agentStream', () => {
 		assert.equal(handoffArg.userId, 'user-good-token');
 		assert.equal(handoffArg.turnIdx, 1);
 		assert.equal(handoffArg.isEngineFirstMessage, true);
+		assert.equal(handoffArg.createEngineSession, true);
+		assert.equal(handoffArg.engineSessionId, 'se-sess-1');
+		assert.equal(handoffArg.seedState, null);
 		assert.match(handoffArg.message, /^\[Date: /);
 		assert.equal(runIntakeConversationMock.mock.callCount(), 1);
 		assert.equal(sessionUpdates.at(-1).engineSessionStarted, true);
@@ -669,6 +689,7 @@ describe('agentStream', () => {
 				return {
 					exists: true,
 					data: () => ({
+						status: 'complete',
 						userMessage: 'What has opened or closed in my area recently?'
 					})
 				};
@@ -890,6 +911,7 @@ describe('agentStream', () => {
 				return {
 					exists: true,
 					data: () => ({
+						status: 'complete',
 						userMessage: 'What has opened or closed in my area recently?',
 						reply: 'What area should I use?'
 					})
@@ -899,6 +921,7 @@ describe('agentStream', () => {
 				return {
 					exists: true,
 					data: () => ({
+						status: 'complete',
 						userMessage: 'near Zeit fur Brot in Berlin',
 						reply: 'Which Zeit für Brot location in Berlin do you mean?'
 					})
@@ -943,6 +966,8 @@ describe('agentStream', () => {
 
 	it('turn after direct clarification uses selected focus when provided', async () => {
 		mockDb.get.mock.mockImplementation(async (ref) => {
+			const written = readMockWrittenDoc(ref);
+			if (written.exists) return written;
 			if (ref._path === 'sessions/sess-1') {
 				return {
 					exists: true,
@@ -1010,6 +1035,8 @@ describe('agentStream', () => {
 
 	it('does not reconstruct prior turns with fixed clarification wording', async () => {
 		mockDb.get.mock.mockImplementation(async (ref) => {
+			const written = readMockWrittenDoc(ref);
+			if (written.exists) return written;
 			if (ref._path === 'sessions/sess-1') {
 				return {
 					exists: true,
@@ -1069,18 +1096,140 @@ describe('agentStream', () => {
 		assert.equal(gearHandoffMock.mock.calls[0].arguments[0].isEngineFirstMessage, true);
 	});
 
+	it('does not hand off when the run is cancelled during intake', async () => {
+		runIntakeConversationMock.mock.mockImplementationOnce(async ({ message }) => {
+			await mockDb.update(makeRef('sessions/sess-1'), {
+				status: 'error',
+				currentRunId: null
+			});
+			return {
+				action: 'start_research',
+				researchQuestion: message,
+				placeContext: null,
+				acknowledgement: 'Preparing the report. This will take a few minutes.',
+				state: null,
+				reason: 'test_cancelled'
+			};
+		});
+
+		const res = mockRes();
+		await agentStream(authedReq({ ip: '127.0.0.250' }), res);
+
+		assert.equal(res._status, 202);
+		assert.equal(res._json.cancelled, true);
+		assert.equal(gearHandoffMock.mock.callCount(), 0);
+		assert.equal(gearHandoffCleanupMock.mock.callCount(), 0);
+	});
+
+	it('does not hand off when the run is cancelled after intake records research start', async () => {
+		let researchStartRecorded = false;
+		mockDb.update.mock.mockImplementation(async (ref, data) => {
+			if (ref?._path === 'sessions/sess-1' && Object.hasOwn(data, 'placeContext')) {
+				researchStartRecorded = true;
+			}
+		});
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			const written = readMockWrittenDoc(ref);
+			if (ref?._path === 'sessions/sess-1' && researchStartRecorded && written.exists) {
+				const data = written.data();
+				return {
+					exists: true,
+					data: () => ({
+						...data,
+						status: 'error',
+						currentRunId: null
+					})
+				};
+			}
+			return written;
+		});
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({
+				ip: '127.0.0.249',
+				headers: { authorization: 'Bearer post-record-cancel-token' }
+			}),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(res._json.cancelled, true);
+		assert.equal(gearHandoffMock.mock.callCount(), 0);
+		assert.equal(gearHandoffCleanupMock.mock.callCount(), 0);
+	});
+
+	it('does not feed a cancelled pre-engine turn back into intake history', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			const written = readMockWrittenDoc(ref);
+			if (written.exists) return written;
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token'],
+						status: 'error',
+						error: 'user_cancelled',
+						lastTurnIndex: 1,
+						engineSessionStarted: false,
+						engineSessionId: 'se-sess-1',
+						engineSessionGeneration: 1
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0001') {
+				return {
+					exists: true,
+					data: () => ({
+						turnIndex: 1,
+						status: 'error',
+						error: 'user_cancelled',
+						userMessage: 'research lunch pricing'
+					})
+				};
+			}
+			return { exists: false };
+		});
+		runIntakeConversationMock.mock.mockImplementationOnce(async ({ history, message }) => {
+			assert.deepEqual(history, []);
+			return {
+				action: 'start_research',
+				researchQuestion: message,
+				placeContext: null,
+				acknowledgement: 'Preparing the report. This will take a few minutes.',
+				state: null,
+				reason: 'test_history'
+			};
+		});
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({
+				ip: '127.0.0.251',
+				body: { message: 'use dinner instead', sessionId: 'sess-1' }
+			}),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+	});
+
 	it('follow-up from the same user arrayUnion-keeps participants and increments lastTurnIndex', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({
-				userId: 'user-good-token',
-				participants: ['user-good-token'],
-				status: 'complete',
-				lastTurnIndex: 1,
-				placeContext: { name: 'Umami', secondary: 'Berlin', placeId: 'ChIJ...' },
-				title: 'Prior chat'
+		mockDb.get.mock.mockImplementation(async (ref) =>
+			readWrittenFirst(ref, {
+				exists: true,
+				data: () => ({
+					userId: 'user-good-token',
+					participants: ['user-good-token'],
+					status: 'complete',
+					lastTurnIndex: 1,
+					placeContext: { name: 'Umami', secondary: 'Berlin', placeId: 'ChIJ...' },
+					title: 'Prior chat'
+				})
 			})
-		}));
+		);
 
 		const res = mockRes();
 		await agentStream(authedReq({ body: { message: 'follow-up', sessionId: 'sess-1' } }), res);
@@ -1113,16 +1262,188 @@ describe('agentStream', () => {
 		assert.ok(!handoffArg.message.includes('[Context:'));
 	});
 
+	it('turn after user cancellation rotates the ADK working session and seeds visible state', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			const written = readMockWrittenDoc(ref);
+			if (written.exists) return written;
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token', 'user-rotation-token'],
+						status: 'error',
+						error: 'user_cancelled',
+						lastTurnIndex: 3,
+						engineSessionStarted: true,
+						engineSessionId: 'se-sess-1',
+						engineSessionGeneration: 1,
+						placeContext: { name: 'Umami', secondary: 'Seattle, WA', placeId: 'ChIJumami' },
+						title: 'Prior chat'
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0001') {
+				return {
+					exists: true,
+					data: () => ({
+						turnIndex: 1,
+						status: 'complete',
+						userMessage: 'What restaurant should open here?',
+						reply: 'Which area should I use?',
+						turnKind: 'intake_reply'
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0002') {
+				return {
+					exists: true,
+					data: () => ({
+						turnIndex: 2,
+						status: 'complete',
+						userMessage: 'Use Capitol Hill',
+						reply: 'Completed market report',
+						turnKind: 'research_report',
+						sources: [{ title: 'Source', url: 'https://example.com/report' }]
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0003') {
+				return {
+					exists: true,
+					data: () => ({
+						turnIndex: 3,
+						status: 'error',
+						error: 'user_cancelled',
+						userMessage: 'Research lunch pricing in detail'
+					})
+				};
+			}
+			return { exists: false };
+		});
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({
+				ip: '127.0.0.2',
+				headers: { authorization: 'Bearer rotation-token' },
+				body: { message: 'Continue with dinner pricing', sessionId: 'sess-1' }
+			}),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		assert.equal(runIntakeConversationMock.mock.callCount(), 0);
+		const { sessionUpdates, turnSets } = partitionWrites('sessions/sess-1');
+		const sessionUpdate = sessionUpdates[0];
+		assert.equal(sessionUpdate.lastTurnIndex, 4);
+		assert.equal(sessionUpdate.engineSessionId, 'se-sess-1-g2');
+		assert.equal(sessionUpdate.engineSessionGeneration, 2);
+		assert.deepEqual(sessionUpdate.cancelledAt, { __delete: true });
+		assert.equal(turnSets[0].path, 'sessions/sess-1/turns/0004');
+
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.equal(handoffArg.turnIdx, 4);
+		assert.equal(handoffArg.isEngineFirstMessage, true);
+		assert.equal(handoffArg.createEngineSession, true);
+		assert.equal(handoffArg.engineSessionId, 'se-sess-1-g2');
+		assert.equal(handoffArg.seedState.final_report, 'Completed market report');
+		assert.equal(handoffArg.seedState.previous_stopped_request, 'Research lunch pricing in detail');
+		assert.match(handoffArg.seedState.continuation_notes, /What restaurant should open here\?/);
+		assert.match(handoffArg.message, /^\[Context: selected focus: Umami, Seattle, WA/);
+		assert.match(
+			handoffArg.message,
+			/\[Previous stopped request: Research lunch pricing in detail\]/
+		);
+	});
+
+	it('does not treat legacy sourced follow-ups as the durable research report', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			const written = readMockWrittenDoc(ref);
+			if (written.exists) return written;
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token'],
+						status: 'error',
+						error: 'user_cancelled',
+						lastTurnIndex: 3,
+						engineSessionStarted: true,
+						engineSessionId: 'se-sess-1',
+						engineSessionGeneration: 1,
+						title: 'Prior chat'
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0001') {
+				return {
+					exists: true,
+					data: () => ({
+						turnIndex: 1,
+						status: 'complete',
+						userMessage: 'Initial report',
+						reply: 'Original market report',
+						sources: [{ title: 'Report source', url: 'https://example.com/report' }]
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0002') {
+				return {
+					exists: true,
+					data: () => ({
+						turnIndex: 2,
+						status: 'complete',
+						userMessage: 'Continue with competitors',
+						reply: 'Legacy continuation answer with a source',
+						sources: [{ title: 'Follow-up source', url: 'https://example.com/follow-up' }]
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0003') {
+				return {
+					exists: true,
+					data: () => ({
+						turnIndex: 3,
+						status: 'error',
+						error: 'user_cancelled',
+						userMessage: 'Research delivery pricing'
+					})
+				};
+			}
+			return { exists: false };
+		});
+
+		const res = mockRes();
+		await agentStream(
+			authedReq({
+				ip: '127.0.0.3',
+				headers: { authorization: 'Bearer legacy-seed-token' },
+				body: { message: 'Continue with dinner pricing', sessionId: 'sess-1' }
+			}),
+			res
+		);
+
+		assert.equal(res._status, 202);
+		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
+		assert.equal(handoffArg.seedState.final_report, 'Original market report');
+		assert.match(handoffArg.seedState.continuation_notes, /Legacy continuation answer/);
+	});
+
 	it('follow-up from a different user (shared URL) preserves creator UID and arrayUnions participants', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({
-				userId: 'user-creator-token',
-				participants: ['user-creator-token'],
-				status: 'complete',
-				lastTurnIndex: 2
+		mockDb.get.mock.mockImplementation(async (ref) =>
+			readWrittenFirst(ref, {
+				exists: true,
+				data: () => ({
+					userId: 'user-creator-token',
+					participants: ['user-creator-token'],
+					status: 'complete',
+					lastTurnIndex: 2
+				})
 			})
-		}));
+		);
 
 		const res = mockRes();
 		await agentStream(
@@ -1165,7 +1486,7 @@ describe('agentStream', () => {
 		}));
 
 		const res = mockRes();
-		await agentStream(authedReq(), res);
+		await agentStream(authedReq({ ip: '127.0.0.252' }), res);
 
 		assert.equal(res._status, 409);
 		assert.equal(res._json.error, 'turn_cap_reached');
@@ -1173,18 +1494,26 @@ describe('agentStream', () => {
 	});
 
 	it('boundary: lastTurnIndex=9 still admits one more turn and becomes 10', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({
-				userId: 'user-good-token',
-				participants: ['user-good-token'],
-				status: 'complete',
-				lastTurnIndex: 9
+		mockDb.get.mock.mockImplementation(async (ref) =>
+			readWrittenFirst(ref, {
+				exists: true,
+				data: () => ({
+					userId: 'user-good-token',
+					participants: ['user-good-token'],
+					status: 'complete',
+					lastTurnIndex: 9
+				})
 			})
-		}));
+		);
 
 		const res = mockRes();
-		await agentStream(authedReq(), res);
+		await agentStream(
+			authedReq({
+				ip: '127.0.0.252',
+				headers: { authorization: 'Bearer handoff-failure-token' }
+			}),
+			res
+		);
 
 		assert.equal(res._status, 202);
 		const { sessionUpdates, turnSets } = partitionWrites('sessions/sess-1');
@@ -1195,18 +1524,26 @@ describe('agentStream', () => {
 	});
 
 	it('bumps updatedAt on enqueue via serverTimestamp (not just on terminal)', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({
-				userId: 'user-good-token',
-				participants: ['user-good-token'],
-				status: 'complete',
-				lastTurnIndex: 1
+		mockDb.get.mock.mockImplementation(async (ref) =>
+			readWrittenFirst(ref, {
+				exists: true,
+				data: () => ({
+					userId: 'user-good-token',
+					participants: ['user-good-token'],
+					status: 'complete',
+					lastTurnIndex: 1
+				})
 			})
-		}));
+		);
 
 		const res = mockRes();
-		await agentStream(authedReq(), res);
+		await agentStream(
+			authedReq({
+				ip: '127.0.0.254',
+				headers: { authorization: 'Bearer cancel-handoff-token' }
+			}),
+			res
+		);
 
 		assert.equal(res._status, 202);
 		const { sessionUpdates } = partitionWrites('sessions/sess-1');
@@ -1252,7 +1589,7 @@ describe('agentStream', () => {
 	});
 
 	it('gearHandoff failure → gearHandoffCleanup called, 502 returned', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({ exists: false }));
+		mockDb.get.mock.mockImplementation(async (ref) => readMockWrittenDoc(ref));
 		gearHandoffMock.mock.mockImplementationOnce(async () => {
 			throw new Error('streamQuery_not_ok:502');
 		});
@@ -1269,6 +1606,173 @@ describe('agentStream', () => {
 		assert.match(cleanupArgs[2], /^[0-9a-f-]{36}$/);
 		assert.equal(cleanupArgs[3], 1);
 		assert.match(cleanupArgs[4], /^gear_handoff_failed:streamQuery_not_ok/);
+	});
+
+	it('treats gearHandoff failure after user cancellation as cancelled, not 502', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (gearHandoffMock.mock.callCount() > 0 && ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						status: 'error',
+						error: 'user_cancelled',
+						lastTurnIndex: 1
+					})
+				};
+			}
+			return readMockWrittenDoc(ref);
+		});
+		gearHandoffMock.mock.mockImplementationOnce(async () => {
+			throw new Error('streamQuery ended before first NDJSON line');
+		});
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 202);
+		assert.equal(res._json.cancelled, true);
+		assert.equal(gearHandoffCleanupMock.mock.callCount(), 0);
+	});
+});
+
+// ══════════════════════════════════════════════════════
+// agentCancel
+// ══════════════════════════════════════════════════════
+
+describe('agentCancel', () => {
+	function authedCancel(sid, overrides = {}) {
+		return mockReq({
+			method: 'POST',
+			body: { sid, runId: 'run-1', turnIndex: 1, ...(overrides.body || {}) },
+			headers: { authorization: 'Bearer good-token', ...(overrides.headers || {}) }
+		});
+	}
+
+	it('rejects non-POST with 405', async () => {
+		const res = mockRes();
+		await agentCancel(mockReq({ method: 'GET' }), res);
+		assert.equal(res._status, 405);
+		assert.equal(res._json.ok, false);
+	});
+
+	it('returns 403 when caller is not a participant', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				participants: ['user-other-token'],
+				status: 'running',
+				currentRunId: 'run-1',
+				lastTurnIndex: 1
+			})
+		}));
+
+		const res = mockRes();
+		await agentCancel(authedCancel('sess-1'), res);
+
+		assert.equal(res._status, 403);
+		assert.equal(res._json.error, 'not_participant');
+		assert.equal(mockDb.update.mock.callCount(), 0);
+	});
+
+	it('does not cancel queued pre-handoff turns', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				participants: ['user-good-token'],
+				status: 'queued',
+				currentRunId: 'run-1',
+				lastTurnIndex: 1
+			})
+		}));
+
+		const res = mockRes();
+		await agentCancel(authedCancel('sess-1'), res);
+
+		assert.equal(res._status, 409);
+		assert.equal(res._json.error, 'cancel_not_started');
+		assert.equal(mockDb.update.mock.callCount(), 0);
+	});
+
+	it('does not cancel when the requested run/turn is no longer current', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				participants: ['user-good-token'],
+				status: 'running',
+				currentRunId: 'run-2',
+				lastTurnIndex: 3
+			})
+		}));
+
+		const res = mockRes();
+		await agentCancel(authedCancel('sess-1', { body: { runId: 'run-1', turnIndex: 2 } }), res);
+
+		assert.equal(res._status, 409);
+		assert.equal(res._json.error, 'cancel_target_mismatch');
+		assert.equal(mockDb.update.mock.callCount(), 0);
+	});
+
+	it('marks the active turn stopped and clears the current run fence', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						participants: ['user-good-token'],
+						status: 'running',
+						currentRunId: 'run-1',
+						lastTurnIndex: 2
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0002') {
+				return {
+					exists: true,
+					data: () => ({
+						runId: 'run-1',
+						status: 'running'
+					})
+				};
+			}
+			return { exists: false };
+		});
+
+		const res = mockRes();
+		await agentCancel(authedCancel('sess-1', { body: { turnIndex: 2 } }), res);
+
+		assert.equal(res._status, 200);
+		assert.equal(res._json.ok, true);
+		const sessionUpdate = mockDb.update.mock.calls.find(
+			(c) => c.arguments[0]?._path === 'sessions/sess-1'
+		).arguments[1];
+		assert.equal(sessionUpdate.status, 'error');
+		assert.equal(sessionUpdate.error, 'user_cancelled');
+		assert.deepEqual(sessionUpdate.currentRunId, { __delete: true });
+		assert.deepEqual(sessionUpdate.activeAgent, { __delete: true });
+		const turnUpdate = mockDb.update.mock.calls.find(
+			(c) => c.arguments[0]?._path === 'sessions/sess-1/turns/0002'
+		).arguments[1];
+		assert.equal(turnUpdate.status, 'error');
+		assert.equal(turnUpdate.error, 'user_cancelled');
+		assert.equal(turnUpdate.completedAt, '__server_timestamp__');
+	});
+
+	it('is idempotent once the session is already terminal', async () => {
+		mockDb.get.mock.mockImplementation(async () => ({
+			exists: true,
+			data: () => ({
+				participants: ['user-good-token'],
+				status: 'error',
+				error: 'user_cancelled'
+			})
+		}));
+
+		const res = mockRes();
+		await agentCancel(authedCancel('sess-1'), res);
+
+		assert.equal(res._status, 200);
+		assert.deepEqual(res._json, { ok: true, terminal: true });
+		assert.equal(mockDb.update.mock.callCount(), 0);
 	});
 });
 

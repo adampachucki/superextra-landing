@@ -16,6 +16,10 @@ from google.cloud import firestore
 EVENT_TTL_DAYS = 180
 
 
+class TimelineOwnershipLost(Exception):
+    """The session no longer owns this run, so the timeline write must stop."""
+
+
 # ── TurnSummaryBuilder ───────────────────────────────────────────────────────
 
 
@@ -47,6 +51,23 @@ class TurnSummaryBuilder:
 # ── TimelineWriter ───────────────────────────────────────────────────────────
 
 
+def _timeline_write_logic(
+    txn: firestore.Transaction,
+    session_ref: firestore.DocumentReference,
+    event_ref: firestore.DocumentReference,
+    expected_run_id: str,
+    doc: dict[str, Any],
+) -> None:
+    snap = session_ref.get(transaction=txn)
+    data = snap.to_dict() or {}
+    if data.get("currentRunId") != expected_run_id or data.get("status") != "running":
+        raise TimelineOwnershipLost()
+    txn.set(event_ref, doc)
+
+
+_timeline_write_txn = firestore.transactional(_timeline_write_logic)
+
+
 class TimelineWriter:
     def __init__(
         self,
@@ -70,24 +91,32 @@ class TimelineWriter:
         async with self._lock:
             if self.closed:
                 return None
-            self._seq_in_attempt += 1
+            next_seq = self._seq_in_attempt + 1
             doc = {
                 "userId": self._user_id,
                 "runId": self._run_id,
                 "attempt": self._attempt,
-                "seqInAttempt": self._seq_in_attempt,
+                "seqInAttempt": next_seq,
                 "type": "timeline",
                 "data": data,
                 "ts": firestore.SERVER_TIMESTAMP,
                 "expiresAt": datetime.now(timezone.utc) + timedelta(days=EVENT_TTL_DAYS),
             }
-            ref = (
-                self._fs.collection("sessions")
-                .document(self._sid)
-                .collection("events")
-                .document()
-            )
-            await asyncio.to_thread(ref.set, doc)
+            session_ref = self._fs.collection("sessions").document(self._sid)
+            event_ref = session_ref.collection("events").document()
+            try:
+                await asyncio.to_thread(
+                    _timeline_write_txn,
+                    self._fs.transaction(),
+                    session_ref,
+                    event_ref,
+                    self._run_id,
+                    doc,
+                )
+            except TimelineOwnershipLost:
+                self.closed = True
+                raise
+            self._seq_in_attempt = next_seq
             return doc
 
     async def close(self) -> None:

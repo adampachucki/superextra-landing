@@ -661,7 +661,7 @@ describe('chatState (Firestore-driven)', () => {
 			expect(msgs[0]).toMatchObject({ role: 'user', text: 'working?' });
 		});
 
-		it('error turns without acknowledgement render only the user message', async () => {
+		it('error turns without acknowledgement render a terminal status message', async () => {
 			const obs = captureObservers();
 			chatState.selectSession('sid-1');
 			await waitUntil(() => !!obs.turns('sid-1'));
@@ -682,7 +682,10 @@ describe('chatState (Firestore-driven)', () => {
 				])
 			);
 
-			expect(chatState.messages).toHaveLength(1);
+			expect(chatState.messages.map((msg) => [msg.role, msg.kind, msg.text])).toEqual([
+				['user', 'user', 'oops'],
+				['agent', 'status', 'pipeline_error']
+			]);
 			expect(chatState.error).toBe('pipeline_error');
 		});
 
@@ -715,9 +718,50 @@ describe('chatState (Firestore-driven)', () => {
 					'agent',
 					'acknowledgement',
 					'Reviewing the cafe market. The report will take a few minutes.'
-				]
+				],
+				['agent', 'status', 'handoff_failed']
 			]);
 			expect(chatState.error).toBe('handoff_failed');
+		});
+
+		it('keeps a stopped marker in history after the next prompt starts', async () => {
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.turns('sid-1'));
+
+			obs.turns('sid-1')!.onNext(
+				turnsSnap([
+					{
+						data: {
+							turnIndex: 1,
+							runId: 'run-1',
+							userMessage: 'research lunch pricing',
+							status: 'error',
+							reply: null,
+							error: 'user_cancelled',
+							createdAt: { toMillis: () => 1000 },
+							completedAt: { toMillis: () => 2000 }
+						}
+					},
+					{
+						data: {
+							turnIndex: 2,
+							runId: 'run-2',
+							userMessage: 'continue with dinner pricing',
+							status: 'running',
+							reply: null,
+							createdAt: { toMillis: () => 3000 }
+						}
+					}
+				])
+			);
+
+			expect(chatState.messages.map((msg) => [msg.role, msg.kind, msg.text])).toEqual([
+				['user', 'user', 'research lunch pricing'],
+				['agent', 'status', 'user_cancelled'],
+				['user', 'user', 'continue with dinner pricing']
+			]);
+			expect(chatState.error).toBe('');
 		});
 	});
 
@@ -1354,6 +1398,160 @@ describe('chatState (Firestore-driven)', () => {
 
 			await chatState.sendFollowUp('   ');
 			expect(fetchMock).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('cancelActiveTurn()', () => {
+		it('is available for a server-owned active run and POSTs /api/agent/cancel', async () => {
+			const fetchMock: Mock = vi.fn(
+				async () =>
+					({
+						ok: true,
+						status: 200,
+						json: async () => ({ ok: true })
+					}) as unknown as Response
+			);
+			vi.stubGlobal('fetch', fetchMock);
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.session('sid-1'));
+
+			obs.session('sid-1')!.onNext(
+				sessionSnap({
+					userId: 'uid-test',
+					participants: ['uid-test'],
+					status: 'running',
+					currentRunId: 'run-1',
+					lastTurnIndex: 1
+				})
+			);
+
+			expect(chatState.canCancel).toBe(true);
+			await chatState.cancelActiveTurn();
+
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+			expect(url).toBe('/api/agent/cancel');
+			expect(init.headers).toMatchObject({
+				Authorization: 'Bearer mock-id-token'
+			});
+			expect(JSON.parse(init.body as string)).toEqual({
+				sid: 'sid-1',
+				runId: 'run-1',
+				turnIndex: 1
+			});
+		});
+
+		it('does not expose cancel for a shared-session reader who is not a participant', async () => {
+			const fetchMock = vi.fn(
+				async () =>
+					({
+						ok: true,
+						status: 200,
+						json: async () => ({ ok: true })
+					}) as unknown as Response
+			);
+			vi.stubGlobal('fetch', fetchMock);
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.session('sid-1'));
+
+			obs.session('sid-1')!.onNext(
+				sessionSnap({
+					userId: 'uid-other',
+					participants: ['uid-other'],
+					status: 'running',
+					currentRunId: 'run-1',
+					lastTurnIndex: 1
+				})
+			);
+
+			expect(chatState.canCancel).toBe(false);
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it('does not expose cancel while the turn is only queued pre-handoff', async () => {
+			const fetchMock = vi.fn(
+				async () =>
+					({
+						ok: true,
+						status: 200,
+						json: async () => ({ ok: true })
+					}) as unknown as Response
+			);
+			vi.stubGlobal('fetch', fetchMock);
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.session('sid-1'));
+
+			obs.session('sid-1')!.onNext(
+				sessionSnap({
+					userId: 'uid-test',
+					participants: ['uid-test'],
+					status: 'queued',
+					currentRunId: 'run-1',
+					lastTurnIndex: 1
+				})
+			);
+
+			expect(chatState.canCancel).toBe(false);
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it('does not expose cancel for a local optimistic turn before the server run exists', async () => {
+			const fetchMock = vi.fn(
+				async () =>
+					({
+						ok: true,
+						status: 200,
+						json: async () => ({ ok: true })
+					}) as unknown as Response
+			);
+			vi.stubGlobal('fetch', fetchMock);
+			captureObservers();
+			chatState.selectSession('sid-1');
+			await flushAsync();
+
+			await chatState.sendFollowUp('another question');
+
+			expect(chatState.loading).toBe(true);
+			expect(chatState.canCancel).toBe(false);
+		});
+
+		it('throws if no active session', async () => {
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }))
+			);
+			captureObservers();
+			await expect(chatState.cancelActiveTurn()).rejects.toThrow(/no_active_session/);
+		});
+
+		it('propagates non-2xx as an error with the JSON reason', async () => {
+			const fetchMock = vi.fn(
+				async () =>
+					({
+						ok: false,
+						status: 409,
+						json: async () => ({ error: 'cancel_not_active' })
+					}) as unknown as Response
+			);
+			vi.stubGlobal('fetch', fetchMock);
+			const obs = captureObservers();
+			chatState.selectSession('sid-1');
+			await waitUntil(() => !!obs.session('sid-1'));
+
+			obs.session('sid-1')!.onNext(
+				sessionSnap({
+					userId: 'uid-test',
+					participants: ['uid-test'],
+					status: 'running',
+					currentRunId: 'run-1',
+					lastTurnIndex: 1
+				})
+			);
+
+			await expect(chatState.cancelActiveTurn()).rejects.toThrow('cancel_not_active');
 		});
 	});
 

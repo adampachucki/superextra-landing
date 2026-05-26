@@ -121,6 +121,10 @@
 					"function": "agentStream"
 				},
 				{
+					"source": "/api/agent/cancel",
+					"function": "agentCancel"
+				},
+				{
 					"source": "/api/agent/delete",
 					"function": "agentDelete"
 				},

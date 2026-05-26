@@ -43,7 +43,7 @@ function uuid(): string {
 
 export interface ChatMessage {
 	role: 'user' | 'agent';
-	kind: 'user' | 'acknowledgement' | 'final';
+	kind: 'user' | 'acknowledgement' | 'status' | 'final';
 	text: string;
 	timestamp: number;
 	turnIndex: number;
@@ -250,6 +250,15 @@ function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
 				activityEvents: activityEvents?.length ? activityEvents : undefined
 			});
 		}
+		if (turn.status === 'error') {
+			msgs.push({
+				role: 'agent',
+				kind: 'status',
+				text: turn.error ?? 'pipeline_error',
+				timestamp: turn.completedAtMs ?? Date.now(),
+				turnIndex: turn.turnIndex
+			});
+		}
 	}
 	return msgs;
 }
@@ -392,7 +401,8 @@ function removeOptimisticTurn(sid: string, turnIndex: number) {
 async function attachActiveListeners(sid: string) {
 	// Ensure anon auth has resolved before subscribing — the SDK needs a token
 	// even though rules are now path-scoped.
-	await ensureAnonAuth();
+	const uid = await ensureAnonAuth();
+	currentUid = uid;
 	const { db } = await getFirebase();
 	const firestoreMod = await import('firebase/firestore');
 	const { collection, doc, onSnapshot, orderBy, query } = firestoreMod;
@@ -692,6 +702,10 @@ function agentDeleteUrl() {
 	return '/api/agent/delete';
 }
 
+function agentCancelUrl() {
+	return '/api/agent/cancel';
+}
+
 async function postAgentStream(body: Record<string, unknown>): Promise<void> {
 	const idToken = await getIdToken();
 	const res = await fetch(agentStreamUrl(), {
@@ -820,6 +834,46 @@ async function deleteSession(sid: string): Promise<void> {
 	// splice needed.
 }
 
+function activeCancelTarget(): { sid: string; runId: string; turnIndex: number } | null {
+	if (!activeSid || !activeSession || !currentUid) return null;
+	if (!activeSession.participants.includes(currentUid)) return null;
+	if (activeSession.status !== 'running') return null;
+	if (!activeSession.currentRunId || !Number.isInteger(activeSession.lastTurnIndex)) return null;
+	const latest = turns[turns.length - 1];
+	if (latest) {
+		if (latest.turnIndex !== activeSession.lastTurnIndex) return null;
+		if (latest.runId !== activeSession.currentRunId) return null;
+		if (latest.status !== 'running') return null;
+	}
+	return {
+		sid: activeSid,
+		runId: activeSession.currentRunId,
+		turnIndex: activeSession.lastTurnIndex
+	};
+}
+
+async function cancelActiveTurn(): Promise<void> {
+	if (!activeSid) throw new Error('no_active_session');
+	const target = activeCancelTarget();
+	if (!target) throw new Error('cancel_not_active');
+	const idToken = await getIdToken();
+	const res = await fetch(agentCancelUrl(), {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${idToken}`
+		},
+		body: JSON.stringify(target)
+	});
+	if (!res.ok) {
+		const payload = await res.json().catch(() => null);
+		const reason = (payload as { error?: string } | null)?.error ?? `http_${res.status}`;
+		const err = new Error(reason) as Error & { status?: number };
+		err.status = res.status;
+		throw err;
+	}
+}
+
 function reset() {
 	detachActiveListeners();
 	clearActiveState();
@@ -897,6 +951,9 @@ export const chatState = {
 		if (!currentUid || !activeSession) return false;
 		return activeSession.userId === currentUid;
 	},
+	get canCancel(): boolean {
+		return activeCancelTarget() !== null;
+	},
 	get loadState(): LoadState {
 		return loadState;
 	},
@@ -907,6 +964,7 @@ export const chatState = {
 	startNewChat,
 	sendFollowUp,
 	selectSession,
+	cancelActiveTurn,
 	deleteSession,
 	markReplyRevealed,
 	reset

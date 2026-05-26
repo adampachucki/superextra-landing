@@ -128,6 +128,27 @@ class AgentStreamError extends Error {
 	}
 }
 
+class RunOwnershipLost extends Error {
+	constructor() {
+		super('run_ownership_lost');
+	}
+}
+
+function assertRunOwnership(data, runId) {
+	if (data?.currentRunId !== runId) throw new RunOwnershipLost();
+	if (data?.status !== 'queued' && data?.status !== 'running') throw new RunOwnershipLost();
+}
+
+async function assertRunStillCurrent(sessionRef, runId) {
+	const snap = await sessionRef.get();
+	if (!snap.exists) throw new RunOwnershipLost();
+	assertRunOwnership(snap.data() || {}, runId);
+}
+
+function finishAfterRunOwnershipLost(res, sessionId, runId) {
+	res.status(202).json({ ok: true, sessionId, runId, cancelled: true });
+}
+
 function titleFromMessage(message) {
 	const words = message
 		.replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
@@ -157,9 +178,9 @@ async function completeDirectIntake({
 	const elapsedMs = Math.max(0, finishedAtMs - startedAtMs);
 	await db.runTransaction(async (tx) => {
 		const snap = await tx.get(sessionRef);
-		if (!snap.exists) throw new Error('session_missing');
+		if (!snap.exists) throw new RunOwnershipLost();
 		const data = snap.data() || {};
-		if (data.currentRunId !== runId) throw new Error('run_not_current');
+		assertRunOwnership(data, runId);
 
 		const sessionUpdate = {
 			status: 'complete',
@@ -177,6 +198,7 @@ async function completeDirectIntake({
 			status: 'complete',
 			reply,
 			sources: [],
+			turnKind: 'intake_reply',
 			error: null,
 			completedAt: FieldValue.serverTimestamp(),
 			turnSummary: { startedAtMs, finishedAtMs, elapsedMs }
@@ -203,9 +225,9 @@ async function recordResearchStart({ sessionRef, runId, turnIdx, placeContext, a
 	const turnRef = sessionRef.collection('turns').doc(turnKey);
 	await db.runTransaction(async (tx) => {
 		const snap = await tx.get(sessionRef);
-		if (!snap.exists) return;
+		if (!snap.exists) throw new RunOwnershipLost();
 		const data = snap.data() || {};
-		if (data.currentRunId !== runId) return;
+		assertRunOwnership(data, runId);
 		tx.update(sessionRef, {
 			placeContext,
 			updatedAt: FieldValue.serverTimestamp()
@@ -226,6 +248,7 @@ async function readIntakeHistory(sessionRef, latestTurnIdx) {
 		const turnSnap = await sessionRef.collection('turns').doc(turnKey).get();
 		if (!turnSnap.exists) continue;
 		const turn = turnSnap.data() || {};
+		if (turn.status !== 'complete') continue;
 		if (typeof turn.userMessage === 'string' && turn.userMessage.trim()) {
 			history.push({ role: 'user', text: turn.userMessage });
 		}
@@ -234,6 +257,71 @@ async function readIntakeHistory(sessionRef, latestTurnIdx) {
 		}
 	}
 	return history;
+}
+
+function defaultEngineSessionId(sid) {
+	return `se-${sid}`;
+}
+
+function rotatedEngineSessionId(sid, generation) {
+	return `se-${sid}-g${generation}`;
+}
+
+function compactForAgentState(text, maxChars) {
+	return String(text || '')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.slice(0, maxChars);
+}
+
+async function readRotationSeedState(sessionRef, latestTurnIdx, previousStoppedRequest) {
+	const transcript = [];
+	let finalReport = null;
+	let legacyFinalReport = null;
+	for (let idx = 1; idx < latestTurnIdx; idx += 1) {
+		const turnKey = String(idx).padStart(4, '0');
+		const turnSnap = await sessionRef.collection('turns').doc(turnKey).get();
+		if (!turnSnap.exists) continue;
+		const turn = turnSnap.data() || {};
+		const userMessage =
+			typeof turn.userMessage === 'string' ? compactForAgentState(turn.userMessage, 500) : '';
+		const reply = typeof turn.reply === 'string' ? compactForAgentState(turn.reply, 1600) : '';
+		if (turn.status !== 'complete' || !reply) continue;
+		if (turn.turnKind === 'research_report') {
+			finalReport = turn.reply;
+		} else if (
+			!turn.turnKind &&
+			legacyFinalReport === null &&
+			Array.isArray(turn.sources) &&
+			turn.sources.length > 0
+		) {
+			legacyFinalReport = turn.reply;
+		}
+		if (userMessage) {
+			transcript.push(`Turn ${idx}\nUser: ${userMessage}\nAnswer: ${reply}`);
+		}
+	}
+	const seedState = {
+		places_by_id: {}
+	};
+	const report = finalReport || legacyFinalReport;
+	if (report && report.trim()) {
+		seedState.final_report = report;
+	}
+	if (transcript.length) {
+		seedState.continuation_notes = transcript.join('\n\n').slice(-6000);
+	}
+	const stopped = compactForAgentState(previousStoppedRequest, 1000);
+	if (stopped) {
+		seedState.previous_stopped_request = stopped;
+	}
+	return seedState;
+}
+
+function placeContextPrefix(placeContext) {
+	if (!placeContext?.name) return '';
+	const focusLabel = [placeContext.name, placeContext.secondary].filter(Boolean).join(', ');
+	return `[Context: selected focus: ${focusLabel} (Google Place ID: ${placeContext.placeId || 'unknown'})] `;
 }
 
 const agentStreamOptions = { cors: true, timeoutSeconds: 90, secrets: [googlePlacesKey] };
@@ -311,7 +399,12 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	// Transactions can re-run on contention, so we capture decision signals
 	// into outer-scope vars on every attempt.
 	let isFirstMessage = false;
-	let isEngineFirstMessage = false;
+	let shouldRunIntake = false;
+	let createEngineSession = false;
+	let engineSessionId = defaultEngineSessionId(sessionId);
+	let engineSessionGeneration = 1;
+	let rotatedAfterCancel = false;
+	let previousStoppedRequest = null;
 	let creatorUid = submitterUid;
 	let newTurnIdx = 1;
 	let intakeState = null;
@@ -319,6 +412,15 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 		await db.runTransaction(async (t) => {
 			const snap = await t.get(sessionRef);
 			const existing = snap.exists ? snap.data() : null;
+			const lastTurnIndex = existing?.lastTurnIndex ?? 0;
+			let previousTurn = null;
+			if (existing && lastTurnIndex > 0) {
+				const previousTurnRef = sessionRef
+					.collection('turns')
+					.doc(String(lastTurnIndex).padStart(4, '0'));
+				const previousTurnSnap = await t.get(previousTurnRef);
+				previousTurn = previousTurnSnap.exists ? previousTurnSnap.data() || {} : null;
+			}
 
 			// One-in-flight guard per chat (plan §6). The ownership gate is
 			// intentionally gone — any signed-in visitor with the URL may
@@ -327,14 +429,35 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				throw new AgentStreamError(409, 'previous_turn_in_flight');
 			}
 
-			const lastTurnIndex = existing?.lastTurnIndex ?? 0;
 			if (lastTurnIndex >= MAX_TURNS_PER_SESSION) {
 				throw new AgentStreamError(409, 'turn_cap_reached');
 			}
 
 			isFirstMessage = !existing;
 			const engineSessionStarted = existing ? existing.engineSessionStarted !== false : false;
-			isEngineFirstMessage = !engineSessionStarted;
+			shouldRunIntake = !engineSessionStarted;
+			const priorGeneration = Number.isInteger(existing?.engineSessionGeneration)
+				? existing.engineSessionGeneration
+				: 1;
+			rotatedAfterCancel =
+				!!previousTurn &&
+				previousTurn.status === 'error' &&
+				previousTurn.error === 'user_cancelled';
+			previousStoppedRequest =
+				rotatedAfterCancel && typeof previousTurn.userMessage === 'string'
+					? previousTurn.userMessage
+					: null;
+			if (rotatedAfterCancel) {
+				engineSessionGeneration = priorGeneration + 1;
+				engineSessionId = rotatedEngineSessionId(sessionId, engineSessionGeneration);
+			} else {
+				engineSessionGeneration = priorGeneration;
+				engineSessionId =
+					typeof existing?.engineSessionId === 'string' && existing.engineSessionId
+						? existing.engineSessionId
+						: defaultEngineSessionId(sessionId);
+			}
+			createEngineSession = isFirstMessage || !engineSessionStarted || rotatedAfterCancel;
 			creatorUid = existing?.userId || submitterUid;
 			newTurnIdx = lastTurnIndex + 1;
 			intakeState = existing?.intakeState || null;
@@ -350,6 +473,8 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				lastEventAt: null,
 				error: null,
 				lastTurnIndex: newTurnIdx,
+				engineSessionId,
+				engineSessionGeneration,
 				updatedAt: FieldValue.serverTimestamp()
 			};
 
@@ -360,6 +485,8 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 					createdAt: FieldValue.serverTimestamp(),
 					placeContext: placeContext || null,
 					engineSessionStarted: false,
+					engineSessionId,
+					engineSessionGeneration,
 					intakeState: null,
 					title: null,
 					...perTurn
@@ -370,6 +497,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				// the chat to their sidebar without overwriting prior UIDs.
 				t.update(sessionRef, {
 					...perTurn,
+					cancelledAt: FieldValue.delete(),
 					participants: FieldValue.arrayUnion(submitterUid)
 				});
 			}
@@ -389,6 +517,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				acknowledgedAt: null,
 				sources: null,
 				turnSummary: null,
+				turnKind: null,
 				createdAt: FieldValue.serverTimestamp(),
 				completedAt: null,
 				error: null
@@ -406,7 +535,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 
 	const intakeStartedAtMs = Date.now();
 	let researchQuestion = null;
-	if (isEngineFirstMessage) {
+	if (shouldRunIntake) {
 		try {
 			const history = await readIntakeHistory(sessionRef, newTurnIdx);
 			const decision = await runIntakeConversation({
@@ -461,37 +590,62 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				});
 			}
 		} catch (err) {
+			if (err instanceof RunOwnershipLost) {
+				finishAfterRunOwnershipLost(res, sessionId, runId);
+				return;
+			}
+			try {
+				await assertRunStillCurrent(sessionRef, runId);
+			} catch (ownershipErr) {
+				if (ownershipErr instanceof RunOwnershipLost) {
+					finishAfterRunOwnershipLost(res, sessionId, runId);
+					return;
+				}
+				console.error('agentStream ownership check failed:', ownershipErr.message || ownershipErr);
+				res.status(500).json({ ok: false, error: 'session_ownership_check_failed' });
+				return;
+			}
 			console.warn('intake failed; falling back to Agent Engine:', err.message || err);
 		}
 	}
 
-	// 6. Build the query text the pipeline receives. `[Context: ...]` is only
-	// injected on the first Engine message — after that the Reasoning Engine
-	// session holds the place context in state.
+	// 6. Build the query text the pipeline receives. A fresh ADK working
+	// session does not have prior hidden state, so any Firestore-visible
+	// place/stopped-request context needed after rotation is injected into
+	// the user-visible query text.
 	const today = new Date(now).toLocaleDateString('en-US', {
 		year: 'numeric',
 		month: 'long',
 		day: 'numeric'
 	});
 	let queryText = `[Date: ${today}] ${researchQuestion || message}`;
-	if (isEngineFirstMessage && placeContext && placeContext.name) {
-		const focusLabel = [placeContext.name, placeContext.secondary].filter(Boolean).join(', ');
-		queryText = `[Context: selected focus: ${focusLabel} (Google Place ID: ${placeContext.placeId || 'unknown'})] ${queryText}`;
+	if (createEngineSession && previousStoppedRequest) {
+		queryText = `[Previous stopped request: ${compactForAgentState(previousStoppedRequest, 1000)}] ${queryText}`;
 	}
+	if (createEngineSession && placeContext && placeContext.name) {
+		queryText = `${placeContextPrefix(placeContext)}${queryText}`;
+	}
+	const seedState = rotatedAfterCancel
+		? await readRotationSeedState(sessionRef, newTurnIdx, previousStoppedRequest)
+		: null;
 
 	// 7. Direct handoff to Vertex AI Agent Engine. Cleanup on failure flips
 	// session + turn to status='error' atomically inside a `currentRunId`-
 	// fenced txn (mirrors watchdog.js).
 	try {
+		await assertRunStillCurrent(sessionRef, runId);
 		await gearHandoff({
 			sid: sessionId,
+			engineSessionId,
 			runId,
 			turnIdx: newTurnIdx,
 			userId: creatorUid,
 			message: queryText,
-			isEngineFirstMessage
+			isEngineFirstMessage: createEngineSession,
+			createEngineSession,
+			seedState
 		});
-		if (isEngineFirstMessage) {
+		if (createEngineSession) {
 			try {
 				await markEngineSessionStarted({ sessionRef, runId });
 			} catch (markErr) {
@@ -500,6 +654,21 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 		}
 		res.status(202).json({ ok: true, sessionId, runId });
 	} catch (err) {
+		if (err instanceof RunOwnershipLost) {
+			finishAfterRunOwnershipLost(res, sessionId, runId);
+			return;
+		}
+		try {
+			await assertRunStillCurrent(sessionRef, runId);
+		} catch (ownershipErr) {
+			if (ownershipErr instanceof RunOwnershipLost) {
+				finishAfterRunOwnershipLost(res, sessionId, runId);
+				return;
+			}
+			console.error('agentStream ownership check failed:', ownershipErr.message || ownershipErr);
+			res.status(500).json({ ok: false, error: 'session_ownership_check_failed' });
+			return;
+		}
 		console.error('gearHandoff failed:', err.message || err);
 		try {
 			await gearHandoffCleanup(
@@ -617,6 +786,119 @@ export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (re
 		res.status(503).json({ ok: false, error: 'Speech service unreachable' });
 	}
 });
+
+// --- Agent cancel endpoint (participant stop for the active turn) ---
+
+export const agentCancel = onRequest(
+	{ cors: true, timeoutSeconds: 30, memory: '256MiB' },
+	async (req, res) => {
+		if (req.method !== 'POST') {
+			res.status(405).json({ ok: false, error: 'Method not allowed' });
+			return;
+		}
+
+		const authHeader = req.headers.authorization || '';
+		const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
+		if (!tokenMatch) {
+			res.status(401).json({ ok: false, error: 'Authorization header required' });
+			return;
+		}
+		let uid;
+		try {
+			const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
+			uid = decoded.uid;
+		} catch (e) {
+			console.warn('agentCancel verifyIdToken rejected:', e.code || e.message);
+			res.status(401).json({ ok: false, error: 'Invalid auth token' });
+			return;
+		}
+
+		const { sid, runId: requestedRunId, turnIndex: requestedTurnIndex } = req.body || {};
+		if (!sid || typeof sid !== 'string') {
+			res.status(400).json({ ok: false, error: 'sid is required' });
+			return;
+		}
+		if (!requestedRunId || typeof requestedRunId !== 'string') {
+			res.status(400).json({ ok: false, error: 'runId is required' });
+			return;
+		}
+		if (!Number.isInteger(requestedTurnIndex)) {
+			res.status(400).json({ ok: false, error: 'turnIndex is required' });
+			return;
+		}
+
+		const sessionRef = db.collection('sessions').doc(sid);
+		let outcome = { status: 500, body: { ok: false, error: 'cancel_failed' } };
+		try {
+			await db.runTransaction(async (tx) => {
+				const snap = await tx.get(sessionRef);
+				if (!snap.exists) {
+					outcome = { status: 404, body: { ok: false, error: 'session_not_found' } };
+					return;
+				}
+				const data = snap.data() || {};
+				const participants = Array.isArray(data.participants) ? data.participants : [];
+				if (!participants.includes(uid)) {
+					outcome = { status: 403, body: { ok: false, error: 'not_participant' } };
+					return;
+				}
+				if (data.status !== 'running' && data.status !== 'queued') {
+					outcome = { status: 200, body: { ok: true, terminal: true } };
+					return;
+				}
+				const runId = data.currentRunId;
+				const turnIdx = data.lastTurnIndex;
+				if (!runId || typeof runId !== 'string' || !Number.isInteger(turnIdx)) {
+					outcome = { status: 409, body: { ok: false, error: 'cancel_not_active' } };
+					return;
+				}
+				if (runId !== requestedRunId || turnIdx !== requestedTurnIndex) {
+					outcome = { status: 409, body: { ok: false, error: 'cancel_target_mismatch' } };
+					return;
+				}
+				if (data.status === 'queued') {
+					outcome = { status: 409, body: { ok: false, error: 'cancel_not_started' } };
+					return;
+				}
+				const turnRef = sessionRef.collection('turns').doc(String(turnIdx).padStart(4, '0'));
+				const turnSnap = await tx.get(turnRef);
+				if (!turnSnap.exists) {
+					outcome = { status: 409, body: { ok: false, error: 'active_turn_missing' } };
+					return;
+				}
+				const turn = turnSnap.data() || {};
+				if (turn.runId !== runId || (turn.status !== 'pending' && turn.status !== 'running')) {
+					outcome = { status: 409, body: { ok: false, error: 'active_turn_mismatch' } };
+					return;
+				}
+				tx.update(sessionRef, {
+					status: 'error',
+					error: 'user_cancelled',
+					currentRunId: FieldValue.delete(),
+					activeAgent: FieldValue.delete(),
+					activeStage: FieldValue.delete(),
+					activeStageStartedAt: FieldValue.delete(),
+					activeModel: FieldValue.delete(),
+					activeInvocationId: FieldValue.delete(),
+					cancelledAt: FieldValue.serverTimestamp(),
+					updatedAt: FieldValue.serverTimestamp()
+				});
+				tx.update(turnRef, {
+					status: 'error',
+					error: 'user_cancelled',
+					completedAt: FieldValue.serverTimestamp(),
+					cancelledAt: FieldValue.serverTimestamp()
+				});
+				outcome = { status: 200, body: { ok: true } };
+			});
+		} catch (err) {
+			console.error('agentCancel transaction failed:', sid, err.message || err);
+			res.status(500).json({ ok: false, error: 'cancel_failed' });
+			return;
+		}
+		res.status(outcome.status).json(outcome.body);
+	}
+);
 
 // --- Agent delete endpoint (hard-deletes a chat, creator-only) ---
 //

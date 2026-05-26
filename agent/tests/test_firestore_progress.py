@@ -42,6 +42,7 @@ from superextra_agent.firestore_progress import (
     _retry_critical,
 )
 from superextra_agent.gear_run_state import GearRunState
+from superextra_agent.timeline import TimelineOwnershipLost, _timeline_write_logic
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -187,6 +188,31 @@ def test_fenced_logic_raises_on_runid_drift():
     with pytest.raises(OwnershipLost) as ei:
         _fenced_logic(txn, session, None, "r-1", {"x": 1}, None)
     assert "runId" in str(ei.value)
+
+
+# ── timeline write fence ─────────────────────────────────────────────────────
+
+
+def test_timeline_write_logic_writes_event_when_owner_matches():
+    txn = MagicMock()
+    session = _mock_session_ref({"currentRunId": "r-1", "status": "running"})
+    event_ref = MagicMock(name="event_ref")
+    doc = {"runId": "r-1", "data": {"kind": "detail"}}
+
+    _timeline_write_logic(txn, session, event_ref, "r-1", doc)
+
+    txn.set.assert_called_once_with(event_ref, doc)
+
+
+def test_timeline_write_logic_raises_when_owner_is_lost():
+    txn = MagicMock()
+    session = _mock_session_ref({"currentRunId": None, "status": "error"})
+    event_ref = MagicMock(name="event_ref")
+
+    with pytest.raises(TimelineOwnershipLost):
+        _timeline_write_logic(txn, session, event_ref, "r-1", {"runId": "r-1"})
+
+    txn.set.assert_not_called()
 
 
 # ── _retry_critical ──────────────────────────────────────────────────────────

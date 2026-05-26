@@ -185,6 +185,18 @@ describe('gearHandoff', () => {
 		assert.match(urls[0], /\/sessions\?sessionId=se-sid1$/);
 		assert.match(urls[1], /:appendEvent$/);
 		assert.match(urls[2], /:streamQuery\?alt=sse$/);
+		const createBody = JSON.parse(fetchMock.mock.calls[0].arguments[1].body);
+		assert.deepEqual(createBody.sessionState, {
+			runId: 'run1',
+			turnIdx: 1,
+			firestoreSid: 'sid1'
+		});
+		const appendBody = JSON.parse(fetchMock.mock.calls[1].arguments[1].body);
+		assert.deepEqual(appendBody.actions.stateDelta, {
+			runId: 'run1',
+			turnIdx: 1,
+			firestoreSid: 'sid1'
+		});
 
 		// Reader was cancelled (clean disconnect after first NDJSON line)
 		assert.deepEqual(cancelLog, ['cancel']);
@@ -209,6 +221,37 @@ describe('gearHandoff', () => {
 		assert.match(urls[0], /:appendEvent$/);
 		assert.match(urls[1], /:streamQuery\?alt=sse$/);
 		assert.deepEqual(cancelLog, ['cancel']);
+	});
+
+	it('fresh rotated session: uses explicit engineSessionId and seedState', async () => {
+		const { fetchMock } = setupFetch({});
+		await gearHandoff({
+			sid: 'sid1',
+			engineSessionId: 'se-sid1-g2',
+			runId: 'run3',
+			turnIdx: 3,
+			userId: 'user1',
+			message: 'continue',
+			isEngineFirstMessage: false,
+			createEngineSession: true,
+			seedState: {
+				final_report: 'Prior completed report',
+				previous_stopped_request: 'Stopped request'
+			}
+		});
+		const urls = fetchMock.mock.calls.map((c) => c.arguments[0]);
+		assert.match(urls[0], /\/sessions\?sessionId=se-sid1-g2$/);
+		assert.match(urls[1], /\/sessions\/se-sid1-g2:appendEvent$/);
+		const createBody = JSON.parse(fetchMock.mock.calls[0].arguments[1].body);
+		assert.deepEqual(createBody.sessionState, {
+			final_report: 'Prior completed report',
+			previous_stopped_request: 'Stopped request',
+			runId: 'run3',
+			turnIdx: 3,
+			firestoreSid: 'sid1'
+		});
+		const streamBody = JSON.parse(fetchMock.mock.calls[2].arguments[1].body);
+		assert.equal(streamBody.input.session_id, 'se-sid1-g2');
 	});
 
 	it('createSession ALREADY_EXISTS → continues to appendEvent', async () => {

@@ -558,7 +558,7 @@ def test_report_writer_complete_keeps_grounding_sources_on_event_channel():
     assert mapped["grounding_sources"] == [
         {"title": "A", "url": "https://a.example", "domain": "a.example"}
     ]
-    assert mapped["complete"] == {"reply": "# Report"}
+    assert mapped["complete"] == {"reply": "# Report", "reply_key": "final_report"}
 
 
 def test_report_writer_empty_final_report_does_not_complete():
@@ -598,6 +598,7 @@ def test_continue_research_complete_reads_continue_research_reply_key():
     mapped = map_event(ev, {})
     assert mapped["complete"] == {
         "reply": "Short continuation answer.",
+        "reply_key": "continue_research_reply",
     }
 
 

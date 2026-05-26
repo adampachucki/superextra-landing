@@ -100,29 +100,32 @@ async function _doHandoff({
 	controller,
 	resource,
 	sid,
+	engineSessionId,
 	runId,
 	turnIdx,
 	userId,
 	message,
-	isEngineFirstMessage
+	createEngineSession,
+	seedState
 }) {
 	const token = await _getToken();
-	const adkSid = `se-${sid}`;
+	const adkSid = engineSessionId || `se-${sid}`;
 	const headers = {
 		Authorization: `Bearer ${token}`,
 		'Content-Type': 'application/json'
 	};
 
-	// 1. Idempotent createSession on the first turn. Network retries can
+	// 1. Idempotent createSession when this handoff starts a fresh ADK
+	// working session. Network retries can
 	// double-dispatch this — ALREADY_EXISTS treated as success per plan §5.3.
-	if (isEngineFirstMessage) {
+	if (createEngineSession) {
 		const r = await fetch(`${VERTEX_BASE}/v1beta1/${resource}/sessions?sessionId=${adkSid}`, {
 			method: 'POST',
 			signal: controller.signal,
 			headers,
 			body: JSON.stringify({
 				userId,
-				sessionState: { runId, turnIdx }
+				sessionState: { ...(seedState || {}), runId, turnIdx, firestoreSid: sid }
 			})
 		});
 		if (!r.ok) {
@@ -147,7 +150,7 @@ async function _doHandoff({
 			author: 'system',
 			invocationId: `agentstream-${runId}`,
 			timestamp: new Date().toISOString(),
-			actions: { stateDelta: { runId, turnIdx } }
+			actions: { stateDelta: { runId, turnIdx, firestoreSid: sid } }
 		})
 	});
 	if (!ar.ok) {
@@ -195,11 +198,14 @@ async function _doHandoff({
  */
 export async function gearHandoff({
 	sid,
+	engineSessionId,
 	runId,
 	turnIdx,
 	userId,
 	message,
 	isEngineFirstMessage,
+	createEngineSession = isEngineFirstMessage,
+	seedState = null,
 	deadlineMs = HANDOFF_DEADLINE_MS
 }) {
 	const resource = getResource();
@@ -225,11 +231,13 @@ export async function gearHandoff({
 				controller,
 				resource,
 				sid,
+				engineSessionId,
 				runId,
 				turnIdx,
 				userId,
 				message,
-				isEngineFirstMessage
+				createEngineSession,
+				seedState
 			}),
 			deadlinePromise
 		]);

@@ -53,6 +53,7 @@ class GearRunState:
 
     # Mutable accumulators
     final_reply: str | None = None
+    final_turn_kind: str | None = None
     final_sources: list[dict[str, Any]] = field(default_factory=list)
     specialist_sources: list[dict[str, Any]] = field(default_factory=list)
     specialist_sources_seen: set[str] = field(default_factory=set)
@@ -61,6 +62,7 @@ class GearRunState:
 
     # Lifecycle
     heartbeat_task: asyncio.Task[Any] | None = None
+    cancelled: bool = False
 
     # Wired up by FirestoreProgressPlugin (so this dataclass stays decoupled
     # from the Firestore client construction path).
@@ -177,6 +179,13 @@ class GearRunState:
         if not isinstance(reply, str):
             return
         self.final_reply = reply
+        reply_key = complete.get("reply_key")
+        if reply_key == "final_report":
+            self.final_turn_kind = "research_report"
+        elif reply_key == "continue_research_reply":
+            self.final_turn_kind = "continuation_reply"
+        else:
+            self.final_turn_kind = "agent_reply"
 
         # `_merge_source` already accepted/deduped drawer candidates as events
         # arrived. The only remaining transformation is redirect resolution.
@@ -260,6 +269,7 @@ class GearRunState:
             "reply": self.final_reply,
             "sources": self.final_sources,
             "turnSummary": self.timeline_builder.build_summary(),
+            "turnKind": self.final_turn_kind or "agent_reply",
             "completedAt": firestore.SERVER_TIMESTAMP,
         }
         return session_update, turn_update, "complete"

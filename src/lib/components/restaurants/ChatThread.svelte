@@ -30,7 +30,6 @@
 		[
 			chatState.messages.length,
 			chatState.loading,
-			chatState.error ?? '',
 			chatState.liveTimeline
 				.map((event) => `${event.id}:${'text' in event ? event.text.length : ''}`)
 				.join('|')
@@ -138,6 +137,7 @@
 		handoff_failed: 'The analysis could not start. Please try again.',
 		empty_or_malformed_reply: 'The analysis finished without a usable answer. Please try again.',
 		finalize_failed: 'The analysis finished, but the answer could not be saved. Please try again.',
+		user_cancelled: 'Stopped.',
 		pipeline_error: 'The analysis could not be completed. Please try again.'
 	};
 
@@ -235,6 +235,29 @@
 					<p class="text-[15px] leading-relaxed text-black/55 dark:text-white/55">
 						{msg.text}
 					</p>
+				</div>
+			{:else if msg.kind === 'status'}
+				{@const isTimeout = msg.text === 'timeout'}
+				{@const isStopped = msg.text === 'user_cancelled'}
+				{@const message = errorMessage(msg.text)}
+				<div class="assistant-row max-w-[700px]">
+					<div
+						class="inline-flex items-center gap-3 rounded-2xl border px-5 py-3 {isStopped
+							? 'border-black/[0.08] bg-black/[0.02] dark:border-white/[0.1] dark:bg-white/[0.03]'
+							: isTimeout
+								? 'border-amber-200/50 bg-amber-50/50 dark:border-amber-400/20 dark:bg-amber-900/10'
+								: 'border-red-200/50 bg-red-50/50 dark:border-red-400/20 dark:bg-red-900/10'}"
+					>
+						<span
+							class="text-[13px] {isStopped
+								? 'text-black/45 dark:text-white/45'
+								: isTimeout
+									? 'text-amber-600/80 dark:text-amber-400/80'
+									: 'text-red-600/80 dark:text-red-400/80'}"
+						>
+							{message}
+						</span>
+					</div>
 				</div>
 			{:else}
 				<div class="assistant-row min-w-0 px-1 py-1">
@@ -365,26 +388,6 @@
 					startedAtMs={chatState.currentTurnStartedAtMs}
 					statusLabel={chatState.liveStatusLabel}
 				/>
-			</div>
-		{/if}
-
-		{#if chatState.error}
-			{@const isTimeout = chatState.error === 'timeout'}
-			{@const message = errorMessage(chatState.error)}
-			<div class="assistant-row max-w-[700px]">
-				<div
-					class="inline-flex items-center gap-3 rounded-2xl border px-5 py-3 {isTimeout
-						? 'border-amber-200/50 bg-amber-50/50 dark:border-amber-400/20 dark:bg-amber-900/10'
-						: 'border-red-200/50 bg-red-50/50 dark:border-red-400/20 dark:bg-red-900/10'}"
-				>
-					<span
-						class="text-[13px] {isTimeout
-							? 'text-amber-600/80 dark:text-amber-400/80'
-							: 'text-red-600/80 dark:text-red-400/80'}"
-					>
-						{message}
-					</span>
-				</div>
 			</div>
 		{/if}
 		<div bind:this={bottomEl} class="chat-bottom-anchor" aria-hidden="true"></div>

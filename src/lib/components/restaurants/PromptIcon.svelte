@@ -1,5 +1,5 @@
 <script lang="ts">
-	type PromptIconName = 'attach' | 'close' | 'location' | 'mic' | 'send';
+	type PromptIconName = 'attach' | 'close' | 'location' | 'mic' | 'send' | 'stop';
 
 	let {
 		name,
@@ -9,7 +9,9 @@
 		class?: string;
 	} = $props();
 
-	let strokeWidth = $derived(name === 'send' ? 2.5 : name === 'close' ? 2 : 1.75);
+	let strokeWidth = $derived(
+		name === 'stop' ? 0 : name === 'send' ? 2.5 : name === 'close' ? 2 : 1.75
+	);
 </script>
 
 <svg
@@ -42,6 +44,8 @@
 			d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
 		/>
 		<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
+	{:else if name === 'stop'}
+		<rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none" />
 	{:else}
 		<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
 	{/if}

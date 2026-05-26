@@ -343,4 +343,29 @@ describe('ChatThread', () => {
 		expect(body).toContain('The analysis stalled before a final answer was delivered.');
 		expect(body).not.toContain('progress_stalled');
 	});
+
+	it('renders user cancellation as a neutral stopped state', async () => {
+		const obs = captureObservers();
+		chatState.selectSession('sid-1');
+		await waitUntil(() => !!obs.turns('sid-1'));
+
+		obs.turns('sid-1')!.onNext(
+			turnsSnap([
+				{
+					data: {
+						turnIndex: 1,
+						runId: 'run-1',
+						userMessage: 'research this market',
+						status: 'error',
+						error: 'user_cancelled',
+						createdAt: { toMillis: () => 1000 }
+					}
+				}
+			])
+		);
+
+		const { body } = render(ChatThread, { props: {} });
+		expect(body).toContain('Stopped.');
+		expect(body).not.toContain('The analysis could not be completed.');
+	});
 });
