@@ -228,6 +228,21 @@
 		if (chatState.active && activePromptInactive && dictation.active) dictation.stop();
 	});
 
+	let prevActivePromptInactive = false;
+	$effect(() => {
+		const inactive = activePromptInactive;
+		if (prevActivePromptInactive && !inactive && isDesktop && chatState.active) {
+			tick().then(() => {
+				try {
+					inputEl?.focus({ preventScroll: true });
+				} catch {
+					inputEl?.focus();
+				}
+			});
+		}
+		prevActivePromptInactive = inactive;
+	});
+
 	function resizeTextarea() {
 		if (inputEl) {
 			inputEl.style.height = 'auto';
