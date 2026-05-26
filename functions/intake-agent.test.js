@@ -97,11 +97,7 @@ describe('buildIntakePrompt', () => {
 		assert.match(prompt, /Google Places candidates/);
 		assert.match(prompt, /bare generic area descriptor/);
 		assert.match(prompt, /food\/drink brand/);
-		assert.match(
-			prompt,
-			/allowing for accent or transliteration differences and one-character typos/
-		);
-		assert.match(prompt, /Do not silently substitute, invent, or rename an entity/);
+		assert.match(prompt, /normalize, or obviously correct/);
 		assert.match(prompt, /Do not select a candidate just because the street/);
 		assert.match(prompt, /selected place context is relevant/i);
 		assert.match(prompt, /put each option on its own line/i);
