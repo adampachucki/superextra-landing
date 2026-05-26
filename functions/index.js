@@ -433,7 +433,11 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 					runId,
 					turnIdx: newTurnIdx,
 					latencyMs: Date.now() - intakeStartedAtMs,
-					reason: decision.reason
+					reason: decision.reason,
+					scopeKind: decision.scopeKind || null,
+					scopeSummary: intakeState?.scopeSummary || null,
+					pendingQuestion: intakeState?.pendingQuestion || null,
+					candidateCount: intakeState?.candidates?.length || 0
 				});
 				res.status(202).json({ ok: true, sessionId, runId, direct: 'intake' });
 				return;
@@ -457,7 +461,10 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 					latencyMs: Date.now() - intakeStartedAtMs,
 					hasAcknowledgement: !!acknowledgement,
 					placeId: placeContext?.placeId || null,
-					reason: decision.reason
+					reason: decision.reason,
+					scopeKind: decision.scopeKind || null,
+					scopeSummary: intakeState?.scopeSummary || null,
+					candidateCount: intakeState?.candidates?.length || 0
 				});
 			}
 		} catch (err) {
