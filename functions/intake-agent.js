@@ -156,34 +156,6 @@ function normalizeCandidate(candidate, index) {
 	};
 }
 
-function extractTrigrams(text) {
-	const norm = comparable(text);
-	const trigrams = new Set();
-	for (let i = 0; i <= norm.length - 3; i++) {
-		trigrams.add(norm.slice(i, i + 3));
-	}
-	return trigrams;
-}
-
-function candidateNameMatchesUserInput(candidateName, candidateAddress, userCorpus) {
-	const nameTrigrams = extractTrigrams(candidateName);
-	const addressTrigrams = extractTrigrams(candidateAddress);
-	const corpusTrigrams = extractTrigrams(userCorpus);
-	if (nameTrigrams.size === 0 || corpusTrigrams.size === 0) return true;
-	const distinctive = [...nameTrigrams].filter((t) => !addressTrigrams.has(t));
-	if (distinctive.length === 0) return true;
-	return distinctive.some((t) => corpusTrigrams.has(t));
-}
-
-function formatCandidateList(candidates) {
-	const lines = candidates.map((candidate, index) => {
-		const optionNumber = candidate.optionNumber ?? index + 1;
-		const address = candidate.address ? ` — ${candidate.address}` : '';
-		return `${optionNumber}. ${candidate.name}${address}`;
-	});
-	return `Which one did you mean?\n${lines.join('\n')}`;
-}
-
 function placesToCandidates(places) {
 	return places
 		.map((place, index) => normalizeCandidate(place, index))
@@ -319,7 +291,6 @@ export function buildIntakePrompt({
 		'A named restaurant, cafe, bakery, bar, food/drink brand, or chain is anchor_place when the request is about what is near or around it, because branch identity matters.',
 		'Action must follow scopeKind: research_scope -> start_research with no placeId; anchor_place -> lookup_place unless selected or known context already resolves it; candidate_selection -> start_research with a candidate placeId; insufficient_scope -> reply.',
 		'When Tool result contains Google Places candidates for an anchor_place: use one clear matching candidate to start research with its Place ID; ask the user to choose only when multiple plausible branches remain.',
-		'When two or more candidates share the same brand or establishment name: if the user has named a branch identifier (address, street, neighborhood, district, or branch descriptor), commit to the candidate whose name or address matches that identifier; otherwise the lookup is ambiguous — set scopeKind to candidate_selection and reply with the candidate list. Without a user-named branch identifier, do not pick by primary type, name polish, rating, review count, prominence, or result order. The reply must list every candidate on its own line with option number, name, and address; never return an empty reply.',
 		'A clear matching candidate must match the requested establishment or brand name (allowing for accent or transliteration differences and one-character typos) and match the important location cues. Do not select a candidate just because the street, neighborhood, or city matches if its name is a different establishment.',
 		'If there is no clear matching candidate for the requested establishment, ask a short clarification instead of guessing.',
 		'If known candidates exist and the user asks to see them, asks whether there are multiple, or picks by number, street, branch, name, or Place ID, use those candidates.',
@@ -439,31 +410,6 @@ function normalizeDecision({
 			state: resolutionState,
 			reason: 'invalid_place_id'
 		};
-	}
-	if (!placeContext && resolutionState.candidates?.length > 0) {
-		return {
-			action: 'reply',
-			scopeKind: 'candidate_selection',
-			reply: formatCandidateList(resolutionState.candidates),
-			state: resolutionState,
-			reason: 'missing_place_id_with_candidates'
-		};
-	}
-	if (placeContext && candidates && candidates.length > 0) {
-		const userCorpus = [
-			previousState?.originalIntent || '',
-			previousState?.scopeSummary || '',
-			message || ''
-		].join(' ');
-		if (!candidateNameMatchesUserInput(placeContext.name, placeContext.secondary, userCorpus)) {
-			return {
-				action: 'reply',
-				scopeKind: 'candidate_selection',
-				reply: formatCandidateList(candidates),
-				state: resolutionState,
-				reason: 'name_mismatch_with_user_input'
-			};
-		}
 	}
 	return {
 		action,
