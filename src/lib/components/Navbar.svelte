@@ -89,7 +89,7 @@
 			fill="none"
 			viewBox="0 0 24 24"
 			stroke="currentColor"
-			stroke-width="1.5"
+			stroke-width="2"
 		>
 			<path d="M2 2h20v14H10l-2 4-2-4H2z" />
 		</svg>
