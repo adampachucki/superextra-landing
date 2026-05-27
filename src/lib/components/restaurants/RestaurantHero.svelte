@@ -16,19 +16,13 @@
 
 	let {
 		onleave,
-		leaving = $bindable(false),
 		userQuery = $bindable('')
 	}: {
 		onleave?: (detail: { query: string; place: PlaceSuggestion | null }) => void;
-		leaving?: boolean;
 		userQuery?: string;
 	} = $props();
 
 	function handleSubmit(detail: { query: string; place: PlaceSuggestion | null }) {
-		// Don't auto-fade — the parent flips `leaving` only when navigation is
-		// actually about to happen. For sign-in-required submits, the parent
-		// opens a modal instead and the hero stays put.
-		if (leaving) return;
 		onleave?.(detail);
 	}
 
@@ -37,8 +31,7 @@
 	}
 </script>
 
-<section class="page-exit-content pt-32 md:pt-40" class:is-leaving={leaving}>
-	{#if leaving}<div class="page-exit-overlay"></div>{/if}
+<section class="pt-32 md:pt-40">
 	<div class="mx-auto max-w-[1200px] px-6">
 		<!-- Headline -->
 		<h1
@@ -96,37 +89,5 @@
 
 	.prompt-fade {
 		animation: fadeIn 0.6s ease-out both;
-	}
-
-	/* Exit transition */
-	.page-exit-content {
-		transition:
-			opacity 0.25s cubic-bezier(0.4, 0, 1, 1),
-			transform 0.25s cubic-bezier(0.4, 0, 1, 1),
-			filter 0.25s cubic-bezier(0.4, 0, 1, 1);
-	}
-
-	.page-exit-content.is-leaving {
-		opacity: 0;
-		transform: scale(0.98) translateY(-8px);
-		filter: blur(4px);
-		pointer-events: none;
-	}
-
-	.page-exit-overlay {
-		position: fixed;
-		inset: 0;
-		z-index: 9999;
-		background: var(--color-cream);
-		animation: overlayFadeIn 0.25s cubic-bezier(0.4, 0, 1, 1) both;
-	}
-
-	@keyframes overlayFadeIn {
-		from {
-			opacity: 0;
-		}
-		to {
-			opacity: 1;
-		}
 	}
 </style>

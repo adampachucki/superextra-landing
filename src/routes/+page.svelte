@@ -15,7 +15,6 @@
 	import RestaurantCTA from '$lib/components/restaurants/RestaurantCTA.svelte';
 
 	let leaving = $state(false);
-	let heroLeaving = $state(false);
 	let heroQuery = $state('');
 	let limitNotice = $state<string | null>(null);
 
@@ -42,7 +41,6 @@
 		place: { name: string; secondary: string; placeId: string } | null
 	) {
 		leaving = true;
-		heroLeaving = true;
 		chatState.startNewChat(query, place);
 		goto('/chat');
 	}
@@ -140,7 +138,7 @@
 	<Navbar minimal />
 
 	<main>
-		<RestaurantHero onleave={handleLeave} bind:leaving={heroLeaving} bind:userQuery={heroQuery} />
+		<RestaurantHero onleave={handleLeave} bind:userQuery={heroQuery} />
 		{#if limitNotice}
 			<div
 				class="mx-auto mt-2 max-w-[800px] px-6 text-center text-[13px] text-black/65 dark:text-white/65"
