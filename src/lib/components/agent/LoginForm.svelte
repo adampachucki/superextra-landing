@@ -6,9 +6,18 @@
 		onSignedIn?: () => void;
 		initialError?: string | null;
 		compact?: boolean;
+		title?: string;
+		subtitle?: string;
 	}
 
-	let { returnTo = null, onSignedIn, initialError = null, compact = false }: Props = $props();
+	let {
+		returnTo = null,
+		onSignedIn,
+		initialError = null,
+		compact = false,
+		title = 'Sign in to continue',
+		subtitle = 'Save your chats and pick up where you left off.'
+	}: Props = $props();
 
 	let email = $state('');
 	let busy = $state(false);
@@ -86,6 +95,19 @@
 </script>
 
 <div class={compact ? 'space-y-3' : 'space-y-4'}>
+	<div class="space-y-1">
+		<h2 class="text-[18px] font-light text-black dark:text-white">
+			{mode === 'email-sent' ? 'Check your email' : title}
+		</h2>
+		{#if mode === 'email-sent'}
+			<p class="text-[13px] text-black/55 dark:text-white/55">
+				We sent a sign-in link to <span class="text-black dark:text-white">{email}</span>. Open it on
+				this device to come back signed in.
+			</p>
+		{:else if subtitle}
+			<p class="text-[13px] text-black/55 dark:text-white/55">{subtitle}</p>
+		{/if}
+	</div>
 	{#if mode === 'choose'}
 		<button
 			type="button"
@@ -149,19 +171,12 @@
 			Free accounts get 1 chat per day.
 		</p>
 	{:else}
-		<div class="space-y-3 text-center">
-			<div class="text-[15px] text-black dark:text-white">Check your email</div>
-			<p class="text-[13px] text-black/55 dark:text-white/55">
-				We sent a sign-in link to <span class="text-black dark:text-white">{email}</span>. Open it on
-				this device to come back signed in.
-			</p>
-			<button
-				type="button"
-				onclick={reset}
-				class="text-[12px] text-black/45 underline-offset-2 transition-colors hover:text-black/70 hover:underline dark:text-white/45 dark:hover:text-white/70"
-			>
-				Use a different email
-			</button>
-		</div>
+		<button
+			type="button"
+			onclick={reset}
+			class="text-[13px] text-black/55 underline-offset-2 transition-colors hover:text-black/80 hover:underline dark:text-white/55 dark:hover:text-white/80"
+		>
+			Use a different email
+		</button>
 	{/if}
 </div>

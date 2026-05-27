@@ -221,7 +221,7 @@
 							? 'text-white/80 hover:text-white'
 							: 'text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white'}"
 					>
-						Log in
+						Sign in
 					</button>
 				{/if}
 			{/if}
@@ -242,7 +242,7 @@
 							? 'text-white/80 hover:text-white'
 							: 'text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white'}"
 					>
-						Log in
+						Sign in
 					</button>
 				{/if}
 			{/if}

@@ -60,13 +60,6 @@
 				</svg>
 			</button>
 
-			<div class="mb-5 space-y-1">
-				<h2 class="text-[18px] font-light text-black dark:text-white">Sign in to continue</h2>
-				<p class="text-[13px] text-black/55 dark:text-white/55">
-					Save your chats and pick up where you left off.
-				</p>
-			</div>
-
 			<LoginForm returnTo={auth.modalReturnTo} />
 		</div>
 	</div>

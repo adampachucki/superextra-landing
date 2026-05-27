@@ -223,40 +223,37 @@
 			</div>
 		{:else if phase === 'form'}
 			<div class="space-y-4">
-				<div class="space-y-1 text-center">
-					<a
-						href="/"
-						class="inline-flex items-center gap-0.5 text-black no-underline dark:text-white"
-					>
-						<svg class="-mt-1 h-[16px] w-[16px]" viewBox="0 0 12 12" fill="none">
-							<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5" />
-							<line
-								x1="1.24"
-								y1="3.25"
-								x2="10.76"
-								y2="8.75"
-								stroke="currentColor"
-								stroke-width="1.5"
-							/>
-							<line
-								x1="1.24"
-								y1="8.75"
-								x2="10.76"
-								y2="3.25"
-								stroke="currentColor"
-								stroke-width="1.5"
-							/>
-						</svg>
-						<span class="text-[20px] font-light tracking-tight">Superextra</span>
-					</a>
-					<h1 class="pt-4 text-[18px] font-light text-black dark:text-white">
-						{returnTo ? 'Sign in to continue' : 'Sign in to Superextra'}
-					</h1>
-					{#if returnTo}
-						<p class="text-[13px] text-black/55 dark:text-white/55">Sign in to open this chat.</p>
-					{/if}
-				</div>
-				<LoginForm {returnTo} initialError={errorCode} />
+				<a
+					href="/"
+					class="inline-flex items-center gap-0.5 text-black no-underline dark:text-white"
+				>
+					<svg class="-mt-1 h-[16px] w-[16px]" viewBox="0 0 12 12" fill="none">
+						<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5" />
+						<line
+							x1="1.24"
+							y1="3.25"
+							x2="10.76"
+							y2="8.75"
+							stroke="currentColor"
+							stroke-width="1.5"
+						/>
+						<line
+							x1="1.24"
+							y1="8.75"
+							x2="10.76"
+							y2="3.25"
+							stroke="currentColor"
+							stroke-width="1.5"
+						/>
+					</svg>
+					<span class="text-[20px] font-light tracking-tight">Superextra</span>
+				</a>
+				<LoginForm
+					{returnTo}
+					initialError={errorCode}
+					title={returnTo ? 'Sign in to continue' : 'Sign in to Superextra'}
+					subtitle={returnTo ? 'Sign in to open this chat.' : ''}
+				/>
 			</div>
 		{/if}
 	</div>
