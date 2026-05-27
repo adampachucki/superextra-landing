@@ -19,13 +19,11 @@
 	let heroQuery = $state('');
 	let limitNotice = $state<string | null>(null);
 
-	// When the sign-in modal closes without completing sign-in, fade the hero
-	// back in AND restore the prompt the user typed. The composer clears its
-	// own query on submit; we recover it from the draft that handleLeave
-	// saved before opening the modal.
+	// The composer clears its own query on submit; restore it from the saved
+	// draft when the sign-in modal closes without completing sign-in so the
+	// user doesn't lose what they typed.
 	$effect(() => {
 		if (!auth.modalVisible && !auth.user) {
-			heroLeaving = false;
 			const draft = auth.peekDraft();
 			if (draft) heroQuery = draft.prompt;
 		}
@@ -44,6 +42,7 @@
 		place: { name: string; secondary: string; placeId: string } | null
 	) {
 		leaving = true;
+		heroLeaving = true;
 		chatState.startNewChat(query, place);
 		goto('/chat');
 	}

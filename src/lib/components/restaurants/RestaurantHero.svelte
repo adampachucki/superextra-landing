@@ -25,8 +25,10 @@
 	} = $props();
 
 	function handleSubmit(detail: { query: string; place: PlaceSuggestion | null }) {
+		// Don't auto-fade — the parent flips `leaving` only when navigation is
+		// actually about to happen. For sign-in-required submits, the parent
+		// opens a modal instead and the hero stays put.
 		if (leaving) return;
-		leaving = true;
 		onleave?.(detail);
 	}
 
