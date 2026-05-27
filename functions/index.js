@@ -1161,7 +1161,7 @@ function magicLinkEmailHtml(link) {
   <p style="font-size: 15px; margin: 0 0 24px; color: #555;">Click the button below to sign in. The link expires in one hour.</p>
   <a href="${esc(link)}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 15px;">Sign in to Superextra</a>
   <p style="font-size: 13px; margin: 24px 0 0; color: #888;">If you didn’t request this, you can safely ignore this email.</p>
-  <p style="font-size: 13px; margin: 8px 0 0; color: #888;">Or paste this link into your browser:<br><span style="color: #555; word-break: break-all;">${esc(link)}</span></p>
+  <p style="font-size: 13px; margin: 24px 0 0; color: #888;">Or paste this link into your browser:<br><span style="color: #555; word-break: break-all;">${esc(link)}</span></p>
 </div>`;
 }
 
