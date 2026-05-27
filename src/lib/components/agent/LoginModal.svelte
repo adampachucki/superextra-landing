@@ -12,11 +12,14 @@
 	});
 
 	// When auth resolves to signed-in while the modal is open, fire the queued
-	// callback (if any) and close.
+	// callback (if any) and close. Consume the saved draft too — the
+	// modal path uses the closure-captured prompt, so a leftover draft
+	// would otherwise be picked up by a later visit to /login.
 	$effect(() => {
 		if (!auth.modalVisible) return;
 		if (auth.status !== 'signed-in') return;
 		const cb = auth.consumeAfterSignIn();
+		auth.consumeDraft();
 		auth.closeModal();
 		if (cb) cb();
 	});

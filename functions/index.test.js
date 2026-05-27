@@ -24,15 +24,30 @@ function makeRef(path) {
 	return ref;
 }
 
-// Named after the signature (ref, …) so test assertions can introspect which
-// path a mutation hit.
-// Sensible defaults for paths added by the per-user limit machinery
-// (`users/{uid}`, `config/limits`). Most legacy tests pre-date these reads and
-// don't model the new paths in their `mockImplementation`, so when their
-// custom impl returns `undefined` for unrelated paths we substitute these
-// defaults rather than crash inside agentStream. Tests that exercise the
-// limit logic itself set their own users/* response and bypass this fallback.
-function autoDocForReadFallback(ref) {
+const mockDb = {
+	collection: (name) => ({
+		doc: (id) => makeRef(`${name}/${id}`)
+	}),
+	get: mock.fn(async () => ({ exists: false })),
+	set: mock.fn(async () => {}),
+	update: mock.fn(async () => {}),
+	recursiveDelete: mock.fn(async () => {}),
+	runTransaction: mock.fn(async (cb) => {
+		const txn = {
+			get: (ref) => mockDb.get(ref),
+			set: (ref, data) => mockDb.set(ref, data),
+			update: (ref, data) => mockDb.update(ref, data)
+		};
+		return cb(txn);
+	})
+};
+
+// Opt-in default for tests that don't model the per-account limit machinery:
+// returns a paid user with no overrides for `users/{uid}` and the standard
+// plan caps for `config/limits`. Tests that exercise limit behavior return
+// their own users/{uid} response and skip this helper. Returns `null` for
+// any other path so the caller can fall through.
+function defaultAccountDoc(ref) {
 	const path = ref?._path || '';
 	if (path.startsWith('users/')) {
 		return {
@@ -54,53 +69,8 @@ function autoDocForReadFallback(ref) {
 			})
 		};
 	}
-	return undefined;
+	return null;
 }
-
-// Inspect the result returned by the test's `mockDb.get` impl and substitute
-// a sensible default for `users/*` / `config/limits` reads when the test's
-// impl returned something obviously not for that path. Tests that specifically
-// want to drive the limit machinery shape their own user/config docs and the
-// substitution detects that via the shape check.
-async function wrapGet(ref) {
-	const path = ref?._path || '';
-	const result = await mockDb.get(ref);
-	if (!result || typeof result.exists === 'undefined') {
-		const fallback = autoDocForReadFallback(ref);
-		if (fallback) return fallback;
-	}
-	if (path.startsWith('users/')) {
-		const data = result?.exists ? (result.data?.() ?? {}) : null;
-		if (!data || !('plan' in data)) {
-			return autoDocForReadFallback(ref) ?? result;
-		}
-	}
-	if (path === 'config/limits') {
-		const data = result?.exists ? (result.data?.() ?? {}) : null;
-		if (!data || !('free' in data)) {
-			return autoDocForReadFallback(ref) ?? result;
-		}
-	}
-	return result;
-}
-
-const mockDb = {
-	collection: (name) => ({
-		doc: (id) => makeRef(`${name}/${id}`)
-	}),
-	get: mock.fn(async () => ({ exists: false })),
-	set: mock.fn(async () => {}),
-	update: mock.fn(async () => {}),
-	recursiveDelete: mock.fn(async () => {}),
-	runTransaction: mock.fn(async (cb) => {
-		const txn = {
-			get: (ref) => wrapGet(ref),
-			set: (ref, data) => mockDb.set(ref, data),
-			update: (ref, data) => mockDb.update(ref, data)
-		};
-		return cb(txn);
-	})
-};
 
 function readMockWrittenDoc(ref) {
 	const path = ref?._path;
@@ -119,32 +89,8 @@ function readMockWrittenDoc(ref) {
 function readWrittenFirst(ref, fallback) {
 	const written = readMockWrittenDoc(ref);
 	if (written.exists) return written;
-	const path = ref?._path || '';
-	// `users/*` and `config/*` are read inside agentStream/agentCancel for the
-	// new limit machinery. Most legacy tests pre-date this and only express a
-	// session/turn fallback. Return sensible defaults so those tests keep
-	// running without per-test rewrites; tests that care about limits set
-	// their own users/* and config/* responses via mockImplementationOnce.
-	if (path.startsWith('users/')) {
-		return {
-			exists: true,
-			data: () => ({
-				plan: 'paid',
-				limitOverrides: null,
-				lastChatDateUtc: null,
-				chatsCreatedToday: 0
-			})
-		};
-	}
-	if (path === 'config/limits') {
-		return {
-			exists: true,
-			data: () => ({
-				free: { chatsPerDay: 1, turnsPerChat: 1 },
-				paid: { chatsPerDay: 50, turnsPerChat: 20 }
-			})
-		};
-	}
+	const accountDefault = defaultAccountDoc(ref);
+	if (accountDefault) return accountDefault;
 	return typeof fallback === 'function' ? fallback(ref) : fallback;
 }
 
@@ -832,7 +778,7 @@ describe('agentStream', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 		runIntakeConversationMock.mock.mockImplementationOnce(async () => ({
 			action: 'start_research',
@@ -906,7 +852,7 @@ describe('agentStream', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 		runIntakeConversationMock.mock.mockImplementationOnce(async () => ({
 			action: 'start_research',
@@ -974,7 +920,7 @@ describe('agentStream', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 		runIntakeConversationMock.mock.mockImplementationOnce(async () => ({
 			action: 'reply',
@@ -1065,7 +1011,7 @@ describe('agentStream', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 		runIntakeConversationMock.mock.mockImplementationOnce(async () => ({
 			action: 'start_research',
@@ -1130,7 +1076,7 @@ describe('agentStream', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 		runIntakeConversationMock.mock.mockImplementationOnce(async ({ selectedPlaceContext }) => ({
 			action: 'start_research',
@@ -1196,7 +1142,7 @@ describe('agentStream', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 
 		const res = mockRes();
@@ -1327,7 +1273,7 @@ describe('agentStream', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 		runIntakeConversationMock.mock.mockImplementationOnce(async ({ history, message }) => {
 			assert.deepEqual(history, []);
@@ -1457,7 +1403,7 @@ describe('agentStream', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 
 		const res = mockRes();
@@ -1551,7 +1497,7 @@ describe('agentStream', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 
 		const res = mockRes();
@@ -1628,7 +1574,7 @@ describe('agentStream', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 
 		const res = mockRes();
@@ -1952,7 +1898,7 @@ describe('agentStream', () => {
 						})
 					};
 				}
-				return { exists: false };
+				return defaultAccountDoc(ref) ?? { exists: false };
 			})
 		);
 
@@ -2069,7 +2015,7 @@ describe('agentCancel', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 
 		const res = mockRes();
@@ -2149,7 +2095,7 @@ describe('agentCancel', () => {
 					data: () => ({ plan: 'free', lastChatDateUtc: today, chatsCreatedToday: 1 })
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 
 		const res = mockRes();
@@ -2191,7 +2137,7 @@ describe('agentCancel', () => {
 					data: () => ({ plan: 'paid', lastChatDateUtc: today, chatsCreatedToday: 1 })
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 
 		const res = mockRes();
@@ -2237,7 +2183,7 @@ describe('agentCancel', () => {
 					})
 				};
 			}
-			return { exists: false };
+			return defaultAccountDoc(ref) ?? { exists: false };
 		});
 
 		const res = mockRes();

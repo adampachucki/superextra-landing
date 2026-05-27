@@ -87,54 +87,6 @@ export interface Session {
 	updatedAtMs: number | null;
 }
 
-/** Shape of the `users/{uid}` document as consumed by the client. Used to
- *  drive the in-UI "limit reached" copy; the server is the source of truth
- *  for enforcement. */
-export interface UserDoc {
-	email: string | null;
-	displayName: string | null;
-	photoURL: string | null;
-	plan: 'free' | 'paid';
-	limitOverrides: { chatsPerDay?: number; turnsPerChat?: number } | null;
-	lastChatDateUtc: string | null;
-	chatsCreatedToday: number;
-}
-
-/** Effective limits resolved from plan + per-user overrides. Mirrors the
- *  server-side resolver in `functions/limits.js`. */
-export interface EffectiveLimits {
-	chatsPerDay: number;
-	turnsPerChat: number;
-}
-
-// Client-side default plan limits — mirrored from `functions/limits.js` so the
-// UI can render advisory limit-reached states without a Firestore round-trip.
-// The server is authoritative; any divergence resolves on the next request.
-const CLIENT_DEFAULT_LIMITS = {
-	free: { chatsPerDay: 1, turnsPerChat: 1 },
-	paid: { chatsPerDay: 50, turnsPerChat: 20 }
-};
-
-function resolveEffectiveLimits(userDoc: UserDoc | null): EffectiveLimits {
-	const plan = userDoc?.plan === 'paid' ? 'paid' : 'free';
-	const base = CLIENT_DEFAULT_LIMITS[plan];
-	const overrides = userDoc?.limitOverrides ?? {};
-	return {
-		chatsPerDay:
-			typeof overrides.chatsPerDay === 'number' && overrides.chatsPerDay >= 0
-				? overrides.chatsPerDay
-				: base.chatsPerDay,
-		turnsPerChat:
-			typeof overrides.turnsPerChat === 'number' && overrides.turnsPerChat >= 0
-				? overrides.turnsPerChat
-				: base.turnsPerChat
-	};
-}
-
-function todayUtcString(): string {
-	return new Date().toISOString().slice(0, 10);
-}
-
 /** Sidebar entry — subset of Session shape exposed by the sidebar listener. */
 export interface SessionSummary {
 	sid: string;
@@ -151,7 +103,6 @@ export interface Turn {
 	turnIndex: number;
 	runId: string;
 	userMessage: string;
-	authorUid: string | null;
 	status: 'pending' | 'running' | 'complete' | 'error';
 	reply: string | null;
 	acknowledgement: string | null;
@@ -235,15 +186,10 @@ let turns = $state<Turn[]>([]);
 let liveTimeline = $state<TimelineEvent[]>([]);
 let loadState = $state<LoadState>('idle');
 let placeContextState = $state<PlaceContext | null>(null);
-let userDoc = $state<UserDoc | null>(null);
-// Resolves on the first users/{uid} snapshot after sign-in (whether the doc
-// exists or not). Landing page reads this before evaluating the daily-limit
-// gate so a signed-in user can't slip past the UI check during the brief
-// pre-snapshot window.
-let userDocReadyResolve: (() => void) | null = null;
-let userDocReady: Promise<void> = new Promise((r) => {
-	userDocReadyResolve = r;
-});
+// Friendly error from the last failing agentStream call. Surfaces server
+// 429s (CHAT_LIMIT_REACHED / TURN_LIMIT_REACHED) and other transport
+// failures into the UI without a parallel client-side limit cache.
+let lastError = $state<string | null>(null);
 // While a startNewChat POST is in flight, the active-session listener can
 // race it: the listener attaches optimistically and the first server-
 // confirmed snapshot can land before agentStream's Firestore txn does (gap
@@ -265,7 +211,6 @@ let activeSessionUnsubscribe: Unsubscribe | null = null;
 let activeTurnsUnsubscribe: Unsubscribe | null = null;
 let activeEventsUnsubscribe: Unsubscribe | null = null;
 let activeEventsAttachInFlight: Promise<void> | null = null;
-let userDocUnsubscribe: Unsubscribe | null = null;
 let currentEventsRunId: string | null = null;
 let currentEventsCompletedTurnIndex: number | null = null;
 
@@ -349,30 +294,15 @@ function ensureAuthSubscribed() {
 		if (uid) {
 			currentUid = uid;
 			void attachSidebarListener();
-			// User-doc listener attaches separately via maybeAttachUserDoc() —
-			// keeping it off the synchronous auth callback path avoids racing
-			// the active-session attach in tests that share the firestore mock.
-			void maybeAttachUserDoc(uid);
 		} else {
 			currentUid = null;
 			detachSidebarListener();
-			detachUserDocListener();
 			detachActiveListeners();
 			clearActiveState();
 			sessionsList = [];
 		}
 	});
 	void auth.init();
-}
-
-async function maybeAttachUserDoc(uid: string) {
-	// Yield once so the call site's microtask chain unwinds before we kick off
-	// the user-doc Firestore attach. This avoids interleaving with the
-	// active-session attach inside a single tick (which surfaced as a
-	// firebase-mock dedup race in vitest).
-	await Promise.resolve();
-	if (currentUid !== uid) return;
-	await attachUserDocListener(uid);
 }
 
 // ---------------------------------------------------------------------------
@@ -438,63 +368,6 @@ async function attachSidebarListener() {
 }
 
 // ---------------------------------------------------------------------------
-// User-doc listener — drives advisory "limit reached" UI. Server is the truth.
-// ---------------------------------------------------------------------------
-
-function detachUserDocListener() {
-	userDocUnsubscribe?.();
-	userDocUnsubscribe = null;
-	userDoc = null;
-	// Reset the ready gate so the next sign-in starts a fresh wait.
-	userDocReady = new Promise((r) => {
-		userDocReadyResolve = r;
-	});
-}
-
-async function attachUserDocListener(uid: string) {
-	detachUserDocListener();
-	try {
-		const { db } = await getFirebase();
-		const firestoreMod = await getFirestoreMod();
-		const { doc, onSnapshot } = firestoreMod;
-		if (currentUid !== uid) return;
-		const ref = doc(db, 'users', uid);
-		userDocUnsubscribe = onSnapshot(
-			ref,
-			(snap) => {
-				if (currentUid !== uid) return;
-				if (!snap.exists()) {
-					userDoc = null;
-				} else {
-					const data = snap.data() as Record<string, unknown>;
-					userDoc = {
-						email: (data.email as string | null | undefined) ?? null,
-						displayName: (data.displayName as string | null | undefined) ?? null,
-						photoURL: (data.photoURL as string | null | undefined) ?? null,
-						plan: (data.plan as 'free' | 'paid' | undefined) === 'paid' ? 'paid' : 'free',
-						limitOverrides:
-							(data.limitOverrides as UserDoc['limitOverrides'] | null | undefined) ?? null,
-						lastChatDateUtc: (data.lastChatDateUtc as string | null | undefined) ?? null,
-						chatsCreatedToday: (data.chatsCreatedToday as number | undefined) ?? 0
-					};
-				}
-				userDocReadyResolve?.();
-				userDocReadyResolve = null;
-			},
-			(err: unknown) => {
-				console.warn('[chat-state] user doc listener error:', err);
-				userDocReadyResolve?.();
-				userDocReadyResolve = null;
-			}
-		);
-	} catch (err) {
-		if (!isSSRBootstrapSkip(err)) {
-			console.warn('[chat-state] user doc listener bootstrap failed:', err);
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Active session + turns + events listeners
 // ---------------------------------------------------------------------------
 
@@ -535,7 +408,6 @@ function makeOptimisticTurn(turnIndex: number, userMessage: string, startedAtMs:
 		turnIndex,
 		runId: '',
 		userMessage,
-		authorUid: currentUid,
 		status: 'pending',
 		reply: null,
 		acknowledgement: null,
@@ -679,7 +551,6 @@ async function attachActiveListeners(sid: string) {
 					turnIndex,
 					runId: (data.runId as string | undefined) ?? '',
 					userMessage: (data.userMessage as string | undefined) ?? '',
-					authorUid: (data.authorUid as string | null | undefined) ?? null,
 					status,
 					reply: (data.reply as string | null | undefined) ?? null,
 					acknowledgement: (data.acknowledgement as string | null | undefined) ?? null,
@@ -938,6 +809,21 @@ async function postAgentStream(body: Record<string, unknown>): Promise<void> {
 	}
 }
 
+function friendlyAgentError(code: string): string {
+	switch (code) {
+		case 'CHAT_LIMIT_REACHED':
+			return 'Daily chat limit reached. Try again tomorrow.';
+		case 'TURN_LIMIT_REACHED':
+			return 'This chat has used its message budget on the free plan.';
+		case 'AUTH_REQUIRED':
+			return 'Sign in to continue.';
+		case 'previous_turn_in_flight':
+			return 'A previous message is still being processed. Try again in a moment.';
+		default:
+			return 'Could not send message. Please try again.';
+	}
+}
+
 function startNewChat(query: string, place: PlaceContext | null): string {
 	const trimmed = query.trim();
 	if (!trimmed) throw new Error('empty_message');
@@ -984,6 +870,8 @@ function startNewChat(query: string, place: PlaceContext | null): string {
 				clearActiveState();
 				loadState = 'missing';
 			}
+			const code = err instanceof Error ? err.message : String(err);
+			lastError = friendlyAgentError(code);
 			console.warn('[chat-state] startNewChat POST failed:', err);
 		});
 
@@ -1006,6 +894,8 @@ async function sendFollowUp(message: string): Promise<void> {
 		});
 	} catch (err) {
 		removeOptimisticTurn(sid, turnIndex);
+		const code = err instanceof Error ? err.message : String(err);
+		lastError = friendlyAgentError(code);
 		throw err;
 	}
 }
@@ -1143,34 +1033,11 @@ export const chatState = {
 		if (!sidebarAttachStarted && currentUid) void attachSidebarListener();
 		return sessionsList;
 	},
-	get userDoc(): UserDoc | null {
-		return userDoc;
+	get lastError(): string | null {
+		return lastError;
 	},
-	get effectiveLimits(): EffectiveLimits {
-		return resolveEffectiveLimits(userDoc);
-	},
-	get dailyChatLimitReached(): boolean {
-		if (!userDoc) return false;
-		const today = todayUtcString();
-		if (userDoc.lastChatDateUtc !== today) return false;
-		return userDoc.chatsCreatedToday >= resolveEffectiveLimits(userDoc).chatsPerDay;
-	},
-	// Resolves once the users/{uid} doc has been read (or confirmed missing)
-	// for the current sign-in. Use this on a landing-page submit to ensure
-	// `dailyChatLimitReached` reflects server state before deciding to route.
-	async waitForUserDoc() {
-		// Touch the auth subscription so the listener attaches if it hasn't.
-		ensureAuthSubscribed();
-		await userDocReady;
-	},
-	get sessionTurnLimitReached(): boolean {
-		if (!activeSession || !userDoc) return false;
-		const limits = resolveEffectiveLimits(userDoc);
-		const used = Math.max(
-			0,
-			(activeSession.lastTurnIndex || 0) - (activeSession.cancelledTurns || 0)
-		);
-		return used >= limits.turnsPerChat;
+	clearError() {
+		lastError = null;
 	},
 	get currentTurnStartedAtMs(): number | null {
 		const latest = turns[turns.length - 1];
@@ -1223,8 +1090,6 @@ export const _testing = {
 		detachActiveListeners();
 		sessionsListUnsubscribe?.();
 		sessionsListUnsubscribe = null;
-		userDocUnsubscribe?.();
-		userDocUnsubscribe = null;
 		authUnsubscribe?.();
 		authUnsubscribe = null;
 		authSubscribed = false;
@@ -1232,13 +1097,10 @@ export const _testing = {
 		clearActiveState();
 		currentUid = null;
 		sessionsList = [];
-		userDoc = null;
+		lastError = null;
 	},
 	setCurrentUid(uid: string | null) {
 		currentUid = uid;
-	},
-	setUserDoc(doc: UserDoc | null) {
-		userDoc = doc;
 	},
 	// For tests that want to avoid the real attach path.
 	markSidebarAttached() {

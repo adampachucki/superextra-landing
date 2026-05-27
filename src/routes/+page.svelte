@@ -16,7 +16,6 @@
 
 	let leaving = $state(false);
 	let heroQuery = $state('');
-	let limitNotice = $state<string | null>(null);
 
 	// The composer clears its own query on submit; restore it from the saved
 	// draft when the sign-in modal closes without completing sign-in so the
@@ -29,24 +28,18 @@
 	});
 
 	onMount(() => {
-		void auth.init().then(() => {
-			// Touch the user-doc listener so `chatState.dailyChatLimitReached`
-			// reflects the latest counter when the user has signed in already.
-			if (auth.user) void chatState.sessionsList;
-		});
+		void auth.init();
 	});
 
 	function proceedToChat(
 		query: string,
 		place: { name: string; secondary: string; placeId: string } | null
 	) {
+		// Server enforces the daily-chat limit and returns 429 — chat-state
+		// surfaces a friendly message via `lastError`, rendered by /chat.
 		leaving = true;
 		chatState.startNewChat(query, place);
 		goto('/chat');
-	}
-
-	function dailyLimitMessage() {
-		return 'You’ve used your daily chat on the free plan. Come back tomorrow to start another.';
 	}
 
 	async function handleLeave({
@@ -58,29 +51,12 @@
 	}) {
 		await auth.init();
 		if (auth.user) {
-			// Wait for the first users/{uid} snapshot so the limit check sees
-			// real state (not the brief pre-snapshot window where userDoc=null
-			// and the getter would return false).
-			await chatState.waitForUserDoc();
-			if (chatState.dailyChatLimitReached) {
-				limitNotice = dailyLimitMessage();
-				return;
-			}
-			limitNotice = null;
 			proceedToChat(query, place);
 			return;
 		}
 		auth.saveDraft({ prompt: query, placeContext: place });
 		auth.openModal({
-			afterSignIn: async () => {
-				await chatState.waitForUserDoc();
-				if (chatState.dailyChatLimitReached) {
-					limitNotice = dailyLimitMessage();
-					return;
-				}
-				limitNotice = null;
-				proceedToChat(query, place);
-			}
+			afterSignIn: () => proceedToChat(query, place)
 		});
 	}
 
@@ -139,14 +115,6 @@
 
 	<main>
 		<RestaurantHero onleave={handleLeave} bind:userQuery={heroQuery} />
-		{#if limitNotice}
-			<div
-				class="mx-auto mt-2 max-w-[800px] px-6 text-center text-[13px] text-black/65 dark:text-white/65"
-				role="alert"
-			>
-				{limitNotice}
-			</div>
-		{/if}
 		<About
 			headline="The market view your restaurant has been missing"
 			intro="Restaurant operators make critical decisions every day — where to open, how to price, when to hire — too often without a clear view of the market around them at all. Superextra changes that."

@@ -4,6 +4,7 @@
 	import ChatThread from '$lib/components/restaurants/ChatThread.svelte';
 	import PromptIcon from '$lib/components/restaurants/PromptIcon.svelte';
 	import RestaurantPromptComposer from '$lib/components/restaurants/RestaurantPromptComposer.svelte';
+	import AccountMenu from '$lib/components/agent/AccountMenu.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { auth } from '$lib/auth.svelte';
@@ -28,8 +29,7 @@
 	let cancelPosting = $state(false);
 	let activePromptPostMessageCount = $state(0);
 	let activePromptInactive = $derived(
-		chatState.active &&
-			(chatState.loading || activePromptPosting || chatState.sessionTurnLimitReached)
+		chatState.active && (chatState.loading || activePromptPosting)
 	);
 
 	$effect(() => {
@@ -111,50 +111,45 @@
 		window.addEventListener('resize', schedulePromptHeight);
 		schedulePromptHeight();
 
-		// Initialize auth eagerly — downstream Firestore listeners and Cloud
-		// Function calls depend on a real signed-in user.
-		void auth.init();
-
-		const params = new URL(window.location.href).searchParams;
-		const sid = params.get('sid');
-		const q = params.get('q');
-		// Auth-guard: signed-out visitors hitting `/chat` (especially shared URLs)
-		// get redirected to /login with returnTo set, so they land back here
-		// after sign-in.
-		//
-		// Capture the original URL synchronously. chat-state's auth listener
-		// runs clearActiveState() on signed-out, and the URL-sync $effect then
-		// drops the `sid` param. If we awaited auth.init() first we'd read the
-		// post-cleanup URL and lose the shared link.
-		const guardOriginalUrl = new URL(window.location.href);
-		const guardReturnTo = guardOriginalUrl.pathname + guardOriginalUrl.search;
+		// Auth-guard runs synchronously to capture the original URL (before any
+		// state listener can rewrite it), then awaits auth.init(). On signed-out
+		// we redirect to /login with returnTo and return — only the signed-in
+		// branch proceeds to parse q/sid and start a chat. Signed-out visitors
+		// must never reach `chatState.startNewChat`/`selectSession`, which
+		// would create an optimistic chat and fail at `agentStream` auth.
+		const originalUrl = new URL(window.location.href);
+		const returnTo = originalUrl.pathname + originalUrl.search;
+		const sid = originalUrl.searchParams.get('sid');
+		const q = originalUrl.searchParams.get('q');
 		void (async () => {
 			await auth.init();
-			if (auth.user) return;
-			goto(`/login?returnTo=${encodeURIComponent(guardReturnTo)}`, { replaceState: true });
-		})();
-		if (q) {
-			const placeContext =
-				params.get('placeId') && params.get('placeName')
-					? {
-							placeId: params.get('placeId')!,
-							name: params.get('placeName')!,
-							secondary: params.get('placeSecondary') ?? ''
-						}
-					: null;
-			const trimmedQ = q?.trim();
-			if (trimmedQ) {
-				chatState.startNewChat(trimmedQ, placeContext);
-				const clean = new URL(window.location.href);
-				clean.searchParams.delete('q');
-				clean.searchParams.delete('placeName');
-				clean.searchParams.delete('placeSecondary');
-				clean.searchParams.delete('placeId');
-				history.replaceState(history.state, '', clean);
+			if (!auth.user) {
+				goto(`/login?returnTo=${encodeURIComponent(returnTo)}`, { replaceState: true });
+				return;
 			}
-		} else if (sid) {
-			chatState.selectSession(sid);
-		}
+			if (q) {
+				const placeContext =
+					originalUrl.searchParams.get('placeId') && originalUrl.searchParams.get('placeName')
+						? {
+								placeId: originalUrl.searchParams.get('placeId')!,
+								name: originalUrl.searchParams.get('placeName')!,
+								secondary: originalUrl.searchParams.get('placeSecondary') ?? ''
+							}
+						: null;
+				const trimmedQ = q.trim();
+				if (trimmedQ) {
+					chatState.startNewChat(trimmedQ, placeContext);
+					const clean = new URL(window.location.href);
+					clean.searchParams.delete('q');
+					clean.searchParams.delete('placeName');
+					clean.searchParams.delete('placeSecondary');
+					clean.searchParams.delete('placeId');
+					history.replaceState(history.state, '', clean);
+				}
+			} else if (sid) {
+				chatState.selectSession(sid);
+			}
+		})();
 		sidebarOpen = window.matchMedia('(min-width: 1024px)').matches;
 		prevSidebarOpen = sidebarOpen;
 		tick().then(() => {
@@ -183,23 +178,11 @@
 		}
 	});
 
-	function limitErrorCopy(code: string): string {
-		switch (code) {
-			case 'TURN_LIMIT_REACHED':
-				return 'This chat is at its message limit on the free plan.';
-			case 'CHAT_LIMIT_REACHED':
-				return 'Daily chat limit reached. Try again tomorrow.';
-			case 'AUTH_REQUIRED':
-				return 'Sign in to continue.';
-			default:
-				return code;
-		}
-	}
-
 	async function handleSend() {
 		const trimmed = query.trim();
 		if (!chatState.active || !trimmed || activePromptInactive) return;
 		sendError = null;
+		chatState.clearError();
 		if (dictation.active) dictation.stop();
 		activePromptPostMessageCount = chatState.messages.length;
 		activePromptPosting = true;
@@ -207,12 +190,12 @@
 		resizeTextarea();
 		try {
 			await chatState.sendFollowUp(trimmed);
-		} catch (err) {
+		} catch {
 			activePromptPosting = false;
 			query = trimmed;
 			resizeTextarea();
-			const raw = err instanceof Error ? err.message : 'Could not send message. Please try again.';
-			sendError = limitErrorCopy(raw);
+			// chat-state sets a friendly `lastError` already; show it.
+			sendError = chatState.lastError ?? 'Could not send message. Please try again.';
 		}
 	}
 
@@ -323,37 +306,9 @@
 
 	let confirmDeleteId = $state<string | null>(null);
 	let deletingId = $state<string | null>(null);
-	let userMenuOpen = $state(false);
-	let signingOut = $state(false);
-
-	function avatarInitials(): string {
-		const name = auth.user?.displayName ?? auth.user?.email ?? '';
-		const parts = name.trim().split(/\s+/).filter(Boolean);
-		if (!parts.length) return '?';
-		if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-		return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-	}
-
-	async function handleSignOut() {
-		if (signingOut) return;
-		signingOut = true;
-		try {
-			await auth.signOut();
-			userMenuOpen = false;
-			chatState.reset();
-			goto('/', { replaceState: true });
-		} catch (err) {
-			console.warn('sign out failed:', err);
-		} finally {
-			signingOut = false;
-		}
-	}
 
 	function handleWindowClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
-		if (userMenuOpen && !target.closest('.user-menu-anchor')) {
-			userMenuOpen = false;
-		}
 		if (!confirmDeleteId || deletingId) return;
 		if (!target.closest('.sb-item')) confirmDeleteId = null;
 	}
@@ -635,54 +590,11 @@
 	<!-- Account block (avatar + sign-out menu) -->
 	{#if auth.user}
 		<div
-			class="user-menu-anchor sb-item relative border-t border-black/[0.06] px-3 py-3 dark:border-white/[0.06]"
+			class="sb-item border-t border-black/[0.06] px-3 py-3 dark:border-white/[0.06]"
 			style="--sb-delay: 0.43s"
 			class:visible={sidebarContentVisible}
 		>
-			<button
-				type="button"
-				onclick={() => (userMenuOpen = !userMenuOpen)}
-				class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-cream-100/60 dark:hover:bg-cream-100/40"
-			>
-				{#if auth.user.photoURL}
-					<img
-						src={auth.user.photoURL}
-						alt=""
-						referrerpolicy="no-referrer"
-						class="h-7 w-7 rounded-full object-cover"
-					/>
-				{:else}
-					<span
-						class="flex h-7 w-7 items-center justify-center rounded-full bg-black text-[11px] font-medium text-white dark:bg-white dark:text-black"
-					>
-						{avatarInitials()}
-					</span>
-				{/if}
-				<div class="min-w-0 flex-1">
-					<p class="truncate text-[12px] text-black dark:text-white">
-						{auth.user.displayName ?? auth.user.email ?? 'Signed in'}
-					</p>
-					{#if auth.user.displayName && auth.user.email}
-						<p class="truncate text-[11px] text-black/40 dark:text-white/40">{auth.user.email}</p>
-					{/if}
-				</div>
-			</button>
-			{#if userMenuOpen}
-				<div
-					class="absolute right-3 bottom-full mb-2 left-3 rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50"
-					role="menu"
-				>
-					<button
-						type="button"
-						onclick={handleSignOut}
-						disabled={signingOut}
-						class="block w-full px-3 py-2 text-left text-[13px] text-black/70 transition-colors hover:bg-cream-100 hover:text-black disabled:opacity-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
-						role="menuitem"
-					>
-						{signingOut ? 'Signing out…' : 'Sign out'}
-					</button>
-				</div>
-			{/if}
+			<AccountMenu variant="inline" />
 		</div>
 	{/if}
 
@@ -769,8 +681,9 @@
 					? 'is-mounted'
 					: ''}"
 			>
-				<p class="text-[14px] text-black/40 dark:text-white/40">
-					{chatState.active ? "Couldn't load this chat" : "Couldn't start this chat"}
+				<p class="px-6 text-center text-[14px] text-black/55 dark:text-white/55">
+					{chatState.lastError ??
+						(chatState.active ? "Couldn't load this chat" : "Couldn't start this chat")}
 				</p>
 			</div>
 		{:else if chatState.active}
@@ -806,15 +719,6 @@
 				{sendError}
 			</div>
 		{/if}
-		{#if chatState.active && chatState.sessionTurnLimitReached && !chatState.loading}
-			<div class="mb-2 px-1 text-[13px] text-black/55 dark:text-white/55">
-				This chat has used its message budget on the free plan.
-			</div>
-		{:else if !chatState.active && chatState.dailyChatLimitReached}
-			<div class="mb-2 px-1 text-[13px] text-black/55 dark:text-white/55">
-				You've used your daily chat. Come back tomorrow to start another.
-			</div>
-		{/if}
 		{#if chatState.active}
 			<div
 				onclick={focusPromptFromCardClick}
@@ -829,13 +733,11 @@
 						bind:value={query}
 						onkeydown={handleKeydown}
 						disabled={activePromptInactive}
-						placeholder={chatState.sessionTurnLimitReached
-							? 'This chat has used its message budget.'
-							: activePromptInactive
-								? 'Awaiting final response...'
-								: dictation.active
-									? 'Start speaking...'
-									: 'Ask a follow-up...'}
+						placeholder={activePromptInactive
+							? 'Awaiting final response...'
+							: dictation.active
+								? 'Start speaking...'
+								: 'Ask a follow-up...'}
 						rows="1"
 						class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none disabled:cursor-not-allowed disabled:text-black/35 disabled:placeholder:text-black/35 dark:text-white dark:placeholder:text-white/45 dark:disabled:text-white/35 dark:disabled:placeholder:text-white/35"
 					></textarea>
@@ -893,12 +795,6 @@
 						{/if}
 					</div>
 				</div>
-		{:else if chatState.dailyChatLimitReached}
-			<div
-				class="rounded-2xl border border-black/[0.08] bg-white px-5 py-4 text-[14px] text-black/65 dark:border-white/[0.08] dark:bg-cream-50 dark:text-white/65"
-			>
-				You've used your daily chat on the free plan. Come back tomorrow to start another.
-			</div>
 		{:else}
 			{#key composerResetKey}
 				<RestaurantPromptComposer

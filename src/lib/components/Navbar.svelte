@@ -3,6 +3,7 @@
 	import { formState } from '$lib/form-state.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { auth } from '$lib/auth.svelte';
+	import AccountMenu from '$lib/components/agent/AccountMenu.svelte';
 	import { onMount } from 'svelte';
 
 	let {
@@ -13,16 +14,9 @@
 
 	let scrolled = $state(false);
 	let mobileOpen = $state(false);
-	let avatarMenuOpen = $state(false);
-	let signingOut = $state(false);
 
 	function handleScroll() {
 		scrolled = window.scrollY > 20;
-	}
-
-	function handleWindowClick(e: MouseEvent) {
-		const target = e.target as HTMLElement;
-		if (avatarMenuOpen && !target.closest('.nav-user-menu')) avatarMenuOpen = false;
 	}
 
 	onMount(() => {
@@ -36,35 +30,12 @@
 	// the badge stays hidden.
 	let chatCount = $derived(minimal && auth.user ? chatState.sessionsList.length : 0);
 
-	function avatarInitials(): string {
-		const name = auth.user?.displayName ?? auth.user?.email ?? '';
-		const parts = name.trim().split(/\s+/).filter(Boolean);
-		if (!parts.length) return '?';
-		if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-		return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-	}
-
 	function handleLoginClick() {
 		auth.openModal({
 			afterSignIn: () => {
 				goto('/chat');
 			}
 		});
-	}
-
-	async function handleSignOut() {
-		if (signingOut) return;
-		signingOut = true;
-		try {
-			await auth.signOut();
-			avatarMenuOpen = false;
-			chatState.reset();
-			goto('/', { replaceState: true });
-		} catch (err) {
-			console.warn('sign out failed:', err);
-		} finally {
-			signingOut = false;
-		}
 	}
 
 	function smoothScroll(e: MouseEvent) {
@@ -102,55 +73,7 @@
 	</a>
 {/snippet}
 
-{#snippet userMenu()}
-	<div class="nav-user-menu relative">
-		<button
-			type="button"
-			onclick={() => (avatarMenuOpen = !avatarMenuOpen)}
-			aria-label="Account"
-			class="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-black text-[11px] font-medium text-white transition-opacity hover:opacity-80 dark:bg-white dark:text-black"
-		>
-			{#if auth.user?.photoURL}
-				<img
-					src={auth.user.photoURL}
-					alt=""
-					referrerpolicy="no-referrer"
-					class="h-full w-full object-cover"
-				/>
-			{:else}
-				{avatarInitials()}
-			{/if}
-		</button>
-		{#if avatarMenuOpen}
-			<div
-				class="absolute top-full right-0 mt-2 w-56 rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50"
-				role="menu"
-			>
-				<div class="border-b border-black/[0.06] px-3 py-2 dark:border-white/[0.06]">
-					<p class="truncate text-[12px] text-black dark:text-white">
-						{auth.user?.displayName ?? auth.user?.email ?? 'Signed in'}
-					</p>
-					{#if auth.user?.displayName && auth.user?.email}
-						<p class="truncate text-[11px] text-black/40 dark:text-white/40">
-							{auth.user.email}
-						</p>
-					{/if}
-				</div>
-				<button
-					type="button"
-					onclick={handleSignOut}
-					disabled={signingOut}
-					class="block w-full px-3 py-2 text-left text-[13px] text-black/70 transition-colors hover:bg-cream-100 hover:text-black disabled:opacity-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
-					role="menuitem"
-				>
-					{signingOut ? 'Signing out…' : 'Sign out'}
-				</button>
-			</div>
-		{/if}
-	</div>
-{/snippet}
-
-<svelte:window onscroll={handleScroll} onclick={handleWindowClick} />
+<svelte:window onscroll={handleScroll} />
 
 <nav
 	class="{isStatic
@@ -213,7 +136,7 @@
 			{#if minimal}
 				{#if auth.user}
 					{@render chatIcon()}
-					{@render userMenu()}
+					<AccountMenu />
 				{:else}
 					<button
 						onclick={handleLoginClick}
@@ -234,7 +157,7 @@
 			{#if minimal}
 				{#if auth.user}
 					{@render chatIcon()}
-					{@render userMenu()}
+					<AccountMenu />
 				{:else}
 					<button
 						onclick={handleLoginClick}

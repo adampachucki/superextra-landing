@@ -16,19 +16,16 @@ let cachedAt = 0;
 export async function getLimitsConfig(db) {
 	const now = Date.now();
 	if (cachedConfig && now - cachedAt < LIMITS_CACHE_TTL_MS) return cachedConfig;
-	try {
-		const snap = await db.collection('config').doc('limits').get();
-		const raw = snap.exists ? snap.data() || {} : {};
-		cachedConfig = {
-			free: { ...DEFAULT_LIMITS.free, ...(raw.free || {}) },
-			paid: { ...DEFAULT_LIMITS.paid, ...(raw.paid || {}) }
-		};
-		cachedAt = now;
-	} catch (err) {
-		console.warn('[limits] failed to load config/limits, using defaults:', err.message || err);
-		cachedConfig = DEFAULT_LIMITS;
-		cachedAt = now;
-	}
+	// Fail-closed on read errors — silently defaulting to DEFAULT_LIMITS
+	// would bypass any tighter caps an operator set. Missing config doc IS
+	// a normal case (e.g. fresh project) and we fall back to defaults.
+	const snap = await db.collection('config').doc('limits').get();
+	const raw = snap.exists ? snap.data() || {} : {};
+	cachedConfig = {
+		free: { ...DEFAULT_LIMITS.free, ...(raw.free || {}) },
+		paid: { ...DEFAULT_LIMITS.paid, ...(raw.paid || {}) }
+	};
+	cachedAt = now;
 	return cachedConfig;
 }
 

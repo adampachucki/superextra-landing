@@ -572,7 +572,6 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				turnIndex: newTurnIdx,
 				runId,
 				userMessage: message,
-				authorUid: submitterUid,
 				status: 'pending',
 				reply: null,
 				acknowledgement: null,

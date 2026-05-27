@@ -3,18 +3,14 @@
 
 	interface Props {
 		returnTo?: string | null;
-		onSignedIn?: () => void;
 		initialError?: string | null;
-		compact?: boolean;
 		title?: string;
 		subtitle?: string;
 	}
 
 	let {
 		returnTo = null,
-		onSignedIn,
 		initialError = null,
-		compact = false,
 		title = 'Sign in to continue',
 		subtitle = 'Save your chats and pick up where you left off.'
 	}: Props = $props();
@@ -63,7 +59,6 @@
 		localErrorCode = null;
 		try {
 			await auth.signInWithGoogle();
-			onSignedIn?.();
 		} catch (err) {
 			const code =
 				(err as { code?: string } | null)?.code ??
@@ -100,7 +95,7 @@
 	}
 </script>
 
-<div class={compact ? 'space-y-3' : 'space-y-4'}>
+<div class="space-y-4">
 	<div class="space-y-1">
 		<h2 class="text-[18px] font-light text-black dark:text-white">
 			{mode === 'email-sent' ? 'Check your email' : title}
