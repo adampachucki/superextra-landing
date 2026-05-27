@@ -14,6 +14,13 @@ import {
 	checkRateLimit,
 	validatePlaceContext
 } from './utils.js';
+import {
+	getLimitsConfig,
+	resolveLimits,
+	checkChatLimit,
+	checkTurnLimit,
+	todayUtc
+} from './limits.js';
 export { watchdog } from './watchdog.js';
 
 initializeApp();
@@ -114,11 +121,18 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 
 const rateLimitMap = new Map();
 const uidRateLimitMap = new Map();
-const UID_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const UID_RATE_LIMIT_MAX = 20; // per-UID pipeline runs per hour (plan default)
+const magicLinkRateLimitMap = new Map();
 
-// Plan §5 / §6 — shared 10-turn cap per chat, counted across all contributors.
-const MAX_TURNS_PER_SESSION = 10;
+// Test-only — bypass abuse limits so each test starts from a clean slate.
+export function _resetRateLimits() {
+	rateLimitMap.clear();
+	uidRateLimitMap.clear();
+	magicLinkRateLimitMap.clear();
+}
+// Hourly per-UID pipeline rate limit. Bounds cancel-retry abuse on top of the
+// product-level per-day/per-chat limits in `config/limits`.
+const UID_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const UID_RATE_LIMIT_MAX = 20;
 
 class AgentStreamError extends Error {
 	constructor(status, code) {
@@ -340,9 +354,19 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 		return;
 	}
 	let submitterUid;
+	let submitterClaims = null;
 	try {
 		const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
+		if (decoded?.firebase?.sign_in_provider === 'anonymous') {
+			res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
+			return;
+		}
 		submitterUid = decoded.uid;
+		submitterClaims = {
+			email: typeof decoded.email === 'string' ? decoded.email : null,
+			displayName: typeof decoded.name === 'string' ? decoded.name : null,
+			photoURL: typeof decoded.picture === 'string' ? decoded.picture : null
+		};
 	} catch (e) {
 		console.warn('verifyIdToken rejected:', e.code || e.message);
 		res.status(401).json({ ok: false, error: 'Invalid auth token' });
@@ -408,6 +432,12 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	let creatorUid = submitterUid;
 	let newTurnIdx = 1;
 	let intakeState = null;
+
+	// Resolve plan limits outside the transaction (cached, best-effort 60s TTL).
+	// All transaction reads must precede writes; the config snapshot is stable
+	// for the duration of the transaction.
+	const limitsConfig = await getLimitsConfig(db);
+	const today = todayUtc();
 	try {
 		await db.runTransaction(async (t) => {
 			const snap = await t.get(sessionRef);
@@ -422,6 +452,13 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				previousTurn = previousTurnSnap.exists ? previousTurnSnap.data() || {} : null;
 			}
 
+			// Read the submitter's user doc — drives per-account limit checks
+			// and lazy provisioning. Inside the transaction so the chats-per-day
+			// counter increments atomically with the session create.
+			const userRef = db.collection('users').doc(submitterUid);
+			const userSnap = await t.get(userRef);
+			const userDoc = userSnap.exists ? userSnap.data() || {} : null;
+
 			// One-in-flight guard per chat (plan §6). The ownership gate is
 			// intentionally gone — any signed-in visitor with the URL may
 			// submit a turn.
@@ -429,11 +466,34 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				throw new AgentStreamError(409, 'previous_turn_in_flight');
 			}
 
-			if (lastTurnIndex >= MAX_TURNS_PER_SESSION) {
-				throw new AgentStreamError(409, 'turn_cap_reached');
-			}
-
+			const effectiveLimits = resolveLimits(userDoc, limitsConfig);
 			isFirstMessage = !existing;
+			// "Retry after refunded cancel" — when every prior turn was
+			// cancelled, the daily counter was refunded on the cancellation.
+			// Submitting again on the same session is the user picking the
+			// chat back up; gate it against `chatsPerDay` just like a new chat
+			// to close the bypass (refund → spend daily on chat B → come back
+			// to chat A → second usable chat).
+			const allPriorCancelled =
+				!isFirstMessage &&
+				(existing.lastTurnIndex || 0) > 0 &&
+				(existing.cancelledTurns || 0) >= (existing.lastTurnIndex || 0);
+			const treatAsChatCreation =
+				isFirstMessage || (allPriorCancelled && existing.userId === submitterUid);
+			if (treatAsChatCreation) {
+				const chatCheck = checkChatLimit(userDoc, effectiveLimits, today);
+				if (!chatCheck.allow) {
+					const err = new AgentStreamError(429, chatCheck.code);
+					if (chatCheck.resetAt) err.resetAt = chatCheck.resetAt;
+					throw err;
+				}
+			}
+			if (!isFirstMessage) {
+				const turnCheck = checkTurnLimit(existing, effectiveLimits);
+				if (!turnCheck.allow) {
+					throw new AgentStreamError(429, turnCheck.code);
+				}
+			}
 			const engineSessionStarted = existing ? existing.engineSessionStarted !== false : false;
 			shouldRunIntake = !engineSessionStarted;
 			const priorGeneration = Number.isInteger(existing?.engineSessionGeneration)
@@ -489,6 +549,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 					engineSessionGeneration,
 					intakeState: null,
 					title: null,
+					cancelledTurns: 0,
 					...perTurn
 				});
 			} else {
@@ -511,6 +572,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				turnIndex: newTurnIdx,
 				runId,
 				userMessage: message,
+				authorUid: submitterUid,
 				status: 'pending',
 				reply: null,
 				acknowledgement: null,
@@ -522,10 +584,55 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				completedAt: null,
 				error: null
 			});
+
+			// User-doc maintenance (lazy provision + chatsCreatedToday counter).
+			// Counter ticks ONLY on session creation (chatsPerDay limit); follow-
+			// ups never increment the daily counter.
+			const dayRolled = userDoc?.lastChatDateUtc !== today;
+			const currentCount = dayRolled ? 0 : userDoc?.chatsCreatedToday || 0;
+			const identity = {
+				email: submitterClaims?.email ?? null,
+				displayName: submitterClaims?.displayName ?? null,
+				photoURL: submitterClaims?.photoURL ?? null
+			};
+			if (!userDoc) {
+				t.set(userRef, {
+					...identity,
+					plan: 'free',
+					limitOverrides: null,
+					lastChatDateUtc: isFirstMessage ? today : null,
+					chatsCreatedToday: isFirstMessage ? 1 : 0,
+					createdAt: FieldValue.serverTimestamp(),
+					updatedAt: FieldValue.serverTimestamp()
+				});
+			} else if (isFirstMessage) {
+				const update = {
+					lastChatDateUtc: today,
+					chatsCreatedToday: currentCount + 1,
+					updatedAt: FieldValue.serverTimestamp()
+				};
+				// Refresh identity fields opportunistically when present (Google
+				// photo / display name changes).
+				if (identity.email) update.email = identity.email;
+				if (identity.displayName) update.displayName = identity.displayName;
+				if (identity.photoURL) update.photoURL = identity.photoURL;
+				t.update(userRef, update);
+			} else if (treatAsChatCreation) {
+				// Same-user retry of a previously-refunded chat — re-charge the
+				// daily counter. The check above already gated this against
+				// `chatsPerDay`, so we only need to record the spend here.
+				t.update(userRef, {
+					lastChatDateUtc: today,
+					chatsCreatedToday: currentCount + 1,
+					updatedAt: FieldValue.serverTimestamp()
+				});
+			}
 		});
 	} catch (err) {
 		if (err instanceof AgentStreamError) {
-			res.status(err.status).json({ ok: false, error: err.code });
+			const body = { ok: false, error: err.code };
+			if (err.resetAt) body.resetAt = err.resetAt;
+			res.status(err.status).json(body);
 		} else {
 			console.error('agentStream transaction failed:', err.message || err);
 			res.status(500).json({ ok: false, error: 'session_upsert_failed' });
@@ -613,12 +720,12 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	// session does not have prior hidden state, so any Firestore-visible
 	// place/stopped-request context needed after rotation is injected into
 	// the user-visible query text.
-	const today = new Date(now).toLocaleDateString('en-US', {
+	const todayLabel = new Date(now).toLocaleDateString('en-US', {
 		year: 'numeric',
 		month: 'long',
 		day: 'numeric'
 	});
-	let queryText = `[Date: ${today}] ${researchQuestion || message}`;
+	let queryText = `[Date: ${todayLabel}] ${researchQuestion || message}`;
 	if (createEngineSession && previousStoppedRequest) {
 		queryText = `[Previous stopped request: ${compactForAgentState(previousStoppedRequest, 1000)}] ${queryText}`;
 	}
@@ -806,6 +913,10 @@ export const agentCancel = onRequest(
 		let uid;
 		try {
 			const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
+			if (decoded?.firebase?.sign_in_provider === 'anonymous') {
+				res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
+				return;
+			}
 			uid = decoded.uid;
 		} catch (e) {
 			console.warn('agentCancel verifyIdToken rejected:', e.code || e.message);
@@ -828,6 +939,7 @@ export const agentCancel = onRequest(
 		}
 
 		const sessionRef = db.collection('sessions').doc(sid);
+		const today = todayUtc();
 		let outcome = { status: 500, body: { ok: false, error: 'cancel_failed' } };
 		try {
 			await db.runTransaction(async (tx) => {
@@ -871,6 +983,37 @@ export const agentCancel = onRequest(
 					outcome = { status: 409, body: { ok: false, error: 'active_turn_mismatch' } };
 					return;
 				}
+
+				// Cancellation refunds work that didn't produce a result. Two
+				// counters are touched, both inside the transaction:
+				//
+				//   1. session.cancelledTurns +1 — the turn-limit check uses
+				//      `lastTurnIndex - cancelledTurns` so retries reclaim the slot.
+				//      `lastTurnIndex` itself stays put so the next turn writes to
+				//      a fresh doc id and doesn't collide with the cancelled doc.
+				//
+				//   2. users/{creator}.chatsCreatedToday -1 when this cancel
+				//      leaves the session with no productive turns — i.e.
+				//      every turn so far is cancelled. Catches both:
+				//        - First-turn cancel (`lastTurnIndex === 1`).
+				//        - Cancel after a refund+retry sequence (where this
+				//          turn was the re-charged retry that's now being
+				//          cancelled too).
+				//      Only refund if `lastChatDateUtc` still matches today
+				//      (otherwise the day already rolled and the counter
+				//      naturally resets).
+				const creatorUid = typeof data.userId === 'string' ? data.userId : null;
+				const cancelledTurnsAfter = (data.cancelledTurns || 0) + 1;
+				const sessionFullyCancelledAfter =
+					turnIdx === data.lastTurnIndex && cancelledTurnsAfter >= (data.lastTurnIndex || 0);
+				const shouldRefundChat = sessionFullyCancelledAfter && creatorUid;
+				let creatorRef = null;
+				let creatorSnap = null;
+				if (shouldRefundChat) {
+					creatorRef = db.collection('users').doc(creatorUid);
+					creatorSnap = await tx.get(creatorRef);
+				}
+
 				tx.update(sessionRef, {
 					status: 'error',
 					error: 'user_cancelled',
@@ -880,6 +1023,7 @@ export const agentCancel = onRequest(
 					activeStageStartedAt: FieldValue.delete(),
 					activeModel: FieldValue.delete(),
 					activeInvocationId: FieldValue.delete(),
+					cancelledTurns: FieldValue.increment(1),
 					cancelledAt: FieldValue.serverTimestamp(),
 					updatedAt: FieldValue.serverTimestamp()
 				});
@@ -889,6 +1033,18 @@ export const agentCancel = onRequest(
 					completedAt: FieldValue.serverTimestamp(),
 					cancelledAt: FieldValue.serverTimestamp()
 				});
+
+				if (shouldRefundChat && creatorSnap?.exists) {
+					const creatorData = creatorSnap.data() || {};
+					if (creatorData.lastChatDateUtc === today) {
+						const next = Math.max(0, (creatorData.chatsCreatedToday || 0) - 1);
+						tx.update(creatorRef, {
+							chatsCreatedToday: next,
+							updatedAt: FieldValue.serverTimestamp()
+						});
+					}
+				}
+
 				outcome = { status: 200, body: { ok: true } };
 			});
 		} catch (err) {
@@ -930,6 +1086,10 @@ export const agentDelete = onRequest(
 		let uid;
 		try {
 			const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
+			if (decoded?.firebase?.sign_in_provider === 'anonymous') {
+				res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
+				return;
+			}
 			uid = decoded.uid;
 		} catch (e) {
 			console.warn('agentDelete verifyIdToken rejected:', e.code || e.message);
@@ -981,5 +1141,119 @@ export const agentDelete = onRequest(
 		}
 
 		res.status(200).json({ ok: true });
+	}
+);
+
+// --- Magic-link send endpoint (passwordless email sign-in) ---
+//
+// Wraps Firebase Admin's `generateSignInWithEmailLink` so the email body is
+// our own branded template, delivered via Resend (same provider used for
+// /api/intake). The Firebase default mailer would otherwise send from
+// `noreply@<project>.firebaseapp.com` with a generic template.
+//
+// `returnTo` is an optional same-origin path the callback route honours after
+// sign-in completes (used for shared-URL redirects).
+
+const MAGIC_LINK_BASE_URL = process.env.MAGIC_LINK_BASE_URL || 'https://agent.superextra.ai/login';
+
+function magicLinkEmailHtml(link) {
+	return `<div style="font-family: -apple-system, system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a; line-height: 1.5;">
+  <h1 style="font-size: 22px; margin: 0 0 8px; font-weight: 300;">Sign in to Superextra</h1>
+  <p style="font-size: 15px; margin: 0 0 24px; color: #555;">Click the button below to sign in. The link expires in one hour.</p>
+  <a href="${esc(link)}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 15px;">Sign in to Superextra</a>
+  <p style="font-size: 13px; margin: 24px 0 0; color: #888;">If you didn’t request this, you can safely ignore this email.</p>
+  <p style="font-size: 13px; margin: 8px 0 0; color: #888;">Or paste this link into your browser:<br><span style="color: #555; word-break: break-all;">${esc(link)}</span></p>
+</div>`;
+}
+
+function magicLinkEmailText(link) {
+	return `Sign in to Superextra\n\nClick this link to sign in. It expires in one hour:\n\n${link}\n\nIf you didn't request this, you can safely ignore this email.\n`;
+}
+
+function safeReturnTo(value) {
+	if (typeof value !== 'string') return null;
+	if (!value.startsWith('/')) return null;
+	if (value.startsWith('//')) return null;
+	if (value.length > 512) return null;
+	return value;
+}
+
+export const sendMagicLink = onRequest(
+	{ cors: true, timeoutSeconds: 30, memory: '256MiB', secrets: [relayKey] },
+	async (req, res) => {
+		if (req.method !== 'POST') {
+			res.status(405).json({ ok: false, error: 'Method not allowed' });
+			return;
+		}
+
+		const RELAY_KEY = relayKey.value();
+		if (!RELAY_KEY) {
+			console.error('RELAY_KEY env var is not set');
+			res.status(500).json({ ok: false, error: 'Email service not configured' });
+			return;
+		}
+
+		const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+		if (!checkRateLimit(magicLinkRateLimitMap, ip, Date.now(), 10 * 60 * 1000, 10)) {
+			res.status(429).json({ ok: false, error: 'Too many requests. Please wait a few minutes.' });
+			return;
+		}
+
+		const { email, returnTo } = req.body || {};
+		if (
+			!email ||
+			typeof email !== 'string' ||
+			email.length > 320 ||
+			!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+		) {
+			res.status(400).json({ ok: false, error: 'Valid email is required' });
+			return;
+		}
+
+		const sanitizedReturn = safeReturnTo(returnTo);
+		const continueUrl = sanitizedReturn
+			? `${MAGIC_LINK_BASE_URL}?returnTo=${encodeURIComponent(sanitizedReturn)}`
+			: MAGIC_LINK_BASE_URL;
+
+		let link;
+		try {
+			link = await getAuth().generateSignInWithEmailLink(email, {
+				url: continueUrl,
+				handleCodeInApp: true
+			});
+		} catch (err) {
+			console.error('generateSignInWithEmailLink failed:', err.message || err);
+			res.status(500).json({ ok: false, error: 'Magic link generation failed' });
+			return;
+		}
+
+		try {
+			const r = await fetch('https://api.resend.com/emails', {
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${RELAY_KEY}`,
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					from: 'Superextra <hello@superextra.ai>',
+					to: email,
+					subject: 'Sign in to Superextra',
+					html: magicLinkEmailHtml(link),
+					text: magicLinkEmailText(link)
+				})
+			});
+			if (!r.ok) {
+				const body = await r.text().catch(() => '');
+				console.error('Resend magic link error:', r.status, body);
+				res.status(502).json({ ok: false, error: 'Email send failed' });
+				return;
+			}
+		} catch (err) {
+			console.error('Resend magic link fetch failed:', err.message || err);
+			res.status(503).json({ ok: false, error: 'Email service unreachable' });
+			return;
+		}
+
+		res.json({ ok: true });
 	}
 );

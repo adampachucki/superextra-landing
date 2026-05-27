@@ -17,10 +17,56 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 vi.mock('$lib/firebase', () => ({
-	ensureAnonAuth: vi.fn(async () => 'uid-test'),
-	getFirebase: vi.fn(async () => ({ db: {}, auth: {} })),
-	getIdToken: vi.fn(async () => 'mock-id-token')
+	getFirebase: vi.fn(async () => ({ db: {}, auth: {} }))
 }));
+
+vi.mock('$lib/auth.svelte', () => {
+	type Listener = (uid: string | null) => void;
+	const listeners = new Set<Listener>();
+	let uid: string | null = 'uid-test';
+	return {
+		auth: {
+			get user() {
+				return uid
+					? { uid, displayName: 'Test User', email: 't@example.com', photoURL: null }
+					: null;
+			},
+			get status() {
+				return uid ? 'signed-in' : 'signed-out';
+			},
+			get uid() {
+				return uid;
+			},
+			init: vi.fn(async () => {}),
+			getIdToken: vi.fn(async () => 'mock-id-token'),
+			signInWithGoogle: vi.fn(),
+			sendMagicLink: vi.fn(),
+			completeMagicLinkSignIn: vi.fn(),
+			signOut: vi.fn(),
+			saveDraft: vi.fn(),
+			consumeDraft: vi.fn(() => null),
+			peekDraft: vi.fn(() => null),
+			openModal: vi.fn(),
+			closeModal: vi.fn(),
+			consumeAfterSignIn: vi.fn(() => null),
+			get modalVisible() {
+				return false;
+			},
+			get modalReturnTo() {
+				return null;
+			},
+			onAuthChange(listener: Listener) {
+				listeners.add(listener);
+				queueMicrotask(() => listener(uid));
+				return () => listeners.delete(listener);
+			},
+			__testSetUid(next: string | null) {
+				uid = next;
+				for (const l of listeners) l(next);
+			}
+		}
+	};
+});
 
 import { chatState, _testing } from './chat-state.svelte';
 import { onSnapshot } from 'firebase/firestore';

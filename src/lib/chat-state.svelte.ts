@@ -21,7 +21,18 @@
 
 import type { Unsubscribe } from 'firebase/firestore';
 import type { ChatSource, TimelineEvent, TurnSummary } from '$lib/chat-types';
-import { ensureAnonAuth, getFirebase, getIdToken } from '$lib/firebase';
+import { getFirebase } from '$lib/firebase';
+import { auth } from '$lib/auth.svelte';
+
+// Cache the dynamic firestore import so every attach path resolves to the
+// same module object. Avoids racing parallel dynamic imports under test
+// (vitest's vi.mock factory can deliver inconsistent results across
+// concurrent dynamic-import calls in the same module).
+let firestoreModulePromise: Promise<typeof import('firebase/firestore')> | null = null;
+function getFirestoreMod() {
+	if (!firestoreModulePromise) firestoreModulePromise = import('firebase/firestore');
+	return firestoreModulePromise;
+}
 
 /** True iff `err` is `FirebaseUnavailableInSSRError` from `$lib/firebase`.
  *  Checked by name rather than `instanceof` so test-time module mocks that
@@ -71,8 +82,57 @@ export interface Session {
 	activeAgent: string | null;
 	activeStage: string | null;
 	lastTurnIndex: number;
+	cancelledTurns: number;
 	createdAtMs: number | null;
 	updatedAtMs: number | null;
+}
+
+/** Shape of the `users/{uid}` document as consumed by the client. Used to
+ *  drive the in-UI "limit reached" copy; the server is the source of truth
+ *  for enforcement. */
+export interface UserDoc {
+	email: string | null;
+	displayName: string | null;
+	photoURL: string | null;
+	plan: 'free' | 'paid';
+	limitOverrides: { chatsPerDay?: number; turnsPerChat?: number } | null;
+	lastChatDateUtc: string | null;
+	chatsCreatedToday: number;
+}
+
+/** Effective limits resolved from plan + per-user overrides. Mirrors the
+ *  server-side resolver in `functions/limits.js`. */
+export interface EffectiveLimits {
+	chatsPerDay: number;
+	turnsPerChat: number;
+}
+
+// Client-side default plan limits — mirrored from `functions/limits.js` so the
+// UI can render advisory limit-reached states without a Firestore round-trip.
+// The server is authoritative; any divergence resolves on the next request.
+const CLIENT_DEFAULT_LIMITS = {
+	free: { chatsPerDay: 1, turnsPerChat: 1 },
+	paid: { chatsPerDay: 50, turnsPerChat: 20 }
+};
+
+function resolveEffectiveLimits(userDoc: UserDoc | null): EffectiveLimits {
+	const plan = userDoc?.plan === 'paid' ? 'paid' : 'free';
+	const base = CLIENT_DEFAULT_LIMITS[plan];
+	const overrides = userDoc?.limitOverrides ?? {};
+	return {
+		chatsPerDay:
+			typeof overrides.chatsPerDay === 'number' && overrides.chatsPerDay >= 0
+				? overrides.chatsPerDay
+				: base.chatsPerDay,
+		turnsPerChat:
+			typeof overrides.turnsPerChat === 'number' && overrides.turnsPerChat >= 0
+				? overrides.turnsPerChat
+				: base.turnsPerChat
+	};
+}
+
+function todayUtcString(): string {
+	return new Date().toISOString().slice(0, 10);
 }
 
 /** Sidebar entry — subset of Session shape exposed by the sidebar listener. */
@@ -91,6 +151,7 @@ export interface Turn {
 	turnIndex: number;
 	runId: string;
 	userMessage: string;
+	authorUid: string | null;
 	status: 'pending' | 'running' | 'complete' | 'error';
 	reply: string | null;
 	acknowledgement: string | null;
@@ -174,6 +235,15 @@ let turns = $state<Turn[]>([]);
 let liveTimeline = $state<TimelineEvent[]>([]);
 let loadState = $state<LoadState>('idle');
 let placeContextState = $state<PlaceContext | null>(null);
+let userDoc = $state<UserDoc | null>(null);
+// Resolves on the first users/{uid} snapshot after sign-in (whether the doc
+// exists or not). Landing page reads this before evaluating the daily-limit
+// gate so a signed-in user can't slip past the UI check during the brief
+// pre-snapshot window.
+let userDocReadyResolve: (() => void) | null = null;
+let userDocReady: Promise<void> = new Promise((r) => {
+	userDocReadyResolve = r;
+});
 // While a startNewChat POST is in flight, the active-session listener can
 // race it: the listener attaches optimistically and the first server-
 // confirmed snapshot can land before agentStream's Firestore txn does (gap
@@ -194,6 +264,8 @@ let sessionsListUnsubscribe: Unsubscribe | null = null;
 let activeSessionUnsubscribe: Unsubscribe | null = null;
 let activeTurnsUnsubscribe: Unsubscribe | null = null;
 let activeEventsUnsubscribe: Unsubscribe | null = null;
+let activeEventsAttachInFlight: Promise<void> | null = null;
+let userDocUnsubscribe: Unsubscribe | null = null;
 let currentEventsRunId: string | null = null;
 let currentEventsCompletedTurnIndex: number | null = null;
 
@@ -212,6 +284,8 @@ const completedActivityByTurn = new Map<number, TimelineEvent[]>();
 
 // Sidebar listener state — attached lazily on first consumer access.
 let sidebarAttachStarted = false;
+let authSubscribed = false;
+let authUnsubscribe: (() => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Derived state (plain getters over $state — read inside components)
@@ -264,23 +338,73 @@ function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
 }
 
 // ---------------------------------------------------------------------------
+// Auth coordination — subscribe once; on sign-in, attach sidebar + user-doc
+// listeners; on sign-out, detach everything and clear state.
+// ---------------------------------------------------------------------------
+
+function ensureAuthSubscribed() {
+	if (authSubscribed) return;
+	authSubscribed = true;
+	authUnsubscribe = auth.onAuthChange((uid) => {
+		if (uid) {
+			currentUid = uid;
+			void attachSidebarListener();
+			// User-doc listener attaches separately via maybeAttachUserDoc() —
+			// keeping it off the synchronous auth callback path avoids racing
+			// the active-session attach in tests that share the firestore mock.
+			void maybeAttachUserDoc(uid);
+		} else {
+			currentUid = null;
+			detachSidebarListener();
+			detachUserDocListener();
+			detachActiveListeners();
+			clearActiveState();
+			sessionsList = [];
+		}
+	});
+	void auth.init();
+}
+
+async function maybeAttachUserDoc(uid: string) {
+	// Yield once so the call site's microtask chain unwinds before we kick off
+	// the user-doc Firestore attach. This avoids interleaving with the
+	// active-session attach inside a single tick (which surfaced as a
+	// firebase-mock dedup race in vitest).
+	await Promise.resolve();
+	if (currentUid !== uid) return;
+	await attachUserDocListener(uid);
+}
+
+// ---------------------------------------------------------------------------
 // Sidebar listener
 // ---------------------------------------------------------------------------
 
+function detachSidebarListener() {
+	sessionsListUnsubscribe?.();
+	sessionsListUnsubscribe = null;
+	sidebarAttachStarted = false;
+	sessionsList = [];
+}
+
 async function attachSidebarListener() {
 	if (sidebarAttachStarted) return;
+	const uid = currentUid;
+	if (!uid) return;
 	sidebarAttachStarted = true;
 	try {
-		const uid = await ensureAnonAuth();
-		currentUid = uid;
 		const { db } = await getFirebase();
-		const firestoreMod = await import('firebase/firestore');
+		const firestoreMod = await getFirestoreMod();
 		const { collection, query, where, orderBy, onSnapshot } = firestoreMod;
 		const q = query(
 			collection(db, 'sessions'),
 			where('participants', 'array-contains', uid),
 			orderBy('updatedAt', 'desc')
 		);
+		// Guard against a sign-out racing the listener attach.
+		if (currentUid !== uid) {
+			sidebarAttachStarted = false;
+			return;
+		}
 		sessionsListUnsubscribe = onSnapshot(
 			q,
 			(snap) => {
@@ -310,6 +434,63 @@ async function attachSidebarListener() {
 			console.warn('[chat-state] sidebar listener bootstrap failed:', err);
 		}
 		sidebarAttachStarted = false;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// User-doc listener — drives advisory "limit reached" UI. Server is the truth.
+// ---------------------------------------------------------------------------
+
+function detachUserDocListener() {
+	userDocUnsubscribe?.();
+	userDocUnsubscribe = null;
+	userDoc = null;
+	// Reset the ready gate so the next sign-in starts a fresh wait.
+	userDocReady = new Promise((r) => {
+		userDocReadyResolve = r;
+	});
+}
+
+async function attachUserDocListener(uid: string) {
+	detachUserDocListener();
+	try {
+		const { db } = await getFirebase();
+		const firestoreMod = await getFirestoreMod();
+		const { doc, onSnapshot } = firestoreMod;
+		if (currentUid !== uid) return;
+		const ref = doc(db, 'users', uid);
+		userDocUnsubscribe = onSnapshot(
+			ref,
+			(snap) => {
+				if (currentUid !== uid) return;
+				if (!snap.exists()) {
+					userDoc = null;
+				} else {
+					const data = snap.data() as Record<string, unknown>;
+					userDoc = {
+						email: (data.email as string | null | undefined) ?? null,
+						displayName: (data.displayName as string | null | undefined) ?? null,
+						photoURL: (data.photoURL as string | null | undefined) ?? null,
+						plan: (data.plan as 'free' | 'paid' | undefined) === 'paid' ? 'paid' : 'free',
+						limitOverrides:
+							(data.limitOverrides as UserDoc['limitOverrides'] | null | undefined) ?? null,
+						lastChatDateUtc: (data.lastChatDateUtc as string | null | undefined) ?? null,
+						chatsCreatedToday: (data.chatsCreatedToday as number | undefined) ?? 0
+					};
+				}
+				userDocReadyResolve?.();
+				userDocReadyResolve = null;
+			},
+			(err: unknown) => {
+				console.warn('[chat-state] user doc listener error:', err);
+				userDocReadyResolve?.();
+				userDocReadyResolve = null;
+			}
+		);
+	} catch (err) {
+		if (!isSSRBootstrapSkip(err)) {
+			console.warn('[chat-state] user doc listener bootstrap failed:', err);
+		}
 	}
 }
 
@@ -354,6 +535,7 @@ function makeOptimisticTurn(turnIndex: number, userMessage: string, startedAtMs:
 		turnIndex,
 		runId: '',
 		userMessage,
+		authorUid: currentUid,
 		status: 'pending',
 		reply: null,
 		acknowledgement: null,
@@ -399,12 +581,15 @@ function removeOptimisticTurn(sid: string, turnIndex: number) {
 }
 
 async function attachActiveListeners(sid: string) {
-	// Ensure anon auth has resolved before subscribing — the SDK needs a token
-	// even though rules are now path-scoped.
-	const uid = await ensureAnonAuth();
+	// The Firestore SDK needs a signed-in user for reads even though rules are
+	// path-scoped to participants. Wait for auth to resolve before subscribing.
+	ensureAuthSubscribed();
+	await auth.init();
+	const uid = auth.uid;
+	if (!uid) return;
 	currentUid = uid;
 	const { db } = await getFirebase();
-	const firestoreMod = await import('firebase/firestore');
+	const firestoreMod = await getFirestoreMod();
 	const { collection, doc, onSnapshot, orderBy, query } = firestoreMod;
 
 	// Bail if the active sid has changed by the time we resolved.
@@ -462,6 +647,7 @@ async function attachActiveListeners(sid: string) {
 				activeAgent: (data.activeAgent as string | undefined) ?? null,
 				activeStage: (data.activeStage as string | undefined) ?? null,
 				lastTurnIndex: (data.lastTurnIndex as number | undefined) ?? 0,
+				cancelledTurns: (data.cancelledTurns as number | undefined) ?? 0,
 				createdAtMs: toMillis(data.createdAt),
 				updatedAtMs: toMillis(data.updatedAt)
 			};
@@ -493,6 +679,7 @@ async function attachActiveListeners(sid: string) {
 					turnIndex,
 					runId: (data.runId as string | undefined) ?? '',
 					userMessage: (data.userMessage as string | undefined) ?? '',
+					authorUid: (data.authorUid as string | null | undefined) ?? null,
 					status,
 					reply: (data.reply as string | null | undefined) ?? null,
 					acknowledgement: (data.acknowledgement as string | null | undefined) ?? null,
@@ -622,6 +809,19 @@ async function ensureEventsListener(
 	) {
 		return;
 	}
+	// In-flight dedup: when session and turn snapshots both fire close together
+	// they each trigger maybeAttachEventsListener → ensureEventsListener. The
+	// first call hasn't set `activeEventsUnsubscribe` yet (it's still awaiting
+	// dynamic imports), so the second call would race a duplicate attach.
+	// Wait for any in-flight attach to settle, then re-check the early-return
+	// condition before doing the work again.
+	if (
+		activeEventsAttachInFlight &&
+		currentEventsRunId === runId &&
+		currentEventsCompletedTurnIndex === completedTurnIndex
+	) {
+		return;
+	}
 	// Different runId — detach the old listener first.
 	detachActiveEventsListener();
 	currentEventsRunId = runId;
@@ -630,9 +830,14 @@ async function ensureEventsListener(
 	renderedEventKeys.clear();
 	liveTimeline = [];
 
+	let resolveAttach!: () => void;
+	const attachPromise = new Promise<void>((r) => {
+		resolveAttach = r;
+	});
+	activeEventsAttachInFlight = attachPromise;
 	try {
 		const { db } = await getFirebase();
-		const firestoreMod = await import('firebase/firestore');
+		const firestoreMod = await getFirestoreMod();
 		const { collection, onSnapshot, orderBy, query, where } = firestoreMod;
 		// Bail if the active sid/runId moved while we awaited imports.
 		if (
@@ -687,6 +892,14 @@ async function ensureEventsListener(
 		);
 	} catch (err) {
 		console.warn('[chat-state] events listener bootstrap failed:', err);
+	} finally {
+		resolveAttach();
+		// Identity-check: a newer attach may have already replaced our marker
+		// (different runId / completedTurnIndex). Only clear the slot if it
+		// still points to OUR promise.
+		if (activeEventsAttachInFlight === attachPromise) {
+			activeEventsAttachInFlight = null;
+		}
 	}
 }
 
@@ -707,7 +920,7 @@ function agentCancelUrl() {
 }
 
 async function postAgentStream(body: Record<string, unknown>): Promise<void> {
-	const idToken = await getIdToken();
+	const idToken = await auth.getIdToken();
 	const res = await fetch(agentStreamUrl(), {
 		method: 'POST',
 		headers: {
@@ -759,7 +972,7 @@ function startNewChat(query: string, place: PlaceContext | null): string {
 			let docExists = false;
 			try {
 				const { db } = await getFirebase();
-				const firestoreMod = await import('firebase/firestore');
+				const firestoreMod = await getFirestoreMod();
 				const snap = await firestoreMod.getDoc(firestoreMod.doc(db, 'sessions', sid));
 				docExists = snap.exists();
 			} catch (e) {
@@ -810,7 +1023,7 @@ function selectSession(sid: string) {
 }
 
 async function deleteSession(sid: string): Promise<void> {
-	const idToken = await getIdToken();
+	const idToken = await auth.getIdToken();
 	const res = await fetch(agentDeleteUrl(), {
 		method: 'POST',
 		headers: {
@@ -856,7 +1069,7 @@ async function cancelActiveTurn(): Promise<void> {
 	if (!activeSid) throw new Error('no_active_session');
 	const target = activeCancelTarget();
 	if (!target) throw new Error('cancel_not_active');
-	const idToken = await getIdToken();
+	const idToken = await auth.getIdToken();
 	const res = await fetch(agentCancelUrl(), {
 		method: 'POST',
 		headers: {
@@ -924,9 +1137,40 @@ export const chatState = {
 		return activeSession;
 	},
 	get sessionsList(): SessionSummary[] {
-		// Lazy-attach on first read from the UI.
-		if (!sidebarAttachStarted) void attachSidebarListener();
+		// Lazy-attach on first read from the UI. The auth subscription is the
+		// real gate — sidebar listener only fires once auth resolves to a UID.
+		ensureAuthSubscribed();
+		if (!sidebarAttachStarted && currentUid) void attachSidebarListener();
 		return sessionsList;
+	},
+	get userDoc(): UserDoc | null {
+		return userDoc;
+	},
+	get effectiveLimits(): EffectiveLimits {
+		return resolveEffectiveLimits(userDoc);
+	},
+	get dailyChatLimitReached(): boolean {
+		if (!userDoc) return false;
+		const today = todayUtcString();
+		if (userDoc.lastChatDateUtc !== today) return false;
+		return userDoc.chatsCreatedToday >= resolveEffectiveLimits(userDoc).chatsPerDay;
+	},
+	// Resolves once the users/{uid} doc has been read (or confirmed missing)
+	// for the current sign-in. Use this on a landing-page submit to ensure
+	// `dailyChatLimitReached` reflects server state before deciding to route.
+	async waitForUserDoc() {
+		// Touch the auth subscription so the listener attaches if it hasn't.
+		ensureAuthSubscribed();
+		await userDocReady;
+	},
+	get sessionTurnLimitReached(): boolean {
+		if (!activeSession || !userDoc) return false;
+		const limits = resolveEffectiveLimits(userDoc);
+		const used = Math.max(
+			0,
+			(activeSession.lastTurnIndex || 0) - (activeSession.cancelledTurns || 0)
+		);
+		return used >= limits.turnsPerChat;
 	},
 	get currentTurnStartedAtMs(): number | null {
 		const latest = turns[turns.length - 1];
@@ -979,13 +1223,22 @@ export const _testing = {
 		detachActiveListeners();
 		sessionsListUnsubscribe?.();
 		sessionsListUnsubscribe = null;
+		userDocUnsubscribe?.();
+		userDocUnsubscribe = null;
+		authUnsubscribe?.();
+		authUnsubscribe = null;
+		authSubscribed = false;
 		sidebarAttachStarted = false;
 		clearActiveState();
 		currentUid = null;
 		sessionsList = [];
+		userDoc = null;
 	},
 	setCurrentUid(uid: string | null) {
 		currentUid = uid;
+	},
+	setUserDoc(doc: UserDoc | null) {
+		userDoc = doc;
 	},
 	// For tests that want to avoid the real attach path.
 	markSidebarAttached() {

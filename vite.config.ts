@@ -45,6 +45,11 @@ export default defineConfig({
 				changeOrigin: true,
 				rewrite: (path: string) => path.replace(/^\/api\/agent\/cancel/, '/agentCancel')
 			},
+			'/api/auth/send-magic-link': {
+				target: 'https://us-central1-superextra-site.cloudfunctions.net',
+				changeOrigin: true,
+				rewrite: (path: string) => path.replace(/^\/api\/auth\/send-magic-link/, '/sendMagicLink')
+			},
 			'/api/agent/stream': {
 				// Hash-based Cloud Run URL — matches the other services in the
 				// superextra-site project. Legacy project-number format still

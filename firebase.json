@@ -129,6 +129,10 @@
 					"function": "agentDelete"
 				},
 				{
+					"source": "/api/auth/send-magic-link",
+					"function": "sendMagicLink"
+				},
+				{
 					"source": "/api/stt-token",
 					"function": "sttToken"
 				},

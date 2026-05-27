@@ -58,14 +58,6 @@ export function getFirebase(): Promise<FirebaseHandle> {
 		// `initializeFirestore(...)` MUST stay inside this lazy async path.
 		// `persistentMultipleTabManager()` touches `window` and IndexedDB,
 		// which would throw during prerender if hoisted to module scope.
-		// Plan §7 SDK config block: persistent local cache + multi-tab
-		// coordination for automatic listener resumption after offline →
-		// online transitions. Cache size uses the SDK default (100 MB).
-		//
-		// On HMR the FirebaseApp persists across module reloads but our
-		// `handlePromise` memo does not. Calling `initializeFirestore` twice
-		// on the same app throws; fall back to `getFirestore` in that case so
-		// a stale editor save doesn't hard-crash the dev page.
 		let db: Firestore;
 		if (appAlreadyExists) {
 			db = firestoreMod.getFirestore(app);
@@ -83,60 +75,4 @@ export function getFirebase(): Promise<FirebaseHandle> {
 		};
 	})();
 	return handlePromise;
-}
-
-/**
- * Ensure the current user is signed in anonymously. Resolves with the UID.
- * Single-flight: concurrent cold callers share one `signInAnonymously()`
- * call so the listener UID and the bearer-token UID can't diverge. The
- * IIFE assignment happens synchronously before any `await`, closing the
- * check-then-assign race.
- */
-let anonAuthInFlight: Promise<string> | null = null;
-
-export async function ensureAnonAuth(): Promise<string> {
-	const { auth } = await getFirebase();
-	if (auth.currentUser) return auth.currentUser.uid;
-	if (!anonAuthInFlight) {
-		anonAuthInFlight = (async () => {
-			const { signInAnonymously, onAuthStateChanged } = await import('firebase/auth');
-			return new Promise<string>((resolve, reject) => {
-				const unsubscribe = onAuthStateChanged(
-					auth,
-					(user) => {
-						if (user) {
-							unsubscribe();
-							resolve(user.uid);
-						}
-					},
-					(err) => {
-						unsubscribe();
-						reject(err);
-					}
-				);
-				signInAnonymously(auth).catch((err) => {
-					unsubscribe();
-					reject(err);
-				});
-			});
-		})().finally(() => {
-			anonAuthInFlight = null;
-		});
-	}
-	return anonAuthInFlight;
-}
-
-/**
- * Fetch a Firebase ID token for the current anonymous user, for sending to
- * server-side endpoints (agentStream, agentDelete) that verify via Admin SDK.
- * We pass `forceRefresh=false` — the Firebase Auth SDK automatically refreshes
- * the token ~5 min before expiry, so forcing refresh on every call would just
- * add latency without improving safety.
- */
-export async function getIdToken(): Promise<string> {
-	await ensureAnonAuth();
-	const { auth } = await getFirebase();
-	const user = auth.currentUser;
-	if (!user) throw new Error('No authenticated user');
-	return user.getIdToken(/* forceRefresh */ false);
 }

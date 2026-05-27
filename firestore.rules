@@ -25,5 +25,22 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+
+    // Per-user account doc (plan/usage counters/overrides). Owner-read only;
+    // all writes server-only via Cloud Functions (lazy provision in agentStream,
+    // refund in agentCancel, future Stripe webhook).
+    match /users/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list: if false;
+      allow write: if false;
+    }
+
+    // Runtime-editable plan limits (Firebase Console → Firestore → config/limits).
+    // Readable by any signed-in client for client-side mirroring; server is the
+    // source of truth via the same doc.
+    match /config/{doc} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }

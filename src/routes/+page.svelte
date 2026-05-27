@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { chatState } from '$lib/chat-state.svelte';
+	import { auth } from '$lib/auth.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import AccessForm from '$lib/components/AccessForm.svelte';
@@ -13,17 +15,62 @@
 	import RestaurantCTA from '$lib/components/restaurants/RestaurantCTA.svelte';
 
 	let leaving = $state(false);
+	let limitNotice = $state<string | null>(null);
 
-	function handleLeave({
+	onMount(() => {
+		void auth.init().then(() => {
+			// Touch the user-doc listener so `chatState.dailyChatLimitReached`
+			// reflects the latest counter when the user has signed in already.
+			if (auth.user) void chatState.sessionsList;
+		});
+	});
+
+	function proceedToChat(
+		query: string,
+		place: { name: string; secondary: string; placeId: string } | null
+	) {
+		leaving = true;
+		chatState.startNewChat(query, place);
+		goto('/chat');
+	}
+
+	function dailyLimitMessage() {
+		return 'You’ve used your daily chat on the free plan. Come back tomorrow to start another.';
+	}
+
+	async function handleLeave({
 		query,
 		place
 	}: {
 		query: string;
 		place: { name: string; secondary: string; placeId: string } | null;
 	}) {
-		leaving = true;
-		chatState.startNewChat(query, place);
-		goto('/chat');
+		await auth.init();
+		if (auth.user) {
+			// Wait for the first users/{uid} snapshot so the limit check sees
+			// real state (not the brief pre-snapshot window where userDoc=null
+			// and the getter would return false).
+			await chatState.waitForUserDoc();
+			if (chatState.dailyChatLimitReached) {
+				limitNotice = dailyLimitMessage();
+				return;
+			}
+			limitNotice = null;
+			proceedToChat(query, place);
+			return;
+		}
+		auth.saveDraft({ prompt: query, placeContext: place });
+		auth.openModal({
+			afterSignIn: async () => {
+				await chatState.waitForUserDoc();
+				if (chatState.dailyChatLimitReached) {
+					limitNotice = dailyLimitMessage();
+					return;
+				}
+				limitNotice = null;
+				proceedToChat(query, place);
+			}
+		});
 	}
 
 	const agentUseCases = [
@@ -81,6 +128,14 @@
 
 	<main>
 		<RestaurantHero onleave={handleLeave} />
+		{#if limitNotice}
+			<div
+				class="mx-auto mt-2 max-w-[800px] px-6 text-center text-[13px] text-black/65 dark:text-white/65"
+				role="alert"
+			>
+				{limitNotice}
+			</div>
+		{/if}
 		<About
 			headline="The market view your restaurant has been missing"
 			intro="Restaurant operators make critical decisions every day — where to open, how to price, when to hire — too often without a clear view of the market around them at all. Superextra changes that."

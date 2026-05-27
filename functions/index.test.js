@@ -26,6 +26,64 @@ function makeRef(path) {
 
 // Named after the signature (ref, …) so test assertions can introspect which
 // path a mutation hit.
+// Sensible defaults for paths added by the per-user limit machinery
+// (`users/{uid}`, `config/limits`). Most legacy tests pre-date these reads and
+// don't model the new paths in their `mockImplementation`, so when their
+// custom impl returns `undefined` for unrelated paths we substitute these
+// defaults rather than crash inside agentStream. Tests that exercise the
+// limit logic itself set their own users/* response and bypass this fallback.
+function autoDocForReadFallback(ref) {
+	const path = ref?._path || '';
+	if (path.startsWith('users/')) {
+		return {
+			exists: true,
+			data: () => ({
+				plan: 'paid',
+				limitOverrides: null,
+				lastChatDateUtc: null,
+				chatsCreatedToday: 0
+			})
+		};
+	}
+	if (path === 'config/limits') {
+		return {
+			exists: true,
+			data: () => ({
+				free: { chatsPerDay: 1, turnsPerChat: 1 },
+				paid: { chatsPerDay: 50, turnsPerChat: 20 }
+			})
+		};
+	}
+	return undefined;
+}
+
+// Inspect the result returned by the test's `mockDb.get` impl and substitute
+// a sensible default for `users/*` / `config/limits` reads when the test's
+// impl returned something obviously not for that path. Tests that specifically
+// want to drive the limit machinery shape their own user/config docs and the
+// substitution detects that via the shape check.
+async function wrapGet(ref) {
+	const path = ref?._path || '';
+	const result = await mockDb.get(ref);
+	if (!result || typeof result.exists === 'undefined') {
+		const fallback = autoDocForReadFallback(ref);
+		if (fallback) return fallback;
+	}
+	if (path.startsWith('users/')) {
+		const data = result?.exists ? (result.data?.() ?? {}) : null;
+		if (!data || !('plan' in data)) {
+			return autoDocForReadFallback(ref) ?? result;
+		}
+	}
+	if (path === 'config/limits') {
+		const data = result?.exists ? (result.data?.() ?? {}) : null;
+		if (!data || !('free' in data)) {
+			return autoDocForReadFallback(ref) ?? result;
+		}
+	}
+	return result;
+}
+
 const mockDb = {
 	collection: (name) => ({
 		doc: (id) => makeRef(`${name}/${id}`)
@@ -36,7 +94,7 @@ const mockDb = {
 	recursiveDelete: mock.fn(async () => {}),
 	runTransaction: mock.fn(async (cb) => {
 		const txn = {
-			get: async (ref) => mockDb.get(ref),
+			get: (ref) => wrapGet(ref),
 			set: (ref, data) => mockDb.set(ref, data),
 			update: (ref, data) => mockDb.update(ref, data)
 		};
@@ -61,16 +119,54 @@ function readMockWrittenDoc(ref) {
 function readWrittenFirst(ref, fallback) {
 	const written = readMockWrittenDoc(ref);
 	if (written.exists) return written;
+	const path = ref?._path || '';
+	// `users/*` and `config/*` are read inside agentStream/agentCancel for the
+	// new limit machinery. Most legacy tests pre-date this and only express a
+	// session/turn fallback. Return sensible defaults so those tests keep
+	// running without per-test rewrites; tests that care about limits set
+	// their own users/* and config/* responses via mockImplementationOnce.
+	if (path.startsWith('users/')) {
+		return {
+			exists: true,
+			data: () => ({
+				plan: 'paid',
+				limitOverrides: null,
+				lastChatDateUtc: null,
+				chatsCreatedToday: 0
+			})
+		};
+	}
+	if (path === 'config/limits') {
+		return {
+			exists: true,
+			data: () => ({
+				free: { chatsPerDay: 1, turnsPerChat: 1 },
+				paid: { chatsPerDay: 50, turnsPerChat: 20 }
+			})
+		};
+	}
 	return typeof fallback === 'function' ? fallback(ref) : fallback;
 }
 
-// Firebase Auth mock — verifyIdToken returns { uid: 'user-<token>' } so tests
-// can pass different tokens to simulate different users.
+// Firebase Auth mock — verifyIdToken returns { uid, firebase: { sign_in_provider } }
+// so tests can drive anonymous-token rejection and provider-aware code paths.
+// Tokens starting with 'anon-' simulate anonymous sign-in; everything else
+// counts as a real provider (Google / email link).
 const authInstance = {
 	verifyIdToken: mock.fn(async (token) => {
 		if (token === 'bad-token') throw new Error('invalid token');
-		return { uid: `user-${token}` };
-	})
+		const isAnon = typeof token === 'string' && token.startsWith('anon-');
+		return {
+			uid: `user-${token}`,
+			email: isAnon ? null : `${token}@example.com`,
+			name: isAnon ? null : `User ${token}`,
+			picture: isAnon ? null : `https://example.com/${token}.png`,
+			firebase: { sign_in_provider: isAnon ? 'anonymous' : 'google.com' }
+		};
+	}),
+	generateSignInWithEmailLink: mock.fn(
+		async (email, settings) => `https://example.test/__link__?email=${email}&url=${settings.url}`
+	)
 };
 
 mock.module('firebase-admin/app', {
@@ -82,7 +178,8 @@ mock.module('firebase-admin/firestore', {
 		FieldValue: {
 			serverTimestamp: () => '__server_timestamp__',
 			arrayUnion: (...values) => ({ __arrayUnion: values }),
-			delete: () => ({ __delete: true })
+			delete: () => ({ __delete: true }),
+			increment: (n) => ({ __increment: n })
 		}
 	}
 });
@@ -129,7 +226,17 @@ mock.module('./intake-agent.js', {
 	}
 });
 
-const { intake, agentStream, agentCancel, agentDelete, sttToken, tts } = await import('./index.js');
+const {
+	intake,
+	agentStream,
+	agentCancel,
+	agentDelete,
+	sttToken,
+	tts,
+	sendMagicLink,
+	_resetRateLimits
+} = await import('./index.js');
+const { _resetLimitsCache } = await import('./limits.js');
 
 // ── Test helpers ──
 
@@ -196,7 +303,38 @@ beforeEach(() => {
 	gearHandoffMock.mock.resetCalls();
 	gearHandoffCleanupMock.mock.resetCalls();
 	runIntakeConversationMock.mock.resetCalls();
+	authInstance.generateSignInWithEmailLink.mock.resetCalls();
+	// Reset and reseed the limits cache so tests see a stable config snapshot.
+	_resetLimitsCache();
+	_resetRateLimits();
 	mockDb.get.mock.mockImplementation(async (ref) => {
+		const path = ref?._path || '';
+		// Default user docs to the paid tier with generous limits so legacy
+		// tests that pre-date the per-user limit machinery aren't accidentally
+		// gated by the default free tier (1 chat/day, 1 turn/chat). Tests that
+		// care about limits set their own mockImplementation.
+		if (path.startsWith('users/')) {
+			return {
+				exists: true,
+				data: () => ({
+					plan: 'paid',
+					limitOverrides: null,
+					lastChatDateUtc: null,
+					chatsCreatedToday: 0
+				})
+			};
+		}
+		// `config/limits` — return the same shape the real Firestore doc uses
+		// so resolveLimits works as expected.
+		if (path === 'config/limits') {
+			return {
+				exists: true,
+				data: () => ({
+					free: { chatsPerDay: 1, turnsPerChat: 1 },
+					paid: { chatsPerDay: 50, turnsPerChat: 20 }
+				})
+			};
+		}
 		return readMockWrittenDoc(ref);
 	});
 	mockDb.recursiveDelete.mock.mockImplementation(async () => {});
@@ -1474,23 +1612,55 @@ describe('agentStream', () => {
 		assert.equal(handoffArg.isEngineFirstMessage, false);
 	});
 
-	it('returns 409 turn_cap_reached when lastTurnIndex is already 10', async () => {
-		mockDb.get.mock.mockImplementation(async () => ({
-			exists: true,
-			data: () => ({
-				userId: 'user-good-token',
-				participants: ['user-good-token'],
-				status: 'complete',
-				lastTurnIndex: 10
-			})
-		}));
+	it('returns 429 TURN_LIMIT_REACHED when effective turn count meets the plan cap', async () => {
+		// Default fallback supplies a paid user (turnsPerChat=20). Push the
+		// session to lastTurnIndex=20 — effective = 20 - 0 = 20 → reject.
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token'],
+						status: 'complete',
+						lastTurnIndex: 20,
+						cancelledTurns: 0
+					})
+				};
+			}
+			return { exists: false };
+		});
 
 		const res = mockRes();
 		await agentStream(authedReq({ ip: '127.0.0.252' }), res);
 
-		assert.equal(res._status, 409);
-		assert.equal(res._json.error, 'turn_cap_reached');
+		assert.equal(res._status, 429);
+		assert.equal(res._json.error, 'TURN_LIMIT_REACHED');
 		assert.equal(gearHandoffMock.mock.callCount(), 0);
+	});
+
+	it('refunds turn slots so cancelled turns do not count against the plan cap', async () => {
+		// 20 lastTurnIndex but 5 cancelledTurns → effective = 15, still under
+		// paid.turnsPerChat=20, so the next turn should be admitted.
+		mockDb.get.mock.mockImplementation(async (ref) =>
+			readWrittenFirst(ref, {
+				exists: true,
+				data: () => ({
+					userId: 'user-good-token',
+					participants: ['user-good-token'],
+					status: 'complete',
+					engineSessionStarted: true,
+					lastTurnIndex: 20,
+					cancelledTurns: 5
+				})
+			})
+		);
+
+		const res = mockRes();
+		await agentStream(authedReq({ ip: '127.0.0.252' }), res);
+
+		assert.equal(res._status, 202);
+		assert.equal(gearHandoffMock.mock.callCount(), 1);
 	});
 
 	it('boundary: lastTurnIndex=9 still admits one more turn and becomes 10', async () => {
@@ -1633,6 +1803,171 @@ describe('agentStream', () => {
 		assert.equal(res._json.cancelled, true);
 		assert.equal(gearHandoffCleanupMock.mock.callCount(), 0);
 	});
+
+	it('rejects anonymous Firebase tokens with 401 AUTH_REQUIRED', async () => {
+		const res = mockRes();
+		await agentStream(authedReq({ headers: { authorization: 'Bearer anon-leftover-token' } }), res);
+
+		assert.equal(res._status, 401);
+		assert.equal(res._json.error, 'AUTH_REQUIRED');
+		assert.equal(gearHandoffMock.mock.callCount(), 0);
+	});
+
+	it('returns 429 CHAT_LIMIT_REACHED when a free user has already used today', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			const path = ref?._path || '';
+			if (path === 'users/user-good-token') {
+				return {
+					exists: true,
+					data: () => ({
+						plan: 'free',
+						limitOverrides: null,
+						lastChatDateUtc: new Date().toISOString().slice(0, 10),
+						chatsCreatedToday: 1
+					})
+				};
+			}
+			if (path === 'config/limits') {
+				return {
+					exists: true,
+					data: () => ({
+						free: { chatsPerDay: 1, turnsPerChat: 1 },
+						paid: { chatsPerDay: 50, turnsPerChat: 20 }
+					})
+				};
+			}
+			return readMockWrittenDoc(ref);
+		});
+
+		const res = mockRes();
+		await agentStream(authedReq({ body: { message: 'hi', sessionId: 'new-sid' } }), res);
+
+		assert.equal(res._status, 429);
+		assert.equal(res._json.error, 'CHAT_LIMIT_REACHED');
+		assert.ok(res._json.resetAt);
+		assert.equal(gearHandoffMock.mock.callCount(), 0);
+	});
+
+	it('closes the refund-then-retry bypass with a chat-limit check at the retry', async () => {
+		// Simulate: user already cancelled chat A (refund applied), spent the
+		// day's quota on chat B, then comes back to chat A and submits again.
+		// userDoc reflects 1 chat used (chat B). chat A is fully cancelled.
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			const path = ref?._path || '';
+			if (path === 'users/user-good-token') {
+				return {
+					exists: true,
+					data: () => ({
+						plan: 'free',
+						limitOverrides: null,
+						lastChatDateUtc: new Date().toISOString().slice(0, 10),
+						chatsCreatedToday: 1
+					})
+				};
+			}
+			if (path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token'],
+						status: 'error',
+						error: 'user_cancelled',
+						lastTurnIndex: 1,
+						cancelledTurns: 1,
+						engineSessionStarted: false
+					})
+				};
+			}
+			if (path === 'sessions/sess-1/turns/0001') {
+				return {
+					exists: true,
+					data: () => ({
+						runId: 'run-old',
+						status: 'error',
+						error: 'user_cancelled',
+						userMessage: 'first attempt'
+					})
+				};
+			}
+			if (path === 'config/limits') {
+				return {
+					exists: true,
+					data: () => ({
+						free: { chatsPerDay: 1, turnsPerChat: 1 },
+						paid: { chatsPerDay: 50, turnsPerChat: 20 }
+					})
+				};
+			}
+			return readMockWrittenDoc(ref);
+		});
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 429);
+		assert.equal(res._json.error, 'CHAT_LIMIT_REACHED');
+		assert.equal(gearHandoffMock.mock.callCount(), 0);
+	});
+
+	it('admits a same-day refund-then-retry when daily quota still has room', async () => {
+		// Same as above but chatsCreatedToday=0 (no chat B was created) — the
+		// retry should be admitted and the daily counter re-charged.
+		const today = new Date().toISOString().slice(0, 10);
+		mockDb.get.mock.mockImplementation(async (ref) =>
+			readWrittenFirst(ref, () => {
+				if (ref._path === 'users/user-good-token') {
+					return {
+						exists: true,
+						data: () => ({
+							plan: 'free',
+							limitOverrides: { chatsPerDay: 1, turnsPerChat: 5 },
+							lastChatDateUtc: today,
+							chatsCreatedToday: 0
+						})
+					};
+				}
+				if (ref._path === 'sessions/sess-1') {
+					return {
+						exists: true,
+						data: () => ({
+							userId: 'user-good-token',
+							participants: ['user-good-token'],
+							status: 'error',
+							error: 'user_cancelled',
+							lastTurnIndex: 1,
+							cancelledTurns: 1,
+							engineSessionStarted: false
+						})
+					};
+				}
+				if (ref._path === 'sessions/sess-1/turns/0001') {
+					return {
+						exists: true,
+						data: () => ({
+							runId: 'run-old',
+							status: 'error',
+							error: 'user_cancelled',
+							userMessage: 'first attempt'
+						})
+					};
+				}
+				return { exists: false };
+			})
+		);
+
+		const res = mockRes();
+		await agentStream(authedReq(), res);
+
+		assert.equal(res._status, 202);
+		// Re-charge: user-doc update should bump chatsCreatedToday to 1.
+		const userUpdate = mockDb.update.mock.calls.find(
+			(c) => c.arguments[0]?._path === 'users/user-good-token'
+		);
+		assert.ok(userUpdate, 'expected a users/{uid} update on refund-retry');
+		assert.equal(userUpdate.arguments[1].chatsCreatedToday, 1);
+		assert.equal(userUpdate.arguments[1].lastChatDateUtc, today);
+	});
 });
 
 // ══════════════════════════════════════════════════════
@@ -1773,6 +2108,151 @@ describe('agentCancel', () => {
 		assert.equal(res._status, 200);
 		assert.deepEqual(res._json, { ok: true, terminal: true });
 		assert.equal(mockDb.update.mock.callCount(), 0);
+	});
+
+	it('rejects anonymous Firebase tokens with 401 AUTH_REQUIRED', async () => {
+		const res = mockRes();
+		await agentCancel(
+			authedCancel('sess-1', { headers: { authorization: 'Bearer anon-leftover-token' } }),
+			res
+		);
+		assert.equal(res._status, 401);
+		assert.equal(res._json.error, 'AUTH_REQUIRED');
+		assert.equal(mockDb.update.mock.callCount(), 0);
+	});
+
+	it('refunds the daily chat counter again when retry+cancel leaves the session fully cancelled', async () => {
+		// State at cancel: turn 1 was cancelled earlier; the user retried and
+		// turn 2 is now running. Cancelling turn 2 leaves every turn
+		// cancelled → daily counter must refund again (no productive turn).
+		const today = new Date().toISOString().slice(0, 10);
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token'],
+						status: 'running',
+						currentRunId: 'run-2',
+						lastTurnIndex: 2,
+						cancelledTurns: 1
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0002') {
+				return { exists: true, data: () => ({ runId: 'run-2', status: 'running' }) };
+			}
+			if (ref._path === 'users/user-good-token') {
+				return {
+					exists: true,
+					data: () => ({ plan: 'free', lastChatDateUtc: today, chatsCreatedToday: 1 })
+				};
+			}
+			return { exists: false };
+		});
+
+		const res = mockRes();
+		await agentCancel(authedCancel('sess-1', { body: { turnIndex: 2, runId: 'run-2' } }), res);
+
+		assert.equal(res._status, 200);
+		const userUpdate = mockDb.update.mock.calls.find(
+			(c) => c.arguments[0]?._path === 'users/user-good-token'
+		);
+		assert.ok(userUpdate, 'expected a users/{uid} refund update');
+		assert.equal(userUpdate.arguments[1].chatsCreatedToday, 0);
+	});
+
+	it('does NOT refund the daily counter when a prior turn was productive', async () => {
+		// State: turn 1 succeeded (no cancellation), turn 2 is running. Cancel
+		// turn 2 → session went from a productive chat to a cancelled tail.
+		// The original chat was used, so daily counter must NOT refund.
+		const today = new Date().toISOString().slice(0, 10);
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token'],
+						status: 'running',
+						currentRunId: 'run-2',
+						lastTurnIndex: 2,
+						cancelledTurns: 0
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0002') {
+				return { exists: true, data: () => ({ runId: 'run-2', status: 'running' }) };
+			}
+			if (ref._path === 'users/user-good-token') {
+				return {
+					exists: true,
+					data: () => ({ plan: 'paid', lastChatDateUtc: today, chatsCreatedToday: 1 })
+				};
+			}
+			return { exists: false };
+		});
+
+		const res = mockRes();
+		await agentCancel(authedCancel('sess-1', { body: { turnIndex: 2, runId: 'run-2' } }), res);
+
+		assert.equal(res._status, 200);
+		const userUpdate = mockDb.update.mock.calls.find(
+			(c) => c.arguments[0]?._path === 'users/user-good-token'
+		);
+		assert.equal(
+			userUpdate,
+			undefined,
+			'no user-doc update expected when a prior turn was productive'
+		);
+	});
+
+	it('refunds the daily chat counter when the cancelled turn was the first turn', async () => {
+		const today = new Date().toISOString().slice(0, 10);
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				return {
+					exists: true,
+					data: () => ({
+						userId: 'user-good-token',
+						participants: ['user-good-token'],
+						status: 'running',
+						currentRunId: 'run-1',
+						lastTurnIndex: 1,
+						cancelledTurns: 0
+					})
+				};
+			}
+			if (ref._path === 'sessions/sess-1/turns/0001') {
+				return { exists: true, data: () => ({ runId: 'run-1', status: 'running' }) };
+			}
+			if (ref._path === 'users/user-good-token') {
+				return {
+					exists: true,
+					data: () => ({
+						plan: 'free',
+						lastChatDateUtc: today,
+						chatsCreatedToday: 1
+					})
+				};
+			}
+			return { exists: false };
+		});
+
+		const res = mockRes();
+		await agentCancel(authedCancel('sess-1'), res);
+
+		assert.equal(res._status, 200);
+		const sessionUpdate = mockDb.update.mock.calls.find(
+			(c) => c.arguments[0]?._path === 'sessions/sess-1'
+		).arguments[1];
+		assert.deepEqual(sessionUpdate.cancelledTurns, { __increment: 1 });
+		const userUpdate = mockDb.update.mock.calls.find(
+			(c) => c.arguments[0]?._path === 'users/user-good-token'
+		);
+		assert.ok(userUpdate, 'expected a users/{uid} refund update');
+		assert.equal(userUpdate.arguments[1].chatsCreatedToday, 0);
 	});
 });
 
@@ -1918,5 +2398,87 @@ describe('agentDelete', () => {
 		} finally {
 			console.error = origError;
 		}
+	});
+
+	it('rejects anonymous Firebase tokens with 401 AUTH_REQUIRED', async () => {
+		const res = mockRes();
+		await agentDelete(
+			authedDelete('sess-1', { headers: { authorization: 'Bearer anon-leftover-token' } }),
+			res
+		);
+		assert.equal(res._status, 401);
+		assert.equal(res._json.error, 'AUTH_REQUIRED');
+		assert.equal(mockDb.recursiveDelete.mock.callCount(), 0);
+	});
+});
+
+// ══════════════════════════════════════════════════════
+// sendMagicLink
+// ══════════════════════════════════════════════════════
+
+describe('sendMagicLink', () => {
+	it('generates an action link and sends it via Resend', async () => {
+		const fetches = [];
+		globalThis.fetch = mock.fn(async (url, init) => {
+			fetches.push({ url, init });
+			return { ok: true, status: 200, text: async () => '', json: async () => ({}) };
+		});
+
+		const res = mockRes();
+		await sendMagicLink(
+			mockReq({
+				method: 'POST',
+				body: { email: 'me@example.com', returnTo: '/chat?sid=abc' },
+				ip: '127.9.9.1'
+			}),
+			res
+		);
+
+		assert.equal(res._status, 200);
+		assert.equal(res._json.ok, true);
+		assert.equal(authInstance.generateSignInWithEmailLink.mock.callCount(), 1);
+		const generateArgs = authInstance.generateSignInWithEmailLink.mock.calls[0].arguments;
+		assert.equal(generateArgs[0], 'me@example.com');
+		assert.equal(generateArgs[1].handleCodeInApp, true);
+		// returnTo flows into the actionCodeSettings url
+		assert.ok(generateArgs[1].url.includes('returnTo='));
+		assert.equal(fetches.length, 1);
+		assert.match(fetches[0].url, /api\.resend\.com\/emails/);
+	});
+
+	it('rejects malformed email addresses', async () => {
+		const res = mockRes();
+		await sendMagicLink(
+			mockReq({ method: 'POST', body: { email: 'not-an-email' }, ip: '127.9.9.2' }),
+			res
+		);
+		assert.equal(res._status, 400);
+		assert.equal(res._json.error, 'Valid email is required');
+	});
+
+	it('rejects protocol-relative returnTo to prevent open-redirect', async () => {
+		globalThis.fetch = mock.fn(async () => ({
+			ok: true,
+			status: 200,
+			text: async () => '',
+			json: async () => ({})
+		}));
+
+		const res = mockRes();
+		await sendMagicLink(
+			mockReq({
+				method: 'POST',
+				body: { email: 'me@example.com', returnTo: '//evil.example.com/' },
+				ip: '127.9.9.3'
+			}),
+			res
+		);
+		assert.equal(res._status, 200);
+		// Bad returnTo gets stripped — generated url should NOT carry returnTo.
+		const generateArgs = authInstance.generateSignInWithEmailLink.mock.calls[0].arguments;
+		assert.ok(
+			!generateArgs[1].url.includes('returnTo='),
+			'expected returnTo to be omitted for unsafe values'
+		);
 	});
 });

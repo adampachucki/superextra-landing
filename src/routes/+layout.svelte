@@ -3,6 +3,7 @@
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import CookieBanner from '$lib/components/CookieBanner.svelte';
+	import LoginModal from '$lib/components/agent/LoginModal.svelte';
 
 	onMount(() => {
 		const onBeforeUnload = () => {
@@ -32,3 +33,4 @@
 
 {@render children()}
 <CookieBanner />
+<LoginModal />
