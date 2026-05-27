@@ -1227,6 +1227,25 @@ export const sendMagicLink = onRequest(
 			return;
 		}
 
+		// Rewrite the link so the click lands directly on our /login route,
+		// skipping the `firebaseapp.com/__/auth/action` intermediate handler
+		// (the white loading page that briefly appears before redirecting).
+		// `isSignInWithEmailLink()` only checks for `mode=signIn` + `oobCode`
+		// in the URL — host and path are not validated. We carry forward the
+		// Firebase-supplied query params (mode, oobCode, apiKey, lang) onto
+		// the continueUrl directly.
+		try {
+			const fbLink = new URL(link);
+			const direct = new URL(continueUrl);
+			for (const [k, v] of fbLink.searchParams) {
+				if (k === 'continueUrl') continue;
+				direct.searchParams.set(k, v);
+			}
+			link = direct.toString();
+		} catch (err) {
+			console.warn('magic link rewrite failed; falling back to default:', err.message || err);
+		}
+
 		try {
 			const r = await fetch('https://api.resend.com/emails', {
 				method: 'POST',
