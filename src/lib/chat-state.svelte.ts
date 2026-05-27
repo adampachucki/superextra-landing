@@ -291,6 +291,7 @@ function ensureAuthSubscribed() {
 	if (authSubscribed) return;
 	authSubscribed = true;
 	authUnsubscribe = auth.onAuthChange((uid) => {
+		console.log('[sidebar-diag] auth change uid=', uid);
 		detachSidebarListener();
 		if (uid) {
 			currentUid = uid;
@@ -316,20 +317,30 @@ function detachSidebarListener() {
 }
 
 async function attachSidebarListener() {
+	console.log(
+		'[sidebar-diag] attachSidebarListener entry, started=',
+		sidebarAttachStarted,
+		'uid=',
+		currentUid
+	);
 	if (sidebarAttachStarted) return;
 	const uid = currentUid;
 	if (!uid) return;
 	sidebarAttachStarted = true;
 	try {
 		const { auth: fbAuth, db } = await getFirebase();
-		// Force-refresh the ID token before subscribing. onSnapshot uses the
-		// Firestore SDK's internal credentials snapshot, which can lag the
-		// `onAuthStateChanged` callback that triggered this attach. Without
-		// the await, the first snapshot can come back empty (using the prior
-		// user's auth) and Firestore won't re-fire on auth changes alone —
-		// leaving the sidebar empty until a manual refresh.
-		await fbAuth.currentUser?.getIdToken().catch(() => {});
+		const token = await fbAuth.currentUser?.getIdToken().catch((e) => {
+			console.warn('[sidebar-diag] getIdToken failed', e);
+			return null;
+		});
+		console.log(
+			'[sidebar-diag] got token, len=',
+			token?.length ?? 0,
+			'fbCurrent=',
+			fbAuth.currentUser?.uid
+		);
 		if (currentUid !== uid) {
+			console.log('[sidebar-diag] uid changed during token wait, bailing');
 			sidebarAttachStarted = false;
 			return;
 		}
@@ -344,6 +355,7 @@ async function attachSidebarListener() {
 			sidebarAttachStarted = false;
 			return;
 		}
+		console.log('[sidebar-diag] subscribing onSnapshot for uid=', uid);
 		sessionsListUnsubscribe = onSnapshot(
 			q,
 			(snap) => {
@@ -360,10 +372,18 @@ async function attachSidebarListener() {
 						status: (data.status as SessionSummary['status']) ?? null
 					});
 				});
+				console.log(
+					'[sidebar-diag] snapshot fired, count=',
+					next.length,
+					'fromCache=',
+					snap.metadata.fromCache,
+					'uid=',
+					uid
+				);
 				sessionsList = next;
 			},
 			(err) => {
-				console.warn('[chat-state] sidebar listener error:', err);
+				console.warn('[sidebar-diag] listener error', err);
 			}
 		);
 	} catch (err) {
