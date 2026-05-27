@@ -34,6 +34,12 @@
 				return 'Sign-in window closed before finishing. Try again.';
 			case 'auth/account-exists-with-different-credential':
 				return 'This email is already linked to a different sign-in method. Use that method instead.';
+			case 'auth/operation-not-allowed':
+			case 'auth/operation-not-supported-in-this-environment':
+				return 'Google sign-in is not available yet. Use email below for now.';
+			case 'auth/configuration-not-found':
+			case 'auth/unauthorized-domain':
+				return 'Sign-in is misconfigured for this domain. Try email below or contact support.';
 			case 'auth/invalid-action-code':
 			case 'auth/expired-action-code':
 				return 'This sign-in link expired. Enter your email below to get a new one.';
