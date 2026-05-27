@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/auth.svelte';
-	import { chatState } from '$lib/chat-state.svelte';
 
 	interface Props {
 		// `inline` (sidebar) renders the avatar + name+email row with a popover
@@ -34,7 +33,6 @@
 		try {
 			await auth.signOut();
 			open = false;
-			chatState.reset();
 			goto('/', { replaceState: true });
 		} catch (err) {
 			console.warn('sign out failed:', err);

@@ -321,27 +321,17 @@ async function attachSidebarListener() {
 	if (!uid) return;
 	sidebarAttachStarted = true;
 	try {
-		const { auth: fbAuth, db } = await getFirebase();
-		// Force a token fetch so the Firestore SDK's auth provider is primed
-		// with the new credentials before we subscribe — otherwise the first
-		// onSnapshot can race the SDK's own auth listener and fail with
-		// permission-denied (manifesting as an empty sidebar until refresh).
-		await fbAuth.currentUser?.getIdToken().catch(() => null);
+		const { db } = await getFirebase();
 		if (currentUid !== uid) {
 			sidebarAttachStarted = false;
 			return;
 		}
-		const firestoreMod = await getFirestoreMod();
-		const { collection, query, where, orderBy, onSnapshot } = firestoreMod;
+		const { collection, query, where, orderBy, onSnapshot } = await getFirestoreMod();
 		const q = query(
 			collection(db, 'sessions'),
 			where('participants', 'array-contains', uid),
 			orderBy('updatedAt', 'desc')
 		);
-		if (currentUid !== uid) {
-			sidebarAttachStarted = false;
-			return;
-		}
 		sessionsListUnsubscribe = onSnapshot(
 			q,
 			(snap) => {
@@ -361,11 +351,7 @@ async function attachSidebarListener() {
 				sessionsList = next;
 			},
 			(err) => {
-				// Reset the attach guard on error so the next consumer read can
-				// retry — otherwise a one-time race (permission-denied during
-				// auth propagation) leaves the sidebar empty until refresh.
 				console.warn('[chat-state] sidebar listener error:', err);
-				sidebarAttachStarted = false;
 			}
 		);
 	} catch (err) {
