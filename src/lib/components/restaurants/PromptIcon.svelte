@@ -45,7 +45,7 @@
 		/>
 		<path stroke-linecap="square" stroke-linejoin="miter" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
 	{:else if name === 'stop'}
-		<rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none" />
+		<rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor" stroke="none" />
 	{:else}
 		<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
 	{/if}
