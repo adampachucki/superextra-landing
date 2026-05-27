@@ -121,12 +121,17 @@
 		// Auth-guard: signed-out visitors hitting `/chat` (especially shared URLs)
 		// get redirected to /login with returnTo set, so they land back here
 		// after sign-in.
+		//
+		// Capture the original URL synchronously. chat-state's auth listener
+		// runs clearActiveState() on signed-out, and the URL-sync $effect then
+		// drops the `sid` param. If we awaited auth.init() first we'd read the
+		// post-cleanup URL and lose the shared link.
+		const guardOriginalUrl = new URL(window.location.href);
+		const guardReturnTo = guardOriginalUrl.pathname + guardOriginalUrl.search;
 		void (async () => {
 			await auth.init();
 			if (auth.user) return;
-			const target = new URL(window.location.href);
-			const returnTo = target.pathname + target.search;
-			goto(`/login?returnTo=${encodeURIComponent(returnTo)}`, { replaceState: true });
+			goto(`/login?returnTo=${encodeURIComponent(guardReturnTo)}`, { replaceState: true });
 		})();
 		if (q) {
 			const placeContext =
