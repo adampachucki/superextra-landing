@@ -291,15 +291,14 @@ function ensureAuthSubscribed() {
 	if (authSubscribed) return;
 	authSubscribed = true;
 	authUnsubscribe = auth.onAuthChange((uid) => {
+		detachSidebarListener();
 		if (uid) {
 			currentUid = uid;
 			void attachSidebarListener();
 		} else {
 			currentUid = null;
-			detachSidebarListener();
 			detachActiveListeners();
 			clearActiveState();
-			sessionsList = [];
 		}
 	});
 	void auth.init();
@@ -322,7 +321,18 @@ async function attachSidebarListener() {
 	if (!uid) return;
 	sidebarAttachStarted = true;
 	try {
-		const { db } = await getFirebase();
+		const { auth: fbAuth, db } = await getFirebase();
+		// Force-refresh the ID token before subscribing. onSnapshot uses the
+		// Firestore SDK's internal credentials snapshot, which can lag the
+		// `onAuthStateChanged` callback that triggered this attach. Without
+		// the await, the first snapshot can come back empty (using the prior
+		// user's auth) and Firestore won't re-fire on auth changes alone —
+		// leaving the sidebar empty until a manual refresh.
+		await fbAuth.currentUser?.getIdToken().catch(() => {});
+		if (currentUid !== uid) {
+			sidebarAttachStarted = false;
+			return;
+		}
 		const firestoreMod = await getFirestoreMod();
 		const { collection, query, where, orderBy, onSnapshot } = firestoreMod;
 		const q = query(
@@ -330,7 +340,6 @@ async function attachSidebarListener() {
 			where('participants', 'array-contains', uid),
 			orderBy('updatedAt', 'desc')
 		);
-		// Guard against a sign-out racing the listener attach.
 		if (currentUid !== uid) {
 			sidebarAttachStarted = false;
 			return;

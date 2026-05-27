@@ -60,9 +60,9 @@
 			fill="none"
 			viewBox="0 0 24 24"
 			stroke="currentColor"
-			stroke-width="2"
+			stroke-width="1"
 		>
-			<path d="M2 2h20v14H10l-2 4-2-4H2z" />
+			<path d="M2.5 2.5h19v13H10l-2 4-2-4H2.5z" />
 		</svg>
 		{#if chatCount > 0}
 			<span
