@@ -52,6 +52,16 @@ export function getFirebase(): Promise<FirebaseHandle> {
 			import('firebase/firestore')
 		]);
 		const config = await loadConfig();
+		// Override authDomain to our current host so OAuth popups (Google
+		// account picker, etc.) say "agent.superextra.ai" instead of
+		// "{projectId}.firebaseapp.com". Firebase Hosting auto-serves
+		// `/__/auth/handler` and `/__/auth/iframe` at any associated site, so
+		// the redirect target works at our domain too. Skipped on localhost
+		// (dev) — the popup needs an authorized domain, and localhost is
+		// already configured.
+		if (window.location.hostname === 'agent.superextra.ai') {
+			config.authDomain = 'agent.superextra.ai';
+		}
 		// Guard against double-init when the module is re-imported in dev HMR.
 		const appAlreadyExists = getApps().length > 0;
 		const app = appAlreadyExists ? getApps()[0] : initializeApp(config);
