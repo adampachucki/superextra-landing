@@ -26,9 +26,11 @@ service cloud.firestore {
       }
     }
 
-    // Per-user account doc (plan/usage counters/overrides). Owner-read only;
-    // all writes server-only via Cloud Functions (lazy provision in agentStream,
-    // refund in agentCancel, future Stripe webhook).
+    // Per-user account doc (identity + plan + daily research-runs counter).
+    // Owner-read only; all writes server-only — Cloud Functions handle
+    // identity lazy-provision on agentStream; the agent's quota gate
+    // (agent/superextra_agent/quota_gate.py) atomically reserves the daily
+    // research-runs counter inside research_pipeline.
     match /users/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
       allow list: if false;

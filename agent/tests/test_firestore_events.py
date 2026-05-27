@@ -602,6 +602,40 @@ def test_continue_research_complete_reads_continue_research_reply_key():
     }
 
 
+def test_research_pipeline_quota_block_reply_completes_as_agent_reply():
+    """The research_pipeline before_agent_callback halts the pipeline when
+    daily quota is reached by emitting a final event authored by
+    `research_pipeline` whose state_delta sets `quota_block_reply`. Mapper
+    must surface that reply, and the resulting `reply_key` must be one that
+    `_capture_final` tags as `agent_reply` (not `research_report`)."""
+    from superextra_agent.gear_run_state import GearRunState
+
+    ev = _event(
+        author="research_pipeline",
+        is_final=True,
+        state_delta={"quota_block_reply": "Daily research limit reached on the free plan. Try again tomorrow."},
+    )
+    mapped = map_event(ev, {})
+    assert mapped["complete"] == {
+        "reply": "Daily research limit reached on the free plan. Try again tomorrow.",
+        "reply_key": "quota_block_reply",
+    }
+
+    # Round-trip through _capture_final to confirm turnKind tagging.
+    state = GearRunState(
+        sid="sid",
+        invocation_id="inv",
+        run_id="run",
+        turn_idx=1,
+        user_id="uid",
+        query_text="hi",
+        fs=None,
+    )
+    state._capture_final(mapped["complete"])
+    assert state.final_turn_kind == "agent_reply"
+    assert state.final_reply == "Daily research limit reached on the free plan. Try again tomorrow."
+
+
 def test_continue_research_notes_state_delta_does_not_complete_or_emit_activity():
     ev = _event(
         author="continue_research",

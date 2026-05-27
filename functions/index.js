@@ -14,13 +14,6 @@ import {
 	checkRateLimit,
 	validatePlaceContext
 } from './utils.js';
-import {
-	getLimitsConfig,
-	resolveLimits,
-	checkChatLimit,
-	checkTurnLimit,
-	todayUtc
-} from './limits.js';
 export { watchdog } from './watchdog.js';
 
 initializeApp();
@@ -129,8 +122,9 @@ export function _resetRateLimits() {
 	uidRateLimitMap.clear();
 	magicLinkRateLimitMap.clear();
 }
-// Hourly per-UID pipeline rate limit. Bounds cancel-retry abuse on top of the
-// product-level per-day/per-chat limits in `config/limits`.
+// Hourly per-UID pipeline rate limit. An abuse cap that runs in front of
+// every agentStream call — the product-level daily research limit is
+// enforced inside the agent (see agent/superextra_agent/quota_gate.py).
 const UID_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const UID_RATE_LIMIT_MAX = 20;
 
@@ -433,11 +427,6 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	let newTurnIdx = 1;
 	let intakeState = null;
 
-	// Resolve plan limits outside the transaction (cached, best-effort 60s TTL).
-	// All transaction reads must precede writes; the config snapshot is stable
-	// for the duration of the transaction.
-	const limitsConfig = await getLimitsConfig(db);
-	const today = todayUtc();
 	try {
 		await db.runTransaction(async (t) => {
 			const snap = await t.get(sessionRef);
@@ -452,9 +441,9 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				previousTurn = previousTurnSnap.exists ? previousTurnSnap.data() || {} : null;
 			}
 
-			// Read the submitter's user doc — drives per-account limit checks
-			// and lazy provisioning. Inside the transaction so the chats-per-day
-			// counter increments atomically with the session create.
+			// Read the submitter's user doc — lazy provision identity fields
+			// only. Quota enforcement lives in the agent's research_pipeline
+			// before_agent_callback (see agent/superextra_agent/quota_gate.py).
 			const userRef = db.collection('users').doc(submitterUid);
 			const userSnap = await t.get(userRef);
 			const userDoc = userSnap.exists ? userSnap.data() || {} : null;
@@ -466,34 +455,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				throw new AgentStreamError(409, 'previous_turn_in_flight');
 			}
 
-			const effectiveLimits = resolveLimits(userDoc, limitsConfig);
 			isFirstMessage = !existing;
-			// "Retry after refunded cancel" — when every prior turn was
-			// cancelled, the daily counter was refunded on the cancellation.
-			// Submitting again on the same session is the user picking the
-			// chat back up; gate it against `chatsPerDay` just like a new chat
-			// to close the bypass (refund → spend daily on chat B → come back
-			// to chat A → second usable chat).
-			const allPriorCancelled =
-				!isFirstMessage &&
-				(existing.lastTurnIndex || 0) > 0 &&
-				(existing.cancelledTurns || 0) >= (existing.lastTurnIndex || 0);
-			const treatAsChatCreation =
-				isFirstMessage || (allPriorCancelled && existing.userId === submitterUid);
-			if (treatAsChatCreation) {
-				const chatCheck = checkChatLimit(userDoc, effectiveLimits, today);
-				if (!chatCheck.allow) {
-					const err = new AgentStreamError(429, chatCheck.code);
-					if (chatCheck.resetAt) err.resetAt = chatCheck.resetAt;
-					throw err;
-				}
-			}
-			if (!isFirstMessage) {
-				const turnCheck = checkTurnLimit(existing, effectiveLimits);
-				if (!turnCheck.allow) {
-					throw new AgentStreamError(429, turnCheck.code);
-				}
-			}
 			const engineSessionStarted = existing ? existing.engineSessionStarted !== false : false;
 			shouldRunIntake = !engineSessionStarted;
 			const priorGeneration = Number.isInteger(existing?.engineSessionGeneration)
@@ -549,7 +511,6 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 					engineSessionGeneration,
 					intakeState: null,
 					title: null,
-					cancelledTurns: 0,
 					...perTurn
 				});
 			} else {
@@ -584,11 +545,9 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				error: null
 			});
 
-			// User-doc maintenance (lazy provision + chatsCreatedToday counter).
-			// Counter ticks ONLY on session creation (chatsPerDay limit); follow-
-			// ups never increment the daily counter.
-			const dayRolled = userDoc?.lastChatDateUtc !== today;
-			const currentCount = dayRolled ? 0 : userDoc?.chatsCreatedToday || 0;
+			// User-doc maintenance — identity fields only. Quota counters live
+			// on the user doc but are owned by the agent-side quota gate
+			// (agent/superextra_agent/quota_gate.py); never written here.
 			const identity = {
 				email: submitterClaims?.email ?? null,
 				displayName: submitterClaims?.displayName ?? null,
@@ -599,32 +558,17 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 					...identity,
 					plan: 'free',
 					limitOverrides: null,
-					lastChatDateUtc: isFirstMessage ? today : null,
-					chatsCreatedToday: isFirstMessage ? 1 : 0,
 					createdAt: FieldValue.serverTimestamp(),
 					updatedAt: FieldValue.serverTimestamp()
 				});
 			} else if (isFirstMessage) {
-				const update = {
-					lastChatDateUtc: today,
-					chatsCreatedToday: currentCount + 1,
-					updatedAt: FieldValue.serverTimestamp()
-				};
+				const update = { updatedAt: FieldValue.serverTimestamp() };
 				// Refresh identity fields opportunistically when present (Google
 				// photo / display name changes).
 				if (identity.email) update.email = identity.email;
 				if (identity.displayName) update.displayName = identity.displayName;
 				if (identity.photoURL) update.photoURL = identity.photoURL;
-				t.update(userRef, update);
-			} else if (treatAsChatCreation) {
-				// Same-user retry of a previously-refunded chat — re-charge the
-				// daily counter. The check above already gated this against
-				// `chatsPerDay`, so we only need to record the spend here.
-				t.update(userRef, {
-					lastChatDateUtc: today,
-					chatsCreatedToday: currentCount + 1,
-					updatedAt: FieldValue.serverTimestamp()
-				});
+				if (Object.keys(update).length > 1) t.update(userRef, update);
 			}
 		});
 	} catch (err) {
@@ -746,6 +690,11 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 			runId,
 			turnIdx: newTurnIdx,
 			userId: creatorUid,
+			// quotaUid is the SUBMITTER's uid so the daily research counter
+			// charges the user actually making the request, not the original
+			// chat creator (matters for shared-URL contributors). The agent's
+			// quota gate reads this from session state per turn.
+			quotaUid: submitterUid,
 			message: queryText,
 			isEngineFirstMessage: createEngineSession,
 			createEngineSession,
@@ -938,7 +887,6 @@ export const agentCancel = onRequest(
 		}
 
 		const sessionRef = db.collection('sessions').doc(sid);
-		const today = todayUtc();
 		let outcome = { status: 500, body: { ok: false, error: 'cancel_failed' } };
 		try {
 			await db.runTransaction(async (tx) => {
@@ -983,36 +931,11 @@ export const agentCancel = onRequest(
 					return;
 				}
 
-				// Cancellation refunds work that didn't produce a result. Two
-				// counters are touched, both inside the transaction:
-				//
-				//   1. session.cancelledTurns +1 — the turn-limit check uses
-				//      `lastTurnIndex - cancelledTurns` so retries reclaim the slot.
-				//      `lastTurnIndex` itself stays put so the next turn writes to
-				//      a fresh doc id and doesn't collide with the cancelled doc.
-				//
-				//   2. users/{creator}.chatsCreatedToday -1 when this cancel
-				//      leaves the session with no productive turns — i.e.
-				//      every turn so far is cancelled. Catches both:
-				//        - First-turn cancel (`lastTurnIndex === 1`).
-				//        - Cancel after a refund+retry sequence (where this
-				//          turn was the re-charged retry that's now being
-				//          cancelled too).
-				//      Only refund if `lastChatDateUtc` still matches today
-				//      (otherwise the day already rolled and the counter
-				//      naturally resets).
-				const creatorUid = typeof data.userId === 'string' ? data.userId : null;
-				const cancelledTurnsAfter = (data.cancelledTurns || 0) + 1;
-				const sessionFullyCancelledAfter =
-					turnIdx === data.lastTurnIndex && cancelledTurnsAfter >= (data.lastTurnIndex || 0);
-				const shouldRefundChat = sessionFullyCancelledAfter && creatorUid;
-				let creatorRef = null;
-				let creatorSnap = null;
-				if (shouldRefundChat) {
-					creatorRef = db.collection('users').doc(creatorUid);
-					creatorSnap = await tx.get(creatorRef);
-				}
-
+				// Flip session + turn to error('user_cancelled'). The daily
+				// research-runs counter is intentionally NOT refunded — the
+				// quota gate in agent/superextra_agent/quota_gate.py reserves
+				// the slot before research runs, and cancelled/failed research
+				// still counts against the daily allotment.
 				tx.update(sessionRef, {
 					status: 'error',
 					error: 'user_cancelled',
@@ -1022,7 +945,6 @@ export const agentCancel = onRequest(
 					activeStageStartedAt: FieldValue.delete(),
 					activeModel: FieldValue.delete(),
 					activeInvocationId: FieldValue.delete(),
-					cancelledTurns: FieldValue.increment(1),
 					cancelledAt: FieldValue.serverTimestamp(),
 					updatedAt: FieldValue.serverTimestamp()
 				});
@@ -1032,17 +954,6 @@ export const agentCancel = onRequest(
 					completedAt: FieldValue.serverTimestamp(),
 					cancelledAt: FieldValue.serverTimestamp()
 				});
-
-				if (shouldRefundChat && creatorSnap?.exists) {
-					const creatorData = creatorSnap.data() || {};
-					if (creatorData.lastChatDateUtc === today) {
-						const next = Math.max(0, (creatorData.chatsCreatedToday || 0) - 1);
-						tx.update(creatorRef, {
-							chatsCreatedToday: next,
-							updatedAt: FieldValue.serverTimestamp()
-						});
-					}
-				}
 
 				outcome = { status: 200, body: { ok: true } };
 			});

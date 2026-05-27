@@ -42,11 +42,11 @@ const mockDb = {
 	})
 };
 
-// Opt-in default for tests that don't model the per-account limit machinery:
-// returns a paid user with no overrides for `users/{uid}` and the standard
-// plan caps for `config/limits`. Tests that exercise limit behavior return
-// their own users/{uid} response and skip this helper. Returns `null` for
-// any other path so the caller can fall through.
+// Opt-in default for tests that don't model the per-account user doc:
+// returns a paid user for `users/{uid}` so tests don't need to model the
+// agent-side quota gate (which reads users/{uid} from inside the engine,
+// not the Cloud Function). Returns `null` for any other path so the caller
+// can fall through.
 function defaultAccountDoc(ref) {
 	const path = ref?._path || '';
 	if (path.startsWith('users/')) {
@@ -54,18 +54,7 @@ function defaultAccountDoc(ref) {
 			exists: true,
 			data: () => ({
 				plan: 'paid',
-				limitOverrides: null,
-				lastChatDateUtc: null,
-				chatsCreatedToday: 0
-			})
-		};
-	}
-	if (path === 'config/limits') {
-		return {
-			exists: true,
-			data: () => ({
-				free: { chatsPerDay: 1, turnsPerChat: 1 },
-				paid: { chatsPerDay: 50, turnsPerChat: 20 }
+				limitOverrides: null
 			})
 		};
 	}
@@ -182,7 +171,6 @@ const {
 	sendMagicLink,
 	_resetRateLimits
 } = await import('./index.js');
-const { _resetLimitsCache } = await import('./limits.js');
 
 // ── Test helpers ──
 
@@ -250,34 +238,18 @@ beforeEach(() => {
 	gearHandoffCleanupMock.mock.resetCalls();
 	runIntakeConversationMock.mock.resetCalls();
 	authInstance.generateSignInWithEmailLink.mock.resetCalls();
-	// Reset and reseed the limits cache so tests see a stable config snapshot.
-	_resetLimitsCache();
 	_resetRateLimits();
 	mockDb.get.mock.mockImplementation(async (ref) => {
 		const path = ref?._path || '';
-		// Default user docs to the paid tier with generous limits so legacy
-		// tests that pre-date the per-user limit machinery aren't accidentally
-		// gated by the default free tier (1 chat/day, 1 turn/chat). Tests that
-		// care about limits set their own mockImplementation.
+		// Default user docs to the paid tier — the Cloud Function only reads
+		// users/{uid} for identity provisioning now; quota enforcement is in
+		// the agent's research_pipeline before_agent_callback.
 		if (path.startsWith('users/')) {
 			return {
 				exists: true,
 				data: () => ({
 					plan: 'paid',
-					limitOverrides: null,
-					lastChatDateUtc: null,
-					chatsCreatedToday: 0
-				})
-			};
-		}
-		// `config/limits` — return the same shape the real Firestore doc uses
-		// so resolveLimits works as expected.
-		if (path === 'config/limits') {
-			return {
-				exists: true,
-				data: () => ({
-					free: { chatsPerDay: 1, turnsPerChat: 1 },
-					paid: { chatsPerDay: 50, turnsPerChat: 20 }
+					limitOverrides: null
 				})
 			};
 		}
@@ -1550,63 +1522,15 @@ describe('agentStream', () => {
 		assert.equal(turnSets.length, 1);
 		assert.equal(turnSets[0].path, 'sessions/sess-1/turns/0003');
 
-		// Handoff arg: userId = original creator, NOT the submitter.
+		// Handoff arg: userId = original creator (engine session ownership),
+		// quotaUid = the visitor (so the visitor's daily research counter
+		// gets charged, not the creator's).
 		assert.equal(gearHandoffMock.mock.callCount(), 1);
 		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
 		assert.equal(handoffArg.turnIdx, 3);
 		assert.equal(handoffArg.userId, 'user-creator-token');
+		assert.equal(handoffArg.quotaUid, 'user-visitor-token');
 		assert.equal(handoffArg.isEngineFirstMessage, false);
-	});
-
-	it('returns 429 TURN_LIMIT_REACHED when effective turn count meets the plan cap', async () => {
-		// Default fallback supplies a paid user (turnsPerChat=20). Push the
-		// session to lastTurnIndex=20 — effective = 20 - 0 = 20 → reject.
-		mockDb.get.mock.mockImplementation(async (ref) => {
-			if (ref._path === 'sessions/sess-1') {
-				return {
-					exists: true,
-					data: () => ({
-						userId: 'user-good-token',
-						participants: ['user-good-token'],
-						status: 'complete',
-						lastTurnIndex: 20,
-						cancelledTurns: 0
-					})
-				};
-			}
-			return defaultAccountDoc(ref) ?? { exists: false };
-		});
-
-		const res = mockRes();
-		await agentStream(authedReq({ ip: '127.0.0.252' }), res);
-
-		assert.equal(res._status, 429);
-		assert.equal(res._json.error, 'TURN_LIMIT_REACHED');
-		assert.equal(gearHandoffMock.mock.callCount(), 0);
-	});
-
-	it('refunds turn slots so cancelled turns do not count against the plan cap', async () => {
-		// 20 lastTurnIndex but 5 cancelledTurns → effective = 15, still under
-		// paid.turnsPerChat=20, so the next turn should be admitted.
-		mockDb.get.mock.mockImplementation(async (ref) =>
-			readWrittenFirst(ref, {
-				exists: true,
-				data: () => ({
-					userId: 'user-good-token',
-					participants: ['user-good-token'],
-					status: 'complete',
-					engineSessionStarted: true,
-					lastTurnIndex: 20,
-					cancelledTurns: 5
-				})
-			})
-		);
-
-		const res = mockRes();
-		await agentStream(authedReq({ ip: '127.0.0.252' }), res);
-
-		assert.equal(res._status, 202);
-		assert.equal(gearHandoffMock.mock.callCount(), 1);
 	});
 
 	it('boundary: lastTurnIndex=9 still admits one more turn and becomes 10', async () => {
@@ -1757,162 +1681,6 @@ describe('agentStream', () => {
 		assert.equal(res._status, 401);
 		assert.equal(res._json.error, 'AUTH_REQUIRED');
 		assert.equal(gearHandoffMock.mock.callCount(), 0);
-	});
-
-	it('returns 429 CHAT_LIMIT_REACHED when a free user has already used today', async () => {
-		mockDb.get.mock.mockImplementation(async (ref) => {
-			const path = ref?._path || '';
-			if (path === 'users/user-good-token') {
-				return {
-					exists: true,
-					data: () => ({
-						plan: 'free',
-						limitOverrides: null,
-						lastChatDateUtc: new Date().toISOString().slice(0, 10),
-						chatsCreatedToday: 1
-					})
-				};
-			}
-			if (path === 'config/limits') {
-				return {
-					exists: true,
-					data: () => ({
-						free: { chatsPerDay: 1, turnsPerChat: 1 },
-						paid: { chatsPerDay: 50, turnsPerChat: 20 }
-					})
-				};
-			}
-			return readMockWrittenDoc(ref);
-		});
-
-		const res = mockRes();
-		await agentStream(authedReq({ body: { message: 'hi', sessionId: 'new-sid' } }), res);
-
-		assert.equal(res._status, 429);
-		assert.equal(res._json.error, 'CHAT_LIMIT_REACHED');
-		assert.ok(res._json.resetAt);
-		assert.equal(gearHandoffMock.mock.callCount(), 0);
-	});
-
-	it('closes the refund-then-retry bypass with a chat-limit check at the retry', async () => {
-		// Simulate: user already cancelled chat A (refund applied), spent the
-		// day's quota on chat B, then comes back to chat A and submits again.
-		// userDoc reflects 1 chat used (chat B). chat A is fully cancelled.
-		mockDb.get.mock.mockImplementation(async (ref) => {
-			const path = ref?._path || '';
-			if (path === 'users/user-good-token') {
-				return {
-					exists: true,
-					data: () => ({
-						plan: 'free',
-						limitOverrides: null,
-						lastChatDateUtc: new Date().toISOString().slice(0, 10),
-						chatsCreatedToday: 1
-					})
-				};
-			}
-			if (path === 'sessions/sess-1') {
-				return {
-					exists: true,
-					data: () => ({
-						userId: 'user-good-token',
-						participants: ['user-good-token'],
-						status: 'error',
-						error: 'user_cancelled',
-						lastTurnIndex: 1,
-						cancelledTurns: 1,
-						engineSessionStarted: false
-					})
-				};
-			}
-			if (path === 'sessions/sess-1/turns/0001') {
-				return {
-					exists: true,
-					data: () => ({
-						runId: 'run-old',
-						status: 'error',
-						error: 'user_cancelled',
-						userMessage: 'first attempt'
-					})
-				};
-			}
-			if (path === 'config/limits') {
-				return {
-					exists: true,
-					data: () => ({
-						free: { chatsPerDay: 1, turnsPerChat: 1 },
-						paid: { chatsPerDay: 50, turnsPerChat: 20 }
-					})
-				};
-			}
-			return readMockWrittenDoc(ref);
-		});
-
-		const res = mockRes();
-		await agentStream(authedReq(), res);
-
-		assert.equal(res._status, 429);
-		assert.equal(res._json.error, 'CHAT_LIMIT_REACHED');
-		assert.equal(gearHandoffMock.mock.callCount(), 0);
-	});
-
-	it('admits a same-day refund-then-retry when daily quota still has room', async () => {
-		// Same as above but chatsCreatedToday=0 (no chat B was created) — the
-		// retry should be admitted and the daily counter re-charged.
-		const today = new Date().toISOString().slice(0, 10);
-		mockDb.get.mock.mockImplementation(async (ref) =>
-			readWrittenFirst(ref, () => {
-				if (ref._path === 'users/user-good-token') {
-					return {
-						exists: true,
-						data: () => ({
-							plan: 'free',
-							limitOverrides: { chatsPerDay: 1, turnsPerChat: 5 },
-							lastChatDateUtc: today,
-							chatsCreatedToday: 0
-						})
-					};
-				}
-				if (ref._path === 'sessions/sess-1') {
-					return {
-						exists: true,
-						data: () => ({
-							userId: 'user-good-token',
-							participants: ['user-good-token'],
-							status: 'error',
-							error: 'user_cancelled',
-							lastTurnIndex: 1,
-							cancelledTurns: 1,
-							engineSessionStarted: false
-						})
-					};
-				}
-				if (ref._path === 'sessions/sess-1/turns/0001') {
-					return {
-						exists: true,
-						data: () => ({
-							runId: 'run-old',
-							status: 'error',
-							error: 'user_cancelled',
-							userMessage: 'first attempt'
-						})
-					};
-				}
-				return defaultAccountDoc(ref) ?? { exists: false };
-			})
-		);
-
-		const res = mockRes();
-		await agentStream(authedReq(), res);
-
-		assert.equal(res._status, 202);
-		// Re-charge: user-doc update should bump chatsCreatedToday to 1.
-		const userUpdate = mockDb.update.mock.calls.find(
-			(c) => c.arguments[0]?._path === 'users/user-good-token'
-		);
-		assert.ok(userUpdate, 'expected a users/{uid} update on refund-retry');
-		assert.equal(userUpdate.arguments[1].chatsCreatedToday, 1);
-		assert.equal(userUpdate.arguments[1].lastChatDateUtc, today);
 	});
 });
 
@@ -2065,140 +1833,6 @@ describe('agentCancel', () => {
 		assert.equal(res._status, 401);
 		assert.equal(res._json.error, 'AUTH_REQUIRED');
 		assert.equal(mockDb.update.mock.callCount(), 0);
-	});
-
-	it('refunds the daily chat counter again when retry+cancel leaves the session fully cancelled', async () => {
-		// State at cancel: turn 1 was cancelled earlier; the user retried and
-		// turn 2 is now running. Cancelling turn 2 leaves every turn
-		// cancelled → daily counter must refund again (no productive turn).
-		const today = new Date().toISOString().slice(0, 10);
-		mockDb.get.mock.mockImplementation(async (ref) => {
-			if (ref._path === 'sessions/sess-1') {
-				return {
-					exists: true,
-					data: () => ({
-						userId: 'user-good-token',
-						participants: ['user-good-token'],
-						status: 'running',
-						currentRunId: 'run-2',
-						lastTurnIndex: 2,
-						cancelledTurns: 1
-					})
-				};
-			}
-			if (ref._path === 'sessions/sess-1/turns/0002') {
-				return { exists: true, data: () => ({ runId: 'run-2', status: 'running' }) };
-			}
-			if (ref._path === 'users/user-good-token') {
-				return {
-					exists: true,
-					data: () => ({ plan: 'free', lastChatDateUtc: today, chatsCreatedToday: 1 })
-				};
-			}
-			return defaultAccountDoc(ref) ?? { exists: false };
-		});
-
-		const res = mockRes();
-		await agentCancel(authedCancel('sess-1', { body: { turnIndex: 2, runId: 'run-2' } }), res);
-
-		assert.equal(res._status, 200);
-		const userUpdate = mockDb.update.mock.calls.find(
-			(c) => c.arguments[0]?._path === 'users/user-good-token'
-		);
-		assert.ok(userUpdate, 'expected a users/{uid} refund update');
-		assert.equal(userUpdate.arguments[1].chatsCreatedToday, 0);
-	});
-
-	it('does NOT refund the daily counter when a prior turn was productive', async () => {
-		// State: turn 1 succeeded (no cancellation), turn 2 is running. Cancel
-		// turn 2 → session went from a productive chat to a cancelled tail.
-		// The original chat was used, so daily counter must NOT refund.
-		const today = new Date().toISOString().slice(0, 10);
-		mockDb.get.mock.mockImplementation(async (ref) => {
-			if (ref._path === 'sessions/sess-1') {
-				return {
-					exists: true,
-					data: () => ({
-						userId: 'user-good-token',
-						participants: ['user-good-token'],
-						status: 'running',
-						currentRunId: 'run-2',
-						lastTurnIndex: 2,
-						cancelledTurns: 0
-					})
-				};
-			}
-			if (ref._path === 'sessions/sess-1/turns/0002') {
-				return { exists: true, data: () => ({ runId: 'run-2', status: 'running' }) };
-			}
-			if (ref._path === 'users/user-good-token') {
-				return {
-					exists: true,
-					data: () => ({ plan: 'paid', lastChatDateUtc: today, chatsCreatedToday: 1 })
-				};
-			}
-			return defaultAccountDoc(ref) ?? { exists: false };
-		});
-
-		const res = mockRes();
-		await agentCancel(authedCancel('sess-1', { body: { turnIndex: 2, runId: 'run-2' } }), res);
-
-		assert.equal(res._status, 200);
-		const userUpdate = mockDb.update.mock.calls.find(
-			(c) => c.arguments[0]?._path === 'users/user-good-token'
-		);
-		assert.equal(
-			userUpdate,
-			undefined,
-			'no user-doc update expected when a prior turn was productive'
-		);
-	});
-
-	it('refunds the daily chat counter when the cancelled turn was the first turn', async () => {
-		const today = new Date().toISOString().slice(0, 10);
-		mockDb.get.mock.mockImplementation(async (ref) => {
-			if (ref._path === 'sessions/sess-1') {
-				return {
-					exists: true,
-					data: () => ({
-						userId: 'user-good-token',
-						participants: ['user-good-token'],
-						status: 'running',
-						currentRunId: 'run-1',
-						lastTurnIndex: 1,
-						cancelledTurns: 0
-					})
-				};
-			}
-			if (ref._path === 'sessions/sess-1/turns/0001') {
-				return { exists: true, data: () => ({ runId: 'run-1', status: 'running' }) };
-			}
-			if (ref._path === 'users/user-good-token') {
-				return {
-					exists: true,
-					data: () => ({
-						plan: 'free',
-						lastChatDateUtc: today,
-						chatsCreatedToday: 1
-					})
-				};
-			}
-			return defaultAccountDoc(ref) ?? { exists: false };
-		});
-
-		const res = mockRes();
-		await agentCancel(authedCancel('sess-1'), res);
-
-		assert.equal(res._status, 200);
-		const sessionUpdate = mockDb.update.mock.calls.find(
-			(c) => c.arguments[0]?._path === 'sessions/sess-1'
-		).arguments[1];
-		assert.deepEqual(sessionUpdate.cancelledTurns, { __increment: 1 });
-		const userUpdate = mockDb.update.mock.calls.find(
-			(c) => c.arguments[0]?._path === 'users/user-good-token'
-		);
-		assert.ok(userUpdate, 'expected a users/{uid} refund update');
-		assert.equal(userUpdate.arguments[1].chatsCreatedToday, 0);
 	});
 });
 

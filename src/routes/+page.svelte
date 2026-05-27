@@ -35,8 +35,9 @@
 		query: string,
 		place: { name: string; secondary: string; placeId: string } | null
 	) {
-		// Server enforces the daily-chat limit and returns 429 — chat-state
-		// surfaces a friendly message via `lastError`, rendered by /chat.
+		// Daily research-runs limits are enforced inside the agent's
+		// research_pipeline (see agent/superextra_agent/quota_gate.py). Limit-
+		// reached cases land as a normal agent reply in the chat thread.
 		leaving = true;
 		chatState.startNewChat(query, place);
 		goto('/chat');

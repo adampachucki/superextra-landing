@@ -11,6 +11,7 @@ from google.genai import types
 
 from .chat_logger import ChatLoggerPlugin
 from .firestore_progress import FirestoreProgressPlugin
+from .quota_gate import research_quota_gate
 from .places_tools import (
     find_nearby_restaurants,
     get_batch_restaurant_details,
@@ -301,6 +302,7 @@ research_pipeline = SequentialAgent(
     name="research_pipeline",
     sub_agents=[_make_enricher(), research_lead, report_writer],
     description="Enriches context, researches, then writes the report.",
+    before_agent_callback=research_quota_gate,
 )
 
 # --- Router (root agent) ---

@@ -174,6 +174,7 @@ describe('gearHandoff', () => {
 			runId: 'run1',
 			turnIdx: 1,
 			userId: 'user1',
+			quotaUid: 'submitter1',
 			message: 'hello',
 			isEngineFirstMessage: true
 		});
@@ -186,6 +187,9 @@ describe('gearHandoff', () => {
 		assert.match(urls[1], /:appendEvent$/);
 		assert.match(urls[2], /:streamQuery\?alt=sse$/);
 		const createBody = JSON.parse(fetchMock.mock.calls[0].arguments[1].body);
+		// createSession seed state must NOT include quotaUid — that would
+		// pin a stale value into session state. quotaUid only lives in
+		// per-turn appendEvent state deltas.
 		assert.deepEqual(createBody.sessionState, {
 			runId: 'run1',
 			turnIdx: 1,
@@ -195,8 +199,13 @@ describe('gearHandoff', () => {
 		assert.deepEqual(appendBody.actions.stateDelta, {
 			runId: 'run1',
 			turnIdx: 1,
-			firestoreSid: 'sid1'
+			firestoreSid: 'sid1',
+			quotaUid: 'submitter1'
 		});
+		// streamQuery still passes the creator UID as user_id — engine session
+		// ownership stays pinned regardless of which submitter charges the quota.
+		const streamBody = JSON.parse(fetchMock.mock.calls[2].arguments[1].body);
+		assert.equal(streamBody.input.user_id, 'user1');
 
 		// Reader was cancelled (clean disconnect after first NDJSON line)
 		assert.deepEqual(cancelLog, ['cancel']);

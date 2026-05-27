@@ -104,6 +104,7 @@ async function _doHandoff({
 	runId,
 	turnIdx,
 	userId,
+	quotaUid,
 	message,
 	createEngineSession,
 	seedState
@@ -150,7 +151,11 @@ async function _doHandoff({
 			author: 'system',
 			invocationId: `agentstream-${runId}`,
 			timestamp: new Date().toISOString(),
-			actions: { stateDelta: { runId, turnIdx, firestoreSid: sid } }
+			// `quotaUid` is the SUBMITTER's uid, not the engine session's `userId`
+			// (which stays pinned to the original creator). The quota gate reads
+			// `quotaUid` so shared-URL contributors are charged on their own
+			// daily allotment, not the creator's.
+			actions: { stateDelta: { runId, turnIdx, firestoreSid: sid, quotaUid } }
 		})
 	});
 	if (!ar.ok) {
@@ -202,6 +207,7 @@ export async function gearHandoff({
 	runId,
 	turnIdx,
 	userId,
+	quotaUid,
 	message,
 	isEngineFirstMessage,
 	createEngineSession = isEngineFirstMessage,
@@ -235,6 +241,7 @@ export async function gearHandoff({
 				runId,
 				turnIdx,
 				userId,
+				quotaUid,
 				message,
 				createEngineSession,
 				seedState

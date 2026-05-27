@@ -82,7 +82,6 @@ export interface Session {
 	activeAgent: string | null;
 	activeStage: string | null;
 	lastTurnIndex: number;
-	cancelledTurns: number;
 	createdAtMs: number | null;
 	updatedAtMs: number | null;
 }
@@ -186,9 +185,10 @@ let turns = $state<Turn[]>([]);
 let liveTimeline = $state<TimelineEvent[]>([]);
 let loadState = $state<LoadState>('idle');
 let placeContextState = $state<PlaceContext | null>(null);
-// Friendly error from the last failing agentStream call. Surfaces server
-// 429s (CHAT_LIMIT_REACHED / TURN_LIMIT_REACHED) and other transport
-// failures into the UI without a parallel client-side limit cache.
+// Friendly error from the last failing agentStream call. Surfaces transport
+// failures (handoff errors, auth) into the UI. Daily-research limits are
+// no longer a 429 — the agent's quota gate writes the limit-reached message
+// as a normal agent reply in the chat thread.
 let lastError = $state<string | null>(null);
 // While a startNewChat POST is in flight, the active-session listener can
 // race it: the listener attaches optimistically and the first server-
@@ -516,7 +516,6 @@ async function attachActiveListeners(sid: string) {
 				activeAgent: (data.activeAgent as string | undefined) ?? null,
 				activeStage: (data.activeStage as string | undefined) ?? null,
 				lastTurnIndex: (data.lastTurnIndex as number | undefined) ?? 0,
-				cancelledTurns: (data.cancelledTurns as number | undefined) ?? 0,
 				createdAtMs: toMillis(data.createdAt),
 				updatedAtMs: toMillis(data.updatedAt)
 			};
@@ -808,10 +807,6 @@ async function postAgentStream(body: Record<string, unknown>): Promise<void> {
 
 function friendlyAgentError(code: string): string {
 	switch (code) {
-		case 'CHAT_LIMIT_REACHED':
-			return 'One research per day on the free plan. Try again tomorrow.';
-		case 'TURN_LIMIT_REACHED':
-			return 'One research per day on the free plan. Try again tomorrow.';
 		case 'AUTH_REQUIRED':
 			return 'Sign in to continue.';
 		case 'previous_turn_in_flight':

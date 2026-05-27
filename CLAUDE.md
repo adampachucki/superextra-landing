@@ -51,10 +51,35 @@ This applies whether the delegated agent is a code reviewer, plan reviewer, secu
 
 `codex` is installed on the VM (where Claude Code runs) and is the preferred second opinion for plans, proposals, and non-trivial diffs.
 
-- **First call**: `codex exec "<prompt>"` — one-shot, non-interactive. The session UUID prints in the output and is saved under `~/.codex/sessions/`. Capture it.
-- **Re-review / follow-up on the same artifact**: `codex exec resume <uuid> "<follow-up>"` — resumes the recorded session with prior transcript context. Always use the explicit UUID; `--last` can pick up another Claude session's run.
-- The bare `codex` command launches a TUI that can't be driven from `Bash` — never use it from tool calls. Always `codex exec`.
-- Include the verbatim review brief above in every codex prompt. No exceptions.
+**Invocation pattern that works (use this every time):**
+
+1. **Write the brief to a file** with the `Write` tool — never inline a large prompt as a heredoc inside the same Bash command that runs codex. `cat > /tmp/foo.md <<'EOF' ... EOF && codex exec ...` chains get rejected at the harness layer. Two separate steps: `Write` the brief, then `Bash` runs codex against the file.
+2. **Run codex in background with `$(cat …)` substitution**:
+   ```
+   codex exec "$(cat /tmp/your-brief.md)" 2>&1 > /tmp/codex-out.log
+   ```
+   Set `run_in_background: true` on the `Bash` tool call. Foreground runs burn the 5-minute prompt cache window because codex review takes 5–10 min (it reads ADK source, fetches docs, runs `rg` over the repo).
+3. **Wait for the task-notification**, then read the output file. Output is huge (thousands of lines of read/grep transcripts) — the final answer is everything after the LAST `^codex$` line. Grep with `grep -n "^codex$" /tmp/codex-out.log | tail -1` to find the offset, then `awk 'NR>=$OFFSET' /tmp/codex-out.log` to extract just the final answer.
+
+**What to put in the brief** (every brief, no exceptions):
+
+- The full **reviewer brief** paragraph (see the "When delegating to a review agent" section above). This sets correct priorities — without it codex defaults to mild, surface-level review.
+- A **list of what's true today**: code references with `file:line` citations so codex can verify against the working tree instead of guessing.
+- The **owner's actual requirements** (user-spoken), not your interpretation of them.
+- Your **proposed plan or summary of the diff**, with sections per file.
+- **Specific numbered questions** you want answered. Generic "review this" gets surface-level output; numbered questions get pointed, file:line-cited responses.
+- Cap the response length at the end: `"Cap at 600 words."` — codex respects this and gives tight findings instead of a wall of prose.
+
+**Re-review of an updated artifact:**
+
+- `codex exec resume <uuid> "<follow-up>"` — resumes the recorded session with prior transcript context. The session UUID is printed at the top of every codex output (`session id: 019e6b02-…`). Always use the explicit UUID; `--last` can pick up another Claude session's run if multiple are in flight on the VM.
+- Or just write a fresh brief listing what changed since the prior review and run a new `codex exec` against that. Cleaner for diff reviews where the artifact is the working tree, not a fixed proposal.
+
+**Never:**
+
+- Run the bare `codex` command from a tool call — it launches a TUI that can't be driven via Bash.
+- Pipe the brief on stdin (`cat brief.md | codex exec -`) — it works in principle but has been intermittently rejected; the `$(cat …)` form is reliable.
+- Run codex in the foreground unless the brief is tiny and you genuinely need the answer in the next turn. Background + task-notification is the default.
 
 ## Dev server (port 5199) — never run npm run dev
 
