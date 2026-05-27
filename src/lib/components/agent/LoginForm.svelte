@@ -169,8 +169,23 @@
 			</p>
 		{/if}
 
-		<p class="pt-1 text-[12px] text-black/45 dark:text-white/45">
-			Free accounts get 1 chat per day.
+		<p class="pt-1 text-[12px] leading-snug text-black/45 dark:text-white/45">
+			By continuing, you agree to the
+			<a
+				href="/terms"
+				target="_blank"
+				rel="noopener"
+				class="underline underline-offset-2 transition-colors hover:text-black dark:hover:text-white"
+				>Terms</a
+			>
+			and
+			<a
+				href="/privacy-policy"
+				target="_blank"
+				rel="noopener"
+				class="underline underline-offset-2 transition-colors hover:text-black dark:hover:text-white"
+				>Privacy Policy</a
+			>. Free accounts get 1 research per day.
 		</p>
 	{:else}
 		<button
