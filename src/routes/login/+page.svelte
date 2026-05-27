@@ -5,7 +5,12 @@
 	import LoginForm from '$lib/components/agent/LoginForm.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 
-	let phase = $state<'unknown' | 'completing' | 'form' | 'confirm-email'>('unknown');
+	// Initial state is `completing` so the prerendered HTML ships with the
+	// neutral "Signing you in…" placeholder. Magic-link arrivals stay on this
+	// state until completion or the email-confirm form takes over; standalone
+	// visits flip to `form` synchronously in onMount before any async work,
+	// avoiding a flash from spinner to form.
+	let phase = $state<'completing' | 'form' | 'confirm-email'>('completing');
 	let errorCode = $state<string | null>(null);
 	let returnTo = $state<string | null>(null);
 	let confirmEmail = $state('');
@@ -46,7 +51,6 @@
 	}
 
 	async function tryCompleteMagicLink() {
-		phase = 'completing';
 		magicUrl = window.location.href;
 		try {
 			const result = await auth.completeMagicLinkSignIn(magicUrl);
@@ -107,6 +111,13 @@
 		const url = new URL(window.location.href);
 		returnTo = url.searchParams.get('returnTo');
 		void auth.init();
+		// Quick sync URL probe — Firebase magic-link URLs carry `oobCode`. If
+		// it's not present we know there's no link to complete and can show
+		// the login form immediately, no spinner flash.
+		if (!url.searchParams.has('oobCode')) {
+			phase = 'form';
+			return;
+		}
 		void tryCompleteMagicLink();
 	});
 
@@ -132,7 +143,27 @@
 <main class="flex min-h-dvh items-center justify-center bg-[var(--color-cream)] px-4">
 	<div class="w-full max-w-[400px]">
 		{#if phase === 'completing'}
-			<p class="text-center text-[14px] text-black/55 dark:text-white/55">Signing you in…</p>
+			<div class="flex flex-col items-center gap-3 text-center">
+				<svg class="h-5 w-5 animate-spin text-black/40 dark:text-white/40" viewBox="0 0 24 24">
+					<circle
+						cx="12"
+						cy="12"
+						r="9"
+						stroke="currentColor"
+						stroke-width="2"
+						fill="none"
+						opacity="0.25"
+					/>
+					<path
+						d="M21 12a9 9 0 0 1-9 9"
+						stroke="currentColor"
+						stroke-width="2"
+						fill="none"
+						stroke-linecap="round"
+					/>
+				</svg>
+				<p class="text-[14px] text-black/55 dark:text-white/55">Signing you in…</p>
+			</div>
 		{:else if phase === 'confirm-email'}
 			<div class="space-y-4">
 				<div class="space-y-1 text-center">
