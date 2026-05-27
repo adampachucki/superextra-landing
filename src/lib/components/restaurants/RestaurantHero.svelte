@@ -14,13 +14,14 @@
 		return () => mq.removeEventListener('change', handler);
 	});
 
-	let userQuery = $state('');
 	let {
 		onleave,
-		leaving = $bindable(false)
+		leaving = $bindable(false),
+		userQuery = $bindable('')
 	}: {
 		onleave?: (detail: { query: string; place: PlaceSuggestion | null }) => void;
 		leaving?: boolean;
+		userQuery?: string;
 	} = $props();
 
 	function handleSubmit(detail: { query: string; place: PlaceSuggestion | null }) {
