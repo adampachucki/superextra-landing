@@ -133,16 +133,30 @@ async function sendMagicLink(email: string, returnTo?: string | null): Promise<v
 	}
 }
 
-async function completeMagicLinkSignIn(url: string): Promise<User | null> {
+export type MagicLinkResult =
+	| { kind: 'not-magic-link' }
+	| { kind: 'signed-in'; user: User }
+	| { kind: 'needs-email' };
+
+async function isMagicLink(url: string): Promise<boolean> {
 	await init();
 	const { auth: fbAuth } = await getFirebase();
 	const authMod = await import('firebase/auth');
-	if (!authMod.isSignInWithEmailLink(fbAuth, url)) return null;
-	let email = browser ? localStorage.getItem(MAGIC_LINK_EMAIL_KEY) : null;
-	if (!email) {
-		email = window.prompt('Confirm the email you used to sign in:');
-		if (!email) return null;
-	}
+	return authMod.isSignInWithEmailLink(fbAuth, url);
+}
+
+async function completeMagicLinkSignIn(url: string): Promise<MagicLinkResult> {
+	if (!(await isMagicLink(url))) return { kind: 'not-magic-link' };
+	const email = browser ? localStorage.getItem(MAGIC_LINK_EMAIL_KEY) : null;
+	if (!email) return { kind: 'needs-email' };
+	const user = await finishMagicLinkSignIn(url, email);
+	return { kind: 'signed-in', user };
+}
+
+async function finishMagicLinkSignIn(url: string, email: string): Promise<User> {
+	await init();
+	const { auth: fbAuth } = await getFirebase();
+	const authMod = await import('firebase/auth');
 	const result = await authMod.signInWithEmailLink(fbAuth, email, url);
 	if (browser) {
 		try {
@@ -271,6 +285,7 @@ export const auth = {
 	signInWithGoogle,
 	sendMagicLink,
 	completeMagicLinkSignIn,
+	finishMagicLinkSignIn,
 	signOut: signOutUser,
 	getIdToken,
 	saveDraft,

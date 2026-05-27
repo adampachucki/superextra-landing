@@ -5,9 +5,13 @@
 	import LoginForm from '$lib/components/agent/LoginForm.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 
-	let phase = $state<'unknown' | 'completing' | 'form'>('unknown');
+	let phase = $state<'unknown' | 'completing' | 'form' | 'confirm-email'>('unknown');
 	let errorCode = $state<string | null>(null);
 	let returnTo = $state<string | null>(null);
+	let confirmEmail = $state('');
+	let confirming = $state(false);
+	let confirmError = $state<string | null>(null);
+	let magicUrl = '';
 
 	function safeReturnTo(raw: string | null): string | null {
 		if (!raw) return null;
@@ -43,12 +47,18 @@
 
 	async function tryCompleteMagicLink() {
 		phase = 'completing';
+		magicUrl = window.location.href;
 		try {
-			const result = await auth.completeMagicLinkSignIn(window.location.href);
-			if (!result) {
-				// Not a magic-link URL — show the login form so this page also acts
-				// as a standalone login entry (e.g. shared chat URL redirect).
+			const result = await auth.completeMagicLinkSignIn(magicUrl);
+			if (result.kind === 'not-magic-link') {
+				// Standalone login entry (e.g. arrived via shared-URL redirect).
 				phase = 'form';
+				return;
+			}
+			if (result.kind === 'needs-email') {
+				// Clicked link in a browser without the stored email — ask for
+				// confirmation inline instead of throwing a native window.prompt.
+				phase = 'confirm-email';
 				return;
 			}
 			const dest = await postSignInDestination();
@@ -58,6 +68,38 @@
 				(err as { code?: string } | null)?.code ?? (err instanceof Error ? err.message : 'unknown');
 			errorCode = code;
 			phase = 'form';
+		}
+	}
+
+	async function handleConfirmEmail(e: Event) {
+		e.preventDefault();
+		const trimmed = confirmEmail.trim();
+		if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+			confirmError = 'Enter the email you used to request the link.';
+			return;
+		}
+		confirming = true;
+		confirmError = null;
+		try {
+			await auth.finishMagicLinkSignIn(magicUrl, trimmed);
+			const dest = await postSignInDestination();
+			goto(dest, { replaceState: true });
+		} catch (err) {
+			const code =
+				(err as { code?: string } | null)?.code ?? (err instanceof Error ? err.message : 'unknown');
+			if (code === 'auth/invalid-action-code' || code === 'auth/expired-action-code') {
+				errorCode = code;
+				phase = 'form';
+				return;
+			}
+			if (code === 'auth/invalid-email') {
+				confirmError =
+					'That email doesn’t match this sign-in link. Use the address you requested it from.';
+			} else {
+				confirmError = 'Sign-in failed. Try again or request a new link.';
+			}
+		} finally {
+			confirming = false;
 		}
 	}
 
@@ -91,6 +133,63 @@
 	<div class="w-full max-w-[400px]">
 		{#if phase === 'completing'}
 			<p class="text-center text-[14px] text-black/55 dark:text-white/55">Signing you in…</p>
+		{:else if phase === 'confirm-email'}
+			<div class="space-y-4">
+				<div class="space-y-1 text-center">
+					<a
+						href="/"
+						class="inline-flex items-center gap-0.5 text-black no-underline dark:text-white"
+					>
+						<svg class="-mt-1 h-[16px] w-[16px]" viewBox="0 0 12 12" fill="none">
+							<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5" />
+							<line
+								x1="1.24"
+								y1="3.25"
+								x2="10.76"
+								y2="8.75"
+								stroke="currentColor"
+								stroke-width="1.5"
+							/>
+							<line
+								x1="1.24"
+								y1="8.75"
+								x2="10.76"
+								y2="3.25"
+								stroke="currentColor"
+								stroke-width="1.5"
+							/>
+						</svg>
+						<span class="text-[20px] font-light tracking-tight">Superextra</span>
+					</a>
+					<h1 class="pt-4 text-[18px] font-light text-black dark:text-white">Confirm your email</h1>
+					<p class="text-[13px] text-black/55 dark:text-white/55">
+						Enter the email you used to request this sign-in link.
+					</p>
+				</div>
+				<form onsubmit={handleConfirmEmail} class="space-y-3">
+					<input
+						type="email"
+						bind:value={confirmEmail}
+						placeholder="you@example.com"
+						autocomplete="email"
+						required
+						disabled={confirming}
+						class="w-full rounded-xl border border-black/[0.12] bg-white px-4 py-3 text-[14px] text-black placeholder:text-black/30 focus:border-black/[0.55] focus:ring-0 focus:outline-none disabled:opacity-50 dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/[0.55]"
+					/>
+					<button
+						type="submit"
+						disabled={confirming || !confirmEmail.trim()}
+						class="w-full rounded-xl bg-black px-4 py-3 text-[14px] font-medium text-white transition-colors hover:bg-black/85 disabled:opacity-30 dark:bg-white dark:text-black dark:hover:bg-white/85"
+					>
+						{confirming ? 'Signing in…' : 'Continue'}
+					</button>
+				</form>
+				{#if confirmError}
+					<p class="text-[13px] text-red-600 dark:text-red-400" role="alert">
+						{confirmError}
+					</p>
+				{/if}
+			</div>
 		{:else if phase === 'form'}
 			<div class="space-y-4">
 				<div class="space-y-1 text-center">
