@@ -16,12 +16,12 @@
 
 	let userQuery = $state('');
 	let {
-		onleave
+		onleave,
+		leaving = $bindable(false)
 	}: {
 		onleave?: (detail: { query: string; place: PlaceSuggestion | null }) => void;
+		leaving?: boolean;
 	} = $props();
-
-	let leaving = $state(false);
 
 	function handleSubmit(detail: { query: string; place: PlaceSuggestion | null }) {
 		if (leaving) return;

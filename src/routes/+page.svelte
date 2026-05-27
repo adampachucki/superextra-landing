@@ -15,7 +15,17 @@
 	import RestaurantCTA from '$lib/components/restaurants/RestaurantCTA.svelte';
 
 	let leaving = $state(false);
+	let heroLeaving = $state(false);
 	let limitNotice = $state<string | null>(null);
+
+	// When the sign-in modal closes without completing sign-in, fade the hero
+	// back in. Without this, the hero stays in its leaving state from the
+	// initial submit and the page looks empty.
+	$effect(() => {
+		if (!auth.modalVisible && !auth.user) {
+			heroLeaving = false;
+		}
+	});
 
 	onMount(() => {
 		void auth.init().then(() => {
@@ -127,7 +137,7 @@
 	<Navbar minimal />
 
 	<main>
-		<RestaurantHero onleave={handleLeave} />
+		<RestaurantHero onleave={handleLeave} bind:leaving={heroLeaving} />
 		{#if limitNotice}
 			<div
 				class="mx-auto mt-2 max-w-[800px] px-6 text-center text-[13px] text-black/65 dark:text-white/65"
