@@ -841,9 +841,9 @@ async function postAgentStream(body: Record<string, unknown>): Promise<void> {
 function friendlyAgentError(code: string): string {
 	switch (code) {
 		case 'CHAT_LIMIT_REACHED':
-			return 'Daily chat limit reached. Try again tomorrow.';
+			return 'One research per day on the free plan. Try again tomorrow.';
 		case 'TURN_LIMIT_REACHED':
-			return 'This chat has used its message budget on the free plan.';
+			return 'One research per day on the free plan. Try again tomorrow.';
 		case 'AUTH_REQUIRED':
 			return 'Sign in to continue.';
 		case 'previous_turn_in_flight':

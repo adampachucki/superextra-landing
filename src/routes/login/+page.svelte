@@ -251,8 +251,8 @@
 				<LoginForm
 					{returnTo}
 					initialError={errorCode}
-					title={returnTo ? 'Sign in to continue' : 'Sign in to Superextra'}
-					subtitle={returnTo ? 'Sign in to open this chat.' : ''}
+					title={returnTo ? 'Sign in to open this chat' : 'Sign in to Superextra'}
+					subtitle={returnTo ? 'Takes a few seconds.' : ''}
 				/>
 			</div>
 		{/if}
