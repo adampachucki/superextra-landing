@@ -29,6 +29,9 @@ RESOURCE_NAME = (
 )
 GCS_DIR_NAME = "agent_engine_staging"
 LEGACY_ADC_ACCOUNT = "adam@finebite.co"
+# Keep one instance warm so the first turn after idle doesn't eat a ~20s
+# Reasoning Engine cold start.
+MIN_INSTANCES = 1
 TRACE_ENV_VARS = {
     "ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS": "false",
     "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
@@ -358,6 +361,7 @@ def main() -> int:
         gcs_dir_name=args.gcs_dir_name,
         extra_packages=extra_packages,
         env_vars=env_vars,
+        min_instances=MIN_INSTANCES,
     )
     print(f"\nUpdated: {remote.resource_name}")
 
