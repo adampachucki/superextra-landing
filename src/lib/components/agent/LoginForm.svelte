@@ -16,7 +16,8 @@
 	}: Props = $props();
 
 	let email = $state('');
-	let busy = $state(false);
+	let pending = $state<'google' | 'email' | null>(null);
+	const busy = $derived(pending !== null);
 	let mode = $state<'choose' | 'email-sent'>('choose');
 	let localErrorCode = $state<string | null>(null);
 	const errorCode = $derived(localErrorCode ?? initialError);
@@ -55,7 +56,7 @@
 
 	async function handleGoogle() {
 		if (busy) return;
-		busy = true;
+		pending = 'google';
 		localErrorCode = null;
 		try {
 			await auth.signInWithGoogle();
@@ -65,7 +66,7 @@
 				(err instanceof Error ? err.message : 'unknown');
 			localErrorCode = code;
 		} finally {
-			busy = false;
+			pending = null;
 		}
 	}
 
@@ -77,7 +78,7 @@
 			localErrorCode = 'auth/invalid-email';
 			return;
 		}
-		busy = true;
+		pending = 'email';
 		localErrorCode = null;
 		try {
 			await auth.sendMagicLink(trimmed, returnTo);
@@ -85,7 +86,7 @@
 		} catch (err) {
 			localErrorCode = err instanceof Error ? err.message : 'unknown';
 		} finally {
-			busy = false;
+			pending = null;
 		}
 	}
 
@@ -134,7 +135,7 @@
 					d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
 				/>
 			</svg>
-			Continue with Google
+			{pending === 'google' ? 'Signing in…' : 'Continue with Google'}
 		</button>
 
 		<div class="flex items-center gap-3">
@@ -158,7 +159,7 @@
 				disabled={busy || !email.trim()}
 				class="w-full rounded-xl bg-black px-4 py-3 text-[14px] font-medium text-white transition-colors hover:bg-black/85 disabled:opacity-30 dark:bg-white dark:text-black dark:hover:bg-white/85"
 			>
-				{busy ? 'Sending…' : 'Email me a sign-in link'}
+				{pending === 'email' ? 'Sending…' : 'Email me a sign-in link'}
 			</button>
 		</form>
 
