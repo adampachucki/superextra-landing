@@ -234,13 +234,21 @@ function peekDraft(): DraftPrompt | null {
 function onAuthChange(listener: AuthChangeListener): () => void {
 	authChangeListeners.add(listener);
 	// Fire immediately if state is already known so consumers can sync without
-	// missing the first transition.
+	// missing the first transition. Deferred to a microtask because consumers
+	// typically subscribe from inside a Svelte tracked read (e.g. chat-state's
+	// sidebar getter): a synchronous fire would mutate $state during render,
+	// and the downstream Firestore subscribe would race the SDK's own auth
+	// listener — manifesting as an empty sidebar until the next page load.
 	if (status !== 'unknown') {
-		try {
-			listener(user?.uid ?? null);
-		} catch (err) {
-			console.warn('[auth] listener immediate fire failed', err);
-		}
+		const uidNow = user?.uid ?? null;
+		queueMicrotask(() => {
+			if (!authChangeListeners.has(listener)) return;
+			try {
+				listener(uidNow);
+			} catch (err) {
+				console.warn('[auth] listener immediate fire failed', err);
+			}
+		});
 	}
 	return () => {
 		authChangeListeners.delete(listener);

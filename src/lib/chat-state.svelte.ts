@@ -291,7 +291,6 @@ function ensureAuthSubscribed() {
 	if (authSubscribed) return;
 	authSubscribed = true;
 	authUnsubscribe = auth.onAuthChange((uid) => {
-		console.log('[sidebar-diag] auth change uid=', uid);
 		detachSidebarListener();
 		if (uid) {
 			currentUid = uid;
@@ -317,30 +316,18 @@ function detachSidebarListener() {
 }
 
 async function attachSidebarListener() {
-	console.log(
-		'[sidebar-diag] attachSidebarListener entry, started=',
-		sidebarAttachStarted,
-		'uid=',
-		currentUid
-	);
 	if (sidebarAttachStarted) return;
 	const uid = currentUid;
 	if (!uid) return;
 	sidebarAttachStarted = true;
 	try {
 		const { auth: fbAuth, db } = await getFirebase();
-		const token = await fbAuth.currentUser?.getIdToken().catch((e) => {
-			console.warn('[sidebar-diag] getIdToken failed', e);
-			return null;
-		});
-		console.log(
-			'[sidebar-diag] got token, len=',
-			token?.length ?? 0,
-			'fbCurrent=',
-			fbAuth.currentUser?.uid
-		);
+		// Force a token fetch so the Firestore SDK's auth provider is primed
+		// with the new credentials before we subscribe — otherwise the first
+		// onSnapshot can race the SDK's own auth listener and fail with
+		// permission-denied (manifesting as an empty sidebar until refresh).
+		await fbAuth.currentUser?.getIdToken().catch(() => null);
 		if (currentUid !== uid) {
-			console.log('[sidebar-diag] uid changed during token wait, bailing');
 			sidebarAttachStarted = false;
 			return;
 		}
@@ -355,7 +342,6 @@ async function attachSidebarListener() {
 			sidebarAttachStarted = false;
 			return;
 		}
-		console.log('[sidebar-diag] subscribing onSnapshot for uid=', uid);
 		sessionsListUnsubscribe = onSnapshot(
 			q,
 			(snap) => {
@@ -372,18 +358,14 @@ async function attachSidebarListener() {
 						status: (data.status as SessionSummary['status']) ?? null
 					});
 				});
-				console.log(
-					'[sidebar-diag] snapshot fired, count=',
-					next.length,
-					'fromCache=',
-					snap.metadata.fromCache,
-					'uid=',
-					uid
-				);
 				sessionsList = next;
 			},
 			(err) => {
-				console.warn('[sidebar-diag] listener error', err);
+				// Reset the attach guard on error so the next consumer read can
+				// retry — otherwise a one-time race (permission-denied during
+				// auth propagation) leaves the sidebar empty until refresh.
+				console.warn('[chat-state] sidebar listener error:', err);
+				sidebarAttachStarted = false;
 			}
 		);
 	} catch (err) {
