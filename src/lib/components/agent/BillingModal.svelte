@@ -76,9 +76,6 @@
 						/>
 					</svg>
 				</div>
-				<p class="mt-2 text-[12px] leading-snug text-black/45 dark:text-white/45">
-					Used for currency and tax handling in Stripe Checkout.
-				</p>
 
 				{#if billing.error}
 					<p class="mt-3 text-[13px] text-red-600 dark:text-red-400" role="alert">

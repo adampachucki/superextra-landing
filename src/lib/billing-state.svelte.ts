@@ -351,7 +351,9 @@ async function openPortal() {
 	posting = true;
 	error = null;
 	try {
-		const url = await postBilling(billingEndpoint('portal'));
+		const url = await postBilling(billingEndpoint('portal'), {
+			returnPath: checkoutReturnPath()
+		});
 		window.location.assign(url);
 	} catch (err) {
 		error = 'Could not open billing management. Please try again.';

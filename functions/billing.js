@@ -308,10 +308,10 @@ async function getOrCreateCustomer(user, config) {
 	return customer.id;
 }
 
-async function createPortalSessionUrl(customerId, baseUrl, config) {
+async function createPortalSessionUrl(customerId, baseUrl, returnPath, config) {
 	const session = await stripe(config).billingPortal.sessions.create({
 		customer: customerId,
-		return_url: `${baseUrl}/chat`
+		return_url: `${baseUrl}${returnPath}`
 	});
 	return session.url;
 }
@@ -450,7 +450,12 @@ function createCheckoutFunction(config) {
 		if (checkoutShouldOpenPortal(billing)) {
 			const customerId = stripeCustomerIdFromBilling(billing);
 			try {
-				const url = await createPortalSessionUrl(customerId, requestBaseUrl(req), config);
+				const url = await createPortalSessionUrl(
+					customerId,
+					requestBaseUrl(req),
+					returnPath,
+					config
+				);
 				res.json({ ok: true, url });
 			} catch (err) {
 				console.error('billingCheckout portal redirect failed:', err);
@@ -585,6 +590,7 @@ function createPortalFunction(config) {
 		const user = await requireUser(req, res);
 		if (!user) return;
 		if (!requireBillingModeAccess(config, user, res)) return;
+		const returnPath = normalizeReturnPath(req.body?.returnPath, config);
 		const snap = await db().collection('users').doc(user.uid).get();
 		const billing = snap.exists ? billingMapFromUserData(snap.data() || {}, config) : {};
 		if (!checkoutShouldOpenPortal(billing)) {
@@ -596,7 +602,7 @@ function createPortalFunction(config) {
 		}
 		const customerId = stripeCustomerIdFromBilling(billing);
 		try {
-			const url = await createPortalSessionUrl(customerId, requestBaseUrl(req), config);
+			const url = await createPortalSessionUrl(customerId, requestBaseUrl(req), returnPath, config);
 			res.json({ ok: true, url });
 		} catch (err) {
 			console.error('billingPortal failed:', err);
