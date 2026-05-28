@@ -36,7 +36,7 @@
 		'rounded-full border border-black/10 px-4 py-1.5 text-[13px] text-black/70 transition-colors hover:border-black/20 hover:bg-black/[0.03] dark:border-white/10 dark:text-white/70 dark:hover:border-white/20 dark:hover:bg-white/[0.04]';
 </script>
 
-<div class="mt-5 max-w-[700px]">
+<div class="mt-8 max-w-[700px]">
 	<div
 		class="rounded-2xl border border-black/[0.08] bg-black/[0.02] px-4 py-3 dark:border-white/[0.1] dark:bg-white/[0.03]"
 	>
