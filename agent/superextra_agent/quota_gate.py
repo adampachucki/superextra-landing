@@ -1,16 +1,25 @@
-"""Daily-research-runs quota gate, attached as `before_agent_callback` on the
-`research_pipeline` SequentialAgent.
+"""Daily usage gates, attached as `before_agent_callback` on the two
+research-capable agents.
 
-The gate is the single enforcement point. Cloud Functions no longer pre-check.
-Returning `types.Content` halts `research_pipeline` before any sub-agent runs
-(per `google/adk/agents/base_agent.py:471-480`, which sets
-`ctx.end_invocation = True` when the callback yields content). The reply tag
-`turnKind="agent_reply"` is preserved by writing into a dedicated state key
-`quota_block_reply` that `firestore_events._map_complete` recognizes.
+Two independent daily counters per user, both enforced inside the engine
+(Cloud Functions no longer pre-check):
 
-Failed and cancelled research runs DO burn the quota — the counter ticks
-*before* the pipeline runs, and we never refund. Concurrent runs are
-serialized by the Firestore transaction on the single `users/{uid}` doc.
+  - `researchRunsToday`  — full `research_pipeline` runs (free: 1/day)
+  - `continueRunsToday`  — `continue_research` turns      (free: 5/day)
+
+Each gate is a `before_agent_callback`. Returning `types.Content` halts the
+agent before any sub-agent / tool runs (per
+`google/adk/agents/base_agent.py:471-480`, which sets
+`ctx.end_invocation = True` when the callback yields content). The block
+reply is written to `state["quota_block_reply"]` so
+`firestore_events._map_complete` surfaces it and `_capture_final` tags it
+`turnKind="agent_reply"` — a blocked turn never looks like research.
+
+A turn is routed to exactly one of the two agents, so the two counters
+never both tick on the same turn. Counters use separate date fields so the
+gates stay fully independent. Failed/cancelled work still burns the credit
+(the counter ticks before the agent runs; no refund). Any Firestore error
+fails open — these are product fairness controls, not security boundaries.
 """
 
 from __future__ import annotations
@@ -20,7 +29,7 @@ import logging
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 from google.adk.agents.callback_context import CallbackContext
 from google.cloud import firestore
@@ -30,11 +39,14 @@ log = logging.getLogger(__name__)
 
 QUOTA_BLOCK_REPLY_KEY = "quota_block_reply"
 
-_DEFAULT_LIMITS = {"free": 1, "paid": 50}
+_DEFAULT_LIMITS: dict[str, dict[str, int]] = {
+    "free": {"researchPerDay": 1, "continuePerDay": 5},
+    "paid": {"researchPerDay": 50, "continuePerDay": 100},
+}
 _CONFIG_TTL_SECONDS = 60
 
 _fs: firestore.Client | None = None
-_config_cache: dict[str, int] | None = None
+_config_cache: dict[str, dict[str, int]] | None = None
 _config_cached_at: float = 0.0
 
 
@@ -57,113 +69,139 @@ def _sanitize_limit(value: Any, fallback: int) -> int:
     return fallback
 
 
-def _research_limits(fs: firestore.Client) -> dict[str, int]:
-    """Read `config/limits.{plan}.researchPerDay` with a 60s cache. Missing
-    config doc falls back to defaults; the doc is editable from Firebase
-    Console so bad values are clamped per-plan."""
+def _limits_config(fs: firestore.Client) -> dict[str, dict[str, int]]:
+    """Read `config/limits` with a 60s cache. Missing doc / bad values fall
+    back to per-plan defaults (the doc is Console-editable)."""
     global _config_cache, _config_cached_at
     if _config_cache is not None and time.time() - _config_cached_at < _CONFIG_TTL_SECONDS:
         return _config_cache
     snap = fs.collection("config").document("limits").get()
-    raw = snap.to_dict() or {} if snap.exists else {}
-    free = _sanitize_limit((raw.get("free") or {}).get("researchPerDay"), _DEFAULT_LIMITS["free"])
-    paid = _sanitize_limit((raw.get("paid") or {}).get("researchPerDay"), _DEFAULT_LIMITS["paid"])
-    _config_cache = {"free": free, "paid": paid}
+    raw = (snap.to_dict() or {}) if snap.exists else {}
+    config: dict[str, dict[str, int]] = {}
+    for plan, defaults in _DEFAULT_LIMITS.items():
+        plan_raw = raw.get(plan) or {}
+        config[plan] = {
+            key: _sanitize_limit(plan_raw.get(key), default) for key, default in defaults.items()
+        }
+    _config_cache = config
     _config_cached_at = time.time()
-    return _config_cache
+    return config
 
 
-def _resolve_limit(user_doc: dict | None, limits: dict[str, int]) -> int:
-    plan = "paid" if (user_doc or {}).get("plan") == "paid" else "free"
-    base = limits.get(plan, _DEFAULT_LIMITS[plan])
-    overrides = ((user_doc or {}).get("limitOverrides") or {})
-    return _sanitize_limit(overrides.get("researchPerDay"), base)
+def _plan(user_doc: dict | None) -> str:
+    return "paid" if (user_doc or {}).get("plan") == "paid" else "free"
+
+
+def _resolve_limit(user_doc: dict | None, config: dict[str, dict[str, int]], key: str) -> int:
+    plan = _plan(user_doc)
+    base = config.get(plan, _DEFAULT_LIMITS[plan]).get(key, _DEFAULT_LIMITS[plan][key])
+    overrides = (user_doc or {}).get("limitOverrides") or {}
+    return _sanitize_limit(overrides.get(key), base)
 
 
 def _check_and_reserve(
     txn: firestore.Transaction,
     user_ref: firestore.DocumentReference,
     today: str,
-    limits: dict[str, int],
-) -> tuple[bool, int]:
+    config: dict[str, dict[str, int]],
+    limit_key: str,
+    counter_field: str,
+    date_field: str,
+) -> bool:
     """Single Firestore transaction: read counter, roll on UTC date change,
-    increment if under limit. Returns ``(allowed, limit)``."""
+    increment if under limit. Returns True if the credit was reserved."""
     snap = user_ref.get(transaction=txn)
-    data = snap.to_dict() or {} if snap.exists else None
-    limit = _resolve_limit(data, limits)
-    last_date = (data or {}).get("lastResearchDateUtc")
-    used = (data or {}).get("researchRunsToday", 0) if last_date == today else 0
+    data = (snap.to_dict() or {}) if snap.exists else None
+    limit = _resolve_limit(data, config, limit_key)
+    used = (data or {}).get(counter_field, 0) if (data or {}).get(date_field) == today else 0
     if used >= limit:
-        return (False, limit)
+        return False
     update = {
-        "lastResearchDateUtc": today,
-        "researchRunsToday": used + 1,
+        date_field: today,
+        counter_field: used + 1,
         "updatedAt": firestore.SERVER_TIMESTAMP,
     }
     if snap.exists:
         txn.update(user_ref, update)
     else:
-        # Lazy provision — preserves identity + plan defaults. Cloud Function
-        # still writes identity fields on session create; this branch only
-        # fires if the gate runs before any identity write (unlikely but
-        # tolerable).
+        # Lazy provision — the Cloud Function normally writes identity first;
+        # this only fires if the gate somehow runs before any identity write.
         txn.set(user_ref, {"plan": "free", "createdAt": firestore.SERVER_TIMESTAMP, **update})
-    return (True, limit)
+    return True
 
 
-def _block_message(user_doc: dict | None) -> str:
-    plan = "paid" if (user_doc or {}).get("plan") == "paid" else "free"
-    if plan == "paid":
+def _research_block_message(user_doc: dict | None) -> str:
+    if _plan(user_doc) == "paid":
         return "Daily research limit reached. Try again tomorrow."
     return "Daily research limit reached on the free plan. Try again tomorrow."
 
 
-async def research_quota_gate(*, callback_context: CallbackContext):
-    """`before_agent_callback` on `research_pipeline`.
+def _continue_block_message(user_doc: dict | None) -> str:
+    if _plan(user_doc) == "paid":
+        return "Daily follow-up limit reached. Try again tomorrow."
+    return "Daily follow-up limit reached on the free plan. Try again tomorrow."
 
-    Returns ``None`` to let the pipeline run, or ``types.Content`` to halt it
-    with a friendly limit-reached reply. Also writes
-    ``state[QUOTA_BLOCK_REPLY_KEY]`` on block so the reply is tagged
-    ``turnKind="agent_reply"`` via firestore_events recognition.
-    """
-    # Prefer `quotaUid` from session state (set per-turn by the Cloud Function
-    # to the SUBMITTER's uid). Fall back to engine `user_id`, which equals the
-    # session creator's uid — only relevant for the original creator's own
-    # turns or local dev.
-    quota_uid = callback_context.state.get("quotaUid") or callback_context.user_id
-    if not quota_uid:
-        # Anonymous / no-auth path — let the pipeline run. The Cloud Function
-        # gates anonymous tokens upstream; reaching the gate without a UID
-        # means something already vouched for the caller (e.g. local dev).
-        return None
 
-    user_doc: dict | None = None
-    try:
-        fs = _client()
-        today = _today_utc()
-        user_ref = fs.collection("users").document(quota_uid)
-        limits = await asyncio.to_thread(_research_limits, fs)
-        txn_fn = firestore.transactional(_check_and_reserve)
-        allowed, _limit = await asyncio.to_thread(
-            txn_fn, fs.transaction(), user_ref, today, limits
-        )
-    except Exception:  # noqa: BLE001
-        # Fail open — a Firestore outage shouldn't block a paying user. The
-        # rate cap is a product fairness control, not a security boundary.
-        log.exception("quota gate Firestore failure; allowing uid=%s", quota_uid)
-        return None
+def _make_gate(
+    *,
+    limit_key: str,
+    counter_field: str,
+    date_field: str,
+    block_message: Callable[[dict | None], str],
+):
+    """Build a `before_agent_callback` that atomically reserves one daily
+    credit of the given kind, or halts the agent with a friendly block reply."""
 
-    if allowed:
-        return None
+    async def gate(*, callback_context: CallbackContext):
+        # `quotaUid` (submitter) is set per-turn by the Cloud Function; fall
+        # back to engine `user_id` (the session creator) for the creator's own
+        # turns / local dev.
+        quota_uid = callback_context.state.get("quotaUid") or callback_context.user_id
+        if not quota_uid:
+            return None
 
-    # On block, read the user doc once more (outside the txn) just for plan,
-    # so the message can match. Fail-soft to the default free message.
-    try:
-        snap = await asyncio.to_thread(user_ref.get)
-        if snap.exists:
-            user_doc = snap.to_dict() or {}
-    except Exception:  # noqa: BLE001
-        pass
-    reply = _block_message(user_doc)
-    callback_context.state[QUOTA_BLOCK_REPLY_KEY] = reply
-    return types.Content(role="model", parts=[types.Part(text=reply)])
+        user_ref = None
+        try:
+            fs = _client()
+            today = _today_utc()
+            user_ref = fs.collection("users").document(quota_uid)
+            config = await asyncio.to_thread(_limits_config, fs)
+            txn_fn = firestore.transactional(_check_and_reserve)
+            allowed = await asyncio.to_thread(
+                txn_fn, fs.transaction(), user_ref, today, config, limit_key, counter_field, date_field
+            )
+        except Exception:  # noqa: BLE001
+            log.exception("quota gate (%s) Firestore failure; allowing uid=%s", counter_field, quota_uid)
+            return None
+
+        if allowed:
+            return None
+
+        # Re-read the user doc just for plan, so the message matches. Fail-soft.
+        user_doc: dict | None = None
+        try:
+            snap = await asyncio.to_thread(user_ref.get)
+            if snap.exists:
+                user_doc = snap.to_dict() or {}
+        except Exception:  # noqa: BLE001
+            pass
+        reply = block_message(user_doc)
+        callback_context.state[QUOTA_BLOCK_REPLY_KEY] = reply
+        return types.Content(role="model", parts=[types.Part(text=reply)])
+
+    return gate
+
+
+research_quota_gate = _make_gate(
+    limit_key="researchPerDay",
+    counter_field="researchRunsToday",
+    date_field="lastResearchDateUtc",
+    block_message=_research_block_message,
+)
+
+continue_quota_gate = _make_gate(
+    limit_key="continuePerDay",
+    counter_field="continueRunsToday",
+    date_field="lastContinueDateUtc",
+    block_message=_continue_block_message,
+)

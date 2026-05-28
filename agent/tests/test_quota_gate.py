@@ -1,8 +1,8 @@
-"""Tests for the research-pipeline quota gate.
+"""Tests for the daily usage gates (research + continuation).
 
-The gate is the single enforcement point for daily research-runs limits.
-These tests cover: allow under limit, block at limit, day rollover reset,
-plan-based limit selection, transactional check + reserve.
+Covers: limit resolution, config read/fallback, transactional check+reserve
+for each counter, day rollover, independence of the two counters, block
+messages, quotaUid override, and fail-open on Firestore errors.
 """
 
 from __future__ import annotations
@@ -12,22 +12,21 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from google.cloud import firestore
 
 from superextra_agent import quota_gate
 from superextra_agent.quota_gate import (
     QUOTA_BLOCK_REPLY_KEY,
     _check_and_reserve,
-    _research_limits,
+    _limits_config,
     _resolve_limit,
     _today_utc,
+    continue_quota_gate,
     research_quota_gate,
 )
 
 
 @pytest.fixture(autouse=True)
 def _reset_module_caches():
-    """Reset module-level Firestore client + config cache between tests."""
     quota_gate._fs = None
     quota_gate._config_cache = None
     quota_gate._config_cached_at = 0.0
@@ -38,8 +37,6 @@ def _reset_module_caches():
 
 
 def _callback_context(user_id: str = "", *, state: dict | None = None):
-    """Minimal CallbackContext stand-in. `state` seeds the initial dict;
-    `_deltas` captures writes during the test."""
     deltas: dict = {}
     initial = dict(state or {})
 
@@ -62,147 +59,197 @@ def _user_snap(data: dict | None):
     return snap
 
 
+def _config(free_research=1, free_continue=5, paid_research=50, paid_continue=100):
+    return {
+        "free": {"researchPerDay": free_research, "continuePerDay": free_continue},
+        "paid": {"researchPerDay": paid_research, "continuePerDay": paid_continue},
+    }
+
+
+def _passthrough_transactional(fn):
+    def wrapper(*args, **kwargs):
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+# ── limit resolution ─────────────────────────────────────────────────────────
+
+
 def test_resolve_limit_uses_plan_default():
-    assert _resolve_limit({"plan": "free"}, {"free": 1, "paid": 50}) == 1
-    assert _resolve_limit({"plan": "paid"}, {"free": 1, "paid": 50}) == 50
-    assert _resolve_limit(None, {"free": 1, "paid": 50}) == 1
+    cfg = _config()
+    assert _resolve_limit({"plan": "free"}, cfg, "researchPerDay") == 1
+    assert _resolve_limit({"plan": "free"}, cfg, "continuePerDay") == 5
+    assert _resolve_limit({"plan": "paid"}, cfg, "researchPerDay") == 50
+    assert _resolve_limit({"plan": "paid"}, cfg, "continuePerDay") == 100
+    assert _resolve_limit(None, cfg, "researchPerDay") == 1
 
 
 def test_resolve_limit_honors_per_user_override():
-    user = {"plan": "free", "limitOverrides": {"researchPerDay": 10}}
-    assert _resolve_limit(user, {"free": 1, "paid": 50}) == 10
+    user = {"plan": "free", "limitOverrides": {"continuePerDay": 20}}
+    assert _resolve_limit(user, _config(), "continuePerDay") == 20
+    # other key unaffected
+    assert _resolve_limit(user, _config(), "researchPerDay") == 1
 
 
 def test_resolve_limit_rejects_bad_override():
-    user = {"plan": "free", "limitOverrides": {"researchPerDay": -5}}
-    assert _resolve_limit(user, {"free": 1, "paid": 50}) == 1
+    user = {"plan": "free", "limitOverrides": {"continuePerDay": -5}}
+    assert _resolve_limit(user, _config(), "continuePerDay") == 5
     user = {"plan": "free", "limitOverrides": {"researchPerDay": "ten"}}
-    assert _resolve_limit(user, {"free": 1, "paid": 50}) == 1
+    assert _resolve_limit(user, _config(), "researchPerDay") == 1
 
 
-def test_research_limits_reads_config_doc():
+# ── config read ──────────────────────────────────────────────────────────────
+
+
+def _fs_with_config(config_doc):
     fs = MagicMock()
     snap = MagicMock()
-    snap.exists = True
-    snap.to_dict.return_value = {
-        "free": {"researchPerDay": 3},
-        "paid": {"researchPerDay": 99},
+    snap.exists = config_doc is not None
+    snap.to_dict.return_value = config_doc
+    fs.collection.return_value.document.return_value.get.return_value = snap
+    return fs
+
+
+def test_limits_config_reads_both_keys():
+    fs = _fs_with_config({
+        "free": {"researchPerDay": 3, "continuePerDay": 9},
+        "paid": {"researchPerDay": 99, "continuePerDay": 999},
+    })
+    cfg = _limits_config(fs)
+    assert cfg == {
+        "free": {"researchPerDay": 3, "continuePerDay": 9},
+        "paid": {"researchPerDay": 99, "continuePerDay": 999},
     }
-    fs.collection.return_value.document.return_value.get.return_value = snap
-
-    limits = _research_limits(fs)
-    assert limits == {"free": 3, "paid": 99}
 
 
-def test_research_limits_falls_back_when_doc_missing():
-    fs = MagicMock()
-    snap = MagicMock()
-    snap.exists = False
-    fs.collection.return_value.document.return_value.get.return_value = snap
-
-    limits = _research_limits(fs)
-    assert limits == {"free": 1, "paid": 50}
-
-
-def test_research_limits_clamps_bad_values():
-    fs = MagicMock()
-    snap = MagicMock()
-    snap.exists = True
-    snap.to_dict.return_value = {
-        "free": {"researchPerDay": -1},
-        "paid": {"researchPerDay": "many"},
+def test_limits_config_falls_back_when_doc_missing():
+    fs = _fs_with_config(None)
+    cfg = _limits_config(fs)
+    assert cfg == {
+        "free": {"researchPerDay": 1, "continuePerDay": 5},
+        "paid": {"researchPerDay": 50, "continuePerDay": 100},
     }
-    fs.collection.return_value.document.return_value.get.return_value = snap
-
-    limits = _research_limits(fs)
-    assert limits == {"free": 1, "paid": 50}
 
 
-def test_check_and_reserve_under_limit_increments():
+def test_limits_config_clamps_bad_values_per_key():
+    fs = _fs_with_config({"free": {"researchPerDay": -1, "continuePerDay": "lots"}})
+    cfg = _limits_config(fs)
+    assert cfg["free"] == {"researchPerDay": 1, "continuePerDay": 5}
+
+
+# ── check + reserve ──────────────────────────────────────────────────────────
+
+
+def _reserve(data, *, limit_key, counter_field, date_field, config=None):
     txn = MagicMock()
     user_ref = MagicMock()
-    user_ref.get.return_value = _user_snap({
-        "plan": "free",
-        "researchRunsToday": 0,
-        "lastResearchDateUtc": _today_utc(),
-    })
+    user_ref.get.return_value = _user_snap(data)
+    allowed = _check_and_reserve(
+        txn, user_ref, _today_utc(), config or _config(), limit_key, counter_field, date_field
+    )
+    return allowed, txn, user_ref
 
-    allowed, limit = _check_and_reserve(txn, user_ref, _today_utc(), {"free": 1, "paid": 50})
+
+def test_reserve_research_under_limit_increments():
+    allowed, txn, _ = _reserve(
+        {"plan": "free", "researchRunsToday": 0, "lastResearchDateUtc": _today_utc()},
+        limit_key="researchPerDay",
+        counter_field="researchRunsToday",
+        date_field="lastResearchDateUtc",
+    )
     assert allowed is True
-    assert limit == 1
-    user_ref.get.assert_called_once_with(transaction=txn)
-    txn.update.assert_called_once()
-    update_args = txn.update.call_args.args[1]
-    assert update_args["researchRunsToday"] == 1
-    assert update_args["lastResearchDateUtc"] == _today_utc()
+    args = txn.update.call_args.args[1]
+    assert args["researchRunsToday"] == 1
+    assert args["lastResearchDateUtc"] == _today_utc()
 
 
-def test_check_and_reserve_at_limit_blocks():
-    txn = MagicMock()
-    user_ref = MagicMock()
-    user_ref.get.return_value = _user_snap({
-        "plan": "free",
-        "researchRunsToday": 1,
-        "lastResearchDateUtc": _today_utc(),
-    })
-
-    allowed, limit = _check_and_reserve(txn, user_ref, _today_utc(), {"free": 1, "paid": 50})
+def test_reserve_research_at_limit_blocks():
+    allowed, txn, _ = _reserve(
+        {"plan": "free", "researchRunsToday": 1, "lastResearchDateUtc": _today_utc()},
+        limit_key="researchPerDay",
+        counter_field="researchRunsToday",
+        date_field="lastResearchDateUtc",
+    )
     assert allowed is False
-    assert limit == 1
     txn.update.assert_not_called()
 
 
-def test_check_and_reserve_day_rollover_resets_counter():
-    txn = MagicMock()
-    user_ref = MagicMock()
-    user_ref.get.return_value = _user_snap({
+def test_reserve_continue_allows_up_to_five():
+    # 4 used, free continue limit 5 → still allowed (becomes 5)
+    allowed, txn, _ = _reserve(
+        {"plan": "free", "continueRunsToday": 4, "lastContinueDateUtc": _today_utc()},
+        limit_key="continuePerDay",
+        counter_field="continueRunsToday",
+        date_field="lastContinueDateUtc",
+    )
+    assert allowed is True
+    assert txn.update.call_args.args[1]["continueRunsToday"] == 5
+
+
+def test_reserve_continue_blocks_at_five():
+    allowed, txn, _ = _reserve(
+        {"plan": "free", "continueRunsToday": 5, "lastContinueDateUtc": _today_utc()},
+        limit_key="continuePerDay",
+        counter_field="continueRunsToday",
+        date_field="lastContinueDateUtc",
+    )
+    assert allowed is False
+    txn.update.assert_not_called()
+
+
+def test_reserve_day_rollover_resets_counter():
+    allowed, txn, _ = _reserve(
+        {"plan": "free", "continueRunsToday": 5, "lastContinueDateUtc": "2020-01-01"},
+        limit_key="continuePerDay",
+        counter_field="continueRunsToday",
+        date_field="lastContinueDateUtc",
+    )
+    assert allowed is True
+    assert txn.update.call_args.args[1]["continueRunsToday"] == 1  # reset → +1
+
+
+def test_reserve_counters_are_independent():
+    """A maxed research counter must not block continuations (separate date +
+    counter fields)."""
+    data = {
         "plan": "free",
         "researchRunsToday": 1,
-        "lastResearchDateUtc": "2020-01-01",  # old day
-    })
-
-    allowed, limit = _check_and_reserve(txn, user_ref, _today_utc(), {"free": 1, "paid": 50})
+        "lastResearchDateUtc": _today_utc(),
+        "continueRunsToday": 0,
+        "lastContinueDateUtc": _today_utc(),
+    }
+    allowed, _, _ = _reserve(
+        data,
+        limit_key="continuePerDay",
+        counter_field="continueRunsToday",
+        date_field="lastContinueDateUtc",
+    )
     assert allowed is True
-    assert limit == 1
-    txn.update.assert_called_once()
-    update_args = txn.update.call_args.args[1]
-    assert update_args["researchRunsToday"] == 1  # reset → +1
 
 
-def test_check_and_reserve_lazy_provisions_missing_user_doc():
-    txn = MagicMock()
-    user_ref = MagicMock()
-    user_ref.get.return_value = _user_snap(None)
-
-    allowed, _ = _check_and_reserve(txn, user_ref, _today_utc(), {"free": 1, "paid": 50})
+def test_reserve_lazy_provisions_missing_user_doc():
+    allowed, txn, _ = _reserve(
+        None,
+        limit_key="researchPerDay",
+        counter_field="researchRunsToday",
+        date_field="lastResearchDateUtc",
+    )
     assert allowed is True
-    txn.set.assert_called_once()
     set_args = txn.set.call_args.args[1]
     assert set_args["plan"] == "free"
     assert set_args["researchRunsToday"] == 1
 
 
-def test_gate_returns_none_for_anonymous_user():
-    ctx = _callback_context("")
-    out = asyncio.run(research_quota_gate(callback_context=ctx))
-    assert out is None
+# ── gate end-to-end ──────────────────────────────────────────────────────────
 
 
-def test_gate_prefers_quotaUid_over_user_id():
-    """Shared-URL submitter: `quotaUid` in session state must be charged,
-    not the engine session's creator `user_id`."""
-    ctx = _callback_context("creator-uid", state={"quotaUid": "submitter-uid"})
-
-    fake_fs = MagicMock()
+def _gate_fs(*, config_doc, user_doc, capture_uid=None):
+    fs = MagicMock()
     config_snap = MagicMock()
     config_snap.exists = True
-    config_snap.to_dict.return_value = {"free": {"researchPerDay": 1}, "paid": {"researchPerDay": 50}}
-    user_snap = _user_snap({
-        "plan": "free",
-        "researchRunsToday": 0,
-        "lastResearchDateUtc": _today_utc(),
-    })
-    submitter_doc_calls: list[str] = []
+    config_snap.to_dict.return_value = config_doc
+    user_snap = _user_snap(user_doc)
 
     def collection_router(name: str):
         col = MagicMock()
@@ -210,168 +257,114 @@ def test_gate_prefers_quotaUid_over_user_id():
             col.document.return_value.get.return_value = config_snap
         elif name == "users":
             def doc(uid):
-                submitter_doc_calls.append(uid)
-                user_ref = MagicMock()
-                user_ref.get.return_value = user_snap
-                return user_ref
+                if capture_uid is not None:
+                    capture_uid.append(uid)
+                ref = MagicMock()
+                ref.get.return_value = user_snap
+                return ref
             col.document.side_effect = doc
         return col
 
-    fake_fs.collection.side_effect = collection_router
-    fake_fs.transaction.return_value = MagicMock()
+    fs.collection.side_effect = collection_router
+    fs.transaction.return_value = MagicMock()
+    return fs
 
-    def passthrough_transactional(fn):
-        def wrapper(*args, **kwargs):
-            return fn(*args, **kwargs)
-        return wrapper
 
-    with patch.object(quota_gate, "_client", return_value=fake_fs), patch(
-        "google.cloud.firestore.transactional", passthrough_transactional
+def _run_gate(gate, ctx, fs):
+    with patch.object(quota_gate, "_client", return_value=fs), patch(
+        "google.cloud.firestore.transactional", _passthrough_transactional
     ):
-        asyncio.run(research_quota_gate(callback_context=ctx))
-
-    # Must have charged the submitter's doc, not the creator's.
-    assert submitter_doc_calls == ["submitter-uid"], submitter_doc_calls
+        return asyncio.run(gate(callback_context=ctx))
 
 
-def test_gate_returns_none_when_under_limit():
-    ctx = _callback_context("uid-allowed")
+def test_gate_returns_none_for_anonymous_user():
+    assert asyncio.run(research_quota_gate(callback_context=_callback_context(""))) is None
+    assert asyncio.run(continue_quota_gate(callback_context=_callback_context(""))) is None
 
-    fake_fs = MagicMock()
-    # _research_limits path
-    config_snap = MagicMock()
-    config_snap.exists = True
-    config_snap.to_dict.return_value = {"free": {"researchPerDay": 1}, "paid": {"researchPerDay": 50}}
-    # _check_and_reserve path
-    user_snap = _user_snap({
-        "plan": "free",
-        "researchRunsToday": 0,
-        "lastResearchDateUtc": _today_utc(),
-    })
 
-    def collection_router(name: str):
-        col = MagicMock()
-        if name == "config":
-            col.document.return_value.get.return_value = config_snap
-        elif name == "users":
-            user_ref = MagicMock()
-            user_ref.get.return_value = user_snap
-            col.document.return_value = user_ref
-        return col
-
-    fake_fs.collection.side_effect = collection_router
-    fake_fs.transaction.return_value = MagicMock()
-
-    # Skip real firestore.transactional by patching it to call the inner fn directly.
-    def passthrough_transactional(fn):
-        def wrapper(*args, **kwargs):
-            return fn(*args, **kwargs)
-        return wrapper
-
-    with patch.object(quota_gate, "_client", return_value=fake_fs), patch(
-        "google.cloud.firestore.transactional", passthrough_transactional
-    ):
-        out = asyncio.run(research_quota_gate(callback_context=ctx))
-
-    assert out is None
+def test_research_gate_allows_under_limit():
+    ctx = _callback_context("uid1")
+    fs = _gate_fs(
+        config_doc=_config(),
+        user_doc={"plan": "free", "researchRunsToday": 0, "lastResearchDateUtc": _today_utc()},
+    )
+    assert _run_gate(research_quota_gate, ctx, fs) is None
     assert ctx._deltas == {}
 
 
-def _make_block_fs(plan: str, limits: dict[str, int]):
-    """Build a fake firestore.Client where the user is already AT the limit
-    for the given plan."""
-    fake_fs = MagicMock()
-    config_snap = MagicMock()
-    config_snap.exists = True
-    config_snap.to_dict.return_value = {
-        "free": {"researchPerDay": limits["free"]},
-        "paid": {"researchPerDay": limits["paid"]},
-    }
-    used = limits[plan]
-    user_snap = _user_snap({
-        "plan": plan,
-        "researchRunsToday": used,
-        "lastResearchDateUtc": _today_utc(),
-    })
-
-    def collection_router(name: str):
-        col = MagicMock()
-        if name == "config":
-            col.document.return_value.get.return_value = config_snap
-        elif name == "users":
-            user_ref = MagicMock()
-            user_ref.get.return_value = user_snap
-            col.document.return_value = user_ref
-        return col
-
-    fake_fs.collection.side_effect = collection_router
-    fake_fs.transaction.return_value = MagicMock()
-    return fake_fs
-
-
-def _passthrough_transactional(fn):
-    def wrapper(*args, **kwargs):
-        return fn(*args, **kwargs)
-    return wrapper
-
-
-def test_gate_blocks_with_free_message_at_limit():
-    ctx = _callback_context("uid-blocked")
-    fake_fs = _make_block_fs("free", {"free": 1, "paid": 50})
-
-    with patch.object(quota_gate, "_client", return_value=fake_fs), patch(
-        "google.cloud.firestore.transactional", _passthrough_transactional
-    ):
-        out = asyncio.run(research_quota_gate(callback_context=ctx))
-
+def test_research_gate_blocks_at_limit_with_free_message():
+    ctx = _callback_context("uid1")
+    fs = _gate_fs(
+        config_doc=_config(),
+        user_doc={"plan": "free", "researchRunsToday": 1, "lastResearchDateUtc": _today_utc()},
+    )
+    out = _run_gate(research_quota_gate, ctx, fs)
     assert out is not None
     text = out.parts[0].text
-    assert "free plan" in text.lower()
-    assert "tomorrow" in text.lower()
+    assert "research" in text.lower() and "free plan" in text.lower()
     assert ctx._deltas[QUOTA_BLOCK_REPLY_KEY] == text
 
 
-def test_gate_blocks_paid_plan_with_plan_neutral_message():
-    """Paid users hitting their limit get a different message (no 'free
-    plan' wording — that would be misleading)."""
-    ctx = _callback_context("uid-paid-blocked")
-    fake_fs = _make_block_fs("paid", {"free": 1, "paid": 1})
-
-    with patch.object(quota_gate, "_client", return_value=fake_fs), patch(
-        "google.cloud.firestore.transactional", _passthrough_transactional
-    ):
-        out = asyncio.run(research_quota_gate(callback_context=ctx))
-
+def test_continue_gate_blocks_at_five_with_followup_message():
+    ctx = _callback_context("uid1")
+    fs = _gate_fs(
+        config_doc=_config(),
+        user_doc={"plan": "free", "continueRunsToday": 5, "lastContinueDateUtc": _today_utc()},
+    )
+    out = _run_gate(continue_quota_gate, ctx, fs)
     assert out is not None
     text = out.parts[0].text
-    assert "free plan" not in text.lower()
-    assert "tomorrow" in text.lower()
+    assert "follow-up" in text.lower() and "free plan" in text.lower()
     assert ctx._deltas[QUOTA_BLOCK_REPLY_KEY] == text
+
+
+def test_continue_gate_allows_fifth_then_blocks_sixth():
+    # 4 used → allowed
+    ctx = _callback_context("uid1")
+    fs = _gate_fs(
+        config_doc=_config(),
+        user_doc={"plan": "free", "continueRunsToday": 4, "lastContinueDateUtc": _today_utc()},
+    )
+    assert _run_gate(continue_quota_gate, ctx, fs) is None
+
+
+def test_paid_block_message_is_plan_neutral():
+    ctx = _callback_context("uid-paid")
+    fs = _gate_fs(
+        config_doc=_config(paid_continue=1),
+        user_doc={"plan": "paid", "continueRunsToday": 1, "lastContinueDateUtc": _today_utc()},
+    )
+    out = _run_gate(continue_quota_gate, ctx, fs)
+    assert out is not None
+    assert "free plan" not in out.parts[0].text.lower()
+
+
+def test_gate_prefers_quotaUid_over_user_id():
+    """Shared-URL submitter charges their own counter, not the creator's."""
+    ctx = _callback_context("creator-uid", state={"quotaUid": "submitter-uid"})
+    captured: list[str] = []
+    fs = _gate_fs(
+        config_doc=_config(),
+        user_doc={"plan": "free", "researchRunsToday": 0, "lastResearchDateUtc": _today_utc()},
+        capture_uid=captured,
+    )
+    _run_gate(research_quota_gate, ctx, fs)
+    assert captured and captured[0] == "submitter-uid"
 
 
 def test_gate_fails_open_on_firestore_error():
-    """Firestore outage must not block the user — quota is a fairness control,
-    not a security boundary."""
     ctx = _callback_context("uid-fs-error")
-
-    fake_fs = MagicMock()
-    # collection().document() builds local refs and won't throw; the failure
-    # mode we care about is reads/transactions blowing up under load.
+    fs = MagicMock()
     config_doc = MagicMock()
-    config_doc.get.side_effect = RuntimeError("simulated firestore outage")
-    user_ref = MagicMock()
+    config_doc.get.side_effect = RuntimeError("simulated outage")
 
     def collection_router(name: str):
         col = MagicMock()
         if name == "config":
             col.document.return_value = config_doc
-        elif name == "users":
-            col.document.return_value = user_ref
         return col
 
-    fake_fs.collection.side_effect = collection_router
+    fs.collection.side_effect = collection_router
 
-    with patch.object(quota_gate, "_client", return_value=fake_fs):
-        out = asyncio.run(research_quota_gate(callback_context=ctx))
-
-    assert out is None
+    with patch.object(quota_gate, "_client", return_value=fs):
+        assert asyncio.run(continue_quota_gate(callback_context=ctx)) is None

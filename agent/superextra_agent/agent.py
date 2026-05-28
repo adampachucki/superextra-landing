@@ -11,7 +11,7 @@ from google.genai import types
 
 from .chat_logger import ChatLoggerPlugin
 from .firestore_progress import FirestoreProgressPlugin
-from .quota_gate import research_quota_gate
+from .quota_gate import continue_quota_gate, research_quota_gate
 from .places_tools import (
     find_nearby_restaurants,
     get_batch_restaurant_details,
@@ -243,6 +243,7 @@ continue_research = LlmAgent(
         ),
     ],
     generate_content_config=MEDIUM_THINKING_CONFIG,
+    before_agent_callback=continue_quota_gate,
     before_model_callback=_inject_geo_bias,
     on_model_error_callback=_on_model_error,
     on_tool_error_callback=_on_tool_error,
