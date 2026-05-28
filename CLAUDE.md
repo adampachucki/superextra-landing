@@ -37,6 +37,7 @@ These rules get violated most often. Re-read before proposing or editing code.
 - **Verify before recommending.** Before suggesting a function, flag, or pattern, grep the codebase or fetch the SDK source to confirm it exists in the version we're on.
 - **Verify UI changes in a browser.** Type checks and unit tests don't prove rendering. Use Chrome DevTools MCP.
 - **`firebase deploy` REPLACES function env vars** — every var the function needs at runtime must be in `functions/.env.superextra-site` at deploy time, or the next deploy quietly removes it.
+- **Never manually deploy a dirty worktree. Commit first, then deploy from that commit.** This is mandatory for Firebase Hosting/Functions and Vertex AI Agent Engine. Agent Engine deploys record the committed runtime SHA; deploying uncommitted code leaves production ahead of git history and makes rollback/audit ambiguous. If this is violated, immediately commit the deployed source and redeploy the Agent Engine so the recorded runtime SHA matches the committed code.
 - **From the VM, ADC needs `quota_project_id=superextra-site`** or Google API calls (Firebase Hosting, Cloud Functions, Cloud Build) fail with `403 PERMISSION_DENIED`.
 
 ### When delegating to a review agent — ALWAYS pass these requirements
@@ -218,6 +219,8 @@ Push to `main` → `.github/workflows/deploy.yml`:
 2. **deploy-hosting** — Firebase Hosting + Cloud Functions + Firestore rules/indexes.
 
 The agent app itself is hosted as a Vertex AI Agent Engine Reasoning Engine; redeploy via `agent_engines.update(...)` from the agent venv when the agent code changes.
+
+Manual deploy invariant: **commit before deploy**. Do not run `firebase deploy`, `firebase-tools deploy`, or `agent/scripts/redeploy_engine.py` from an uncommitted worktree. For Agent Engine deploys, confirm the script reports the current commit as `runtime commit` and records that same SHA after the update.
 
 Deployment gotchas (agent engine deploy, env-var REPLACE, Firestore shape, watchdog, ADC quota, Chrome MCP E2E): `docs/deployment-gotchas.md`.
 
