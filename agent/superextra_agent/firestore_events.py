@@ -519,9 +519,14 @@ def map_tool_result(
         place = _place_name(state, place_id)
         if status == "success":
             count = int(response.get("total_fetched") or 0)
-            label = f"{count} Google reviews plus place signals"
-            if place:
-                label = f"{count} reviews and place signals for {place}"
+            if count:
+                label = f"{count} Google reviews plus place signals"
+                if place:
+                    label = f"{count} reviews and place signals for {place}"
+            else:
+                label = "Google Maps place signals loaded"
+                if place:
+                    label = f"Place signals loaded for {place}"
             return [_detail(row_id, "platform", "Google Maps", label)]
         if status == "error":
             return [

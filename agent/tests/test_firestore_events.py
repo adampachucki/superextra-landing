@@ -591,6 +591,21 @@ def test_google_place_signals_uses_saved_place_name():
     assert rows[0]["text"] == "12 reviews and place signals for Noma"
 
 
+def test_google_place_signals_zero_review_call_labels_place_signals_only():
+    state = {"place_names": {}}
+    map_event(
+        _event(author="context_enricher", state_delta={"_place_name_abc123": "Noma"}),
+        state,
+    )
+    rows = map_tool_result(
+        "get_google_place_signals",
+        {"status": "success", "place_id": "abc123", "total_fetched": 0},
+        state,
+        "call-1",
+    )
+    assert rows[0]["text"] == "Place signals loaded for Noma"
+
+
 def test_specialist_grounding_sources_are_exposed():
     research = map_event(
         _event(
