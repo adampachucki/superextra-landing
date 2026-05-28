@@ -26,14 +26,10 @@ from superextra_agent.quota_gate import (
 
 
 @pytest.fixture(autouse=True)
-def _reset_module_caches():
+def _reset_client():
     quota_gate._fs = None
-    quota_gate._config_cache = None
-    quota_gate._config_cached_at = 0.0
     yield
     quota_gate._fs = None
-    quota_gate._config_cache = None
-    quota_gate._config_cached_at = 0.0
 
 
 def _callback_context(user_id: str = "", *, state: dict | None = None):
@@ -145,7 +141,7 @@ def _reserve(data, *, limit_key, counter_field, date_field, config=None):
     txn = MagicMock()
     user_ref = MagicMock()
     user_ref.get.return_value = _user_snap(data)
-    allowed = _check_and_reserve(
+    allowed, _plan = _check_and_reserve(
         txn, user_ref, _today_utc(), config or _config(), limit_key, counter_field, date_field
     )
     return allowed, txn, user_ref

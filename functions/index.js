@@ -932,10 +932,9 @@ export const agentCancel = onRequest(
 				}
 
 				// Flip session + turn to error('user_cancelled'). The daily
-				// research-runs counter is intentionally NOT refunded — the
-				// quota gate in agent/superextra_agent/quota_gate.py reserves
-				// the slot before research runs, and cancelled/failed research
-				// still counts against the daily allotment.
+				// usage counters are intentionally NOT refunded — the quota
+				// gates in agent/superextra_agent/quota_gate.py reserve a credit
+				// before the agent runs, and cancelled/failed work still counts.
 				tx.update(sessionRef, {
 					status: 'error',
 					error: 'user_cancelled',

@@ -603,11 +603,11 @@ def test_continue_research_complete_reads_continue_research_reply_key():
 
 
 def test_research_pipeline_quota_block_reply_completes_as_agent_reply():
-    """The research_pipeline before_agent_callback halts the pipeline when
-    daily quota is reached by emitting a final event authored by
-    `research_pipeline` whose state_delta sets `quota_block_reply`. Mapper
-    must surface that reply, and the resulting `reply_key` must be one that
-    `_capture_final` tags as `agent_reply` (not `research_report`)."""
+    """A quota gate (here research_pipeline; continue_research uses the same
+    `quota_block_reply` key) halts its agent when a daily usage limit is
+    reached, emitting a final event whose state_delta sets `quota_block_reply`.
+    Mapper must surface that reply, and the resulting `reply_key` must be one
+    that `_capture_final` tags as `agent_reply` (not research/continuation)."""
     from superextra_agent.gear_run_state import GearRunState
 
     ev = _event(

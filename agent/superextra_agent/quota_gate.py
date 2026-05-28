@@ -18,8 +18,10 @@ reply is written to `state["quota_block_reply"]` so
 A turn is routed to exactly one of the two agents, so the two counters
 never both tick on the same turn. Counters use separate date fields so the
 gates stay fully independent. Failed/cancelled work still burns the credit
-(the counter ticks before the agent runs; no refund). Any Firestore error
-fails open — these are product fairness controls, not security boundaries.
+(the counter ticks before the agent runs; no refund).
+
+Limits come from `config/limits.{plan}.{researchPerDay,continuePerDay}`,
+with optional per-user `users/{uid}.limitOverrides.{key}`.
 """
 
 from __future__ import annotations
@@ -27,7 +29,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -43,11 +44,8 @@ _DEFAULT_LIMITS: dict[str, dict[str, int]] = {
     "free": {"researchPerDay": 1, "continuePerDay": 5},
     "paid": {"researchPerDay": 50, "continuePerDay": 100},
 }
-_CONFIG_TTL_SECONDS = 60
 
 _fs: firestore.Client | None = None
-_config_cache: dict[str, dict[str, int]] | None = None
-_config_cached_at: float = 0.0
 
 
 def _client() -> firestore.Client:
@@ -70,22 +68,14 @@ def _sanitize_limit(value: Any, fallback: int) -> int:
 
 
 def _limits_config(fs: firestore.Client) -> dict[str, dict[str, int]]:
-    """Read `config/limits` with a 60s cache. Missing doc / bad values fall
-    back to per-plan defaults (the doc is Console-editable)."""
-    global _config_cache, _config_cached_at
-    if _config_cache is not None and time.time() - _config_cached_at < _CONFIG_TTL_SECONDS:
-        return _config_cache
+    """Read `config/limits`. Missing doc / bad values fall back to per-plan
+    defaults (the doc is Console-editable)."""
     snap = fs.collection("config").document("limits").get()
     raw = (snap.to_dict() or {}) if snap.exists else {}
-    config: dict[str, dict[str, int]] = {}
-    for plan, defaults in _DEFAULT_LIMITS.items():
-        plan_raw = raw.get(plan) or {}
-        config[plan] = {
-            key: _sanitize_limit(plan_raw.get(key), default) for key, default in defaults.items()
-        }
-    _config_cache = config
-    _config_cached_at = time.time()
-    return config
+    return {
+        plan: {key: _sanitize_limit((raw.get(plan) or {}).get(key), default) for key, default in defaults.items()}
+        for plan, defaults in _DEFAULT_LIMITS.items()
+    }
 
 
 def _plan(user_doc: dict | None) -> str:
@@ -107,15 +97,17 @@ def _check_and_reserve(
     limit_key: str,
     counter_field: str,
     date_field: str,
-) -> bool:
+) -> tuple[bool, str]:
     """Single Firestore transaction: read counter, roll on UTC date change,
-    increment if under limit. Returns True if the credit was reserved."""
+    increment if under limit. Returns ``(reserved, plan)`` — plan is returned
+    so the caller can word a block message without re-reading the doc."""
     snap = user_ref.get(transaction=txn)
     data = (snap.to_dict() or {}) if snap.exists else None
+    plan = _plan(data)
     limit = _resolve_limit(data, config, limit_key)
     used = (data or {}).get(counter_field, 0) if (data or {}).get(date_field) == today else 0
     if used >= limit:
-        return False
+        return (False, plan)
     update = {
         date_field: today,
         counter_field: used + 1,
@@ -127,17 +119,20 @@ def _check_and_reserve(
         # Lazy provision — the Cloud Function normally writes identity first;
         # this only fires if the gate somehow runs before any identity write.
         txn.set(user_ref, {"plan": "free", "createdAt": firestore.SERVER_TIMESTAMP, **update})
-    return True
+    return (True, plan)
 
 
-def _research_block_message(user_doc: dict | None) -> str:
-    if _plan(user_doc) == "paid":
+_reserve_txn = firestore.transactional(_check_and_reserve)
+
+
+def _research_block_message(plan: str) -> str:
+    if plan == "paid":
         return "Daily research limit reached. Try again tomorrow."
     return "Daily research limit reached on the free plan. Try again tomorrow."
 
 
-def _continue_block_message(user_doc: dict | None) -> str:
-    if _plan(user_doc) == "paid":
+def _continue_block_message(plan: str) -> str:
+    if plan == "paid":
         return "Daily follow-up limit reached. Try again tomorrow."
     return "Daily follow-up limit reached on the free plan. Try again tomorrow."
 
@@ -147,7 +142,7 @@ def _make_gate(
     limit_key: str,
     counter_field: str,
     date_field: str,
-    block_message: Callable[[dict | None], str],
+    block_message: Callable[[str], str],
 ):
     """Build a `before_agent_callback` that atomically reserves one daily
     credit of the given kind, or halts the agent with a friendly block reply."""
@@ -160,32 +155,24 @@ def _make_gate(
         if not quota_uid:
             return None
 
-        user_ref = None
         try:
             fs = _client()
-            today = _today_utc()
             user_ref = fs.collection("users").document(quota_uid)
             config = await asyncio.to_thread(_limits_config, fs)
-            txn_fn = firestore.transactional(_check_and_reserve)
-            allowed = await asyncio.to_thread(
-                txn_fn, fs.transaction(), user_ref, today, config, limit_key, counter_field, date_field
+            reserved, plan = await asyncio.to_thread(
+                _reserve_txn, fs.transaction(), user_ref, _today_utc(), config, limit_key, counter_field, date_field
             )
         except Exception:  # noqa: BLE001
-            log.exception("quota gate (%s) Firestore failure; allowing uid=%s", counter_field, quota_uid)
+            # Fail open on ANY error (not just Firestore). This is a fairness
+            # cap, not a security boundary — a bug here must never hard-block a
+            # paying user mid-research. Errors are logged loudly instead.
+            log.exception("quota gate (%s) failed; allowing uid=%s", counter_field, quota_uid)
             return None
 
-        if allowed:
+        if reserved:
             return None
 
-        # Re-read the user doc just for plan, so the message matches. Fail-soft.
-        user_doc: dict | None = None
-        try:
-            snap = await asyncio.to_thread(user_ref.get)
-            if snap.exists:
-                user_doc = snap.to_dict() or {}
-        except Exception:  # noqa: BLE001
-            pass
-        reply = block_message(user_doc)
+        reply = block_message(plan)
         callback_context.state[QUOTA_BLOCK_REPLY_KEY] = reply
         return types.Content(role="model", parts=[types.Part(text=reply)])
 
