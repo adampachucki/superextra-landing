@@ -450,23 +450,30 @@ def test_capture_final_preserves_place_scoped_sources_with_same_url():
 
 
 @pytest.mark.asyncio
-async def test_observe_typed_pill_dedupes_detail_rows():
+async def test_observe_typed_pill_dedupes_by_id():
+    """Dedupe keys on `id`: a repeat of the same id is dropped, but two rows
+    that share group/family/text yet carry distinct ids both write — distinct
+    tool calls (e.g. searching two named restaurants) must not collapse."""
     state = _make_state()
     state.timeline_writer.write_timeline = AsyncMock(return_value={"ok": True})
     pill = {
         "kind": "detail",
         "id": "a",
-        "group": "search",
-        "family": "Searching the web",
-        "text": "pizza",
+        "group": "platform",
+        "family": "Google Maps",
+        "text": "1 place matches",
     }
 
     first = await state.observe_typed_pill(pill)
-    second = await state.observe_typed_pill({**pill, "id": "b"})
+    # Same identity re-emitted → dropped.
+    repeat = await state.observe_typed_pill({**pill})
+    # Different call (different id), identical label → still written.
+    distinct = await state.observe_typed_pill({**pill, "id": "b"})
 
     assert first == {"ok": True}
-    assert second is None
-    state.timeline_writer.write_timeline.assert_awaited_once_with(pill)
+    assert repeat is None
+    assert distinct == {"ok": True}
+    assert state.timeline_writer.write_timeline.await_count == 2
 
 
 def test_observe_event_capture_final_short_circuits_after_first():

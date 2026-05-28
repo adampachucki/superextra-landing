@@ -340,6 +340,22 @@ def test_grounding_search_queries_dedupe_within_event():
     assert [r["text"] for r in search_rows] == ["warsaw pizza", "warsaw pasta"]
 
 
+def test_grounding_search_query_id_is_stable_across_events():
+    """The same query in two different events gets the same row id so the
+    id-based timeline dedup collapses cross-event repeats."""
+    first = map_event(
+        _event(author="research_lead", web_search_queries=["warsaw pizza"], event_id="evt-1"),
+        {},
+    )["timeline_events"]
+    second = map_event(
+        _event(author="research_lead", web_search_queries=["warsaw pizza"], event_id="evt-2"),
+        {},
+    )["timeline_events"]
+    id_first = next(r["id"] for r in first if r["family"] == "Searching the web")
+    id_second = next(r["id"] for r in second if r["family"] == "Searching the web")
+    assert id_first == id_second == "search:warsaw pizza"
+
+
 def test_non_durable_specialist_grounding_sources_are_captured():
     ev = _event(
         author="market_landscape",
@@ -485,8 +501,8 @@ def test_multi_tool_call_emits_multiple_detail_rows_in_order():
         "Public sources",
         "TripAdvisor",
     ]
-    # Per-venue label so timeline dedup (group+family+text) keeps rows distinct
-    # across a multi-venue research run.
+    # Per-venue label keeps rows human-distinguishable across a multi-venue
+    # research run (dedup itself keys on the unique call id, not the text).
     assert rows[4]["text"] == "Reading Umami P Berg-Berlin"
     assert rows[0]["text"] == "best burgers berlin"
     assert rows[1]["text"] == "new cafes gdynia"
@@ -500,6 +516,47 @@ def test_google_maps_response_uses_place_name():
         "call-1",
     )
     assert rows[0]["text"] == "Profile for Umami Berlin"
+
+
+def test_search_restaurants_single_result_echoes_venue_name():
+    rows = map_tool_result(
+        "search_restaurants",
+        {"status": "success", "results": [{"displayName": {"text": "Restauracja Mezalians"}}]},
+        {},
+        "call-1",
+    )
+    assert rows[0]["text"] == "1 place match: Restauracja Mezalians"
+
+
+def test_search_restaurants_multiple_results_count_only():
+    rows = map_tool_result(
+        "search_restaurants",
+        {"status": "success", "results": [{"id": "a"}, {"id": "b"}, {"id": "c"}]},
+        {},
+        "call-1",
+    )
+    assert rows[0]["text"] == "3 place matches"
+
+
+def test_search_restaurants_error_surfaces_warning():
+    rows = map_tool_result(
+        "search_restaurants",
+        {"status": "error", "error_message": "Places API error 429"},
+        {},
+        "call-1",
+    )
+    assert rows[0]["group"] == "warning"
+    assert rows[0]["text"] == "Venue search failed"
+
+
+def test_find_nearby_restaurants_keeps_nearby_label():
+    rows = map_tool_result(
+        "find_nearby_restaurants",
+        {"status": "success", "results": [{"id": "a"}, {"id": "b"}]},
+        {},
+        "call-1",
+    )
+    assert rows[0]["text"] == "2 nearby places"
 
 
 def test_failed_fetch_batch_warning_preserves_failure_count():

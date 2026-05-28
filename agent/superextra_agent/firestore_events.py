@@ -87,14 +87,16 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
     # web_search_queries) as `Searching the web` detail rows. The native
     # grounding path doesn't emit `function_call(name='google_search')`,
     # so without this branch the searches Gemini ran inline stay invisible.
-    event_id = _get(event, "id") or ""
-    for idx, query in enumerate(_extract_search_queries(event)):
+    # Key the row id on the normalized query (not the event id) so the same
+    # query echoed across streamed events collapses under id-based dedupe.
+    for query in _extract_search_queries(event):
+        normalized = _normalize_space(query)
         mapping["timeline_events"].append(
             _detail(
-                f"search:{event_id}:{idx}",
+                f"search:{normalized}",
                 "search",
                 "Searching the web",
-                query,
+                normalized,
             )
         )
 
@@ -474,12 +476,27 @@ def map_tool_result(
             return [_detail(row_id, "platform", "Google Maps", f"{len(places)} place profiles")]
         return []
 
-    if name in ("find_nearby_restaurants", "search_restaurants") and status == "success":
+    if name in ("find_nearby_restaurants", "search_restaurants"):
+        if status == "error":
+            return [_detail(row_id, "warning", "Warnings", "Venue search failed")]
+        if status != "success":
+            return []
         results = response.get("results")
-        if isinstance(results, list):
-            label = "nearby places" if name == "find_nearby_restaurants" else "place matches"
-            return [_detail(row_id, "platform", "Google Maps", f"{len(results)} {label}")]
-        return []
+        if not isinstance(results, list):
+            return []
+        if name == "find_nearby_restaurants":
+            return [_detail(row_id, "platform", "Google Maps", f"{len(results)} nearby places")]
+        count = len(results)
+        if count == 1:
+            first = results[0] if isinstance(results[0], dict) else {}
+            display_name = _get(first.get("displayName"), "text")
+            if isinstance(display_name, str) and display_name.strip():
+                text = f"1 place match: {display_name.strip()}"
+            else:
+                text = "1 place match"
+        else:
+            text = f"{count} place matches"
+        return [_detail(row_id, "platform", "Google Maps", text)]
 
     if name == "search_public_web":
         if status == "success":

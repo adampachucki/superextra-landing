@@ -26,14 +26,10 @@ class TimelineOwnershipLost(Exception):
 class TurnSummaryBuilder:
     def __init__(self, *, started_at_ms: int):
         self.started_at_ms = started_at_ms
-        self.detail_dedupe: set[tuple[str, str, str]] = set()
+        self.detail_dedupe: set[str] = set()
 
     def accept_detail(self, event: dict[str, Any]) -> bool:
-        key = (
-            str(event.get("group") or ""),
-            str(event.get("family") or ""),
-            str(event.get("text") or ""),
-        )
+        key = str(event.get("id") or "")
         if key in self.detail_dedupe:
             return False
         self.detail_dedupe.add(key)
