@@ -5,6 +5,7 @@
 	import { splitChartSegments } from '$lib/chart-blocks';
 	import type { ChatSource, ChatSourceProvider, TimelineEvent } from '$lib/chat-types';
 	import { finalAnswerReveal } from '$lib/final-answer-reveal';
+	import { billing } from '$lib/billing-state.svelte';
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
 	import { renderMarkdown } from '$lib/markdown';
 	import ChartBlock from './ChartBlock.svelte';
@@ -310,6 +311,17 @@
 						{/each}
 					</div>
 					<div class="mt-2 flex max-w-[700px] items-center justify-end gap-2">
+						{#if msg.turnKind === 'quota_block' && !billing.paid}
+							<button
+								type="button"
+								onclick={() => billing.openUpgrade()}
+								disabled={billing.posting}
+								class="mr-auto inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full bg-black px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
+							>
+								<span>Upgrade</span>
+								<span class="text-white/60 dark:text-black/50">19 PLN / 9 EUR / $9</span>
+							</button>
+						{/if}
 						<MessageFeedback
 							sid={chatState.activeSid}
 							turnIndex={msg.turnIndex}

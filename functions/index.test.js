@@ -115,6 +115,9 @@ mock.module('firebase-admin/firestore', {
 			arrayUnion: (...values) => ({ __arrayUnion: values }),
 			delete: () => ({ __delete: true }),
 			increment: (n) => ({ __increment: n })
+		},
+		Timestamp: {
+			fromMillis: (ms) => ({ __timestampMillis: ms })
 		}
 	}
 });

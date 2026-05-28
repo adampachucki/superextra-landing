@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import CookieBanner from '$lib/components/CookieBanner.svelte';
 	import LoginModal from '$lib/components/agent/LoginModal.svelte';
+	import BillingModal from '$lib/components/agent/BillingModal.svelte';
 
 	onMount(() => {
 		const onBeforeUnload = () => {
@@ -34,3 +35,4 @@
 {@render children()}
 <CookieBanner />
 <LoginModal />
+<BillingModal />

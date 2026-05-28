@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/auth.svelte';
+	import { billing } from '$lib/billing-state.svelte';
 
 	interface Props {
 		// `inline` (sidebar) renders the avatar + name+email row with a popover
@@ -13,6 +14,7 @@
 
 	let open = $state(false);
 	let signingOut = $state(false);
+	let billingAction = $derived(billing.paid || billing.canManage ? 'Manage billing' : 'Upgrade');
 
 	function handleWindowClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
@@ -38,6 +40,15 @@
 			console.warn('sign out failed:', err);
 		} finally {
 			signingOut = false;
+		}
+	}
+
+	async function handleBilling() {
+		open = false;
+		if (billing.paid || billing.canManage) {
+			await billing.openPortal();
+		} else {
+			billing.openUpgrade();
 		}
 	}
 </script>
@@ -67,7 +78,21 @@
 			{#if user.displayName && user.email}
 				<p class="truncate text-[11px] text-black/40 dark:text-white/40">{user.email}</p>
 			{/if}
+			{#if billing.paid}
+				<p class="mt-1 text-[11px] text-black/40 dark:text-white/40">
+					{billing.snapshot.cancelAtPeriodEnd ? 'Unlimited ends soon' : 'Unlimited'}
+				</p>
+			{/if}
 		</div>
+		<button
+			type="button"
+			onclick={handleBilling}
+			disabled={billing.posting}
+			class="block w-full px-3 py-2 text-left text-[13px] text-black/70 transition-colors hover:bg-cream-100 hover:text-black disabled:opacity-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
+			role="menuitem"
+		>
+			{billing.posting ? 'Opening…' : billingAction}
+		</button>
 		<button
 			type="button"
 			onclick={handleSignOut}

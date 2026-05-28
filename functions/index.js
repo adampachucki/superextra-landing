@@ -15,6 +15,7 @@ import {
 	validatePlaceContext
 } from './utils.js';
 export { watchdog } from './watchdog.js';
+export { billingCheckout, billingPortal, stripeWebhook } from './billing.js';
 
 initializeApp();
 const db = getFirestore();

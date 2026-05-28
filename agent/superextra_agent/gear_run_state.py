@@ -184,6 +184,8 @@ class GearRunState:
             self.final_turn_kind = "research_report"
         elif reply_key == "continue_research_reply":
             self.final_turn_kind = "continuation_reply"
+        elif reply_key == "quota_block_reply":
+            self.final_turn_kind = "quota_block"
         else:
             self.final_turn_kind = "agent_reply"
 

@@ -55,6 +55,7 @@ function uuid(): string {
 export interface ChatMessage {
 	role: 'user' | 'agent';
 	kind: 'user' | 'acknowledgement' | 'status' | 'final';
+	turnKind?: TurnKind | null;
 	text: string;
 	timestamp: number;
 	turnIndex: number;
@@ -113,7 +114,15 @@ export interface Turn {
 	acknowledgedAtMs: number | null;
 	completedAtMs: number | null;
 	error: string | null;
+	turnKind: TurnKind | null;
 }
+
+export type TurnKind =
+	| 'agent_reply'
+	| 'research_report'
+	| 'continuation_reply'
+	| 'intake_reply'
+	| 'quota_block';
 
 export type LoadState = 'idle' | 'loading' | 'loaded' | 'missing';
 
@@ -262,6 +271,7 @@ function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
 			msgs.push({
 				role: 'agent',
 				kind: 'final',
+				turnKind: turn.turnKind,
 				text: turn.reply,
 				timestamp: turn.completedAtMs ?? Date.now(),
 				turnIndex: turn.turnIndex,
@@ -417,7 +427,8 @@ function makeOptimisticTurn(turnIndex: number, userMessage: string, startedAtMs:
 		createdAtMs: startedAtMs,
 		acknowledgedAtMs: null,
 		completedAtMs: null,
-		error: null
+		error: null,
+		turnKind: null
 	};
 }
 
@@ -564,7 +575,8 @@ async function attachActiveListeners(sid: string) {
 					createdAtMs: toMillis(data.createdAt),
 					acknowledgedAtMs: toMillis(data.acknowledgedAt),
 					completedAtMs: toMillis(data.completedAt),
-					error: (data.error as string | null | undefined) ?? null
+					error: (data.error as string | null | undefined) ?? null,
+					turnKind: (data.turnKind as TurnKind | null | undefined) ?? null
 				};
 				next.push(turn);
 				const prev = previousTurnStatus.get(turnIndex);

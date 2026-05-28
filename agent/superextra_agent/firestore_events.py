@@ -347,8 +347,7 @@ def _map_complete(event: Any) -> dict[str, Any] | None:
     # distinct so a continuation reply doesn't clobber the original report
     # in session state). `final_report` is the report writer's.
     # `quota_block_reply` is set by either quota gate (research_pipeline or
-    # continue_research) when a daily usage limit is reached, so the reply
-    # gets tagged `turnKind="agent_reply"` rather than research/continuation.
+    # continue_research) when a daily usage limit is reached.
     for key in ("continue_research_reply", "final_report", "quota_block_reply"):
         if _has_state_delta(event, key):
             candidate = _state_delta(event).get(key)

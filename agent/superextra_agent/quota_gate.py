@@ -21,7 +21,7 @@ block reply. Returning Content sets `ctx.end_invocation` (per
 `google/adk/agents/base_agent.py:471-480`), halting every sub-agent/tool.
 The reply is written to `state["quota_block_reply"]` so
 `firestore_events._map_complete` surfaces it and `_capture_final` tags it
-`turnKind="agent_reply"`.
+`turnKind="quota_block"`.
 
 A turn routes to exactly one of the two agents, so the counters never both
 tick. Account-scoped continue lives on the user doc; research-scoped continue
@@ -91,6 +91,10 @@ def _sanitize_limit(value: Any, fallback: int) -> int:
     return fallback
 
 
+def _dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def _period_key(period: str, now: datetime) -> str:
     """Current period bucket as a string. Counter resets when this changes."""
     if period == "week":
@@ -115,7 +119,7 @@ def _resolve_spec(config: dict[str, Any], plan: str, quota: str, user_doc: dict 
     fall back to the per-plan default and are logged loudly (fail-generous —
     a misconfig under-enforces rather than locking users out)."""
     defaults = _DEFAULT_LIMITS[plan][quota]
-    raw = (config.get(plan) or {}).get(quota) or {}
+    raw = _dict(_dict(config.get(plan)).get(quota))
 
     period = raw.get("period")
     if period not in _VALID_PERIODS:
@@ -133,7 +137,7 @@ def _resolve_spec(config: dict[str, Any], plan: str, quota: str, user_doc: dict 
             scope = defaults["scope"]
 
     base = _sanitize_limit(raw.get("limit"), defaults["limit"])
-    overrides = (user_doc or {}).get("limitOverrides") or {}
+    overrides = _dict(_dict(user_doc).get("limitOverrides"))
     limit = _sanitize_limit(overrides.get(quota), base)
 
     return {"scope": scope, "period": period, "limit": limit}

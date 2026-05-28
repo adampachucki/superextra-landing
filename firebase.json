@@ -133,6 +133,18 @@
 					"function": "agentFeedback"
 				},
 				{
+					"source": "/api/billing/checkout",
+					"function": "billingCheckout"
+				},
+				{
+					"source": "/api/billing/portal",
+					"function": "billingPortal"
+				},
+				{
+					"source": "/api/billing/webhook",
+					"function": "stripeWebhook"
+				},
+				{
 					"source": "/api/auth/send-magic-link",
 					"function": "sendMagicLink"
 				},

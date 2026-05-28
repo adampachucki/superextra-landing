@@ -165,6 +165,19 @@ def test_resolve_spec_missing_plan_uses_defaults():
     assert spec == {"scope": "account", "period": "day", "limit": 5}
 
 
+def test_resolve_spec_malformed_config_nodes_use_defaults():
+    spec = _resolve_spec({"free": "oops"}, "free", "continue", None)
+    assert spec == {"scope": "account", "period": "day", "limit": 5}
+
+    spec = _resolve_spec({"free": {"continue": ["oops"]}}, "free", "continue", None)
+    assert spec == {"scope": "account", "period": "day", "limit": 5}
+
+
+def test_resolve_spec_malformed_overrides_are_ignored():
+    spec = _resolve_spec(_config(), "free", "research", {"limitOverrides": "oops"})
+    assert spec["limit"] == 1
+
+
 # ── reserve transaction ──────────────────────────────────────────────────────
 
 

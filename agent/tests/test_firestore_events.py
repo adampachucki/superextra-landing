@@ -659,12 +659,12 @@ def test_continue_research_complete_reads_continue_research_reply_key():
     }
 
 
-def test_research_pipeline_quota_block_reply_completes_as_agent_reply():
+def test_research_pipeline_quota_block_reply_completes_as_quota_block():
     """A quota gate (here research_pipeline; continue_research uses the same
     `quota_block_reply` key) halts its agent when a daily usage limit is
     reached, emitting a final event whose state_delta sets `quota_block_reply`.
     Mapper must surface that reply, and the resulting `reply_key` must be one
-    that `_capture_final` tags as `agent_reply` (not research/continuation)."""
+    that `_capture_final` tags as `quota_block`."""
     from superextra_agent.gear_run_state import GearRunState
 
     ev = _event(
@@ -689,7 +689,7 @@ def test_research_pipeline_quota_block_reply_completes_as_agent_reply():
         fs=None,
     )
     state._capture_final(mapped["complete"])
-    assert state.final_turn_kind == "agent_reply"
+    assert state.final_turn_kind == "quota_block"
     assert state.final_reply == "Daily research limit reached on the free plan. Try again tomorrow."
 
 

@@ -50,6 +50,16 @@ export default defineConfig({
 				changeOrigin: true,
 				rewrite: (path: string) => path.replace(/^\/api\/agent\/feedback/, '/agentFeedback')
 			},
+			'/api/billing/checkout': {
+				target: 'https://us-central1-superextra-site.cloudfunctions.net',
+				changeOrigin: true,
+				rewrite: (path: string) => path.replace(/^\/api\/billing\/checkout/, '/billingCheckout')
+			},
+			'/api/billing/portal': {
+				target: 'https://us-central1-superextra-site.cloudfunctions.net',
+				changeOrigin: true,
+				rewrite: (path: string) => path.replace(/^\/api\/billing\/portal/, '/billingPortal')
+			},
 			'/api/auth/send-magic-link': {
 				target: 'https://us-central1-superextra-site.cloudfunctions.net',
 				changeOrigin: true,
