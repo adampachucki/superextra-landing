@@ -254,6 +254,8 @@ class TestMakeInstruction:
         assert "clearly identifies the same venue" in result
         assert "treat absence as a finding" in result
         assert 'mode="deep"' in result
+        assert "specific review count" in result
+        assert "Do not fetch review samples for people-also-search" in result
         # Snippet usage: TA-rendered profile facts (rating/rank/total) are OK;
         # not as review evidence.
         assert "Do not treat search snippets as review evidence" in result
