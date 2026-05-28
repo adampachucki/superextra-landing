@@ -192,6 +192,17 @@ class TestGetTripadvisorReviews:
         assert mock_client.get.call_count == 10
 
     @pytest.mark.asyncio
+    async def test_default_fast_path_fetches_50_reviews(self):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response(REVIEWS_RESPONSE_PAGE_0))
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            await get_tripadvisor_reviews(TA_URL)
+
+        assert mock_client.get.call_count == 5
+
+    @pytest.mark.asyncio
     async def test_stops_on_empty_page(self):
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[

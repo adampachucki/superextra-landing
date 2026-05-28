@@ -237,13 +237,14 @@ async def _fetch_tripadvisor_reviews_apify(
 
 async def get_tripadvisor_reviews(
     url: str,
-    max_reviews: int = 100,
+    max_reviews: int = 50,
     mode: str = "fast",
     tool_context=None,
 ) -> dict:
     """Fetch TripAdvisor reviews for a restaurant page.
 
-    Default `mode="fast"` uses SerpAPI for up to 100 reviews. Use
+    Default `mode="fast"` uses SerpAPI for up to 50 reviews. It can fetch up to
+    100 reviews on the fast path when requested. Use
     `mode="deep"` or `max_reviews > 100` when owner responses, deeper history,
     subratings, or the place rating histogram matter; that path uses Apify and
     returns up to 300 reviews.
@@ -252,7 +253,7 @@ async def get_tripadvisor_reviews(
 
     Args:
         url: Full TripAdvisor Restaurant_Review page URL from a search result.
-        max_reviews: Number of reviews to fetch. Default 100. Deep path max 300.
+        max_reviews: Number of reviews to fetch. Default 50. Deep path max 300.
         mode: "fast" for SerpAPI, "deep" for Apify. `max_reviews > 100`
               selects deep mode automatically.
     """
