@@ -985,8 +985,9 @@ export const agentCancel = onRequest(
 //   The "why" (downvote reasons + free-text note) is NOT put on the turn doc —
 //     turn docs are readable by any signed-in client (firestore.rules), so free
 //     text would leak. It goes to the server-only `feedback` collection.
-//   kind:'survey' → the periodic "did this help you decide?" prompt shown after
-//     a research report. Appended to the same `feedback` collection.
+//   kind:'survey' → the periodic "do you find this report useful?" prompt shown
+//     after a research report (useful:'yes'|'no', plus optional reasons/note on
+//     a 'no'). Appended to the same `feedback` collection.
 // The `feedback` collection is never read by the client (unmatched path ⇒ rules
 // deny client reads; Admin SDK bypasses rules), so it is the private analytics
 // surface for ratings-with-reasons, notes, and survey answers.
@@ -1052,9 +1053,9 @@ export const agentFeedback = onRequest(
 				return;
 			}
 		} else {
-			const { helped } = req.body;
-			if (helped !== 'yes' && helped !== 'not_yet') {
-				res.status(400).json({ ok: false, error: 'helped is required' });
+			const { useful } = req.body;
+			if (useful !== 'yes' && useful !== 'no') {
+				res.status(400).json({ ok: false, error: 'useful is required' });
 				return;
 			}
 		}
@@ -1114,13 +1115,16 @@ export const agentFeedback = onRequest(
 					return;
 				}
 			} else {
-				const { helped } = req.body;
+				const { useful } = req.body;
+				const reasons = useful === 'no' ? cleanFeedbackReasons(req.body.reasons) : [];
 				await db.collection('feedback').doc().set({
 					uid,
 					sid,
 					turnIndex,
 					kind: 'survey',
-					helped,
+					useful,
+					reasons,
+					note,
 					createdAt: FieldValue.serverTimestamp()
 				});
 			}

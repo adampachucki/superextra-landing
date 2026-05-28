@@ -1976,24 +1976,39 @@ describe('agentFeedback', () => {
 		assert.equal(res._status, 400);
 	});
 
-	it('appends a survey response to the feedback collection', async () => {
+	it('appends a "yes" survey response to the feedback collection', async () => {
 		sessionGet();
 		const res = mockRes();
-		await agentFeedback(authed({ kind: 'survey', helped: 'yes' }), res);
+		await agentFeedback(authed({ kind: 'survey', useful: 'yes' }), res);
 		assert.equal(res._status, 200);
 		const row = feedbackRow();
 		assert.ok(row, 'expected a write to the feedback collection');
 		assert.equal(row.kind, 'survey');
 		assert.equal(row.uid, 'user-good-token');
 		assert.equal(row.sid, 'sess-1');
-		assert.equal(row.helped, 'yes');
+		assert.equal(row.useful, 'yes');
+		assert.deepEqual(row.reasons, []);
 		assert.equal(row.createdAt, '__server_timestamp__');
+	});
+
+	it('keeps "no" survey reasons + note in the feedback collection', async () => {
+		sessionGet();
+		const res = mockRes();
+		await agentFeedback(
+			authed({ kind: 'survey', useful: 'no', reasons: ['Incomplete'], note: '  too thin  ' }),
+			res
+		);
+		assert.equal(res._status, 200);
+		const row = feedbackRow();
+		assert.equal(row.useful, 'no');
+		assert.deepEqual(row.reasons, ['Incomplete']);
+		assert.equal(row.note, 'too thin');
 	});
 
 	it('400s on an invalid survey answer', async () => {
 		sessionGet();
 		const res = mockRes();
-		await agentFeedback(authed({ kind: 'survey', helped: 'maybe' }), res);
+		await agentFeedback(authed({ kind: 'survey', useful: 'maybe' }), res);
 		assert.equal(res._status, 400);
 	});
 });

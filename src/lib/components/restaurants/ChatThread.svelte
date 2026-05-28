@@ -219,34 +219,21 @@
 
 	let expandedSources: Record<number, boolean> = $state({});
 
-	// Offer the periodic value prompt when a research report finishes live in this
-	// session — detected by `loading` falling from true→false within the SAME
-	// session (a historical chat load never makes that transition, and switching
-	// away from a running chat to a finished one is excluded by the sid guard; it
-	// also doesn't depend on the reveal animation, which reduced-motion skips).
-	// Completed activity can hydrate a beat AFTER the loading edge, so the turn is
-	// remembered and the survey is offered once it qualifies as a research report.
-	let wasLoading = false;
-	let prevSid: string | null = null;
-	let liveCompletedTurn: number | null = null;
+	// Offer the periodic value prompt the first time the latest message is a
+	// finished research report — gated to once a week by the cooldown in
+	// `maybeOfferSurvey`. No need to catch the live completion moment: the weekly
+	// cap means we just show it on the first qualifying report-view that week,
+	// which also covers navigating away during a run and coming back.
 	$effect(() => {
-		const sid = chatState.activeSid;
-		const loading = chatState.loading;
-		const messages = chatState.messages;
-		if (sid !== prevSid) liveCompletedTurn = null;
-		if (sid === prevSid && wasLoading && !loading) {
-			const last = messages[messages.length - 1];
-			if (last?.kind === 'final') liveCompletedTurn = last.turnIndex;
+		if (chatState.loading) return;
+		const last = chatState.messages[chatState.messages.length - 1];
+		if (
+			last?.kind === 'final' &&
+			last.turnSummary &&
+			thoughtCount(last.activityEvents) >= ACTIVITY_THOUGHT_MIN
+		) {
+			feedback.maybeOfferSurvey(chatState.activeSid, last.turnIndex);
 		}
-		if (liveCompletedTurn !== null) {
-			const turn = messages.find((m) => m.kind === 'final' && m.turnIndex === liveCompletedTurn);
-			if (turn?.turnSummary && thoughtCount(turn.activityEvents) >= ACTIVITY_THOUGHT_MIN) {
-				feedback.maybeOfferSurvey(sid, liveCompletedTurn);
-				liveCompletedTurn = null;
-			}
-		}
-		wasLoading = loading;
-		prevSid = sid;
 	});
 </script>
 

@@ -106,9 +106,15 @@ function maybeOfferSurvey(sid: string | null, turnIndex: number): void {
 	}
 }
 
-function recordSurvey(sid: string | null, turnIndex: number, helped: 'yes' | 'not_yet'): void {
+function recordSurvey(
+	sid: string | null,
+	turnIndex: number,
+	useful: 'yes' | 'no',
+	reasons?: string[],
+	note?: string
+): void {
 	if (!sid) return;
-	post({ sid, turnIndex, kind: 'survey', helped }).catch((err) =>
+	post({ sid, turnIndex, kind: 'survey', useful, reasons, note }).catch((err) =>
 		console.warn('[feedback] survey submit failed', err)
 	);
 }
