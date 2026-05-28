@@ -310,7 +310,7 @@
 							{/if}
 						{/each}
 					</div>
-					<div class="mt-2 flex max-w-[700px] items-center justify-end gap-2">
+					<div class="mt-4 flex max-w-[700px] items-center justify-end gap-2">
 						{#if msg.turnKind === 'quota_block' && !billing.paid}
 							<button
 								type="button"
