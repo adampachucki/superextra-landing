@@ -15,7 +15,14 @@ import {
 	validatePlaceContext
 } from './utils.js';
 export { watchdog } from './watchdog.js';
-export { billingCheckout, billingPortal, stripeWebhook } from './billing.js';
+export {
+	billingCheckout,
+	billingPortal,
+	stripeWebhook,
+	billingCheckoutTest,
+	billingPortalTest,
+	stripeWebhookTest
+} from './billing.js';
 
 initializeApp();
 const db = getFirestore();

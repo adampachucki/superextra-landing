@@ -1,0 +1,162 @@
+#!/usr/bin/env node
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import { createRequire } from 'node:module';
+
+const require = createRequire(new URL('../functions/package.json', import.meta.url));
+const admin = require('firebase-admin');
+const Stripe = require('stripe');
+
+const PROJECT_ID = process.env.PROJECT_ID || 'superextra-site';
+const BASE_URL = process.env.BASE_URL || 'https://agent.superextra.ai';
+
+function readLiveStripeKey() {
+	return execFileSync(
+		'gcloud',
+		[
+			'secrets',
+			'versions',
+			'access',
+			'latest',
+			'--secret=STRIPE_LIVE_SECRET_KEY',
+			`--project=${PROJECT_ID}`
+		],
+		{ encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }
+	).trim();
+}
+
+function readTestStripeKey() {
+	if (process.env.STRIPE_TEST_SECRET_KEY) return process.env.STRIPE_TEST_SECRET_KEY;
+	const configPath = `${os.homedir()}/.config/stripe/config.toml`;
+	const config = fs.readFileSync(configPath, 'utf8');
+	const match = config.match(/sk_test_[A-Za-z0-9_]+/);
+	if (!match) throw new Error(`Stripe test key not found in ${configPath}`);
+	return match[0];
+}
+
+async function firebaseWebApiKey() {
+	const response = await fetch(`${BASE_URL}/__/firebase/init.json`);
+	if (!response.ok) throw new Error(`Firebase init failed: ${response.status}`);
+	const config = await response.json();
+	if (!config.apiKey) throw new Error('Firebase init response did not include apiKey');
+	return config.apiKey;
+}
+
+async function idTokenFor(uid) {
+	const token = await admin.auth().createCustomToken(uid, { billingTester: true });
+	const apiKey = await firebaseWebApiKey();
+	const response = await fetch(
+		`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ token, returnSecureToken: true })
+		}
+	);
+	const payload = await response.json();
+	if (!response.ok || !payload.idToken) {
+		throw new Error(`Custom token exchange failed: ${response.status} ${JSON.stringify(payload)}`);
+	}
+	return payload.idToken;
+}
+
+async function postBilling(path, idToken, body = {}) {
+	const response = await fetch(`${BASE_URL}${path}`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${idToken}`
+		},
+		body: JSON.stringify(body)
+	});
+	const payload = await response.json().catch(() => null);
+	if (!response.ok || !payload?.url) {
+		throw new Error(`${path} failed: ${response.status} ${JSON.stringify(payload)}`);
+	}
+	return payload.url;
+}
+
+function checkoutSessionIdFromUrl(url) {
+	const parsed = new URL(url);
+	const queryId = parsed.searchParams.get('session_id');
+	if (queryId) return queryId;
+	const pathMatch = parsed.pathname.match(/\/(cs_(test|live)_[^/?#]+)/);
+	return pathMatch?.[1] ?? null;
+}
+
+async function checkoutSmoke({ mode, market, stripe, idToken }) {
+	const prefix = mode === 'test' ? '/api/billing/test' : '/api/billing';
+	const checkoutUrl = await postBilling(`${prefix}/checkout`, idToken, { market });
+	const sessionId = checkoutSessionIdFromUrl(checkoutUrl);
+	if (!sessionId) throw new Error(`${mode} Checkout URL did not include session_id`);
+	const session = await stripe.checkout.sessions.retrieve(sessionId);
+	const portalUrl = await postBilling(`${prefix}/portal`, idToken);
+	if (!portalUrl.startsWith('https://billing.stripe.com/')) {
+		throw new Error(`${mode} portal URL did not come from Stripe`);
+	}
+	return {
+		sessionId: session.id,
+		customerId: typeof session.customer === 'string' ? session.customer : session.customer?.id,
+		livemode: session.livemode,
+		mode: session.mode,
+		currency: session.currency,
+		amountTotal: session.amount_total,
+		portal: true
+	};
+}
+
+async function main() {
+	if (!admin.apps.length) admin.initializeApp({ projectId: PROJECT_ID });
+
+	const liveStripe = new Stripe(readLiveStripeKey());
+	const testStripe = new Stripe(readTestStripeKey());
+	const uid = `codex-billing-mode-smoke-${Date.now()}`;
+	const email = `${uid}@superextra.ai`;
+	const auth = admin.auth();
+	const db = admin.firestore();
+	let liveCustomerId = null;
+	let testCustomerId = null;
+
+	try {
+		await auth.createUser({ uid, email, emailVerified: true });
+		const idToken = await idTokenFor(uid);
+
+		const test = await checkoutSmoke({
+			mode: 'test',
+			market: 'de',
+			stripe: testStripe,
+			idToken
+		});
+		testCustomerId = test.customerId;
+
+		const live = await checkoutSmoke({
+			mode: 'live',
+			market: 'pl',
+			stripe: liveStripe,
+			idToken
+		});
+		liveCustomerId = live.customerId;
+
+		if (test.livemode !== false || test.currency !== 'eur' || test.amountTotal !== 900) {
+			throw new Error(`Unexpected test checkout session: ${JSON.stringify(test)}`);
+		}
+		if (live.livemode !== true || live.currency !== 'pln' || live.amountTotal !== 1900) {
+			throw new Error(`Unexpected live checkout session: ${JSON.stringify(live)}`);
+		}
+
+		process.stdout.write(`${JSON.stringify({ ok: true, uid, test, live }, null, 2)}\n`);
+	} finally {
+		await Promise.allSettled([
+			liveCustomerId ? liveStripe.customers.del(liveCustomerId) : null,
+			testCustomerId ? testStripe.customers.del(testCustomerId) : null,
+			db.collection('users').doc(uid).delete(),
+			auth.deleteUser(uid)
+		]);
+	}
+}
+
+main().catch((err) => {
+	console.error(err);
+	process.exitCode = 1;
+});

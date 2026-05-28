@@ -5,6 +5,7 @@ import { getFirebase } from '$lib/firebase';
 import { resolveSupportedBrowserCountry } from '$lib/browser-country';
 
 export type BillingMarket = 'us' | 'pl' | 'de' | 'other';
+export type BillingMode = 'live' | 'test';
 export type BillingStatus =
 	| 'none'
 	| 'checkout_pending'
@@ -19,6 +20,7 @@ export type BillingStatus =
 
 export interface BillingSnapshot {
 	plan: 'free' | 'paid';
+	livePlan: 'free' | 'paid';
 	status: BillingStatus;
 	market: BillingMarket | null;
 	currency: 'usd' | 'pln' | 'eur' | null;
@@ -39,6 +41,8 @@ export const billingMarkets: {
 	{ id: 'other', label: 'Other country', price: '$9', currency: 'usd' }
 ];
 
+const BILLING_MODE_STORAGE_KEY = 'superextra.billingMode';
+
 let firestoreModulePromise: Promise<typeof import('firebase/firestore')> | null = null;
 function getFirestoreMod() {
 	if (!firestoreModulePromise) firestoreModulePromise = import('firebase/firestore');
@@ -48,6 +52,7 @@ function getFirestoreMod() {
 function emptySnapshot(): BillingSnapshot {
 	return {
 		plan: 'free',
+		livePlan: 'free',
 		status: 'none',
 		market: null,
 		currency: null,
@@ -78,12 +83,52 @@ function preferredMarket(): BillingMarket {
 	return code === 'pl' || code === 'de' || code === 'us' ? code : 'other';
 }
 
+function normalizeBillingMode(value: string | null): BillingMode | null {
+	if (value === 'test' || value === 'sandbox') return 'test';
+	if (value === 'live' || value === 'prod' || value === 'production') return 'live';
+	return null;
+}
+
+function initBillingModeFromBrowser() {
+	if (!browser || modeInitialized) return;
+	modeInitialized = true;
+	const url = new URL(window.location.href);
+	const requested =
+		normalizeBillingMode(url.searchParams.get('billingMode')) ??
+		normalizeBillingMode(url.searchParams.get('stripeMode'));
+	if (requested) {
+		billingMode = requested;
+		if (requested === 'test') {
+			window.localStorage.setItem(BILLING_MODE_STORAGE_KEY, requested);
+		} else {
+			window.localStorage.removeItem(BILLING_MODE_STORAGE_KEY);
+		}
+		return;
+	}
+	billingMode =
+		normalizeBillingMode(window.localStorage.getItem(BILLING_MODE_STORAGE_KEY)) ?? 'live';
+}
+
+function activeBillingField(): 'billing' | 'billingTest' {
+	return billingMode === 'test' ? 'billingTest' : 'billing';
+}
+
+function activePlanField(): 'plan' | 'planTest' {
+	return billingMode === 'test' ? 'planTest' : 'plan';
+}
+
+function billingEndpoint(resource: 'checkout' | 'portal') {
+	return billingMode === 'test' ? `/api/billing/test/${resource}` : `/api/billing/${resource}`;
+}
+
 let snapshot = $state<BillingSnapshot>(emptySnapshot());
+let billingMode = $state<BillingMode>('live');
 let modalVisible = $state(false);
 let selectedMarket = $state<BillingMarket>(preferredMarket());
 let posting = $state(false);
 let error = $state<string | null>(null);
 let initialized = false;
+let modeInitialized = false;
 let currentUid: string | null = null;
 let unsubscribe: Unsubscribe | null = null;
 
@@ -94,8 +139,8 @@ function detach() {
 	currentUid = null;
 }
 
-async function attach(uid: string) {
-	if (currentUid === uid && unsubscribe) return;
+async function attach(uid: string, force = false) {
+	if (!force && currentUid === uid && unsubscribe) return;
 	detach();
 	currentUid = uid;
 	try {
@@ -106,12 +151,14 @@ async function attach(uid: string) {
 			doc(db, 'users', uid),
 			(snap) => {
 				const data = snap.exists() ? (snap.data() as Record<string, unknown>) : {};
+				const billingField = activeBillingField();
 				const rawBilling =
-					data.billing && typeof data.billing === 'object'
-						? (data.billing as Record<string, unknown>)
+					data[billingField] && typeof data[billingField] === 'object'
+						? (data[billingField] as Record<string, unknown>)
 						: {};
 				snapshot = {
-					plan: data.plan === 'paid' ? 'paid' : 'free',
+					plan: data[activePlanField()] === 'paid' ? 'paid' : 'free',
+					livePlan: data.plan === 'paid' ? 'paid' : 'free',
 					status: (rawBilling.status as BillingStatus | undefined) ?? 'none',
 					market: (rawBilling.market as BillingMarket | undefined) ?? null,
 					currency: (rawBilling.currency as BillingSnapshot['currency'] | undefined) ?? null,
@@ -134,6 +181,7 @@ async function attach(uid: string) {
 
 function init() {
 	if (initialized || !browser) return;
+	initBillingModeFromBrowser();
 	initialized = true;
 	auth.onAuthChange((uid) => {
 		if (uid) {
@@ -143,6 +191,26 @@ function init() {
 		}
 	});
 	void auth.init();
+}
+
+function setMode(mode: BillingMode) {
+	initBillingModeFromBrowser();
+	if (billingMode === mode) return;
+	billingMode = mode;
+	error = null;
+	if (browser) {
+		if (mode === 'test') {
+			window.localStorage.setItem(BILLING_MODE_STORAGE_KEY, mode);
+		} else {
+			window.localStorage.removeItem(BILLING_MODE_STORAGE_KEY);
+		}
+	}
+	const uid = currentUid;
+	if (uid) {
+		void attach(uid, true);
+	} else {
+		snapshot = emptySnapshot();
+	}
 }
 
 function openUpgrade(options?: { market?: BillingMarket }) {
@@ -195,7 +263,7 @@ async function startCheckout(market: BillingMarket = selectedMarket) {
 	posting = true;
 	error = null;
 	try {
-		const url = await postBilling('/api/billing/checkout', { market });
+		const url = await postBilling(billingEndpoint('checkout'), { market });
 		window.location.assign(url);
 	} catch (err) {
 		error = 'Could not open Checkout. Please try again.';
@@ -215,7 +283,7 @@ async function openPortal() {
 	posting = true;
 	error = null;
 	try {
-		const url = await postBilling('/api/billing/portal');
+		const url = await postBilling(billingEndpoint('portal'));
 		window.location.assign(url);
 	} catch (err) {
 		error = 'Could not open billing management. Please try again.';
@@ -246,15 +314,24 @@ export const billing = {
 	get error(): string | null {
 		return error;
 	},
+	get mode(): BillingMode {
+		init();
+		return billingMode;
+	},
 	get paid(): boolean {
 		init();
 		return snapshot.plan === 'paid';
+	},
+	get entitled(): boolean {
+		init();
+		return snapshot.livePlan === 'paid';
 	},
 	get canManage(): boolean {
 		init();
 		return Boolean(snapshot.stripeCustomerId);
 	},
 	init,
+	setMode,
 	openUpgrade,
 	closeUpgrade,
 	startCheckout,

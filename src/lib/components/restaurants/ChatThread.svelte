@@ -311,7 +311,7 @@
 						{/each}
 					</div>
 					<div class="mt-4 flex max-w-[700px] items-center justify-end gap-2">
-						{#if msg.turnKind === 'quota_block' && !billing.paid}
+						{#if msg.turnKind === 'quota_block' && !billing.entitled}
 							<button
 								type="button"
 								onclick={() => billing.openUpgrade()}

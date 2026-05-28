@@ -14,7 +14,15 @@
 
 	let open = $state(false);
 	let signingOut = $state(false);
-	let billingAction = $derived(billing.paid || billing.canManage ? 'Manage billing' : 'Upgrade');
+	let billingAction = $derived(
+		billing.mode === 'test'
+			? billing.paid || billing.canManage
+				? 'Manage test billing'
+				: 'Test upgrade'
+			: billing.paid || billing.canManage
+				? 'Manage billing'
+				: 'Upgrade'
+	);
 
 	function handleWindowClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
@@ -80,8 +88,16 @@
 			{/if}
 			{#if billing.paid}
 				<p class="mt-1 text-[11px] text-black/40 dark:text-white/40">
-					{billing.snapshot.cancelAtPeriodEnd ? 'Unlimited ends soon' : 'Unlimited'}
+					{billing.mode === 'test'
+						? billing.snapshot.cancelAtPeriodEnd
+							? 'Test Unlimited ends soon'
+							: 'Test Unlimited'
+						: billing.snapshot.cancelAtPeriodEnd
+							? 'Unlimited ends soon'
+							: 'Unlimited'}
 				</p>
+			{:else if billing.mode === 'test'}
+				<p class="mt-1 text-[11px] text-black/40 dark:text-white/40">Test billing</p>
 			{/if}
 		</div>
 		<button

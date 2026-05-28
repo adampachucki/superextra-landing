@@ -9,7 +9,8 @@ mock.module('firebase-functions/v2/https', {
 
 mock.module('firebase-functions/params', {
 	namedExports: {
-		defineSecret: () => ({ value: () => 'test-secret' })
+		defineSecret: () => ({ value: () => 'test-secret' }),
+		defineString: () => ({ value: () => 'tester@example.com,*@superextra.ai' })
 	}
 });
 
@@ -109,6 +110,7 @@ describe('billing helpers', () => {
 			stripeCustomerId: 'cus_123',
 			stripeSubscriptionId: 'sub_123',
 			status: 'active',
+			mode: 'live',
 			priceId: 'price_123',
 			priceLookupKey: 'superextra_unlimited_monthly',
 			market: 'pl',
@@ -139,5 +141,54 @@ describe('billing helpers', () => {
 		});
 
 		assert.equal(update.billing.currency, 'pln');
+	});
+
+	it('keeps sandbox subscription mirrors out of live billing fields', () => {
+		const update = _billingTesting.subscriptionBillingUpdate(
+			{
+				id: 'sub_123',
+				customer: 'cus_123',
+				status: 'active',
+				currency: 'eur',
+				items: { data: [{ price: { id: 'price_123', currency: 'usd' } }] }
+			},
+			{},
+			_billingTesting.TEST_BILLING
+		);
+
+		assert.equal(update.plan, undefined);
+		assert.equal(update.billing, undefined);
+		assert.equal(update.planTest, 'paid');
+		assert.equal(update.billingTest.mode, 'test');
+		assert.equal(update.billingTest.currency, 'eur');
+	});
+
+	it('matches sandbox billing allow-list patterns', () => {
+		assert.equal(_billingTesting.emailPatternMatches('ap@superextra.ai', '*@superextra.ai'), true);
+		assert.equal(_billingTesting.emailPatternMatches('ap@example.com', '*@superextra.ai'), false);
+		assert.equal(
+			_billingTesting.emailPatternMatches('tester@example.com', 'tester@example.com'),
+			true
+		);
+	});
+
+	it('requires a verified allow-listed email or tester claim for sandbox billing', () => {
+		assert.equal(
+			_billingTesting.userCanUseTestBilling({
+				email: 'ap@superextra.ai',
+				emailVerified: true,
+				billingTester: false
+			}),
+			true
+		);
+		assert.equal(
+			_billingTesting.userCanUseTestBilling({
+				email: 'ap@superextra.ai',
+				emailVerified: false,
+				billingTester: false
+			}),
+			false
+		);
+		assert.equal(_billingTesting.userCanUseTestBilling({ billingTester: true }), true);
 	});
 });

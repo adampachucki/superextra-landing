@@ -145,6 +145,18 @@
 					"function": "stripeWebhook"
 				},
 				{
+					"source": "/api/billing/test/checkout",
+					"function": "billingCheckoutTest"
+				},
+				{
+					"source": "/api/billing/test/portal",
+					"function": "billingPortalTest"
+				},
+				{
+					"source": "/api/billing/test/webhook",
+					"function": "stripeWebhookTest"
+				},
+				{
 					"source": "/api/auth/send-magic-link",
 					"function": "sendMagicLink"
 				},

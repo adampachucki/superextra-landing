@@ -136,7 +136,8 @@ mock.module('firebase-functions/params', {
 		defineSecret: (name) => ({
 			value: () =>
 				name === 'RELAY_KEY' ? 'test-relay-key' : name === 'ELEVENLABS_API_KEY' ? 'test-el-key' : ''
-		})
+		}),
+		defineString: () => ({ value: () => '' })
 	}
 });
 // Mock ./gear-handoff.js BEFORE the index.js import. Putting this inside a

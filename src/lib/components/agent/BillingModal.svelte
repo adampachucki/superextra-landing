@@ -23,7 +23,9 @@
 							Superextra Unlimited
 						</h2>
 						<p class="mt-1 text-[13px] leading-snug text-black/50 dark:text-white/50">
-							Billing country sets currency. Tax is included where applicable.
+							{billing.mode === 'test'
+								? 'Stripe test mode. No real payment is collected.'
+								: 'Billing country sets currency. Tax is included where applicable.'}
 						</p>
 					</div>
 					<button
@@ -72,6 +74,11 @@
 				{#if billing.error}
 					<p class="mt-3 text-[13px] text-red-600 dark:text-red-400" role="alert">
 						{billing.error}
+					</p>
+				{/if}
+				{#if billing.mode === 'test'}
+					<p class="mt-3 text-[12px] text-black/45 dark:text-white/45">
+						Test card: 4242 4242 4242 4242
 					</p>
 				{/if}
 			</div>

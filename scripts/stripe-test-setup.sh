@@ -2,4 +2,4 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-STRIPE_MODE=live exec "$SCRIPT_DIR/stripe-billing-setup.sh" "$@"
+STRIPE_MODE=test exec "$SCRIPT_DIR/stripe-billing-setup.sh" "$@"

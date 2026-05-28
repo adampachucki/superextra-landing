@@ -103,6 +103,8 @@ jobs:
         run: |
           echo "GEAR_REASONING_ENGINE_RESOURCE=projects/907466498524/locations/us-central1/reasoningEngines/1179666575196684288" \
             > functions/.env.superextra-site
+          echo "BILLING_TEST_ALLOWED_EMAILS=*@superextra.ai" \
+            >> functions/.env.superextra-site
           echo "✓ wrote functions/.env.superextra-site:"
           cat functions/.env.superextra-site | sed 's/=.*/=***/'
 
