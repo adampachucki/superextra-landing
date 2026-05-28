@@ -51,6 +51,39 @@ REVIEWS_RESPONSE_PAGE_1 = {
     ],
 }
 
+APIFY_REVIEWS = [
+    {
+        "title": "Deep Review",
+        "text": "Detailed review text",
+        "rating": 5,
+        "publishedDate": "2026-04-01",
+        "originalLanguage": "en",
+        "tripType": "COUPLES",
+        "travelDate": "2026-03",
+        "helpfulVotes": 4,
+        "ownerResponse": {
+            "text": "Thanks for visiting.",
+            "publishedDate": "2026-04-02",
+            "lang": "en",
+        },
+        "subratings": [{"name": "Food", "value": 5}],
+        "photos": [{"url": "https://img.example/review.jpg"}],
+        "user": {
+            "userLocation": {"name": "Berlin, Germany"},
+            "contributions": {"reviews": 40, "restaurantReviews": 2},
+        },
+        "placeInfo": {
+            "id": "6796040",
+            "name": "Umami P-Berg",
+            "rating": 4.1,
+            "numberOfReviews": 886,
+            "locationString": "Berlin",
+            "webUrl": TA_URL,
+            "ratingHistogram": {"count5": 439},
+        },
+    }
+]
+
 
 def _mock_response(json_data, status_code=200):
     resp = AsyncMock(spec=httpx.Response)
@@ -74,11 +107,12 @@ class TestGetTripadvisorReviews:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await get_tripadvisor_reviews(TA_URL, num_pages=1)
+            result = await get_tripadvisor_reviews(TA_URL, max_reviews=10)
 
         assert result["status"] == "success"
         assert result["url"] == TA_URL
         assert result["place_id"] == "6796040"
+        assert result["backend"] == "serpapi"
         assert result["total_reviews"] == 886
         assert result["fetched_reviews"] == 10
         assert len(result["reviews"]) == 10
@@ -106,7 +140,7 @@ class TestGetTripadvisorReviews:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await get_tripadvisor_reviews(TA_URL_PAGED, num_pages=1)
+            result = await get_tripadvisor_reviews(TA_URL_PAGED, max_reviews=10)
 
         assert result["status"] == "success"
         assert result["place_id"] == "6796040"
@@ -119,14 +153,14 @@ class TestGetTripadvisorReviews:
                    side_effect=AssertionError("client should not be created on parse failure")), \
              patch("superextra_agent.tripadvisor_tools._get_api_key",
                    side_effect=AssertionError("api key should not be read on parse failure")):
-            result = await get_tripadvisor_reviews(hotel_url, num_pages=1)
+            result = await get_tripadvisor_reviews(hotel_url, max_reviews=10)
 
         assert result["status"] == "error"
         assert "Restaurant_Review" in result["error_message"]
 
     @pytest.mark.asyncio
     async def test_rejects_empty_url(self):
-        result = await get_tripadvisor_reviews("", num_pages=1)
+        result = await get_tripadvisor_reviews("", max_reviews=10)
         assert result["status"] == "error"
 
     @pytest.mark.asyncio
@@ -139,7 +173,7 @@ class TestGetTripadvisorReviews:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await get_tripadvisor_reviews(TA_URL, num_pages=2)
+            result = await get_tripadvisor_reviews(TA_URL, max_reviews=20)
 
         assert result["fetched_reviews"] == 20
         calls = mock_client.get.call_args_list
@@ -147,13 +181,13 @@ class TestGetTripadvisorReviews:
         assert calls[1].kwargs["params"]["offset"] == 10
 
     @pytest.mark.asyncio
-    async def test_caps_at_10_pages(self):
+    async def test_fast_path_caps_at_100_reviews(self):
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(return_value=_mock_response(REVIEWS_RESPONSE_PAGE_0))
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            await get_tripadvisor_reviews(TA_URL, num_pages=50)
+            await get_tripadvisor_reviews(TA_URL, max_reviews=100)
 
         assert mock_client.get.call_count == 10
 
@@ -167,10 +201,25 @@ class TestGetTripadvisorReviews:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await get_tripadvisor_reviews(TA_URL, num_pages=5)
+            result = await get_tripadvisor_reviews(TA_URL, max_reviews=50)
 
         assert result["fetched_reviews"] == 10
         assert mock_client.get.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_first_page_provider_error_with_no_reviews_returns_error(self):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=_mock_response({
+            "search_information": {"total_reviews": 0},
+            "error": "Tripadvisor hasn't returned any reviews for this query.",
+        }))
+
+        with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
+             patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
+            result = await get_tripadvisor_reviews(TA_URL, max_reviews=10)
+
+        assert result["status"] == "error"
+        assert "hasn't returned any reviews" in result["error_message"]
 
     @pytest.mark.asyncio
     async def test_any_page_http_error_returns_error(self):
@@ -184,7 +233,7 @@ class TestGetTripadvisorReviews:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await get_tripadvisor_reviews(TA_URL, num_pages=3)
+            result = await get_tripadvisor_reviews(TA_URL, max_reviews=30)
 
         assert result["status"] == "error"
 
@@ -196,7 +245,7 @@ class TestGetTripadvisorReviews:
 
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            await get_tripadvisor_reviews(TA_URL, num_pages=1, tool_context=ctx)
+            await get_tripadvisor_reviews(TA_URL, max_reviews=10, tool_context=ctx)
 
         pills = [v for k, v in ctx.state.items() if k.startswith("_tool_src_tripadvisor_")]
         assert len(pills) == 1
@@ -215,7 +264,7 @@ class TestGetTripadvisorReviews:
         # No tool_context passed — must not raise even on success path.
         with patch("superextra_agent.tripadvisor_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.tripadvisor_tools._get_api_key", return_value="test-key"):
-            result = await get_tripadvisor_reviews(TA_URL, num_pages=1)
+            result = await get_tripadvisor_reviews(TA_URL, max_reviews=10)
 
         assert result["status"] == "success"
 
@@ -226,7 +275,57 @@ class TestGetTripadvisorReviews:
              patch("superextra_agent.tripadvisor_tools._client", None), \
              patch("superextra_agent.secrets._get_client",
                    side_effect=RuntimeError("sm unreachable in test")):
-            result = await get_tripadvisor_reviews(TA_URL, num_pages=1)
+            result = await get_tripadvisor_reviews(TA_URL, max_reviews=10)
 
         assert result["status"] == "error"
         assert "SERPAPI_API_KEY" in result["error_message"]
+
+    @pytest.mark.asyncio
+    async def test_deep_mode_uses_apify_and_parses_superset_fields(self):
+        with patch(
+            "superextra_agent.tripadvisor_tools._run_actor_sync",
+            AsyncMock(return_value={"status": "success", "items": APIFY_REVIEWS}),
+        ) as run_actor:
+            result = await get_tripadvisor_reviews(TA_URL, max_reviews=300, mode="deep")
+
+        assert result["status"] == "success"
+        assert result["backend"] == "apify"
+        assert result["total_reviews"] == 886
+        assert result["fetched_reviews"] == 1
+        assert result["place_info"]["ratingHistogram"] == {"count5": 439}
+
+        actor, payload = run_actor.call_args.args
+        assert actor == "maxcopell~tripadvisor-reviews"
+        assert payload["startUrls"] == [{"url": TA_URL}]
+        assert payload["maxReviews"] == 300
+        assert payload["scrapeReviewerInfo"] is True
+        assert payload["disableMachineTranslations"] is True
+
+        review = result["reviews"][0]
+        assert review["text"] == "Detailed review text"
+        assert review["owner_response"]["text"] == "Thanks for visiting."
+        assert review["author_hometown"] == "Berlin, Germany"
+        assert review["author_contributions"] == 42
+        assert review["subratings"] == [{"name": "Food", "value": 5}]
+        assert review["photo_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_max_reviews_above_fast_limit_selects_deep_mode(self):
+        with patch(
+            "superextra_agent.tripadvisor_tools._run_actor_sync",
+            AsyncMock(return_value={"status": "success", "items": APIFY_REVIEWS}),
+        ) as run_actor:
+            result = await get_tripadvisor_reviews(TA_URL, max_reviews=101)
+
+        assert result["backend"] == "apify"
+        assert run_actor.call_args.args[1]["maxReviews"] == 101
+
+    @pytest.mark.asyncio
+    async def test_deep_mode_caps_at_300_reviews(self):
+        with patch(
+            "superextra_agent.tripadvisor_tools._run_actor_sync",
+            AsyncMock(return_value={"status": "success", "items": APIFY_REVIEWS}),
+        ) as run_actor:
+            await get_tripadvisor_reviews(TA_URL, max_reviews=500, mode="deep")
+
+        assert run_actor.call_args.args[1]["maxReviews"] == 300

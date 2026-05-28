@@ -20,7 +20,12 @@ from superextra_agent.specialists import (
     _on_model_error,
 )
 
-_SPECIALISTS_WITH_CUSTOM_TOOLS = {"review_analyst", "social_analyst"}
+_SPECIALISTS_WITH_CUSTOM_TOOLS = {
+    "location_traffic",
+    "market_landscape",
+    "review_analyst",
+    "social_analyst",
+}
 NATIVE_INITIAL_SPECIALISTS = {
     specialist.name
     for specialist in SPECIALISTS

@@ -266,9 +266,11 @@ def _wall_overlap(drawer_sources: list[dict]) -> dict:
 
 def _provider_presence(drawer_sources: list[dict]) -> dict:
     providers = {s.get("provider") for s in drawer_sources if s.get("provider")}
+    has_google_place_signals = "google_place_signals" in providers
     return {
         "has_google_maps_pill": "google_maps" in providers,
-        "has_google_reviews_pill": "google_reviews" in providers,
+        "has_google_reviews_pill": "google_reviews" in providers or has_google_place_signals,
+        "has_google_place_signals_pill": has_google_place_signals,
         "has_tripadvisor_pill": "tripadvisor" in providers,
     }
 
@@ -411,6 +413,7 @@ async def _score_file(path: Path, no_judge: bool, venue_own: dict[str, set[str]]
         "wall_brands": ";".join(wall["wall_brands_matched"]),
         "has_google_maps_pill": providers["has_google_maps_pill"],
         "has_google_reviews_pill": providers["has_google_reviews_pill"],
+        "has_google_place_signals_pill": providers["has_google_place_signals_pill"],
         "has_tripadvisor_pill": providers["has_tripadvisor_pill"],
         # Tokens + tools
         "tokens_total": (run.get("token_totals") or {}).get("total", 0),

@@ -12,6 +12,7 @@
 export type ChatSourceProvider =
 	| 'google_maps'
 	| 'google_reviews'
+	| 'google_place_signals'
 	| 'tripadvisor'
 	| 'facebook'
 	| 'instagram'

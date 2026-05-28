@@ -124,6 +124,7 @@
 	const PROVIDER_LABELS: Partial<Record<ChatSourceProvider, string>> = {
 		google_maps: 'Google Maps',
 		google_reviews: 'Google Reviews',
+		google_place_signals: 'Google Maps signals',
 		tripadvisor: 'TripAdvisor',
 		facebook: 'Facebook',
 		instagram: 'Instagram'

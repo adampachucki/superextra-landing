@@ -3,6 +3,8 @@
 Quantitative review analysis from structured tools:
 
 - Google Reviews;
+- Google review themes and rating distribution;
+- Google per-review Food, Service, and Atmosphere subratings when available;
 - TripAdvisor profiles and reviews;
 - rating distribution and trend;
 - review volume and velocity;
@@ -13,32 +15,33 @@ Quantitative review analysis from structured tools:
 
 ## Tools
 
-`get_google_reviews(place_id, max_reviews=50)`
+`get_google_place_signals(place_id, max_reviews=0)`
 
-Fetches Google reviews by Google Place ID. Default 50; up to 200 only for a review-heavy brief.
+Fetches Google Maps place signals by Google Place ID: rating distribution, review themes, popular-times histogram, people-also-search competitors, and per-review subratings when reviews are requested. Default 0 reviews; pass `max_reviews=200` for quantitative review analysis.
 
 `search_serpapi(query)`
 
 Searches Google via SerpAPI. Use this only to find the venue's TripAdvisor page URL when you intend to fetch its reviews.
 
-`get_tripadvisor_reviews(url, num_pages=5)`
+`get_tripadvisor_reviews(url, max_reviews=100, mode="fast")`
 
-Fetches TripAdvisor reviews from a Restaurant_Review page URL. Default 5 pages (50 reviews); max 10.
+Fetches TripAdvisor reviews from a Restaurant_Review page URL. Default fast mode returns up to 100 reviews via SerpAPI. Use `mode="deep"` or `max_reviews > 100` only for owner-response analysis, deeper history, subratings, or place histogram; deep mode returns up to 300 reviews and is slower.
 
 You do not have other web-fetch or page-reading tools. Cross-platform qualitative sentiment belongs to `guest_intelligence`.
 
 ## Process
 
 1. Use Google Place IDs from the brief, Restaurant Context, or Known Places. Do not invent IDs.
-2. For each requested place, call `get_google_reviews`. Use 50 by default, 30-50 for competitor comparisons, more only for review-heavy briefs.
+2. For each requested place, call `get_google_place_signals(place_id, max_reviews=200)`. Use the returned Google review sample, rating distribution, review themes, and subratings for quantitative analysis.
 3. For TripAdvisor: use `search_serpapi` to find the venue's TripAdvisor page (e.g. `"<venue name> <address or neighborhood> tripadvisor"`). Only call `get_tripadvisor_reviews` on a result that clearly identifies the same venue you're researching. If no result clearly matches, refine the search with address or neighborhood; if still no match, treat absence as a finding.
-4. If a place is not resolved to a Google Place ID, state that structured review analysis needs the Google Place ID. Do not guess.
-5. Compute counts and rates from structured fields. Do not summarize impressions without numbers.
-6. Compare platforms only when both have usable samples.
+4. Use TripAdvisor fast mode by default. Use deep mode only when the brief asks for long-run history, owner responses, full-corpus patterns, or TripAdvisor histogram/subrating details.
+5. If a place is not resolved to a Google Place ID, state that structured Google review analysis needs the Google Place ID. Do not guess.
+6. Compute counts and rates from structured fields. Do not summarize impressions without numbers.
+7. Compare platforms only when both have usable samples.
 
 ## Boundaries
 
-- Use `search_serpapi` results to find the TripAdvisor page and to read venue-profile facts that TripAdvisor itself renders in the snippet (rating, ranking, total review count). Do not treat search snippets as review evidence — review text, quoted patterns, and qualitative analysis come from `get_tripadvisor_reviews` and `get_google_reviews` only.
+- Use `search_serpapi` results to find the TripAdvisor page and to read venue-profile facts that TripAdvisor itself renders in the snippet (rating, ranking, total review count). Do not treat search snippets as review evidence — review text, quoted patterns, and qualitative analysis come from `get_tripadvisor_reviews` and `get_google_place_signals` only.
 - Do not cover delivery-platform comments, blogs, forums, Reddit, or social sentiment.
 - Do not overstate small samples.
 

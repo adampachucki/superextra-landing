@@ -6,7 +6,12 @@ from superextra_agent.specialists import ALL_SPECIALISTS, CONTINUATION_SPECIALIS
 from superextra_agent.agent import _skip_enricher_if_cached
 from superextra_agent.specialist_catalog import SPECIALISTS
 
-_SPECIALISTS_WITH_CUSTOM_TOOLS = {"review_analyst", "social_analyst"}
+_SPECIALISTS_WITH_CUSTOM_TOOLS = {
+    "location_traffic",
+    "market_landscape",
+    "review_analyst",
+    "social_analyst",
+}
 NATIVE_INITIAL_SPECIALISTS = {
     specialist.name
     for specialist in SPECIALISTS
@@ -107,9 +112,17 @@ def test_review_analyst_uses_serpapi_for_tripadvisor_discovery():
         names = _tool_names(review.tools)
         assert "search_serpapi" in names
         assert "get_tripadvisor_reviews" in names
-        assert "get_google_reviews" in names
+        assert "get_google_place_signals" in names
         assert "find_tripadvisor_restaurant" not in names
         assert "google_search" not in names
+
+
+def test_market_and_location_specialists_get_google_place_signals_with_native_web():
+    for specialists in (ALL_SPECIALISTS, CONTINUATION_SPECIALISTS):
+        for name in ("market_landscape", "location_traffic"):
+            specialist = next(s for s in specialists if s.name == name)
+            names = _tool_names(specialist.tools)
+            assert names == ["google_search", "url_context", "get_google_place_signals"]
 
 
 def test_skip_enricher_returns_cached_context():

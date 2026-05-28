@@ -194,7 +194,7 @@ async def test_tool_lifecycle_cloud_log_uses_sanitized_metadata(cloud_logs):
         agent_name="review_analyst",
         function_call_id="call-1",
     )
-    tool = SimpleNamespace(name="get_google_reviews")
+    tool = SimpleNamespace(name="get_google_place_signals")
 
     await plugin.before_tool_callback(
         tool=tool,
@@ -212,7 +212,7 @@ async def test_tool_lifecycle_cloud_log_uses_sanitized_metadata(cloud_logs):
     assert tool_call["sid"] == "parent"
     assert tool_call["root_invocation_id"] == "inv-parent"
     assert tool_call["parent_invocation_id"] == "inv-parent"
-    assert tool_call["tool"] == "get_google_reviews"
+    assert tool_call["tool"] == "get_google_place_signals"
     assert tool_call["arg_keys"] == ["limit", "place_id"]
     assert "args" not in tool_call
 
