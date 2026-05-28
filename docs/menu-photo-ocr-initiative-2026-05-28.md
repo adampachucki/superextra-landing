@@ -5,7 +5,7 @@
 
 ## Why this is separate
 
-Menu OCR should not be bundled into the Google reviews / TripAdvisor review-source swap. The review work is a provider replacement: fetch richer structured review and place data, trim it, preserve source pills, and update specialist instructions.
+Menu OCR should not be bundled into the Google reviews / TripAdvisor review-source swap. The review work is a provider decision around structured review samples, source pills, and specialist instructions.
 
 Menu OCR is a different product problem. It needs image retrieval, Gemini vision extraction, price normalization, confidence handling, and operator-facing caveats. The source-photo fetch is the easy part; the quality bar lives in the OCR and item/price extraction.
 
@@ -35,7 +35,7 @@ Durable observations from those tests:
 - Returned image URLs are public `lh3.googleusercontent.com` assets; the photo ID can be parsed from the URL and the size suffix can be normalized before passing to Gemini vision.
 - The equivalent Apify photo-only path was cheaper at 60 photos in the smoke tests, but materially slower for a synchronous agent turn.
 
-The same tests found that `compass/crawler-google-places` returns useful generic photos, but not per-photo menu category tags. Its `imageCategories` field tells which tabs exist; the actual `imageUrls` list is flat. Do not use that actor as the menu-photo source unless a later smoke test proves the output shape changed.
+The same tests found that the broader Google Maps place crawler returns useful generic photos, but not per-photo menu category tags. Its category metadata only tells which tabs exist; the actual image URL list is flat. Do not use that crawler as the menu-photo source unless a later smoke test proves the output shape changed.
 
 ## Proposed Tool
 

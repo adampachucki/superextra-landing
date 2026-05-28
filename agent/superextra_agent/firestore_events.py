@@ -134,7 +134,7 @@ _FUNCTION_TOOL_LABELS: dict[str, str] = {
     "get_restaurant_details": "venue profile",
     "get_batch_restaurant_details": "venue profiles",
     "get_tripadvisor_reviews": "structured reviews",
-    "get_google_place_signals": "Google Maps signals",
+    "get_google_reviews": "structured reviews",
     "google_search": "source search",
     "search_public_web": "source search",
     "read_web_pages": "source reading",
@@ -418,14 +418,14 @@ def map_tool_call(
         if query:
             return _detail(row_id, "platform", "Google Maps", query)
         return _detail(row_id, "platform", "Google Maps", "Searching places")
-    if name == "get_google_place_signals":
+    if name == "get_google_reviews":
         place_id = str(args.get("place_id") or "").strip()
         place = _place_name(state, place_id)
         return _detail(
             row_id,
             "platform",
-            "Google Maps",
-            f"Checking signals for {place}" if place else "Checking place signals",
+            "Google reviews",
+            f"Checking {place}" if place else "Checking reviews",
         )
     if name == "get_tripadvisor_reviews":
         url = str(args.get("url") or "").strip()
@@ -514,29 +514,22 @@ def map_tool_result(
             return [_detail(row_id, "warning", "Warnings", "TripAdvisor reviews unavailable")]
         return []
 
-    if name == "get_google_place_signals":
+    if name == "get_google_reviews":
         place_id = str(response.get("place_id") or "").strip()
         place = _place_name(state, place_id)
         if status == "success":
             count = int(response.get("total_fetched") or 0)
-            if count:
-                label = f"{count} Google reviews plus place signals"
-                if place:
-                    label = f"{count} reviews and place signals for {place}"
-            else:
-                label = "Google Maps place signals loaded"
-                if place:
-                    label = f"Place signals loaded for {place}"
-            return [_detail(row_id, "platform", "Google Maps", label)]
+            label = f"{count} reviews for {place}" if place else f"{count} Google reviews"
+            return [_detail(row_id, "platform", "Google reviews", label)]
         if status == "error":
             return [
                 _detail(
                     row_id,
                     "warning",
                     "Warnings",
-                    f"Google Maps signals unavailable for {place}"
+                    f"Google reviews unavailable for {place}"
                     if place
-                    else "Google Maps signals unavailable",
+                    else "Google reviews unavailable",
                 )
             ]
         return []

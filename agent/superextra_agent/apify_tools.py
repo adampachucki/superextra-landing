@@ -1,9 +1,9 @@
 """Apify-backed structured providers.
 
 Thin wrappers around Apify actors that take a single venue identifier
-(Google Place ID for `get_google_place_signals`; a platform URL for the
-social fetchers) and return a trimmed, model-friendly subset of the actor's
-dataset items.
+(Google Place ID for `get_google_reviews`; a platform URL for the social
+fetchers) and return a trimmed, model-friendly subset of the actor's dataset
+items.
 
 Each public function emits one source pill via `tool_source_key(...)`
 into `tool_context.state` so the run-state pipeline can fold it into the
@@ -19,12 +19,12 @@ from .place_state import source_title, tool_source_key
 from .secrets import get_secret
 
 APIFY_BASE = "https://api.apify.com/v2"
-GOOGLE_PLACE_SIGNALS_ACTOR = "compass~crawler-google-places"
+GOOGLE_REVIEWS_ACTOR = "compass~google-maps-reviews-scraper"
 TRIPADVISOR_PAGE_ACTOR = "maxcopell~tripadvisor"
 FACEBOOK_PAGE_ACTOR = "apify~facebook-pages-scraper"
 FACEBOOK_POSTS_ACTOR = "apify~facebook-posts-scraper"
 INSTAGRAM_ACTOR = "apify~instagram-scraper"
-GOOGLE_PLACE_SIGNALS_MAX_REVIEWS = 200
+GOOGLE_REVIEWS_MAX_REVIEWS = 200
 
 _client: httpx.AsyncClient | None = None
 
@@ -143,65 +143,31 @@ def _compact_google_review(item: dict) -> dict:
     return review
 
 
-def _compact_reviews_tags(tags: list | None) -> list[dict]:
-    out = []
-    for tag in tags or []:
-        if not isinstance(tag, dict):
-            continue
-        title = tag.get("title")
-        if not title:
-            continue
-        entry = {"title": title}
-        if tag.get("count") is not None:
-            entry["count"] = tag.get("count")
-        out.append(entry)
-    return out
-
-
-def _compact_people_also_search(items: list | None) -> list[dict]:
-    out = []
-    for item in items or []:
-        if not isinstance(item, dict):
-            continue
-        title = item.get("title") or item.get("name")
-        if not title:
-            continue
-        entry = {"title": title}
-        for key in ("categoryName", "totalScore", "reviewsCount", "price", "url", "placeId"):
-            value = item.get(key)
-            if value is not None and value != "":
-                entry[key] = value
-        out.append(entry)
-    return out
-
-
-async def get_google_place_signals(
+async def get_google_reviews(
     place_id: str,
-    max_reviews: int = 0,
+    max_reviews: int = 50,
     tool_context=None,
 ) -> dict:
-    """Fetch Google Maps place, review, demand, and competitor signals.
+    """Fetch Google Maps reviews for a restaurant using its Place ID.
 
     Uses the Google Maps Place ID directly — no name matching needed. Returns
-    a compact place profile, review distribution/themes, popular-times
-    histogram, people-also-search competitors, and structured reviews with
-    per-review subratings when requested and exposed by Google.
+    structured reviews with text, ratings, dates, owner responses, and
+    per-review subratings when the reviews actor exposes them.
 
     Args:
         place_id: Google Places ID (e.g. 'ChIJMRpv9_HNHkcRdzbAYDXx7fc').
                   Found in the Places context data.
-        max_reviews: Maximum number of reviews to fetch (default 0, max 200).
+        max_reviews: Maximum number of reviews to fetch (default 50, max 200).
     """
-    max_reviews = max(0, min(max_reviews, GOOGLE_PLACE_SIGNALS_MAX_REVIEWS))
+    max_reviews = max(1, min(max_reviews, GOOGLE_REVIEWS_MAX_REVIEWS))
     result = await _run_actor_sync(
-        GOOGLE_PLACE_SIGNALS_ACTOR,
+        GOOGLE_REVIEWS_ACTOR,
         {
             "placeIds": [place_id],
-            "maxCrawledPlacesPerSearch": 1,
-            "scrapePlaceDetailPage": True,
             "maxReviews": max_reviews,
             "reviewsSort": "newest",
-            "language": "en",
+            "reviewsOrigin": "google",
+            "personalData": False,
         },
     )
     if result["status"] != "success":
@@ -210,16 +176,14 @@ async def get_google_place_signals(
     if not items:
         return {
             "status": "error",
-            "error_message": f"No Google Maps signals found for place {place_id}",
+            "error_message": f"No Google reviews found for place {place_id}",
         }
-    item = items[0] if isinstance(items[0], dict) else {}
-    raw_reviews = item.get("reviews") if isinstance(item.get("reviews"), list) else []
-    reviews = [_compact_google_review(r) for r in raw_reviews if isinstance(r, dict)]
+    reviews = [_compact_google_review(i) for i in items if isinstance(i, dict)]
 
     if tool_context:
-        tool_context.state[tool_source_key("google_place_signals", place_id)] = {
-            "provider": "google_place_signals",
-            "title": source_title(tool_context.state, place_id, "Google Maps signals"),
+        tool_context.state[tool_source_key("google_reviews", place_id)] = {
+            "provider": "google_reviews",
+            "title": source_title(tool_context.state, place_id, "Google Reviews"),
             "url": f"https://www.google.com/maps/place/?q=place_id:{place_id}",
             "domain": "google.com",
             "place_id": place_id,
@@ -228,16 +192,6 @@ async def get_google_place_signals(
     return {
         "status": "success",
         "place_id": place_id,
-        "title": item.get("title"),
-        "category": item.get("categoryName"),
-        "address": item.get("address"),
-        "url": item.get("url"),
-        "rating": item.get("totalScore"),
-        "reviews_count": item.get("reviewsCount"),
-        "reviews_distribution": item.get("reviewsDistribution"),
-        "review_tags": _compact_reviews_tags(item.get("reviewsTags")),
-        "popular_times": item.get("popularTimesHistogram"),
-        "people_also_search": _compact_people_also_search(item.get("peopleAlsoSearch")),
         "total_fetched": len(reviews),
         "reviews": reviews,
     }

@@ -9,57 +9,31 @@ from superextra_agent.apify_tools import (
     fetch_facebook_posts,
     fetch_instagram_profile,
     fetch_tripadvisor_page,
-    get_google_place_signals,
+    get_google_reviews,
 )
 
 
 # --- Fixtures ---
 
-GOOGLE_PLACE_SIGNALS_RESPONSE = [
+APIFY_DATASET_RESPONSE = [
     {
-        "title": "Test Restaurant",
-        "categoryName": "Restaurant",
-        "address": "123 Test St",
-        "url": "https://www.google.com/maps/search/?api=1&query=Test",
-        "totalScore": 4.6,
-        "reviewsCount": 500,
-        "reviewsDistribution": {"oneStar": 10, "fiveStar": 300},
-        "reviewsTags": [{"title": "service", "count": 20}],
-        "popularTimesHistogram": {"Mo": [{"hour": 12, "occupancyPercent": 40}]},
-        "peopleAlsoSearch": [
-            {
-                "title": "Competitor",
-                "categoryName": "Restaurant",
-                "totalScore": 4.4,
-                "reviewsCount": 120,
-                "placeId": "ChIJcomp",
-            }
-        ],
-        "tableReservationLinks": [{"name": "resmio", "url": "https://resmio.example"}],
-        "orderOnline": {
-            "deliveries": [{"name": "Wolt", "url": "https://wolt.example"}],
-        },
-        "reviews": [
-            {
-                "text": "Great coffee and atmosphere!",
-                "stars": 5,
-                "publishedAtDate": "2026-03-15",
-                "originalLanguage": "en",
-                "isLocalGuide": True,
-                "likesCount": 3,
-                "responseFromOwnerText": "Thank you!",
-                "reviewDetailedRating": {"Food": 5, "Service": 4, "Atmosphere": 5},
-                "reviewImageUrls": ["https://img.example/1"],
-            },
-            {
-                "text": "Decent but overpriced.",
-                "stars": 3,
-                "publishedAtDate": "2026-03-10",
-                "originalLanguage": "pl",
-                "isLocalGuide": False,
-                "likesCount": 0,
-            },
-        ],
+        "text": "Great coffee and atmosphere!",
+        "stars": 5,
+        "publishedAtDate": "2026-03-15",
+        "originalLanguage": "en",
+        "isLocalGuide": True,
+        "likesCount": 3,
+        "responseFromOwnerText": "Thank you!",
+        "reviewDetailedRating": {"Food": 5, "Service": 4, "Atmosphere": 5},
+        "reviewImageUrls": ["https://img.example/1"],
+    },
+    {
+        "text": "Decent but overpriced.",
+        "stars": 3,
+        "publishedAtDate": "2026-03-10",
+        "originalLanguage": "pl",
+        "isLocalGuide": False,
+        "likesCount": 0,
     },
 ]
 
@@ -72,25 +46,18 @@ def _mock_response(json_data, status_code=201):
     return resp
 
 
-class TestGetGooglePlaceSignals:
+class TestGetGoogleReviews:
     @pytest.mark.asyncio
-    async def test_fetches_and_parses_place_signals(self):
+    async def test_fetches_and_parses_reviews(self):
         mock_client = AsyncMock()
-        mock_client.post = AsyncMock(return_value=_mock_response(GOOGLE_PLACE_SIGNALS_RESPONSE))
+        mock_client.post = AsyncMock(return_value=_mock_response(APIFY_DATASET_RESPONSE))
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            result = await get_google_place_signals("ChIJtest123")
+            result = await get_google_reviews("ChIJtest123")
 
         assert result["status"] == "success"
         assert result["place_id"] == "ChIJtest123"
-        assert result["title"] == "Test Restaurant"
-        assert result["rating"] == 4.6
-        assert result["reviews_count"] == 500
-        assert result["reviews_distribution"] == {"oneStar": 10, "fiveStar": 300}
-        assert result["review_tags"] == [{"title": "service", "count": 20}]
-        assert result["popular_times"] == {"Mo": [{"hour": 12, "occupancyPercent": 40}]}
-        assert result["people_also_search"][0]["title"] == "Competitor"
         assert result["total_fetched"] == 2
 
         review = result["reviews"][0]
@@ -107,20 +74,20 @@ class TestGetGooglePlaceSignals:
         review2 = result["reviews"][1]
         assert "owner_response" not in review2
 
-        call_json = mock_client.post.call_args.kwargs.get("json") or mock_client.post.call_args[1].get("json")
-        assert call_json["maxReviews"] == 0
-
     @pytest.mark.asyncio
-    async def test_caps_max_reviews(self):
+    async def test_bounds_max_reviews_to_actor_schema(self):
         mock_client = AsyncMock()
-        mock_client.post = AsyncMock(return_value=_mock_response(GOOGLE_PLACE_SIGNALS_RESPONSE))
+        mock_client.post = AsyncMock(return_value=_mock_response(APIFY_DATASET_RESPONSE))
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            await get_google_place_signals("ChIJtest123", max_reviews=500)
+            await get_google_reviews("ChIJtest123", max_reviews=500)
+            await get_google_reviews("ChIJtest123", max_reviews=0)
 
-        call_json = mock_client.post.call_args.kwargs.get("json") or mock_client.post.call_args[1].get("json")
-        assert call_json["maxReviews"] == 200
+        first_json = mock_client.post.call_args_list[0].kwargs.get("json")
+        second_json = mock_client.post.call_args_list[1].kwargs.get("json")
+        assert first_json["maxReviews"] == 200
+        assert second_json["maxReviews"] == 1
 
     @pytest.mark.asyncio
     async def test_api_error_returns_error(self):
@@ -129,7 +96,7 @@ class TestGetGooglePlaceSignals:
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            result = await get_google_place_signals("ChIJtest123")
+            result = await get_google_reviews("ChIJtest123")
 
         assert result["status"] == "error"
         assert "401" in result["error_message"]
@@ -141,10 +108,10 @@ class TestGetGooglePlaceSignals:
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            result = await get_google_place_signals("ChIJtest123")
+            result = await get_google_reviews("ChIJtest123")
 
         assert result["status"] == "error"
-        assert "No Google Maps signals" in result["error_message"]
+        assert "No Google reviews" in result["error_message"]
 
     @pytest.mark.asyncio
     async def test_timeout_returns_error(self):
@@ -153,7 +120,7 @@ class TestGetGooglePlaceSignals:
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            result = await get_google_place_signals("ChIJtest123")
+            result = await get_google_reviews("ChIJtest123")
 
         assert result["status"] == "error"
         assert "timed out" in result["error_message"]
@@ -167,7 +134,7 @@ class TestGetGooglePlaceSignals:
              patch("superextra_agent.apify_tools._client", None), \
              patch("superextra_agent.secrets._get_client",
                    side_effect=RuntimeError("sm unreachable in test")):
-            result = await get_google_place_signals("ChIJtest123")
+            result = await get_google_reviews("ChIJtest123")
 
         assert result["status"] == "error"
         assert "APIFY_TOKEN" in result["error_message"]
@@ -175,21 +142,21 @@ class TestGetGooglePlaceSignals:
     @pytest.mark.asyncio
     async def test_sends_correct_place_id(self):
         mock_client = AsyncMock()
-        mock_client.post = AsyncMock(return_value=_mock_response(GOOGLE_PLACE_SIGNALS_RESPONSE))
+        mock_client.post = AsyncMock(return_value=_mock_response(APIFY_DATASET_RESPONSE))
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            await get_google_place_signals("ChIJMRpv9_HNHkcRdzbAYDXx7fc")
+            await get_google_reviews("ChIJMRpv9_HNHkcRdzbAYDXx7fc")
 
         call_json = mock_client.post.call_args.kwargs.get("json") or mock_client.post.call_args[1].get("json")
         assert call_json["placeIds"] == ["ChIJMRpv9_HNHkcRdzbAYDXx7fc"]
-        assert call_json["maxCrawledPlacesPerSearch"] == 1
-        assert call_json["scrapePlaceDetailPage"] is True
         assert call_json["reviewsSort"] == "newest"
+        assert call_json["reviewsOrigin"] == "google"
+        assert call_json["personalData"] is False
 
 
-class TestGooglePlaceSignalsSourceWrite:
-    """Google place-signal provider sources are written for the requested place."""
+class TestGoogleReviewsSourceWrite:
+    """Google Reviews provider sources are written for the requested place."""
 
     @pytest.mark.asyncio
     async def test_target_call_writes_provider_source(self):
@@ -207,17 +174,17 @@ class TestGooglePlaceSignalsSourceWrite:
 
         ctx = MockCtx()
         mock_client = AsyncMock()
-        mock_client.post = AsyncMock(return_value=_mock_response(GOOGLE_PLACE_SIGNALS_RESPONSE))
+        mock_client.post = AsyncMock(return_value=_mock_response(APIFY_DATASET_RESPONSE))
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            await get_google_place_signals("ChIJtarget", tool_context=ctx)
+            await get_google_reviews("ChIJtarget", tool_context=ctx)
 
         source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
         assert len(source_keys) == 1
         entry = ctx.state[source_keys[0]]
-        assert entry["provider"] == "google_place_signals"
-        assert entry["title"] == "Google Maps signals - Target"
+        assert entry["provider"] == "google_reviews"
+        assert entry["title"] == "Google Reviews - Target"
         assert entry["url"] == "https://www.google.com/maps/place/?q=place_id:ChIJtarget"
         assert entry["domain"] == "google.com"
         assert entry["place_id"] == "ChIJtarget"
@@ -238,17 +205,17 @@ class TestGooglePlaceSignalsSourceWrite:
 
         ctx = MockCtx()
         mock_client = AsyncMock()
-        mock_client.post = AsyncMock(return_value=_mock_response(GOOGLE_PLACE_SIGNALS_RESPONSE))
+        mock_client.post = AsyncMock(return_value=_mock_response(APIFY_DATASET_RESPONSE))
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            await get_google_place_signals("ChIJcomp", tool_context=ctx)
+            await get_google_reviews("ChIJcomp", tool_context=ctx)
 
         source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
         assert len(source_keys) == 1
         entry = ctx.state[source_keys[0]]
-        assert entry["provider"] == "google_place_signals"
-        assert entry["title"] == "Google Maps signals - Competitor"
+        assert entry["provider"] == "google_reviews"
+        assert entry["title"] == "Google Reviews - Competitor"
         assert entry["place_id"] == "ChIJcomp"
 
     @pytest.mark.asyncio
@@ -259,15 +226,15 @@ class TestGooglePlaceSignalsSourceWrite:
 
         ctx = MockCtx()
         mock_client = AsyncMock()
-        mock_client.post = AsyncMock(return_value=_mock_response(GOOGLE_PLACE_SIGNALS_RESPONSE))
+        mock_client.post = AsyncMock(return_value=_mock_response(APIFY_DATASET_RESPONSE))
 
         with patch("superextra_agent.apify_tools._get_client", return_value=mock_client), \
              patch("superextra_agent.apify_tools._get_api_key", return_value="test-token"):
-            await get_google_place_signals("ChIJunknown", tool_context=ctx)
+            await get_google_reviews("ChIJunknown", tool_context=ctx)
 
         source_keys = [k for k in ctx.state if k.startswith("_tool_src_")]
         assert len(source_keys) == 1
-        assert ctx.state[source_keys[0]]["title"] == "Google Maps signals"
+        assert ctx.state[source_keys[0]]["title"] == "Google Reviews"
         assert ctx.state[source_keys[0]]["place_id"] == "ChIJunknown"
 
 

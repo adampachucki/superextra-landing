@@ -12,7 +12,6 @@ Location quality and trade-area dynamics:
 
 ## Evidence To Seek
 
-- Google Maps popular-times histogram from `get_google_place_signals(place_id, max_reviews=0)` when a Google Place ID is available.
 - Official demographics, census, municipal, transport, planning, and open-data sources.
 - Public busyness, mobility, or venue activity signals when accessible.
 - Nearby anchors such as offices, universities, hotels, malls, transit stops, and event venues.
@@ -22,7 +21,6 @@ Location quality and trade-area dynamics:
 ## Boundaries
 
 - Public busyness indicators are relative signals, not measured footfall.
-- Google popular-times data is a relative demand-shape signal for the venue, not measured pedestrian traffic.
 - Demographic data may be old. State the vintage.
 - Rent varies by exact street and unit. Use ranges and caveats.
 - Do not turn location demand into operating cost analysis. Use `operations` for cost ratios.

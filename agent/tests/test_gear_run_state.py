@@ -346,21 +346,21 @@ def test_source_dedupe_keeps_same_url_for_distinct_provider_or_place():
         "title": "Google Maps - Target",
     })
     state._merge_source({
-        "provider": "google_place_signals",
+        "provider": "google_reviews",
         "place_id": "ChIJtarget",
         "url": url,
-        "title": "Google Maps signals - Target",
+        "title": "Google Reviews - Target",
     })
     state._merge_source({
-        "provider": "google_place_signals",
+        "provider": "google_reviews",
         "place_id": "ChIJtarget",
         "url": url,
-        "title": "Google Maps signals - Target duplicate",
+        "title": "Google Reviews - Target duplicate",
     })
 
     assert [s["provider"] for s in state.specialist_sources] == [
         "google_maps",
-        "google_place_signals",
+        "google_reviews",
     ]
 
 
@@ -434,10 +434,10 @@ def test_capture_final_preserves_place_scoped_sources_with_same_url():
             "title": "Google Maps - Target",
         },
         {
-            "provider": "google_place_signals",
+            "provider": "google_reviews",
             "place_id": "ChIJtarget",
             "url": url,
-            "title": "Google Maps signals - Target",
+            "title": "Google Reviews - Target",
         },
     ]
 
@@ -445,7 +445,7 @@ def test_capture_final_preserves_place_scoped_sources_with_same_url():
 
     assert [s["provider"] for s in state.final_sources] == [
         "google_maps",
-        "google_place_signals",
+        "google_reviews",
     ]
 
 

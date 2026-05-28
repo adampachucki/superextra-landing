@@ -249,13 +249,12 @@ class TestMakeInstruction:
         # New unified flow
         assert "search_serpapi" in result
         assert "get_tripadvisor_reviews(url" in result
-        assert "get_google_place_signals(place_id" in result
+        assert "get_google_reviews(place_id" in result
         assert "Restaurant_Review page URL" in result
         assert "clearly identifies the same venue" in result
         assert "treat absence as a finding" in result
         assert 'mode="deep"' in result
         assert "specific review count" in result
-        assert "Do not fetch review samples for people-also-search" in result
         # Snippet usage: TA-rendered profile facts (rating/rank/total) are OK;
         # not as review evidence.
         assert "Do not treat search snippets as review evidence" in result
@@ -266,14 +265,14 @@ class TestMakeInstruction:
         assert "Do not invent URLs" in result
         assert "Do not guess" in result
 
-    def test_market_and_location_prompts_describe_google_place_signals(self):
+    def test_market_and_location_prompts_do_not_expose_review_tools(self):
         market = _make_instruction("market_landscape")(MockCtx(state={"places_context": "Target data"}))
         location = _make_instruction("location_traffic")(MockCtx(state={"places_context": "Target data"}))
 
-        assert "get_google_place_signals(place_id, max_reviews=0)" in market
-        assert "people-also-search competitors" in market
-        assert "get_google_place_signals(place_id, max_reviews=0)" in location
-        assert "popular-times histogram" in location
+        assert "get_google_reviews" not in market
+        assert "structured Google or TripAdvisor reviews" in market
+        assert "get_google_reviews" not in location
+        assert "structured Google or TripAdvisor reviews" not in location
 
     def test_specialists_have_source_reading_workflow(self):
         provider = _make_instruction("market_landscape")

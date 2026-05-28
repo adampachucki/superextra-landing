@@ -141,7 +141,7 @@ def tool_source_key(provider: str, anchor: str) -> str:
     """Bound source marker state to one key per provider/anchor.
 
     `anchor` is the stable per-source identifier: a Google Place ID for
-    Google-keyed providers (google_maps, google_place_signals) and the source URL
+    Google-keyed providers (google_maps, google_reviews) and the source URL
     for URL-keyed providers (tripadvisor, facebook, instagram).
     """
     digest = hashlib.sha1(f"{provider}:{anchor}".encode("utf-8")).hexdigest()[:16]

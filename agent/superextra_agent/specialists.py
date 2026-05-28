@@ -14,7 +14,7 @@ from .apify_tools import (
     fetch_facebook_posts,
     fetch_instagram_profile,
     fetch_tripadvisor_page,
-    get_google_place_signals,
+    get_google_reviews,
 )
 from .place_state import format_known_places_context
 from .serpapi_search import search_serpapi
@@ -211,17 +211,13 @@ _SOCIAL_ANALYST_TOOLS = [
 ]
 
 _INITIAL_SPECIALIST_TOOLS: dict[str, list] = {
-    "market_landscape": [google_search, url_context, get_google_place_signals],
-    "location_traffic": [google_search, url_context, get_google_place_signals],
-    "review_analyst": [search_serpapi, get_tripadvisor_reviews, get_google_place_signals],
+    "review_analyst": [search_serpapi, get_tripadvisor_reviews, get_google_reviews],
     "social_analyst": _SOCIAL_ANALYST_TOOLS,
 }
 
 # Continuation helpers use the same native web research surface by default.
 _CONTINUATION_SPECIALIST_TOOLS: dict[str, list] = {
-    "market_landscape": [google_search, url_context, get_google_place_signals],
-    "location_traffic": [google_search, url_context, get_google_place_signals],
-    "review_analyst": [search_serpapi, get_tripadvisor_reviews, get_google_place_signals],
+    "review_analyst": [search_serpapi, get_tripadvisor_reviews, get_google_reviews],
     "social_analyst": _SOCIAL_ANALYST_TOOLS,
 }
 

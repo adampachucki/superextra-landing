@@ -38,7 +38,7 @@ class TestGetRestaurantDetails:
     @pytest.mark.asyncio
     async def test_stashes_place_name_per_place(self):
         """Per-place state key (_place_name_<pid>) is written so downstream
-        tools (get_google_place_signals) can label citations per restaurant.
+        tools (get_google_reviews) can label citations per restaurant.
         Lat/lng and _target_place_id stay target-scoped as before."""
         place_data = {
             "displayName": {"text": "Test Restaurant"},
@@ -244,7 +244,7 @@ class TestGetRestaurantDetails:
     @pytest.mark.asyncio
     async def test_missing_display_name_does_not_write_place_name(self):
         """If the Places API omits displayName, don't write a garbage key —
-        leave it absent so get_google_place_signals falls back to its generic
+        leave it absent so get_google_reviews falls back to its generic
         label rather than citing 'None'."""
         place_data = {
             "location": {"latitude": 52.5, "longitude": 13.4},
