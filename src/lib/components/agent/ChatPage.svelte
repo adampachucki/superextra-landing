@@ -10,6 +10,7 @@
 	import { auth } from '$lib/auth.svelte';
 	import { theme } from '$lib/theme.svelte';
 	import { dictation } from '$lib/dictation.svelte';
+	import { lockPageScroll } from '$lib/scroll-lock';
 	import type { PlaceSuggestion } from '$lib/place-search.svelte';
 	import { formatRelativeTime } from '$lib/format-time';
 
@@ -83,11 +84,10 @@
 		sidebarOpen = !sidebarOpen;
 	}
 
-	// Lock body scroll when sidebar open on mobile
+	// Lock page scroll when sidebar is open on mobile.
 	$effect(() => {
 		if (isDesktop || !sidebarOpen) return;
-		document.body.style.overflow = 'hidden';
-		return () => (document.body.style.overflow = '');
+		return lockPageScroll();
 	});
 
 	onMount(() => {

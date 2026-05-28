@@ -78,6 +78,21 @@ describe('billing helpers', () => {
 		assert.equal(
 			_billingTesting.checkoutShouldOpenPortal({
 				stripeCustomerId: 'cus_123',
+				status: 'active'
+			}),
+			false
+		);
+		assert.equal(
+			_billingTesting.checkoutShouldOpenPortal({
+				stripeCustomerId: 'cus_123',
+				status: 'checkout_pending'
+			}),
+			false
+		);
+		assert.equal(
+			_billingTesting.checkoutShouldOpenPortal({
+				stripeCustomerId: 'cus_123',
+				stripeSubscriptionId: 'sub_123',
 				status: 'checkout_pending'
 			}),
 			false

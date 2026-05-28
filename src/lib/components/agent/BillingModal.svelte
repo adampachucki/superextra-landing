@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { billing, billingMarkets } from '$lib/billing-state.svelte';
+	import { billing } from '$lib/billing-state.svelte';
+	import { lockPageScroll } from '$lib/scroll-lock';
+
+	$effect(() => {
+		if (!billing.modalVisible) return;
+		return lockPageScroll();
+	});
 </script>
 
 {#if billing.modalVisible}
@@ -42,34 +48,37 @@
 			</div>
 
 			<div class="px-5 py-4">
-				<div class="grid gap-2">
-					{#each billingMarkets as market (market.id)}
-						<label
-							class="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-3 transition-colors {billing.selectedMarket ===
-							market.id
-								? 'border-black/25 bg-black/[0.04] dark:border-white/25 dark:bg-white/[0.08]'
-								: 'border-black/[0.08] hover:bg-cream-100/60 dark:border-white/[0.08] dark:hover:bg-white/[0.04]'}"
-						>
-							<span class="flex items-center gap-3">
-								<input
-									type="radio"
-									name="billing-market"
-									value={market.id}
-									checked={billing.selectedMarket === market.id}
-									onchange={() => (billing.selectedMarket = market.id)}
-									class="h-4 w-4 accent-black dark:accent-white"
-								/>
-								<span>
-									<span class="block text-[14px] text-black dark:text-white">{market.label}</span>
-									<span class="block text-[12px] text-black/45 dark:text-white/45"
-										>Monthly subscription</span
-									>
-								</span>
-							</span>
-							<span class="text-[14px] font-medium text-black dark:text-white">{market.price}</span>
-						</label>
-					{/each}
+				<label for="billing-market" class="block text-[13px] text-black/55 dark:text-white/55">
+					Billing country
+				</label>
+				<div class="relative mt-2">
+					<select
+						id="billing-market"
+						bind:value={billing.selectedMarket}
+						class="w-full appearance-none rounded-lg border border-black/[0.1] bg-white px-3 py-3 pr-10 text-[14px] text-black outline-none transition-colors focus:border-black/40 dark:border-white/[0.12] dark:bg-cream-100 dark:text-white dark:focus:border-white/40"
+					>
+						{#each billing.marketOptions as market (market.id)}
+							<option value={market.id}>{market.label}</option>
+						{/each}
+					</select>
+					<svg
+						class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-black/45 dark:text-white/45"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						aria-hidden="true"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="1.8"
+							d="m6 9 6 6 6-6"
+						/>
+					</svg>
 				</div>
+				<p class="mt-2 text-[12px] leading-snug text-black/45 dark:text-white/45">
+					Used for currency and tax handling in Stripe Checkout.
+				</p>
 
 				{#if billing.error}
 					<p class="mt-3 text-[13px] text-red-600 dark:text-red-400" role="alert">

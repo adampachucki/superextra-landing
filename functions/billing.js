@@ -12,7 +12,14 @@ const billingTestAllowedEmails = defineString('BILLING_TEST_ALLOWED_EMAILS', { d
 
 const PRICE_LOOKUP_KEY = 'superextra_unlimited_monthly';
 const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);
-const TERMINAL_SUBSCRIPTION_STATUSES = new Set(['canceled', 'incomplete_expired']);
+const PORTAL_SUBSCRIPTION_STATUSES = new Set([
+	'active',
+	'trialing',
+	'past_due',
+	'unpaid',
+	'paused',
+	'incomplete'
+]);
 const CHECKOUT_ALLOWED_ORIGINS = new Set(['https://agent.superextra.ai', 'http://localhost:5199']);
 const MARKET_TO_CURRENCY = {
 	us: 'usd',
@@ -197,7 +204,8 @@ function checkoutShouldOpenPortal(billing) {
 		typeof billing.stripeSubscriptionId === 'string' ? billing.stripeSubscriptionId : null;
 	return Boolean(
 		stripeCustomerIdFromBilling(billing) &&
-		(PAID_STATUSES.has(status) || (subscriptionId && !TERMINAL_SUBSCRIPTION_STATUSES.has(status)))
+		subscriptionId &&
+		PORTAL_SUBSCRIPTION_STATUSES.has(status)
 	);
 }
 
@@ -489,11 +497,14 @@ function createPortalFunction(config) {
 		if (!requireBillingModeAccess(config, user, res)) return;
 		const snap = await db().collection('users').doc(user.uid).get();
 		const billing = snap.exists ? billingMapFromUserData(snap.data() || {}, config) : {};
-		const customerId = stripeCustomerIdFromBilling(billing);
-		if (!customerId) {
-			res.status(404).json({ ok: false, error: 'stripe_customer_missing' });
+		if (!checkoutShouldOpenPortal(billing)) {
+			const error = stripeCustomerIdFromBilling(billing)
+				? 'stripe_subscription_missing'
+				: 'stripe_customer_missing';
+			res.status(404).json({ ok: false, error });
 			return;
 		}
+		const customerId = stripeCustomerIdFromBilling(billing);
 		try {
 			const url = await createPortalSessionUrl(customerId, requestBaseUrl(req), config);
 			res.json({ ok: true, url });

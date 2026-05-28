@@ -77,6 +77,23 @@ async function postBilling(path, idToken, body = {}) {
 	return payload.url;
 }
 
+async function expectBillingError(path, idToken, expectedError) {
+	const response = await fetch(`${BASE_URL}${path}`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${idToken}`
+		},
+		body: '{}'
+	});
+	const payload = await response.json().catch(() => null);
+	if (response.ok || payload?.error !== expectedError) {
+		throw new Error(
+			`${path} expected ${expectedError}: ${response.status} ${JSON.stringify(payload)}`
+		);
+	}
+}
+
 function checkoutSessionIdFromUrl(url) {
 	const parsed = new URL(url);
 	const queryId = parsed.searchParams.get('session_id');
@@ -91,10 +108,7 @@ async function checkoutSmoke({ mode, market, stripe, idToken }) {
 	const sessionId = checkoutSessionIdFromUrl(checkoutUrl);
 	if (!sessionId) throw new Error(`${mode} Checkout URL did not include session_id`);
 	const session = await stripe.checkout.sessions.retrieve(sessionId);
-	const portalUrl = await postBilling(`${prefix}/portal`, idToken);
-	if (!portalUrl.startsWith('https://billing.stripe.com/')) {
-		throw new Error(`${mode} portal URL did not come from Stripe`);
-	}
+	await expectBillingError(`${prefix}/portal`, idToken, 'stripe_subscription_missing');
 	return {
 		sessionId: session.id,
 		customerId: typeof session.customer === 'string' ? session.customer : session.customer?.id,
@@ -102,7 +116,7 @@ async function checkoutSmoke({ mode, market, stripe, idToken }) {
 		mode: session.mode,
 		currency: session.currency,
 		amountTotal: session.amount_total,
-		portal: true
+		portal: 'blocked_until_subscription'
 	};
 }
 

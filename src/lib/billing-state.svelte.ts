@@ -27,21 +27,29 @@ export interface BillingSnapshot {
 	currentPeriodEndMs: number | null;
 	cancelAtPeriodEnd: boolean;
 	stripeCustomerId: string | null;
+	stripeSubscriptionId: string | null;
 }
 
 export const billingMarkets: {
 	id: BillingMarket;
 	label: string;
-	price: string;
 	currency: 'usd' | 'pln' | 'eur';
 }[] = [
-	{ id: 'pl', label: 'Poland', price: '19 PLN', currency: 'pln' },
-	{ id: 'de', label: 'Germany', price: '9 EUR', currency: 'eur' },
-	{ id: 'us', label: 'United States', price: '$9', currency: 'usd' },
-	{ id: 'other', label: 'Other country', price: '$9', currency: 'usd' }
+	{ id: 'pl', label: 'Poland', currency: 'pln' },
+	{ id: 'de', label: 'Germany', currency: 'eur' },
+	{ id: 'us', label: 'United States', currency: 'usd' },
+	{ id: 'other', label: 'Other country', currency: 'usd' }
 ];
 
 const BILLING_MODE_STORAGE_KEY = 'superextra.billingMode';
+const PORTAL_SUBSCRIPTION_STATUSES = new Set<BillingStatus>([
+	'active',
+	'trialing',
+	'past_due',
+	'unpaid',
+	'paused',
+	'incomplete'
+]);
 
 let firestoreModulePromise: Promise<typeof import('firebase/firestore')> | null = null;
 function getFirestoreMod() {
@@ -58,7 +66,8 @@ function emptySnapshot(): BillingSnapshot {
 		currency: null,
 		currentPeriodEndMs: null,
 		cancelAtPeriodEnd: false,
-		stripeCustomerId: null
+		stripeCustomerId: null,
+		stripeSubscriptionId: null
 	};
 }
 
@@ -83,30 +92,50 @@ function preferredMarket(): BillingMarket {
 	return code === 'pl' || code === 'de' || code === 'us' ? code : 'other';
 }
 
+function billingMarketOptions() {
+	const preferred = preferredMarket();
+	const preferredOption = billingMarkets.find((market) => market.id === preferred);
+	return preferredOption
+		? [preferredOption, ...billingMarkets.filter((market) => market.id !== preferred)]
+		: billingMarkets;
+}
+
+function billingCanManage(snapshot: BillingSnapshot): boolean {
+	return Boolean(
+		snapshot.stripeCustomerId &&
+		snapshot.stripeSubscriptionId &&
+		PORTAL_SUBSCRIPTION_STATUSES.has(snapshot.status)
+	);
+}
+
 function normalizeBillingMode(value: string | null): BillingMode | null {
 	if (value === 'test' || value === 'sandbox') return 'test';
 	if (value === 'live' || value === 'prod' || value === 'production') return 'live';
 	return null;
 }
 
-function initBillingModeFromBrowser() {
-	if (!browser || modeInitialized) return;
-	modeInitialized = true;
+function billingModeFromBrowser(): BillingMode {
+	if (!browser) return 'live';
 	const url = new URL(window.location.href);
 	const requested =
 		normalizeBillingMode(url.searchParams.get('billingMode')) ??
 		normalizeBillingMode(url.searchParams.get('stripeMode'));
 	if (requested) {
-		billingMode = requested;
 		if (requested === 'test') {
 			window.localStorage.setItem(BILLING_MODE_STORAGE_KEY, requested);
 		} else {
 			window.localStorage.removeItem(BILLING_MODE_STORAGE_KEY);
 		}
-		return;
+		return requested;
 	}
-	billingMode =
-		normalizeBillingMode(window.localStorage.getItem(BILLING_MODE_STORAGE_KEY)) ?? 'live';
+	return normalizeBillingMode(window.localStorage.getItem(BILLING_MODE_STORAGE_KEY)) ?? 'live';
+}
+
+function initBillingModeFromBrowser() {
+	if (!browser || modeInitialized) return;
+	modeInitialized = true;
+	const nextMode = billingModeFromBrowser();
+	if (billingMode !== nextMode) billingMode = nextMode;
 }
 
 function activeBillingField(): 'billing' | 'billingTest' {
@@ -122,13 +151,13 @@ function billingEndpoint(resource: 'checkout' | 'portal') {
 }
 
 let snapshot = $state<BillingSnapshot>(emptySnapshot());
-let billingMode = $state<BillingMode>('live');
+let billingMode = $state<BillingMode>(billingModeFromBrowser());
 let modalVisible = $state(false);
 let selectedMarket = $state<BillingMarket>(preferredMarket());
 let posting = $state(false);
 let error = $state<string | null>(null);
 let initialized = false;
-let modeInitialized = false;
+let modeInitialized = browser;
 let currentUid: string | null = null;
 let unsubscribe: Unsubscribe | null = null;
 
@@ -165,7 +194,11 @@ async function attach(uid: string, force = false) {
 					currentPeriodEndMs: toMillis(rawBilling.currentPeriodEnd),
 					cancelAtPeriodEnd: rawBilling.cancelAtPeriodEnd === true,
 					stripeCustomerId:
-						typeof rawBilling.stripeCustomerId === 'string' ? rawBilling.stripeCustomerId : null
+						typeof rawBilling.stripeCustomerId === 'string' ? rawBilling.stripeCustomerId : null,
+					stripeSubscriptionId:
+						typeof rawBilling.stripeSubscriptionId === 'string'
+							? rawBilling.stripeSubscriptionId
+							: null
 				};
 			},
 			(err) => {
@@ -308,6 +341,9 @@ export const billing = {
 	set selectedMarket(value: BillingMarket) {
 		selectedMarket = value;
 	},
+	get marketOptions(): typeof billingMarkets {
+		return billingMarketOptions();
+	},
 	get posting(): boolean {
 		return posting;
 	},
@@ -328,7 +364,7 @@ export const billing = {
 	},
 	get canManage(): boolean {
 		init();
-		return Boolean(snapshot.stripeCustomerId);
+		return billingCanManage(snapshot);
 	},
 	init,
 	setMode,

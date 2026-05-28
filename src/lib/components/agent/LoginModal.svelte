@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { auth } from '$lib/auth.svelte';
+	import { lockPageScroll } from '$lib/scroll-lock';
 	import LoginForm from './LoginForm.svelte';
 
 	let mounted = $state(false);
@@ -22,6 +23,11 @@
 		auth.consumeDraft();
 		auth.closeModal();
 		if (cb) cb();
+	});
+
+	$effect(() => {
+		if (!auth.modalVisible || !mounted) return;
+		return lockPageScroll();
 	});
 
 	function handleBackdrop() {

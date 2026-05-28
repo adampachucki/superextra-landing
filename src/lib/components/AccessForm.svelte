@@ -2,6 +2,7 @@
 	import { formState } from '$lib/form-state.svelte';
 	import { resolveSupportedBrowserCountry } from '$lib/browser-country';
 	import { fetchPlaceSuggestions, type PlaceSuggestion } from '$lib/google-places';
+	import { lockPageScroll } from '$lib/scroll-lock';
 
 	// --- Shared constants ---
 
@@ -99,16 +100,8 @@
 	});
 
 	$effect(() => {
-		if (formState.visible) {
-			const scrollY = window.scrollY;
-			document.body.style.overflow = 'hidden';
-			document.documentElement.style.overflow = 'hidden';
-			return () => {
-				document.body.style.overflow = '';
-				document.documentElement.style.overflow = '';
-				window.scrollTo(0, scrollY);
-			};
-		}
+		if (!formState.visible) return;
+		return lockPageScroll();
 	});
 
 	$effect(() => {

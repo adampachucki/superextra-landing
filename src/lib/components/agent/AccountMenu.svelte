@@ -16,10 +16,10 @@
 	let signingOut = $state(false);
 	let billingAction = $derived(
 		billing.mode === 'test'
-			? billing.paid || billing.canManage
+			? billing.canManage
 				? 'Manage test billing'
 				: 'Test upgrade'
-			: billing.paid || billing.canManage
+			: billing.canManage
 				? 'Manage billing'
 				: 'Upgrade'
 	);
@@ -53,7 +53,7 @@
 
 	async function handleBilling() {
 		open = false;
-		if (billing.paid || billing.canManage) {
+		if (billing.canManage) {
 			await billing.openPortal();
 		} else {
 			billing.openUpgrade();
