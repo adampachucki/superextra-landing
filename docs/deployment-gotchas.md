@@ -67,3 +67,11 @@ Two ways, either works:
 - Or export `GOOGLE_CLOUD_QUOTA_PROJECT=superextra-site` in your shell before running `firebase deploy`.
 
 Discovered during R3 setup of the GEAR migration probe work. Once set, ADC stays sticky across sessions.
+
+### gRPC clients (`firestore.Client()` etc.) fail with `ACCESS_TOKEN_SCOPE_INSUFFICIENT`
+
+A script using `google.auth.default()` / `google.cloud.*` clients from the VM can fail with `403 ACCESS_TOKEN_SCOPE_INSUFFICIENT` (distinct from the quota `PERMISSION_DENIED` above). Root cause: there is **no `~/.config/gcloud/application_default_credentials.json`** and `GOOGLE_APPLICATION_CREDENTIALS` is unset, so `google.auth.default()` falls back to the GCE metadata server's default Compute Engine service account, whose token carries only the VM's narrow access scopes (no Firestore / `cloud-platform`). `gcloud auth print-access-token` works because it uses the gcloud _user_ account (full `cloud-platform`), and `redeploy_engine.py` works because it explicitly points `GOOGLE_APPLICATION_CREDENTIALS` at the legacy user cred.
+
+Root-cause fix (do once): `gcloud auth application-default login` then `gcloud auth application-default set-quota-project superextra-site`. Creates a real `cloud-platform`-scoped ADC and pins the quota project — clearing both this and the quota gotcha above for every script that uses `google.auth.default()`. On the headless VM, complete the OAuth callback over an `ssh -L` tunnel.
+
+Per-script workaround if ADC isn't fixed: mint a token with `gcloud auth print-access-token` and pass it explicitly, e.g. `Credentials(token=...).with_quota_project("superextra-site")`.
