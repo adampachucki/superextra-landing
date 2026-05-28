@@ -102,9 +102,9 @@ function checkoutSessionIdFromUrl(url) {
 	return pathMatch?.[1] ?? null;
 }
 
-async function checkoutSmoke({ mode, market, stripe, idToken }) {
+async function checkoutSmoke({ mode, market, stripe, idToken, returnPath }) {
 	const prefix = mode === 'test' ? '/api/billing/test' : '/api/billing';
-	const checkoutUrl = await postBilling(`${prefix}/checkout`, idToken, { market });
+	const checkoutUrl = await postBilling(`${prefix}/checkout`, idToken, { market, returnPath });
 	const sessionId = checkoutSessionIdFromUrl(checkoutUrl);
 	if (!sessionId) throw new Error(`${mode} Checkout URL did not include session_id`);
 	const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -116,6 +116,8 @@ async function checkoutSmoke({ mode, market, stripe, idToken }) {
 		mode: session.mode,
 		currency: session.currency,
 		amountTotal: session.amount_total,
+		successUrl: session.success_url,
+		cancelUrl: session.cancel_url,
 		portal: 'blocked_until_subscription'
 	};
 }
@@ -140,7 +142,8 @@ async function main() {
 			mode: 'test',
 			market: 'de',
 			stripe: testStripe,
-			idToken
+			idToken,
+			returnPath: '/chat?sid=smoke-test&billing=success&session_id=old'
 		});
 		testCustomerId = test.customerId;
 
@@ -148,7 +151,8 @@ async function main() {
 			mode: 'live',
 			market: 'pl',
 			stripe: liveStripe,
-			idToken
+			idToken,
+			returnPath: '/chat?sid=smoke-live'
 		});
 		liveCustomerId = live.customerId;
 
@@ -157,6 +161,18 @@ async function main() {
 		}
 		if (live.livemode !== true || live.currency !== 'pln' || live.amountTotal !== 1900) {
 			throw new Error(`Unexpected live checkout session: ${JSON.stringify(live)}`);
+		}
+		if (
+			test.successUrl !==
+			`${BASE_URL}/chat?sid=smoke-test&billingMode=test&billing=success&session_id={CHECKOUT_SESSION_ID}`
+		) {
+			throw new Error(`Unexpected test success URL: ${test.successUrl}`);
+		}
+		if (
+			live.successUrl !==
+			`${BASE_URL}/chat?sid=smoke-live&billing=success&session_id={CHECKOUT_SESSION_ID}`
+		) {
+			throw new Error(`Unexpected live success URL: ${live.successUrl}`);
 		}
 
 		process.stdout.write(`${JSON.stringify({ ok: true, uid, test, live }, null, 2)}\n`);

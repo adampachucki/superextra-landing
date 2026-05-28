@@ -111,6 +111,33 @@ function normalizeMarket(value) {
 	return Object.hasOwn(MARKET_TO_CURRENCY, value) ? value : 'other';
 }
 
+function normalizeReturnPath(value, config) {
+	const fallback = config.mode === 'test' ? '/chat?billingMode=test' : '/chat';
+	if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
+		return fallback;
+	}
+	try {
+		const url = new URL(value, 'https://agent.superextra.ai');
+		url.searchParams.delete('billing');
+		url.searchParams.delete('session_id');
+		url.searchParams.delete('stripeMode');
+		if (config.mode === 'test') {
+			url.searchParams.set('billingMode', 'test');
+		} else {
+			url.searchParams.delete('billingMode');
+		}
+		return `${url.pathname}${url.search}`;
+	} catch {
+		return fallback;
+	}
+}
+
+function checkoutReturnUrl(baseUrl, returnPath, status, includeSessionId = false) {
+	const separator = returnPath.includes('?') ? '&' : '?';
+	const sessionParam = includeSessionId ? '&session_id={CHECKOUT_SESSION_ID}' : '';
+	return `${baseUrl}${returnPath}${separator}billing=${status}${sessionParam}`;
+}
+
 function billingModeLabel(config) {
 	return config.mode === 'test' ? 'test' : 'live';
 }
@@ -415,6 +442,7 @@ function createCheckoutFunction(config) {
 
 		const market = normalizeMarket(req.body?.market);
 		const currency = MARKET_TO_CURRENCY[market];
+		const returnPath = normalizeReturnPath(req.body?.returnPath, config);
 		const userRef = db().collection('users').doc(user.uid);
 		const userSnap = await userRef.get();
 		const userData = userSnap.exists ? userSnap.data() || {} : {};
@@ -443,8 +471,8 @@ function createCheckoutFunction(config) {
 				client_reference_id: user.uid,
 				line_items: [{ price: priceId, quantity: 1 }],
 				currency,
-				success_url: `${baseUrl}/chat?billing=success`,
-				cancel_url: `${baseUrl}/chat?billing=cancelled`,
+				success_url: checkoutReturnUrl(baseUrl, returnPath, 'success', true),
+				cancel_url: checkoutReturnUrl(baseUrl, returnPath, 'cancelled'),
 				automatic_tax: { enabled: true },
 				tax_id_collection: { enabled: true },
 				billing_address_collection: 'required',
@@ -482,6 +510,68 @@ function createCheckoutFunction(config) {
 		} catch (err) {
 			console.error('billingCheckout failed:', err);
 			res.status(500).json({ ok: false, error: 'checkout_failed' });
+		}
+	});
+}
+
+function createConfirmFunction(config) {
+	return onRequest({ cors: true, secrets: [config.secretKey] }, async (req, res) => {
+		if (req.method !== 'POST') {
+			res.status(405).json({ ok: false, error: 'Method not allowed' });
+			return;
+		}
+		const user = await requireUser(req, res);
+		if (!user) return;
+		if (!requireBillingModeAccess(config, user, res)) return;
+
+		const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId : '';
+		if (!/^cs_(test|live)_[A-Za-z0-9]+$/.test(sessionId)) {
+			res.status(400).json({ ok: false, error: 'checkout_session_invalid' });
+			return;
+		}
+
+		try {
+			const session = await stripe(config).checkout.sessions.retrieve(sessionId);
+			const sessionUid = session.metadata?.uid || session.client_reference_id;
+			if (sessionUid !== user.uid) {
+				res.status(403).json({ ok: false, error: 'checkout_session_forbidden' });
+				return;
+			}
+			const subscriptionId = idOf(session.subscription);
+			if (session.status !== 'complete' || !subscriptionId) {
+				res.status(409).json({ ok: false, error: 'checkout_session_not_complete' });
+				return;
+			}
+
+			const subscription = await retrieveSubscription(subscriptionId, config);
+			const update = {
+				...subscriptionBillingUpdate(
+					subscription,
+					{
+						market: session.metadata?.market || null,
+						latestInvoiceId: idOf(session.invoice)
+					},
+					config
+				),
+				[`${config.billingField}.checkoutSessionId`]: session.id
+			};
+			await db().collection('users').doc(user.uid).set(update, { merge: true });
+			const billing = update[config.billingField];
+			res.json({
+				ok: true,
+				plan: update[config.planField],
+				billing: {
+					stripeCustomerId: billing.stripeCustomerId,
+					stripeSubscriptionId: billing.stripeSubscriptionId,
+					status: billing.status,
+					market: billing.market,
+					currency: billing.currency,
+					cancelAtPeriodEnd: billing.cancelAtPeriodEnd
+				}
+			});
+		} catch (err) {
+			console.error('billingConfirm failed:', err);
+			res.status(500).json({ ok: false, error: 'checkout_confirm_failed' });
 		}
 	});
 }
@@ -560,10 +650,12 @@ function createWebhookFunction(config) {
 }
 
 export const billingCheckout = createCheckoutFunction(LIVE_BILLING);
+export const billingConfirm = createConfirmFunction(LIVE_BILLING);
 export const billingPortal = createPortalFunction(LIVE_BILLING);
 export const stripeWebhook = createWebhookFunction(LIVE_BILLING);
 
 export const billingCheckoutTest = createCheckoutFunction(TEST_BILLING);
+export const billingConfirmTest = createConfirmFunction(TEST_BILLING);
 export const billingPortalTest = createPortalFunction(TEST_BILLING);
 export const stripeWebhookTest = createWebhookFunction(TEST_BILLING);
 
@@ -571,6 +663,8 @@ export const _billingTesting = {
 	LIVE_BILLING,
 	TEST_BILLING,
 	normalizeMarket,
+	normalizeReturnPath,
+	checkoutReturnUrl,
 	planForSubscriptionStatus,
 	checkoutShouldOpenPortal,
 	subscriptionBillingUpdate,

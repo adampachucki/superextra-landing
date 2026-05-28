@@ -137,6 +137,10 @@
 					"function": "billingCheckout"
 				},
 				{
+					"source": "/api/billing/confirm",
+					"function": "billingConfirm"
+				},
+				{
 					"source": "/api/billing/portal",
 					"function": "billingPortal"
 				},
@@ -147,6 +151,10 @@
 				{
 					"source": "/api/billing/test/checkout",
 					"function": "billingCheckoutTest"
+				},
+				{
+					"source": "/api/billing/test/confirm",
+					"function": "billingConfirmTest"
 				},
 				{
 					"source": "/api/billing/test/portal",

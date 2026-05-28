@@ -42,6 +42,39 @@ describe('billing helpers', () => {
 		assert.equal(_billingTesting.normalizeMarket(undefined), 'other');
 	});
 
+	it('keeps checkout returns on the originating app path', () => {
+		assert.equal(
+			_billingTesting.normalizeReturnPath('/chat?sid=abc&billing=success&session_id=cs_test_x', {
+				mode: 'live'
+			}),
+			'/chat?sid=abc'
+		);
+		assert.equal(
+			_billingTesting.normalizeReturnPath('/chat?sid=abc#reply', _billingTesting.LIVE_BILLING),
+			'/chat?sid=abc'
+		);
+		assert.equal(
+			_billingTesting.normalizeReturnPath('/chat?sid=abc', _billingTesting.TEST_BILLING),
+			'/chat?sid=abc&billingMode=test'
+		);
+		assert.equal(
+			_billingTesting.normalizeReturnPath(
+				'https://evil.example/chat',
+				_billingTesting.LIVE_BILLING
+			),
+			'/chat'
+		);
+		assert.equal(
+			_billingTesting.checkoutReturnUrl(
+				'https://agent.superextra.ai',
+				'/chat?sid=abc',
+				'success',
+				true
+			),
+			'https://agent.superextra.ai/chat?sid=abc&billing=success&session_id={CHECKOUT_SESSION_ID}'
+		);
+	});
+
 	it('keeps dunning subscriptions paid until Stripe ends access', () => {
 		assert.equal(_billingTesting.planForSubscriptionStatus('active'), 'paid');
 		assert.equal(_billingTesting.planForSubscriptionStatus('trialing'), 'paid');

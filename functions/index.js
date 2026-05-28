@@ -17,9 +17,11 @@ import {
 export { watchdog } from './watchdog.js';
 export {
 	billingCheckout,
+	billingConfirm,
 	billingPortal,
 	stripeWebhook,
 	billingCheckoutTest,
+	billingConfirmTest,
 	billingPortalTest,
 	stripeWebhookTest
 } from './billing.js';

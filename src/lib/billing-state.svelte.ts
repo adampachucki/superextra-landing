@@ -30,6 +30,18 @@ export interface BillingSnapshot {
 	stripeSubscriptionId: string | null;
 }
 
+export interface BillingConfirmResult {
+	plan: 'free' | 'paid';
+	billing: {
+		status: BillingStatus;
+		market: BillingMarket | null;
+		currency: BillingSnapshot['currency'];
+		cancelAtPeriodEnd: boolean;
+		stripeCustomerId: string | null;
+		stripeSubscriptionId: string | null;
+	};
+}
+
 export const billingMarkets: {
 	id: BillingMarket;
 	label: string;
@@ -146,8 +158,22 @@ function activePlanField(): 'plan' | 'planTest' {
 	return billingMode === 'test' ? 'planTest' : 'plan';
 }
 
-function billingEndpoint(resource: 'checkout' | 'portal') {
+function billingEndpoint(resource: 'checkout' | 'confirm' | 'portal') {
 	return billingMode === 'test' ? `/api/billing/test/${resource}` : `/api/billing/${resource}`;
+}
+
+function checkoutReturnPath() {
+	if (!browser) return billingMode === 'test' ? '/chat?billingMode=test' : '/chat';
+	const url = new URL(window.location.href);
+	url.searchParams.delete('billing');
+	url.searchParams.delete('session_id');
+	url.searchParams.delete('stripeMode');
+	if (billingMode === 'test') {
+		url.searchParams.set('billingMode', 'test');
+	} else {
+		url.searchParams.delete('billingMode');
+	}
+	return `${url.pathname}${url.search}${url.hash}`;
 }
 
 let snapshot = $state<BillingSnapshot>(emptySnapshot());
@@ -269,6 +295,12 @@ function closeUpgrade() {
 }
 
 async function postBilling(path: string, body?: Record<string, unknown>): Promise<string> {
+	const payload = await postBillingJson<{ url?: string }>(path, body);
+	if (!payload.url) throw new Error('url_missing');
+	return payload.url;
+}
+
+async function postBillingJson<T>(path: string, body?: Record<string, unknown>): Promise<T> {
 	const idToken = await auth.getIdToken();
 	const res = await fetch(path, {
 		method: 'POST',
@@ -278,12 +310,12 @@ async function postBilling(path: string, body?: Record<string, unknown>): Promis
 		},
 		body: JSON.stringify(body ?? {})
 	});
-	const payload = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
-	if (!res.ok || !payload?.url) {
+	const payload = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
+	if (!res.ok || !payload) {
 		const reason = payload?.error ?? `http_${res.status}`;
 		throw new Error(reason);
 	}
-	return payload.url;
+	return payload;
 }
 
 async function startCheckout(market: BillingMarket = selectedMarket) {
@@ -296,7 +328,10 @@ async function startCheckout(market: BillingMarket = selectedMarket) {
 	posting = true;
 	error = null;
 	try {
-		const url = await postBilling(billingEndpoint('checkout'), { market });
+		const url = await postBilling(billingEndpoint('checkout'), {
+			market,
+			returnPath: checkoutReturnPath()
+		});
 		window.location.assign(url);
 	} catch (err) {
 		error = 'Could not open Checkout. Please try again.';
@@ -324,6 +359,25 @@ async function openPortal() {
 	} finally {
 		posting = false;
 	}
+}
+
+async function confirmCheckout(sessionId: string): Promise<BillingConfirmResult> {
+	init();
+	const result = await postBillingJson<BillingConfirmResult>(billingEndpoint('confirm'), {
+		sessionId
+	});
+	snapshot = {
+		...snapshot,
+		plan: result.plan,
+		livePlan: billingMode === 'live' ? result.plan : snapshot.livePlan,
+		status: result.billing.status,
+		market: result.billing.market,
+		currency: result.billing.currency,
+		cancelAtPeriodEnd: result.billing.cancelAtPeriodEnd,
+		stripeCustomerId: result.billing.stripeCustomerId,
+		stripeSubscriptionId: result.billing.stripeSubscriptionId
+	};
+	return result;
 }
 
 export const billing = {
@@ -370,6 +424,7 @@ export const billing = {
 	setMode,
 	openUpgrade,
 	closeUpgrade,
+	confirmCheckout,
 	startCheckout,
 	openPortal
 };

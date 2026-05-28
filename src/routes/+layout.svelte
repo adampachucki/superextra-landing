@@ -5,6 +5,7 @@
 	import CookieBanner from '$lib/components/CookieBanner.svelte';
 	import LoginModal from '$lib/components/agent/LoginModal.svelte';
 	import BillingModal from '$lib/components/agent/BillingModal.svelte';
+	import BillingReturnNotice from '$lib/components/agent/BillingReturnNotice.svelte';
 
 	onMount(() => {
 		const onBeforeUnload = () => {
@@ -36,3 +37,4 @@
 <CookieBanner />
 <LoginModal />
 <BillingModal />
+<BillingReturnNotice />
