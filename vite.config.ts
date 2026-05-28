@@ -45,6 +45,11 @@ export default defineConfig({
 				changeOrigin: true,
 				rewrite: (path: string) => path.replace(/^\/api\/agent\/cancel/, '/agentCancel')
 			},
+			'/api/agent/feedback': {
+				target: 'https://us-central1-superextra-site.cloudfunctions.net',
+				changeOrigin: true,
+				rewrite: (path: string) => path.replace(/^\/api\/agent\/feedback/, '/agentFeedback')
+			},
 			'/api/auth/send-magic-link': {
 				target: 'https://us-central1-superextra-site.cloudfunctions.net',
 				changeOrigin: true,

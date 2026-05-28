@@ -166,6 +166,7 @@ const {
 	agentStream,
 	agentCancel,
 	agentDelete,
+	agentFeedback,
 	sttToken,
 	tts,
 	sendMagicLink,
@@ -1833,6 +1834,163 @@ describe('agentCancel', () => {
 		assert.equal(res._status, 401);
 		assert.equal(res._json.error, 'AUTH_REQUIRED');
 		assert.equal(mockDb.update.mock.callCount(), 0);
+	});
+});
+
+// ══════════════════════════════════════════════════════
+// agentFeedback
+// ══════════════════════════════════════════════════════
+
+describe('agentFeedback', () => {
+	function sessionGet(participants = ['user-good-token'], turnExists = true) {
+		mockDb.get.mock.mockImplementation(async (ref) => {
+			if (ref._path === 'sessions/sess-1') {
+				return { exists: true, data: () => ({ participants }) };
+			}
+			if (ref._path.startsWith('sessions/sess-1/turns/')) {
+				return { exists: turnExists, data: () => ({ status: 'complete' }) };
+			}
+			return defaultAccountDoc(ref) ?? { exists: false };
+		});
+	}
+
+	function feedbackRow() {
+		return mockDb.set.mock.calls.find((c) => c.arguments[0]?._path.startsWith('feedback/'))
+			?.arguments[1];
+	}
+
+	function authed(body, overrides = {}) {
+		return mockReq({
+			method: 'POST',
+			body: { sid: 'sess-1', turnIndex: 1, ...body },
+			headers: { authorization: 'Bearer good-token', ...(overrides.headers || {}) }
+		});
+	}
+
+	function writtenAt(path) {
+		return mockDb.set.mock.calls.find((c) => c.arguments[0]?._path === path)?.arguments[1];
+	}
+
+	it('rejects non-POST with 405', async () => {
+		const res = mockRes();
+		await agentFeedback(mockReq({ method: 'GET' }), res);
+		assert.equal(res._status, 405);
+	});
+
+	it('requires an Authorization header', async () => {
+		const res = mockRes();
+		await agentFeedback(mockReq({ method: 'POST', body: { sid: 'sess-1' } }), res);
+		assert.equal(res._status, 401);
+	});
+
+	it('rejects anonymous Firebase tokens with 401 AUTH_REQUIRED', async () => {
+		const res = mockRes();
+		await agentFeedback(
+			authed({ kind: 'rating', rating: 'up' }, { headers: { authorization: 'Bearer anon-x' } }),
+			res
+		);
+		assert.equal(res._status, 401);
+		assert.equal(res._json.error, 'AUTH_REQUIRED');
+	});
+
+	it('400s on an unknown kind', async () => {
+		const res = mockRes();
+		await agentFeedback(authed({ kind: 'nope' }), res);
+		assert.equal(res._status, 400);
+		assert.equal(res._json.error, 'unknown_kind');
+	});
+
+	it('404s when the session does not exist', async () => {
+		mockDb.get.mock.mockImplementation(async (ref) => defaultAccountDoc(ref) ?? { exists: false });
+		const res = mockRes();
+		await agentFeedback(authed({ kind: 'rating', rating: 'up' }), res);
+		assert.equal(res._status, 404);
+	});
+
+	it('403s when the caller is not a participant', async () => {
+		sessionGet(['user-other-token']);
+		const res = mockRes();
+		await agentFeedback(authed({ kind: 'rating', rating: 'up' }), res);
+		assert.equal(res._status, 403);
+		assert.equal(res._json.error, 'not_participant');
+		assert.equal(mockDb.set.mock.callCount(), 0);
+	});
+
+	it('writes only the rating to the turn doc (no reasons/note leak there)', async () => {
+		sessionGet();
+		const res = mockRes();
+		await agentFeedback(authed({ kind: 'rating', rating: 'up' }), res);
+		assert.equal(res._status, 200);
+		assert.equal(res._json.ok, true);
+		const entry = writtenAt('sessions/sess-1/turns/0001').feedback['user-good-token'];
+		assert.deepEqual(Object.keys(entry).sort(), ['at', 'rating']);
+		assert.equal(entry.rating, 'up');
+		assert.equal(entry.at, '__server_timestamp__');
+		// A bare 👍 records no private row.
+		assert.equal(feedbackRow(), undefined);
+	});
+
+	it('404s when the turn does not exist (no phantom turn doc)', async () => {
+		sessionGet(['user-good-token'], false);
+		const res = mockRes();
+		await agentFeedback(authed({ kind: 'rating', rating: 'up' }), res);
+		assert.equal(res._status, 404);
+		assert.equal(res._json.error, 'turn_not_found');
+		assert.equal(mockDb.set.mock.callCount(), 0);
+	});
+
+	it('keeps 👎 reasons + note in the private feedback collection, not the turn', async () => {
+		sessionGet();
+		const res = mockRes();
+		await agentFeedback(
+			authed({
+				turnIndex: 2,
+				kind: 'rating',
+				rating: 'down',
+				reasons: ['Inaccurate', 'Wrong sources'],
+				note: '  too vague  '
+			}),
+			res
+		);
+		assert.equal(res._status, 200);
+		const entry = writtenAt('sessions/sess-1/turns/0002').feedback['user-good-token'];
+		assert.equal(entry.rating, 'down');
+		assert.equal(entry.reasons, undefined);
+		assert.equal(entry.note, undefined);
+		const row = feedbackRow();
+		assert.equal(row.kind, 'rating');
+		assert.equal(row.rating, 'down');
+		assert.deepEqual(row.reasons, ['Inaccurate', 'Wrong sources']);
+		assert.equal(row.note, 'too vague');
+		assert.equal(row.turnIndex, 2);
+	});
+
+	it('400s on an invalid rating', async () => {
+		sessionGet();
+		const res = mockRes();
+		await agentFeedback(authed({ kind: 'rating', rating: 'meh' }), res);
+		assert.equal(res._status, 400);
+	});
+
+	it('appends a survey response to the feedback collection', async () => {
+		sessionGet();
+		const res = mockRes();
+		await agentFeedback(authed({ kind: 'survey', helped: 'yes' }), res);
+		assert.equal(res._status, 200);
+		const row = feedbackRow();
+		assert.ok(row, 'expected a write to the feedback collection');
+		assert.equal(row.kind, 'survey');
+		assert.equal(row.uid, 'user-good-token');
+		assert.equal(row.sid, 'sess-1');
+		assert.equal(row.helped, 'yes');
+		assert.equal(row.createdAt, '__server_timestamp__');
+	});
+
+	it('400s on an invalid survey answer', async () => {
+		sessionGet();
+		const res = mockRes();
+		await agentFeedback(authed({ kind: 'survey', helped: 'maybe' }), res);
+		assert.equal(res._status, 400);
 	});
 });
 

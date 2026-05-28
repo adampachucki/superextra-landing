@@ -20,7 +20,7 @@
  */
 
 import type { Unsubscribe } from 'firebase/firestore';
-import type { ChatSource, TimelineEvent, TurnSummary } from '$lib/chat-types';
+import type { ChatSource, TimelineEvent, TurnFeedback, TurnSummary } from '$lib/chat-types';
 import { getFirebase } from '$lib/firebase';
 import { auth } from '$lib/auth.svelte';
 
@@ -62,6 +62,7 @@ export interface ChatMessage {
 	sources?: ChatSource[];
 	turnSummary?: TurnSummary;
 	activityEvents?: TimelineEvent[];
+	feedback?: TurnFeedback;
 }
 
 export interface PlaceContext {
@@ -107,6 +108,7 @@ export interface Turn {
 	acknowledgement: string | null;
 	sources: ChatSource[] | null;
 	turnSummary: TurnSummary | null;
+	feedback: Record<string, TurnFeedback> | null;
 	createdAtMs: number | null;
 	acknowledgedAtMs: number | null;
 	completedAtMs: number | null;
@@ -266,7 +268,8 @@ function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
 				animateReveal: replyRevealTurns.has(turn.turnIndex),
 				sources: turn.sources?.length ? turn.sources : undefined,
 				turnSummary: turn.turnSummary ?? undefined,
-				activityEvents: activityEvents?.length ? activityEvents : undefined
+				activityEvents: activityEvents?.length ? activityEvents : undefined,
+				feedback: currentUid ? turn.feedback?.[currentUid] : undefined
 			});
 		}
 		if (turn.status === 'error') {
@@ -410,6 +413,7 @@ function makeOptimisticTurn(turnIndex: number, userMessage: string, startedAtMs:
 		acknowledgement: null,
 		sources: null,
 		turnSummary: null,
+		feedback: null,
 		createdAtMs: startedAtMs,
 		acknowledgedAtMs: null,
 		completedAtMs: null,
@@ -543,6 +547,7 @@ async function attachActiveListeners(sid: string) {
 				const turnIndex = (data.turnIndex as number | undefined) ?? Number(docSnap.id);
 				const status = ((data.status as string | undefined) ?? 'pending') as Turn['status'];
 				const sourcesRaw = data.sources as ChatSource[] | null | undefined;
+				const feedbackRaw = data.feedback;
 				const turn: Turn = {
 					turnIndex,
 					runId: (data.runId as string | undefined) ?? '',
@@ -552,6 +557,10 @@ async function attachActiveListeners(sid: string) {
 					acknowledgement: (data.acknowledgement as string | null | undefined) ?? null,
 					sources: Array.isArray(sourcesRaw) ? sourcesRaw : null,
 					turnSummary: (data.turnSummary as TurnSummary | null | undefined) ?? null,
+					feedback:
+						feedbackRaw && typeof feedbackRaw === 'object'
+							? (feedbackRaw as Record<string, TurnFeedback>)
+							: null,
 					createdAtMs: toMillis(data.createdAt),
 					acknowledgedAtMs: toMillis(data.acknowledgedAt),
 					completedAtMs: toMillis(data.completedAt),

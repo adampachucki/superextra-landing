@@ -32,6 +32,14 @@ export interface TurnSummary {
 	elapsedMs: number;
 }
 
+/** One participant's 👍/👎 on a single answer. Only the rating is stored on the
+ *  turn doc (under `feedback.<uid>`) — the turns listener streams it back so the
+ *  UI can show the selected state. Downvote reasons and free-text notes are kept
+ *  in the server-only `feedback` collection, never on the client-readable turn. */
+export interface TurnFeedback {
+	rating: 'up' | 'down';
+}
+
 export type TimelineEvent =
 	| {
 			kind: 'detail';

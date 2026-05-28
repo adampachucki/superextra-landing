@@ -965,6 +965,167 @@ export const agentCancel = onRequest(
 	}
 );
 
+// --- Agent feedback endpoint (per-answer thumbs + periodic value prompt) ---
+//
+// Two feedback shapes share one endpoint; both require the caller to be a
+// session participant (same capability check as cancel/delete).
+//   kind:'rating' → 👍/👎 on a single answer. Only the binary rating is stored
+//     on the turn doc (`feedback.<uid>.rating`) so the existing turns listener
+//     can round-trip the "you rated this" state back to the browser. The write
+//     runs in a transaction that requires the turn to already exist — otherwise
+//     a participant could mint a phantom turn doc that the chat would render.
+//   The "why" (downvote reasons + free-text note) is NOT put on the turn doc —
+//     turn docs are readable by any signed-in client (firestore.rules), so free
+//     text would leak. It goes to the server-only `feedback` collection.
+//   kind:'survey' → the periodic "did this help you decide?" prompt shown after
+//     a research report. Appended to the same `feedback` collection.
+// The `feedback` collection is never read by the client (unmatched path ⇒ rules
+// deny client reads; Admin SDK bypasses rules), so it is the private analytics
+// surface for ratings-with-reasons, notes, and survey answers.
+function cleanFeedbackNote(value) {
+	if (typeof value !== 'string') return null;
+	const trimmed = value.trim();
+	return trimmed ? trimmed.slice(0, 1000) : null;
+}
+
+function cleanFeedbackReasons(value) {
+	if (!Array.isArray(value)) return [];
+	return value
+		.filter((r) => typeof r === 'string' && r.trim())
+		.map((r) => r.trim().slice(0, 60))
+		.slice(0, 6);
+}
+
+export const agentFeedback = onRequest(
+	{ cors: true, timeoutSeconds: 30, memory: '256MiB' },
+	async (req, res) => {
+		if (req.method !== 'POST') {
+			res.status(405).json({ ok: false, error: 'Method not allowed' });
+			return;
+		}
+
+		const authHeader = req.headers.authorization || '';
+		const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
+		if (!tokenMatch) {
+			res.status(401).json({ ok: false, error: 'Authorization header required' });
+			return;
+		}
+		let uid;
+		try {
+			const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
+			if (decoded?.firebase?.sign_in_provider === 'anonymous') {
+				res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
+				return;
+			}
+			uid = decoded.uid;
+		} catch (e) {
+			console.warn('agentFeedback verifyIdToken rejected:', e.code || e.message);
+			res.status(401).json({ ok: false, error: 'Invalid auth token' });
+			return;
+		}
+
+		const { sid, turnIndex, kind } = req.body || {};
+		if (!sid || typeof sid !== 'string') {
+			res.status(400).json({ ok: false, error: 'sid is required' });
+			return;
+		}
+		if (!Number.isInteger(turnIndex)) {
+			res.status(400).json({ ok: false, error: 'turnIndex is required' });
+			return;
+		}
+		if (kind !== 'rating' && kind !== 'survey') {
+			res.status(400).json({ ok: false, error: 'unknown_kind' });
+			return;
+		}
+		if (kind === 'rating') {
+			const { rating } = req.body;
+			if (rating !== 'up' && rating !== 'down') {
+				res.status(400).json({ ok: false, error: 'rating is required' });
+				return;
+			}
+		} else {
+			const { helped } = req.body;
+			if (helped !== 'yes' && helped !== 'not_yet') {
+				res.status(400).json({ ok: false, error: 'helped is required' });
+				return;
+			}
+		}
+
+		const sessionRef = db.collection('sessions').doc(sid);
+		let snap;
+		try {
+			snap = await sessionRef.get();
+		} catch (err) {
+			console.error('agentFeedback session read failed:', sid, err.message || err);
+			res.status(500).json({ ok: false, error: 'feedback_failed' });
+			return;
+		}
+		if (!snap.exists) {
+			res.status(404).json({ ok: false, error: 'session_not_found' });
+			return;
+		}
+		const participants = Array.isArray(snap.data().participants) ? snap.data().participants : [];
+		if (!participants.includes(uid)) {
+			res.status(403).json({ ok: false, error: 'not_participant' });
+			return;
+		}
+
+		const note = cleanFeedbackNote(req.body.note);
+
+		try {
+			if (kind === 'rating') {
+				const { rating } = req.body;
+				const reasons = rating === 'down' ? cleanFeedbackReasons(req.body.reasons) : [];
+				const turnRef = sessionRef.collection('turns').doc(String(turnIndex).padStart(4, '0'));
+				// Return the outcome from the transaction (it can be retried and
+				// re-invoked, so don't accumulate state in an outer variable).
+				const turnExists = await db.runTransaction(async (tx) => {
+					const turnSnap = await tx.get(turnRef);
+					if (!turnSnap.exists) return false;
+					tx.set(
+						turnRef,
+						{ feedback: { [uid]: { rating, at: FieldValue.serverTimestamp() } } },
+						{ merge: true }
+					);
+					if (reasons.length || note) {
+						tx.set(db.collection('feedback').doc(), {
+							uid,
+							sid,
+							turnIndex,
+							kind: 'rating',
+							rating,
+							reasons,
+							note,
+							createdAt: FieldValue.serverTimestamp()
+						});
+					}
+					return true;
+				});
+				if (!turnExists) {
+					res.status(404).json({ ok: false, error: 'turn_not_found' });
+					return;
+				}
+			} else {
+				const { helped } = req.body;
+				await db.collection('feedback').doc().set({
+					uid,
+					sid,
+					turnIndex,
+					kind: 'survey',
+					helped,
+					createdAt: FieldValue.serverTimestamp()
+				});
+			}
+		} catch (err) {
+			console.error('agentFeedback write failed:', sid, err.message || err);
+			res.status(500).json({ ok: false, error: 'feedback_failed' });
+			return;
+		}
+
+		res.status(200).json({ ok: true });
+	}
+);
+
 // --- Agent delete endpoint (hard-deletes a chat, creator-only) ---
 //
 // Plan §6 / §8: possession of the chat URL grants read + continue, but hard

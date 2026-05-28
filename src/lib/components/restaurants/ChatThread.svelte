@@ -9,6 +9,9 @@
 	import { renderMarkdown } from '$lib/markdown';
 	import ChartBlock from './ChartBlock.svelte';
 	import SourceFavicon from './SourceFavicon.svelte';
+	import MessageFeedback from './MessageFeedback.svelte';
+	import FeedbackSurvey from './FeedbackSurvey.svelte';
+	import { feedback } from '$lib/feedback.svelte';
 
 	let scrollEl: HTMLDivElement | undefined = $state();
 	let contentEl: HTMLDivElement | undefined = $state();
@@ -215,6 +218,36 @@
 	}
 
 	let expandedSources: Record<number, boolean> = $state({});
+
+	// Offer the periodic value prompt when a research report finishes live in this
+	// session — detected by `loading` falling from true→false within the SAME
+	// session (a historical chat load never makes that transition, and switching
+	// away from a running chat to a finished one is excluded by the sid guard; it
+	// also doesn't depend on the reveal animation, which reduced-motion skips).
+	// Completed activity can hydrate a beat AFTER the loading edge, so the turn is
+	// remembered and the survey is offered once it qualifies as a research report.
+	let wasLoading = false;
+	let prevSid: string | null = null;
+	let liveCompletedTurn: number | null = null;
+	$effect(() => {
+		const sid = chatState.activeSid;
+		const loading = chatState.loading;
+		const messages = chatState.messages;
+		if (sid !== prevSid) liveCompletedTurn = null;
+		if (sid === prevSid && wasLoading && !loading) {
+			const last = messages[messages.length - 1];
+			if (last?.kind === 'final') liveCompletedTurn = last.turnIndex;
+		}
+		if (liveCompletedTurn !== null) {
+			const turn = messages.find((m) => m.kind === 'final' && m.turnIndex === liveCompletedTurn);
+			if (turn?.turnSummary && thoughtCount(turn.activityEvents) >= ACTIVITY_THOUGHT_MIN) {
+				feedback.maybeOfferSurvey(sid, liveCompletedTurn);
+				liveCompletedTurn = null;
+			}
+		}
+		wasLoading = loading;
+		prevSid = sid;
+	});
 </script>
 
 <div bind:this={scrollEl} class="px-5 py-6 md:px-6">
@@ -277,7 +310,12 @@
 							{/if}
 						{/each}
 					</div>
-					<div class="mt-2 flex max-w-[700px] justify-end">
+					<div class="mt-2 flex max-w-[700px] items-center justify-end gap-2">
+						<MessageFeedback
+							sid={chatState.activeSid}
+							turnIndex={msg.turnIndex}
+							entry={msg.feedback}
+						/>
 						<button
 							onclick={() => tts.play(i, msg.text)}
 							disabled={tts.loading === i}
@@ -377,6 +415,10 @@
 								{/if}
 							</div>
 						</div>
+					{/if}
+
+					{#if feedback.isSurveyActive(chatState.activeSid, msg.turnIndex)}
+						<FeedbackSurvey sid={chatState.activeSid} turnIndex={msg.turnIndex} />
 					{/if}
 				</div>
 			{/if}
