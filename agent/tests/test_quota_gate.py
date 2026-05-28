@@ -176,7 +176,7 @@ def _reserve_call(user_data, *, quota, count_field, period_field, config=None, s
     if has_session:
         session_ref = MagicMock()
         session_ref.get.return_value = _snap(session_data)
-    reserved, plan, period = _reserve(
+    reserved, plan, period, scope = _reserve(
         txn, user_ref, session_ref, config or _config(), quota, count_field, period_field, _now()
     )
     return reserved, plan, period, txn, user_ref, session_ref
@@ -347,7 +347,22 @@ def test_continue_gate_research_scope_block_message_lifetime():
     assert out is not None
     text = out.parts[0].text.lower()
     assert "follow-up" in text
+    assert "for this chat" in text  # research scope → per-chat wording
     assert "tomorrow" not in text  # ever → no reset phrase
+
+
+def test_continue_gate_account_scope_message_has_no_per_chat_wording():
+    # Account-scoped follow-ups (paid) must NOT say "for this chat".
+    ctx = _callback_context("u-paid")
+    fs = _gate_fs(
+        config_doc=_config(),  # paid continue = account/day/100
+        user_doc={"plan": "paid", "continueCount": 100, "continuePeriodKey": _period_key("day", datetime.now(timezone.utc))},
+    )
+    out = _run(continue_quota_gate, ctx, fs)
+    assert out is not None
+    text = out.parts[0].text.lower()
+    assert "for this chat" not in text
+    assert "free plan" not in text  # paid
 
 
 def test_continue_gate_research_scope_targets_session_subdoc():
