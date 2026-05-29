@@ -124,8 +124,9 @@
 
 	// --- Actions ---
 
+	// Close button, backdrop, and Escape are all gated by `dismissible={!submitting}`
+	// on the Modal, so this is unreachable mid-submit.
 	function close() {
-		if (submitting) return;
 		formState.close();
 	}
 
@@ -236,6 +237,18 @@
 
 <!-- Step snippets -->
 
+{#snippet selectChevron()}
+	<svg
+		class="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-black/45 dark:text-white/45"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		aria-hidden="true"
+	>
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m6 9 6 6 6-6" />
+	</svg>
+{/snippet}
+
 {#snippet successStep()}
 	<div class="step-content flex flex-col items-center py-8 text-center">
 		<div
@@ -298,15 +311,18 @@
 					for="country"
 					class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Country</label
 				>
-				<select
-					id="country"
-					bind:value={selectedCountry}
-					class="w-full appearance-none rounded-xl border border-black/[0.12] bg-white px-4 py-3 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55]"
-				>
-					{#each countries as c (c.code)}
-						<option value={c.code}>{c.name}</option>
-					{/each}
-				</select>
+				<div class="relative">
+					<select
+						id="country"
+						bind:value={selectedCountry}
+						class="w-full appearance-none rounded-xl border border-black/[0.12] bg-white px-4 py-3 pr-10 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55]"
+					>
+						{#each countries as c (c.code)}
+							<option value={c.code}>{c.name}</option>
+						{/each}
+					</select>
+					{@render selectChevron()}
+				</div>
 			</div>
 			{#if isVenue}
 				<div class="relative">
@@ -407,21 +423,24 @@
 						class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
 						>Number of locations</label
 					>
-					<select
-						id="locations"
-						bind:value={selectedLocations}
-						class="w-full appearance-none rounded-xl border bg-white px-4 py-3 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55] {shakeFields.has(
-							'locations'
-						)
-							? 'shake border-red-300'
-							: 'border-black/[0.12]'}"
-					>
-						<option value="" disabled class="text-black/25">Select</option>
-						<option value="1">1 location</option>
-						<option value="2-5">2 – 5 locations</option>
-						<option value="6-20">6 – 20 locations</option>
-						<option value="20+">20+ locations</option>
-					</select>
+					<div class="relative">
+						<select
+							id="locations"
+							bind:value={selectedLocations}
+							class="w-full appearance-none rounded-xl border bg-white px-4 py-3 pr-10 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55] {shakeFields.has(
+								'locations'
+							)
+								? 'shake border-red-300'
+								: 'border-black/[0.12]'}"
+						>
+							<option value="" disabled class="text-black/25">Select</option>
+							<option value="1">1 location</option>
+							<option value="2-5">2 – 5 locations</option>
+							<option value="6-20">6 – 20 locations</option>
+							<option value="20+">20+ locations</option>
+						</select>
+						{@render selectChevron()}
+					</div>
 				</div>
 			{:else}
 				<div>
@@ -528,8 +547,7 @@
 	ariaLabel="Book a demo"
 	maxWidth="max-w-[560px]"
 	z="z-[100]"
-	showClose={!submitting}
-	closeOnBackdrop={!submitting}
+	dismissible={!submitting}
 >
 	<div class="p-8 md:p-10">
 		<!-- Content wrapper with animated height -->

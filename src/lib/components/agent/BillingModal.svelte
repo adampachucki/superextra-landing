@@ -9,8 +9,9 @@
 	labelledby="billing-title"
 	maxWidth="max-w-md"
 	z="z-[80]"
+	dismissible={!billing.posting}
 >
-	<div class="border-b border-black/[0.06] px-5 py-4 pr-12 dark:border-white/[0.08]">
+	<div class="p-6">
 		<h2 id="billing-title" class="text-lg font-medium tracking-tight text-black dark:text-white">
 			Superextra Pro
 		</h2>
@@ -19,12 +20,10 @@
 				? 'Stripe test mode. No real payment is collected.'
 				: 'Billing country sets currency. Tax is included where applicable.'}
 		</p>
-	</div>
 
-	<div class="px-5 py-4">
 		<label
 			for="billing-market"
-			class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
+			class="mt-6 mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
 		>
 			Billing country
 		</label>
@@ -59,26 +58,24 @@
 				Test card: 4242 4242 4242 4242
 			</p>
 		{/if}
-	</div>
 
-	<div
-		class="flex items-center justify-end gap-2 border-t border-black/[0.06] px-5 py-4 dark:border-white/[0.08]"
-	>
-		<button
-			type="button"
-			onclick={() => billing.closeUpgrade()}
-			disabled={billing.posting}
-			class="btn-secondary px-4 py-2 text-[13px]"
-		>
-			Cancel
-		</button>
-		<button
-			type="button"
-			onclick={() => billing.startCheckout(billing.selectedMarket)}
-			disabled={billing.posting}
-			class="btn-primary px-4 py-2 text-[13px]"
-		>
-			{billing.posting ? 'Opening…' : 'Continue'}
-		</button>
+		<div class="mt-6 flex items-center justify-end gap-2">
+			<button
+				type="button"
+				onclick={() => billing.closeUpgrade()}
+				disabled={billing.posting}
+				class="btn-secondary px-4 py-2 text-[13px]"
+			>
+				Cancel
+			</button>
+			<button
+				type="button"
+				onclick={() => billing.startCheckout(billing.selectedMarket)}
+				disabled={billing.posting}
+				class="btn-primary px-4 py-2 text-[13px]"
+			>
+				{billing.posting ? 'Opening…' : 'Continue'}
+			</button>
+		</div>
 	</div>
 </Modal>

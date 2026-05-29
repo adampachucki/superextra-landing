@@ -9,8 +9,7 @@
 		labelledby,
 		maxWidth = 'max-w-[400px]',
 		z = 'z-[60]',
-		closeOnBackdrop = true,
-		showClose = true,
+		dismissible = true,
 		children
 	}: {
 		open: boolean;
@@ -19,14 +18,15 @@
 		labelledby?: string;
 		maxWidth?: string;
 		z?: string;
-		closeOnBackdrop?: boolean;
-		showClose?: boolean;
+		/** When false, the close button, backdrop click, and Escape are all inert. */
+		dismissible?: boolean;
 		children: Snippet;
 	} = $props();
 
 	// Single shared open/close motion: backdrop fades + blurs, panel slides + fades.
 	// `mounted` keeps the node in the DOM through the exit animation; `visible`
-	// toggles the animated classes one frame after mount.
+	// toggles the animated classes one frame after mount. DURATION drives both the
+	// JS unmount timer and the CSS transition (applied inline), so they stay in sync.
 	const DURATION = 300;
 
 	let mounted = $state(false);
@@ -62,7 +62,7 @@
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
-			onclose();
+			if (dismissible) onclose();
 			return;
 		}
 		if (e.key !== 'Tab' || !panelEl) return;
@@ -91,11 +91,12 @@
 {#if mounted}
 	<div
 		role="presentation"
-		class="fixed inset-0 {z} flex items-center justify-center px-4 py-8 transition-all duration-300 {visible
+		style="transition-duration: {DURATION}ms"
+		class="fixed inset-0 {z} flex items-center justify-center px-4 py-8 transition-all {visible
 			? 'bg-black/40 backdrop-blur-sm'
 			: 'backdrop-blur-0 bg-black/0'}"
 		onmousedown={(e) => {
-			if (closeOnBackdrop && e.target === e.currentTarget) onclose();
+			if (dismissible && e.target === e.currentTarget) onclose();
 		}}
 	>
 		<div
@@ -106,11 +107,12 @@
 			aria-labelledby={labelledby}
 			tabindex="-1"
 			onkeydown={handleKeydown}
-			class="relative w-full {maxWidth} rounded-2xl bg-white shadow-2xl shadow-black/10 transition-all duration-300 focus:outline-none dark:bg-cream-50 {visible
+			style="transition-duration: {DURATION}ms"
+			class="relative w-full {maxWidth} rounded-2xl bg-white shadow-2xl shadow-black/10 transition-all focus:outline-none dark:bg-cream-50 {visible
 				? 'translate-y-0 opacity-100'
 				: 'translate-y-4 opacity-0'}"
 		>
-			{#if showClose}
+			{#if dismissible}
 				<button
 					type="button"
 					onclick={onclose}
