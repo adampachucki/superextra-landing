@@ -115,7 +115,7 @@
 			type="button"
 			onclick={handleGoogle}
 			disabled={busy}
-			class="flex w-full items-center justify-center gap-3 rounded-xl border border-black/[0.12] bg-white px-4 py-3 text-[14px] font-medium text-black transition-colors hover:bg-cream-100 disabled:opacity-50 dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:hover:bg-cream-100"
+			class="btn-outline flex w-full items-center justify-center gap-3 px-4 py-3 text-[14px]"
 		>
 			<svg class="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
 				<path
@@ -157,7 +157,7 @@
 			<button
 				type="submit"
 				disabled={busy || !email.trim()}
-				class="w-full rounded-xl bg-black px-4 py-3 text-[14px] font-medium text-white transition-colors hover:bg-black/85 disabled:opacity-30 dark:bg-white dark:text-black dark:hover:bg-white/85"
+				class="btn-primary w-full px-4 py-3 text-[14px]"
 			>
 				{pending === 'email' ? 'Sending…' : 'Email me a sign-in link'}
 			</button>

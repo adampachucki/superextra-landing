@@ -29,7 +29,7 @@
 			</p>
 			<button
 				onclick={() => formState.open()}
-				class="inline-flex items-center gap-2 btn-primary px-8 py-3.5 text-sm"
+				class="inline-flex btn-primary items-center gap-2 px-8 py-3.5 text-sm"
 			>
 				Book a demo
 			</button>

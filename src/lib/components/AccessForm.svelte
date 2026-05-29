@@ -258,7 +258,7 @@
 		<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40 dark:text-white/40">
 			A confirmation email has been sent. The team will follow up with available times.
 		</p>
-		<button onclick={close} class="btn-secondary px-7 py-2.5 text-sm"> Done </button>
+		<button onclick={close} class="btn-primary px-7 py-2.5 text-sm"> Done </button>
 	</div>
 {/snippet}
 
@@ -574,7 +574,7 @@
 					<button
 						onclick={back}
 						disabled={submitting}
-						class="inline-flex items-center gap-1.5 text-sm text-black/40 transition-colors hover:text-black disabled:opacity-30 dark:text-white/40 dark:hover:text-white"
+						class="-ml-2 inline-flex btn-secondary items-center gap-1.5 px-4 py-2.5 text-sm"
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
