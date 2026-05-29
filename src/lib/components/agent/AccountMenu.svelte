@@ -79,7 +79,7 @@
 	{/snippet}
 
 	{#snippet menuItems()}
-		<div class="border-b border-black/[0.06] px-3 py-2 dark:border-white/[0.06]">
+		<div class="border-b border-black/[0.06] px-4 py-2 dark:border-white/[0.06]">
 			<p class="truncate text-[12px] text-black dark:text-white">
 				{user.displayName ?? user.email ?? 'Signed in'}
 			</p>

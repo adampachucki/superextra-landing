@@ -343,7 +343,7 @@
 						aria-autocomplete="list"
 						aria-expanded={showSuggestions && placeSuggestions.length > 0}
 						aria-controls="place-suggestions"
-						aria-invalid={shakeFields.has('place-name') ? 'true' : undefined}
+						data-invalid={shakeFields.has('place-name') ? 'true' : undefined}
 						class="field pr-10 {shakeFields.has('place-name') ? 'shake' : ''}"
 					/>
 					{#if loadingSuggestions}
@@ -385,7 +385,7 @@
 						type="text"
 						bind:value={businessName}
 						placeholder="Acme Inc."
-						aria-invalid={shakeFields.has('business-name') ? 'true' : undefined}
+						data-invalid={shakeFields.has('business-name') ? 'true' : undefined}
 						class="field {shakeFields.has('business-name') ? 'shake' : ''}"
 					/>
 				</div>
@@ -401,7 +401,7 @@
 						<select
 							id="locations"
 							bind:value={selectedLocations}
-							aria-invalid={shakeFields.has('locations') ? 'true' : undefined}
+							data-invalid={shakeFields.has('locations') ? 'true' : undefined}
 							class="field appearance-none pr-10 {shakeFields.has('locations') ? 'shake' : ''}"
 						>
 							<option value="" disabled class="text-black/25">Select</option>
@@ -424,7 +424,7 @@
 						type="text"
 						bind:value={webUrl}
 						placeholder="example.com"
-						aria-invalid={shakeFields.has('web-url') ? 'true' : undefined}
+						data-invalid={shakeFields.has('web-url') ? 'true' : undefined}
 						class="field {shakeFields.has('web-url') ? 'shake' : ''}"
 					/>
 				</div>
@@ -453,7 +453,7 @@
 					type="text"
 					bind:value={fullName}
 					placeholder="Jane Smith"
-					aria-invalid={shakeFields.has('full-name') ? 'true' : undefined}
+					data-invalid={shakeFields.has('full-name') ? 'true' : undefined}
 					class="field {shakeFields.has('full-name') ? 'shake' : ''}"
 				/>
 			</div>
@@ -467,7 +467,7 @@
 					bind:this={emailEl}
 					bind:value={email}
 					placeholder="jane@company.com"
-					aria-invalid={shakeFields.has('email') ? 'true' : undefined}
+					data-invalid={shakeFields.has('email') ? 'true' : undefined}
 					class="field {shakeFields.has('email') ? 'shake' : ''}"
 				/>
 			</div>
