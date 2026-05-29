@@ -117,7 +117,7 @@
 					type="button"
 					onclick={onclose}
 					aria-label="Close"
-					class="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-black/40 transition-colors hover:bg-black/[0.06] hover:text-black/70 dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-white/70"
+					class="absolute top-4 right-4 z-10 btn-icon h-8 w-8"
 				>
 					<svg
 						class="h-4 w-4"

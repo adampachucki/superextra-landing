@@ -7,6 +7,7 @@
 	import { finalAnswerReveal } from '$lib/final-answer-reveal';
 	import { billing } from '$lib/billing-state.svelte';
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 	import { renderMarkdown } from '$lib/markdown';
 	import ChartBlock from './ChartBlock.svelte';
 	import SourceFavicon from './SourceFavicon.svelte';
@@ -323,22 +324,7 @@
 								: 'border-black/5 text-black/40 hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60'}"
 						>
 							{#if tts.loading === i}
-								<svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-									<circle
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										stroke-width="2"
-										opacity="0.25"
-									/>
-									<path
-										d="M4 12a8 8 0 018-8"
-										stroke="currentColor"
-										stroke-width="2"
-										stroke-linecap="round"
-									/>
-								</svg>
+								<Spinner class="h-3.5 w-3.5" />
 								<span>Loading…</span>
 							{:else if tts.playingIndex === i}
 								<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">

@@ -31,7 +31,7 @@
 			<select
 				id="billing-market"
 				bind:value={billing.selectedMarket}
-				class="w-full appearance-none rounded-xl border border-black/[0.12] bg-white px-4 py-3 pr-10 text-sm text-black transition-colors focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55]"
+				class="field appearance-none pr-10"
 			>
 				{#each billing.marketOptions as market (market.id)}
 					<option value={market.id}>{market.label}</option>

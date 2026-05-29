@@ -97,7 +97,7 @@
 					type="button"
 					aria-label="Dismiss"
 					onclick={() => (visible = false)}
-					class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-black/35 transition-colors hover:bg-black/[0.05] hover:text-black/65 dark:text-white/35 dark:hover:bg-white/[0.06] dark:hover:text-white/65"
+					class="btn-icon h-7 w-7 shrink-0"
 				>
 					<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
 						<path stroke-linecap="round" stroke-width="1.8" d="M6 6l12 12M18 6L6 18" />

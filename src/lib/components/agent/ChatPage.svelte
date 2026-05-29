@@ -400,7 +400,7 @@
 		<button
 			onclick={toggleSidebar}
 			aria-label="Close sidebar"
-			class="flex h-9 w-9 items-center justify-center rounded-full text-black/40 transition-all duration-200 hover:bg-black/[0.06] hover:text-black/60 dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-white/60"
+			class="btn-icon h-9 w-9"
 		>
 			<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
 				<rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />

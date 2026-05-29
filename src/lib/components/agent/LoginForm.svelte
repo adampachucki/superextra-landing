@@ -151,7 +151,7 @@
 				placeholder="you@example.com"
 				autocomplete="email"
 				required
-				class="w-full rounded-xl border border-black/[0.12] bg-white px-4 py-3 text-[14px] text-black placeholder:text-black/30 focus:border-black/[0.55] focus:ring-0 focus:outline-none disabled:opacity-50 dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/[0.55]"
+				class="field disabled:opacity-50"
 				disabled={busy}
 			/>
 			<button

@@ -104,7 +104,7 @@
 			type="button"
 			onclick={handleBilling}
 			disabled={billing.posting}
-			class="block w-full px-3 py-2 text-left text-[13px] text-black/70 transition-colors hover:bg-cream-100 hover:text-black disabled:opacity-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
+			class="popover-option text-[13px] text-black/70 hover:text-black disabled:opacity-50 dark:text-white/70 dark:hover:text-white"
 			role="menuitem"
 		>
 			{billing.posting ? 'Opening…' : billingAction}
@@ -113,7 +113,7 @@
 			type="button"
 			onclick={handleSignOut}
 			disabled={signingOut}
-			class="block w-full px-3 py-2 text-left text-[13px] text-black/70 transition-colors hover:bg-cream-100 hover:text-black disabled:opacity-50 dark:text-white/70 dark:hover:bg-cream-100 dark:hover:text-white"
+			class="popover-option text-[13px] text-black/70 hover:text-black disabled:opacity-50 dark:text-white/70 dark:hover:text-white"
 			role="menuitem"
 		>
 			{signingOut ? 'Signing out…' : 'Sign out'}
@@ -145,7 +145,7 @@
 			</button>
 			{#if open}
 				<div
-					class="absolute right-3 bottom-full left-3 mb-2 rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50"
+					class="popover absolute right-3 bottom-full left-3 mb-2"
 					role="menu"
 				>
 					{@render menuItems()}
@@ -164,7 +164,7 @@
 			</button>
 			{#if open}
 				<div
-					class="absolute top-full right-0 mt-2 w-56 rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-cream-50"
+					class="popover absolute top-full right-0 mt-2 w-56"
 					role="menu"
 				>
 					{@render menuItems()}

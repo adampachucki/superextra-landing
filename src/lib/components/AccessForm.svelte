@@ -3,12 +3,11 @@
 	import { resolveSupportedBrowserCountry } from '$lib/browser-country';
 	import { fetchPlaceSuggestions, type PlaceSuggestion } from '$lib/google-places';
 	import Modal from '$lib/components/Modal.svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 
 	// --- Shared constants ---
 
 	const btnPrimary = 'inline-flex items-center gap-2 btn-primary px-7 py-2.5 text-sm';
-	const inputBase =
-		'w-full rounded-xl border px-4 py-3 text-sm text-black dark:text-white placeholder:text-black/25 dark:placeholder:text-white/25 focus:border-black/[0.55] dark:focus:border-white/[0.55] focus:ring-0 focus:outline-none';
 
 	const businessTypes = [
 		'Single venue',
@@ -312,11 +311,7 @@
 					class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Country</label
 				>
 				<div class="relative">
-					<select
-						id="country"
-						bind:value={selectedCountry}
-						class="w-full appearance-none rounded-xl border border-black/[0.12] bg-white px-4 py-3 pr-10 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55]"
-					>
+					<select id="country" bind:value={selectedCountry} class="field appearance-none pr-10">
 						{#each countries as c (c.code)}
 							<option value={c.code}>{c.name}</option>
 						{/each}
@@ -348,43 +343,23 @@
 						aria-autocomplete="list"
 						aria-expanded={showSuggestions && placeSuggestions.length > 0}
 						aria-controls="place-suggestions"
-						class="{inputBase} pr-10 {shakeFields.has('place-name')
-							? 'shake border-red-300'
-							: 'border-black/[0.12] dark:border-white/[0.12]'}"
+						aria-invalid={shakeFields.has('place-name') ? 'true' : undefined}
+						class="field pr-10 {shakeFields.has('place-name') ? 'shake' : ''}"
 					/>
 					{#if loadingSuggestions}
-						<svg
-							class="absolute right-3 bottom-3 h-4 w-4 animate-spin text-black/25 dark:text-white/25"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-						>
-							<circle
-								class="opacity-25"
-								cx="12"
-								cy="12"
-								r="10"
-								stroke="currentColor"
-								stroke-width="3"
-							></circle>
-							<path
-								class="opacity-75"
-								fill="currentColor"
-								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-							></path>
-						</svg>
+						<Spinner class="absolute right-3 bottom-3 h-4 w-4 text-black/25 dark:text-white/25" />
 					{/if}
 					{#if showSuggestions && placeSuggestions.length > 0}
 						<ul
 							id="place-suggestions"
 							role="listbox"
-							class="absolute top-full right-0 left-0 z-10 mt-1 max-h-40 overflow-auto rounded-xl border border-black/[0.12] bg-white py-1 shadow-lg dark:border-white/[0.12] dark:bg-cream-50"
+							class="absolute top-full right-0 left-0 z-10 mt-1 max-h-40 popover"
 						>
 							{#each placeSuggestions as s (s.placeId)}
 								<li role="option" aria-selected="false">
 									<button
 										type="button"
-										class="w-full px-4 py-2 text-left text-sm hover:bg-cream-50"
+										class="popover-option text-sm"
 										onpointerdown={(e) => e.preventDefault()}
 										onclick={() => selectPlace(s)}
 									>
@@ -410,9 +385,8 @@
 						type="text"
 						bind:value={businessName}
 						placeholder="Acme Inc."
-						class="{inputBase} {shakeFields.has('business-name')
-							? 'shake border-red-300'
-							: 'border-black/[0.12] dark:border-white/[0.12]'}"
+						aria-invalid={shakeFields.has('business-name') ? 'true' : undefined}
+						class="field {shakeFields.has('business-name') ? 'shake' : ''}"
 					/>
 				</div>
 			{/if}
@@ -427,11 +401,8 @@
 						<select
 							id="locations"
 							bind:value={selectedLocations}
-							class="w-full appearance-none rounded-xl border bg-white px-4 py-3 pr-10 text-sm text-black focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55] {shakeFields.has(
-								'locations'
-							)
-								? 'shake border-red-300'
-								: 'border-black/[0.12]'}"
+							aria-invalid={shakeFields.has('locations') ? 'true' : undefined}
+							class="field appearance-none pr-10 {shakeFields.has('locations') ? 'shake' : ''}"
 						>
 							<option value="" disabled class="text-black/25">Select</option>
 							<option value="1">1 location</option>
@@ -453,9 +424,8 @@
 						type="text"
 						bind:value={webUrl}
 						placeholder="example.com"
-						class="{inputBase} {shakeFields.has('web-url')
-							? 'shake border-red-300'
-							: 'border-black/[0.12] dark:border-white/[0.12]'}"
+						aria-invalid={shakeFields.has('web-url') ? 'true' : undefined}
+						class="field {shakeFields.has('web-url') ? 'shake' : ''}"
 					/>
 				</div>
 			{/if}
@@ -483,9 +453,8 @@
 					type="text"
 					bind:value={fullName}
 					placeholder="Jane Smith"
-					class="{inputBase} {shakeFields.has('full-name')
-						? 'shake border-red-300'
-						: 'border-black/[0.12] dark:border-white/[0.12]'}"
+					aria-invalid={shakeFields.has('full-name') ? 'true' : undefined}
+					class="field {shakeFields.has('full-name') ? 'shake' : ''}"
 				/>
 			</div>
 			<div>
@@ -498,9 +467,8 @@
 					bind:this={emailEl}
 					bind:value={email}
 					placeholder="jane@company.com"
-					class="{inputBase} {shakeFields.has('email')
-						? 'shake border-red-300'
-						: 'border-black/[0.12] dark:border-white/[0.12]'}"
+					aria-invalid={shakeFields.has('email') ? 'true' : undefined}
+					class="field {shakeFields.has('email') ? 'shake' : ''}"
 				/>
 			</div>
 			<div>
@@ -524,7 +492,7 @@
 								: country.code === 'de'
 									? '151 12345678'
 									: '512 345 678'}
-						class="w-full rounded-xl border border-black/[0.12] px-4 py-3 text-sm text-black placeholder:text-black/25 focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:text-white dark:placeholder:text-white/25 dark:focus:border-white/[0.55]"
+						class="field"
 					/>
 				</div>
 			</div>
@@ -622,26 +590,7 @@
 				{:else}
 					<button onclick={submit} disabled={submitting} class={btnPrimary}>
 						{#if submitting}
-							<svg
-								class="h-4 w-4 animate-spin"
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-							>
-								<circle
-									class="opacity-25"
-									cx="12"
-									cy="12"
-									r="10"
-									stroke="currentColor"
-									stroke-width="3"
-								></circle>
-								<path
-									class="opacity-75"
-									fill="currentColor"
-									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-								></path>
-							</svg>
+							<Spinner class="h-4 w-4" />
 							Submitting...
 						{:else}
 							Request demo

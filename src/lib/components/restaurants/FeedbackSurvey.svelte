@@ -49,7 +49,7 @@
 					type="button"
 					onclick={() => feedback.closeSurvey(sid, turnIndex)}
 					aria-label="Dismiss"
-					class="-mr-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-[16px] leading-none text-black/35 transition-colors hover:bg-black/[0.04] hover:text-black/60 dark:text-white/35 dark:hover:bg-white/[0.05] dark:hover:text-white/60"
+					class="-mr-1 btn-icon h-6 w-6 text-[16px] leading-none"
 				>
 					×
 				</button>

@@ -4,6 +4,7 @@
 	import { auth } from '$lib/auth.svelte';
 	import LoginForm from '$lib/components/agent/LoginForm.svelte';
 	import Seo from '$lib/components/Seo.svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 
 	// Initial state is `completing` so the prerendered HTML ships with the
 	// neutral "Signing you in…" placeholder. Magic-link arrivals stay on this
@@ -144,24 +145,7 @@
 	<div class="w-full max-w-[400px]">
 		{#if phase === 'completing'}
 			<div class="flex flex-col items-center gap-3 text-center">
-				<svg class="h-5 w-5 animate-spin text-black/40 dark:text-white/40" viewBox="0 0 24 24">
-					<circle
-						cx="12"
-						cy="12"
-						r="9"
-						stroke="currentColor"
-						stroke-width="2"
-						fill="none"
-						opacity="0.25"
-					/>
-					<path
-						d="M21 12a9 9 0 0 1-9 9"
-						stroke="currentColor"
-						stroke-width="2"
-						fill="none"
-						stroke-linecap="round"
-					/>
-				</svg>
+				<Spinner class="h-5 w-5 text-black/40 dark:text-white/40" />
 				<p class="text-[14px] text-black/55 dark:text-white/55">Signing you in…</p>
 			</div>
 		{:else if phase === 'confirm-email'}
@@ -205,7 +189,7 @@
 						autocomplete="email"
 						required
 						disabled={confirming}
-						class="w-full rounded-xl border border-black/[0.12] bg-white px-4 py-3 text-[14px] text-black placeholder:text-black/30 focus:border-black/[0.55] focus:ring-0 focus:outline-none disabled:opacity-50 dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/[0.55]"
+						class="field disabled:opacity-50"
 					/>
 					<button
 						type="submit"
