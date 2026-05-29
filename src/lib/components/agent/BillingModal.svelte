@@ -26,7 +26,7 @@
 				<div class="flex items-start justify-between gap-4">
 					<div>
 						<h2 id="billing-title" class="text-[16px] font-medium text-black dark:text-white">
-							Superextra Unlimited
+							Superextra Pro
 						</h2>
 						<p class="mt-1 text-[13px] leading-snug text-black/50 dark:text-white/50">
 							{billing.mode === 'test'

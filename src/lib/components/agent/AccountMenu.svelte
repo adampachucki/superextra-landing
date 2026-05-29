@@ -18,10 +18,10 @@
 		billing.mode === 'test'
 			? billing.canManage
 				? 'Manage test billing'
-				: 'Test upgrade'
+				: 'Test Pro'
 			: billing.canManage
 				? 'Manage billing'
-				: 'Upgrade'
+				: 'Upgrade to Pro'
 	);
 
 	function handleWindowClick(e: MouseEvent) {
@@ -90,11 +90,11 @@
 				<p class="mt-1 text-[11px] text-black/40 dark:text-white/40">
 					{billing.mode === 'test'
 						? billing.snapshot.cancelAtPeriodEnd
-							? 'Test Unlimited ends soon'
-							: 'Test Unlimited'
+							? 'Test Pro ends soon'
+							: 'Test Pro'
 						: billing.snapshot.cancelAtPeriodEnd
-							? 'Unlimited ends soon'
-							: 'Unlimited'}
+							? 'Pro ends soon'
+							: 'Pro'}
 				</p>
 			{:else if billing.mode === 'test'}
 				<p class="mt-1 text-[11px] text-black/40 dark:text-white/40">Test billing</p>

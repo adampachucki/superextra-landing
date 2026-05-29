@@ -4,8 +4,8 @@ set -euo pipefail
 STRIPE_BIN="${STRIPE_BIN:-$HOME/.local/bin/stripe}"
 FIREBASE_BIN="${FIREBASE_BIN:-}"
 PROJECT_ID="${PROJECT_ID:-superextra-site}"
-PRODUCT_NAME="${PRODUCT_NAME:-Superextra Unlimited}"
-PRODUCT_DESCRIPTION="${PRODUCT_DESCRIPTION:-Unlimited Superextra monthly subscription}"
+PRODUCT_NAME="${PRODUCT_NAME:-Superextra Pro}"
+PRODUCT_DESCRIPTION="${PRODUCT_DESCRIPTION:-Superextra Pro monthly subscription}"
 LOOKUP_KEY="${LOOKUP_KEY:-superextra_unlimited_monthly}"
 RETURN_URL="${RETURN_URL:-https://agent.superextra.ai/chat}"
 

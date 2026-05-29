@@ -83,11 +83,11 @@
 				</div>
 				<div class="min-w-0 flex-1">
 					<p class="text-[14px] font-medium text-black dark:text-white">
-						{noticeState === 'active' ? 'Welcome to Superextra Unlimited' : 'Activating Unlimited'}
+						{noticeState === 'active' ? 'Welcome to Superextra Pro' : 'Activating Pro'}
 					</p>
 					<p class="mt-0.5 text-[12px] leading-snug text-black/50 dark:text-white/50">
 						{noticeState === 'active'
-							? 'Unlimited use is active on this account.'
+							? 'Superextra Pro is active on this account.'
 							: noticeState === 'confirming'
 								? 'Confirming the subscription with Stripe.'
 								: 'Subscription state will update in a moment.'}

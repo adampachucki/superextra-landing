@@ -108,6 +108,11 @@ async function checkoutSmoke({ mode, market, stripe, idToken, returnPath }) {
 	const sessionId = checkoutSessionIdFromUrl(checkoutUrl);
 	if (!sessionId) throw new Error(`${mode} Checkout URL did not include session_id`);
 	const session = await stripe.checkout.sessions.retrieve(sessionId);
+	const lineItems = await stripe.checkout.sessions.listLineItems(sessionId, {
+		limit: 1,
+		expand: ['data.price.product']
+	});
+	const product = lineItems.data[0]?.price?.product;
 	const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
 	const customer = customerId ? await stripe.customers.retrieve(customerId) : null;
 	await expectBillingError(`${prefix}/portal`, idToken, 'stripe_subscription_missing');
@@ -119,6 +124,7 @@ async function checkoutSmoke({ mode, market, stripe, idToken, returnPath }) {
 		mode: session.mode,
 		currency: session.currency,
 		amountTotal: session.amount_total,
+		productName: typeof product === 'object' && product ? product.name : null,
 		successUrl: session.success_url,
 		cancelUrl: session.cancel_url,
 		portal: 'blocked_until_subscription'
@@ -164,6 +170,12 @@ async function main() {
 		}
 		if (live.livemode !== true || live.currency !== 'pln' || live.amountTotal !== 1900) {
 			throw new Error(`Unexpected live checkout session: ${JSON.stringify(live)}`);
+		}
+		if (test.productName !== 'Superextra Pro') {
+			throw new Error(`Unexpected test product name: ${JSON.stringify(test)}`);
+		}
+		if (live.productName !== 'Superextra Pro') {
+			throw new Error(`Unexpected live product name: ${JSON.stringify(live)}`);
 		}
 		if (test.customerCountry !== 'DE') {
 			throw new Error(`Unexpected test customer country: ${JSON.stringify(test)}`);

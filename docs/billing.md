@@ -62,6 +62,9 @@ Both scripts configure the product, monthly multi-currency price, Customer
 Portal, webhook endpoint, Firebase function secrets, and Polish Stripe Tax
 registration for the selected Stripe mode.
 
+The customer-facing Stripe product is **Superextra Pro**. The price lookup key
+remains `superextra_unlimited_monthly` as the stable internal billing identifier.
+
 ## Smoke Test
 
 After deploying Functions and agent hosting, run:
