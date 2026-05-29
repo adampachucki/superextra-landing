@@ -2,7 +2,7 @@
 	import { formState } from '$lib/form-state.svelte';
 	import { resolveSupportedBrowserCountry } from '$lib/browser-country';
 	import { fetchPlaceSuggestions, type PlaceSuggestion } from '$lib/google-places';
-	import { lockPageScroll } from '$lib/scroll-lock';
+	import Modal from '$lib/components/Modal.svelte';
 
 	// --- Shared constants ---
 
@@ -37,10 +37,7 @@
 
 	// --- Modal state ---
 
-	let backdropVisible = $state(false);
-	let modalVisible = $state(false);
 	let contentEl: HTMLDivElement | undefined = $state();
-	let modalEl: HTMLDivElement | undefined = $state();
 	let contentHeight = $state<number | undefined>();
 
 	// --- Form state ---
@@ -99,76 +96,37 @@
 		}
 	});
 
+	// Reset to a clean first step each time the modal opens. The Modal shell owns
+	// the open/close animation, so there's no exit-delay to clear state behind.
 	$effect(() => {
 		if (!formState.visible) return;
-		return lockPageScroll();
-	});
-
-	$effect(() => {
-		if (formState.visible) {
-			selectedCountry = resolveDefaultCountry();
-			requestAnimationFrame(() => {
-				backdropVisible = true;
-				requestAnimationFrame(() => {
-					modalVisible = true;
-				});
-			});
-		}
-	});
-
-	$effect(() => {
-		if (modalVisible && modalEl) {
-			modalEl.focus();
-		}
-	});
-
-	$effect(() => {
-		if (!modalVisible || !modalEl) return;
-		const el = modalEl;
-		function handleKeydown(e: KeyboardEvent) {
-			if (e.key !== 'Tab') return;
-			const focusable = el.querySelectorAll<HTMLElement>(
-				'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-			);
-			if (focusable.length === 0) return;
-			const first = focusable[0];
-			const last = focusable[focusable.length - 1];
-			if (e.shiftKey && document.activeElement === first) {
-				e.preventDefault();
-				last.focus();
-			} else if (!e.shiftKey && document.activeElement === last) {
-				e.preventDefault();
-				first.focus();
-			}
-		}
-		el.addEventListener('keydown', handleKeydown);
-		return () => el.removeEventListener('keydown', handleKeydown);
+		clearTimeout(debounceTimer);
+		step = 1;
+		selectedType = '';
+		selectedCountry = resolveDefaultCountry();
+		placeName = '';
+		selectedPlaceId = '';
+		businessName = '';
+		selectedLocations = '';
+		webUrl = '';
+		fullName = '';
+		email = '';
+		phone = '';
+		placeSuggestions = [];
+		showSuggestions = false;
+		loadingSuggestions = false;
+		shakeFields = new Set();
+		submitting = false;
+		submitted = false;
+		submitError = false;
+		submitErrorDetail = '';
 	});
 
 	// --- Actions ---
 
 	function close() {
-		modalVisible = false;
-		setTimeout(() => {
-			backdropVisible = false;
-			setTimeout(() => {
-				formState.close();
-				step = 1;
-				selectedType = '';
-				selectedCountry = resolveDefaultCountry();
-				placeName = '';
-				selectedPlaceId = '';
-				businessName = '';
-				selectedLocations = '';
-				webUrl = '';
-				fullName = '';
-				email = '';
-				phone = '';
-				submitting = false;
-				submitted = false;
-				submitError = false;
-			}, 200);
-		}, 150);
+		if (submitting) return;
+		formState.close();
 	}
 
 	function shake(fields: string[]) {
@@ -300,12 +258,7 @@
 		<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40 dark:text-white/40">
 			A confirmation email has been sent. The team will follow up with available times.
 		</p>
-		<button
-			onclick={close}
-			class="rounded-full border border-cream-200 px-7 py-2.5 text-sm text-black transition-colors hover:bg-cream-50 dark:text-white"
-		>
-			Done
-		</button>
+		<button onclick={close} class="btn-secondary px-7 py-2.5 text-sm"> Done </button>
 	</div>
 {/snippet}
 
@@ -571,155 +524,118 @@
 
 <!-- Main template -->
 
-<svelte:window
-	onkeydown={(e) => {
-		if (formState.visible && e.key === 'Escape' && !submitting) close();
-	}}
-/>
-
-{#if formState.visible}
-	<!-- Backdrop -->
-	<div
-		role="presentation"
-		class="fixed inset-0 z-[100] flex items-center justify-center transition-all duration-300
-			{backdropVisible ? 'bg-black/20 backdrop-blur-sm' : 'backdrop-blur-0 bg-black/0'}"
-		onmousedown={(e) => {
-			if (e.target === e.currentTarget && !submitting) close();
-		}}
-	>
-		<!-- Modal -->
+<Modal
+	open={formState.visible}
+	onclose={close}
+	ariaLabel="Book a demo"
+	maxWidth="max-w-[560px]"
+	z="z-[100]"
+	showClose={!submitting}
+	closeOnBackdrop={!submitting}
+>
+	<div class="p-8 md:p-10">
+		<!-- Content wrapper with animated height -->
 		<div
-			bind:this={modalEl}
-			role="dialog"
-			aria-modal="true"
-			aria-label="Book a demo"
-			tabindex="-1"
-			class="relative mx-4 w-full max-w-[560px] rounded-2xl bg-white p-8 shadow-2xl shadow-black/10 transition-all duration-300 focus:outline-none md:p-10 dark:bg-cream-50
-				{modalVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}"
+			class="transition-[height] duration-300 ease-out"
+			style={contentHeight ? `height:${contentHeight}px` : ''}
 		>
-			<!-- Close button -->
-			{#if !submitting}
-				<button
-					onclick={close}
-					class="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full text-black/25 transition-colors hover:bg-cream-100 hover:text-black/60 dark:text-white/25 dark:hover:text-white/60"
-					aria-label="Close"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-4 w-4"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-					</svg>
-				</button>
-			{/if}
+			<div bind:this={contentEl}>
+				{#if submitted}
+					{@render successStep()}
+				{:else}
+					<!-- Step indicator -->
+					<div class="mb-8 flex items-center justify-center gap-2">
+						{#each [1, 2, 3] as s (s)}
+							<div
+								class="h-1 rounded-full transition-all duration-300 {s === step
+									? 'w-8 bg-black dark:bg-white'
+									: s < step
+										? 'w-8 bg-black/30 dark:bg-white/30'
+										: 'w-8 bg-cream-200'}"
+							></div>
+						{/each}
+					</div>
 
-			<!-- Content wrapper with animated height -->
-			<div
-				class="transition-[height] duration-300 ease-out"
-				style={contentHeight ? `height:${contentHeight}px` : ''}
-			>
-				<div bind:this={contentEl}>
-					{#if submitted}
-						{@render successStep()}
+					{#if step === 1}
+						{@render step1()}
+					{:else if step === 2}
+						{@render step2()}
 					{:else}
-						<!-- Step indicator -->
-						<div class="mb-8 flex items-center justify-center gap-2">
-							{#each [1, 2, 3] as s (s)}
-								<div
-									class="h-1 rounded-full transition-all duration-300 {s === step
-										? 'w-8 bg-black dark:bg-white'
-										: s < step
-											? 'w-8 bg-black/30 dark:bg-white/30'
-											: 'w-8 bg-cream-200'}"
-								></div>
-							{/each}
-						</div>
-
-						{#if step === 1}
-							{@render step1()}
-						{:else if step === 2}
-							{@render step2()}
-						{:else}
-							{@render step3()}
-						{/if}
+						{@render step3()}
 					{/if}
-				</div>
+				{/if}
 			</div>
-
-			<!-- Navigation buttons (outside height transition to avoid clipping) -->
-			{#if !submitted}
-				<div class="mt-8 flex items-center {step === 1 ? 'justify-end' : 'justify-between'}">
-					{#if step > 1}
-						<button
-							onclick={back}
-							disabled={submitting}
-							class="inline-flex items-center gap-1.5 text-sm text-black/40 transition-colors hover:text-black disabled:opacity-30 dark:text-white/40 dark:hover:text-white"
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								class="h-3.5 w-3.5"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								stroke-width="2"
-							>
-								<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-							</svg>
-							Back
-						</button>
-					{/if}
-					{#if step < 3}
-						<button onclick={next} class={btnPrimary}>
-							Continue
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								class="h-3.5 w-3.5"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								stroke-width="2"
-							>
-								<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-							</svg>
-						</button>
-					{:else}
-						<button onclick={submit} disabled={submitting} class="{btnPrimary} disabled:opacity-60">
-							{#if submitting}
-								<svg
-									class="h-4 w-4 animate-spin"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-								>
-									<circle
-										class="opacity-25"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										stroke-width="3"
-									></circle>
-									<path
-										class="opacity-75"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-									></path>
-								</svg>
-								Submitting...
-							{:else}
-								Request demo
-							{/if}
-						</button>
-					{/if}
-				</div>
-			{/if}
 		</div>
+
+		<!-- Navigation buttons (outside height transition to avoid clipping) -->
+		{#if !submitted}
+			<div class="mt-8 flex items-center {step === 1 ? 'justify-end' : 'justify-between'}">
+				{#if step > 1}
+					<button
+						onclick={back}
+						disabled={submitting}
+						class="inline-flex items-center gap-1.5 text-sm text-black/40 transition-colors hover:text-black disabled:opacity-30 dark:text-white/40 dark:hover:text-white"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-3.5 w-3.5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+						</svg>
+						Back
+					</button>
+				{/if}
+				{#if step < 3}
+					<button onclick={next} class={btnPrimary}>
+						Continue
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-3.5 w-3.5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+						</svg>
+					</button>
+				{:else}
+					<button onclick={submit} disabled={submitting} class={btnPrimary}>
+						{#if submitting}
+							<svg
+								class="h-4 w-4 animate-spin"
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+							>
+								<circle
+									class="opacity-25"
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="3"
+								></circle>
+								<path
+									class="opacity-75"
+									fill="currentColor"
+									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+								></path>
+							</svg>
+							Submitting...
+						{:else}
+							Request demo
+						{/if}
+					</button>
+				{/if}
+			</div>
+		{/if}
 	</div>
-{/if}
+</Modal>
 
 <style>
 	.step-content {

@@ -72,6 +72,25 @@
 	&:hover {
 		background-color: color-mix(in srgb, var(--color-text) 80%, transparent);
 	}
+	&:disabled {
+		opacity: 0.5;
+	}
+}
+
+@utility btn-secondary {
+	border-radius: 9999px;
+	font-weight: 500;
+	color: color-mix(in srgb, var(--color-text) 55%, transparent);
+	transition-property: color, background-color;
+	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+	transition-duration: 150ms;
+	&:hover {
+		background-color: var(--color-cream-100);
+		color: var(--color-text);
+	}
+	&:disabled {
+		opacity: 0.5;
+	}
 }
 
 @layer base {
