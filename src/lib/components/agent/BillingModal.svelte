@@ -11,7 +11,7 @@
 	z="z-[80]"
 >
 	<div class="border-b border-black/[0.06] px-5 py-4 pr-12 dark:border-white/[0.08]">
-		<h2 id="billing-title" class="text-[16px] font-medium text-black dark:text-white">
+		<h2 id="billing-title" class="text-lg font-medium tracking-tight text-black dark:text-white">
 			Superextra Pro
 		</h2>
 		<p class="mt-1 text-[13px] leading-snug text-black/50 dark:text-white/50">
@@ -22,14 +22,17 @@
 	</div>
 
 	<div class="px-5 py-4">
-		<label for="billing-market" class="block text-[13px] text-black/55 dark:text-white/55">
+		<label
+			for="billing-market"
+			class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
+		>
 			Billing country
 		</label>
-		<div class="relative mt-2">
+		<div class="relative">
 			<select
 				id="billing-market"
 				bind:value={billing.selectedMarket}
-				class="w-full appearance-none rounded-lg border border-black/[0.1] bg-white px-3 py-3 pr-10 text-[14px] text-black outline-none transition-colors focus:border-black/40 dark:border-white/[0.12] dark:bg-cream-100 dark:text-white dark:focus:border-white/40"
+				class="w-full appearance-none rounded-xl border border-black/[0.12] bg-white px-4 py-3 pr-10 text-sm text-black transition-colors focus:border-black/[0.55] focus:ring-0 focus:outline-none dark:border-white/[0.12] dark:bg-cream-50 dark:text-white dark:focus:border-white/[0.55]"
 			>
 				{#each billing.marketOptions as market (market.id)}
 					<option value={market.id}>{market.label}</option>

@@ -98,16 +98,16 @@
 
 <div class="space-y-4">
 	<div class="space-y-1">
-		<h2 class="text-[18px] font-light text-black dark:text-white">
+		<h2 class="text-lg font-medium tracking-tight text-black dark:text-white">
 			{mode === 'email-sent' ? 'Check your email' : title}
 		</h2>
 		{#if mode === 'email-sent'}
-			<p class="text-[13px] text-black/55 dark:text-white/55">
+			<p class="text-[13px] leading-snug text-black/50 dark:text-white/50">
 				We sent a sign-in link to <span class="text-black dark:text-white">{email}</span>. Open it on
 				this device to come back signed in.
 			</p>
 		{:else if subtitle}
-			<p class="text-[13px] text-black/55 dark:text-white/55">{subtitle}</p>
+			<p class="text-[13px] leading-snug text-black/50 dark:text-white/50">{subtitle}</p>
 		{/if}
 	</div>
 	{#if mode === 'choose'}

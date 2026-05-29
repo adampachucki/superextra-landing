@@ -264,10 +264,10 @@
 
 {#snippet step1()}
 	<div class="step-content">
-		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
+		<h2 class="mb-2 text-lg font-medium tracking-tight text-black dark:text-white">
 			What kind of business do you run?
 		</h2>
-		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">Choose the closest fit.</p>
+		<p class="mb-8 text-[13px] text-black/50 dark:text-white/50">Choose the closest fit.</p>
 
 		<div class="grid grid-cols-3 gap-2.5 {shakeFields.has('type-grid') ? 'shake' : ''}">
 			{#each businessTypes as type (type)}
@@ -287,12 +287,10 @@
 
 {#snippet step2()}
 	<div class="step-content">
-		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
+		<h2 class="mb-2 text-lg font-medium tracking-tight text-black dark:text-white">
 			Add your business details
 		</h2>
-		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
-			Help us understand your needs.
-		</p>
+		<p class="mb-8 text-[13px] text-black/50 dark:text-white/50">Help us understand your needs.</p>
 
 		<div class="space-y-4">
 			<div>
@@ -448,10 +446,10 @@
 
 {#snippet step3()}
 	<div class="step-content">
-		<h2 class="mb-2 text-center text-xl font-medium tracking-tight text-black dark:text-white">
+		<h2 class="mb-2 text-lg font-medium tracking-tight text-black dark:text-white">
 			Your contact details
 		</h2>
-		<p class="mb-8 text-center text-sm text-black/40 dark:text-white/40">
+		<p class="mb-8 text-[13px] text-black/50 dark:text-white/50">
 			Available time slots will arrive by email.
 		</p>
 
@@ -544,7 +542,7 @@
 					{@render successStep()}
 				{:else}
 					<!-- Step indicator -->
-					<div class="mb-8 flex items-center justify-center gap-2">
+					<div class="mb-8 flex items-center justify-start gap-2">
 						{#each [1, 2, 3] as s (s)}
 							<div
 								class="h-1 rounded-full transition-all duration-300 {s === step
