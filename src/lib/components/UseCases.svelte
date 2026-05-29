@@ -2,11 +2,12 @@
 	import UseCaseGraphics from './UseCaseGraphics.svelte';
 	import CardCanvas from './CardCanvas.svelte';
 	import SectionHeader from './SectionHeader.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let {
 		items,
-		subtitle = 'Use Cases',
-		title = 'Supporting decisions across different functions',
+		subtitle = m.uc_def_subtitle(),
+		title = m.uc_def_title(),
 		titleClass = 'max-w-2xl',
 		subtitleClass = ''
 	}: {
@@ -39,52 +40,40 @@
 		graphicIndex?: number;
 	}[] = [
 		{
-			title: 'Marketing Strategy',
-			audience: 'Operators & Agencies',
-			description:
-				'Benchmark your brand against local competitors. Know which campaigns, channels, and price points are driving results in your market.'
+			title: m.ucd_marketing_title(),
+			audience: m.ucd_marketing_audience(),
+			description: m.ucd_marketing_desc()
 		},
 		{
-			title: 'Expansion Planning',
-			audience: 'Chains & Investors',
-			description:
-				'Evaluate locations with foot traffic, demographics, competition density, and rent data side by side. De-risk every new site decision.'
+			title: m.ucd_expansion_title(),
+			audience: m.ucd_expansion_audience(),
+			description: m.ucd_expansion_desc()
 		},
 		{
-			title: 'Market Research',
-			audience: 'Operators & Chains',
-			description:
-				'Understand market dynamics, competitive positioning, and emerging white spaces. Continuously monitor shifts so you spot opportunities before anyone else.'
+			title: m.ucd_research_title(),
+			audience: m.ucd_research_audience(),
+			description: m.ucd_research_desc()
+		},
+		{ title: m.ucd_ops_title(), audience: m.ucd_ops_audience(), description: m.ucd_ops_desc() },
+		{
+			title: m.ucd_financial_title(),
+			audience: m.ucd_financial_audience(),
+			description: m.ucd_financial_desc()
 		},
 		{
-			title: 'Ops & Workforce',
-			audience: 'Operators & Chains',
-			description:
-				'Track how your costs, staffing, and channel performance compare to the local market. Spot inefficiencies before they hit margins.'
+			title: m.ucd_sales_title(),
+			audience: m.ucd_sales_audience(),
+			description: m.ucd_sales_desc()
 		},
 		{
-			title: 'Financial Modelling',
-			audience: 'Operators & Investors',
-			description:
-				'Build projections grounded in real revenue benchmarks, occupancy rates, labor costs, and seasonality patterns — not assumptions.'
+			title: m.ucd_diligence_title(),
+			audience: m.ucd_diligence_audience(),
+			description: m.ucd_diligence_desc()
 		},
 		{
-			title: 'Sales & Leads',
-			audience: 'Suppliers & Distributors',
-			description:
-				'Find restaurants that match your ideal customer profile, track new openings in your territory, and time your outreach with real demand signals.'
-		},
-		{
-			title: 'Due Diligence',
-			audience: 'Investors & Advisors',
-			description:
-				'Verify partners and vet investment opportunities with independent market data — revenue benchmarks, competitive positioning, and local demand signals.'
-		},
-		{
-			title: 'Enrichment',
-			audience: 'Tech Platforms',
-			description:
-				'Integrate hyper-local restaurant intelligence into your platform via API. Add market context, venue data, and competitive insights to your product.'
+			title: m.ucd_enrich_title(),
+			audience: m.ucd_enrich_audience(),
+			description: m.ucd_enrich_desc()
 		}
 	];
 
@@ -140,7 +129,7 @@
 		onclick={prev}
 		disabled={activeIndex === 0}
 		class="flex h-10 w-10 items-center justify-center rounded-full border border-cream-200 transition-colors hover:bg-cream-50 disabled:opacity-30"
-		aria-label="Previous"
+		aria-label={m.uc_prev()}
 	>
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
@@ -150,7 +139,7 @@
 		onclick={next}
 		disabled={activeIndex === useCases.length - 1}
 		class="flex h-10 w-10 items-center justify-center rounded-full border border-cream-200 transition-colors hover:bg-cream-50 disabled:opacity-30"
-		aria-label="Next"
+		aria-label={m.uc_next()}
 	>
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />

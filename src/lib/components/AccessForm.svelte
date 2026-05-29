@@ -4,11 +4,15 @@
 	import { fetchPlaceSuggestions, type PlaceSuggestion } from '$lib/google-places';
 	import Modal from '$lib/components/Modal.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
+	import * as m from '$lib/paraglide/messages';
+	import { getLocale } from '$lib/paraglide/runtime';
 
 	// --- Shared constants ---
 
 	const btnPrimary = 'inline-flex items-center gap-2 btn-primary px-7 py-2.5 text-sm';
 
+	// English ids are canonical — used for branching (isVenue) and sent to the
+	// intake email. Display labels are localized via `typeLabel`.
 	const businessTypes = [
 		'Single venue',
 		'Chain operator',
@@ -21,12 +25,33 @@
 		'Other'
 	];
 
+	const typeLabel: Record<string, () => string> = {
+		'Single venue': m.af_type_single,
+		'Chain operator': m.af_type_chain,
+		'Hotel operator': m.af_type_hotel,
+		'Delivery service': m.af_type_delivery,
+		'Supply & distrib.': m.af_type_supply,
+		Advisory: m.af_type_advisory,
+		'Real estate': m.af_type_realestate,
+		'Tech platform': m.af_type_tech,
+		Other: m.af_type_other
+	};
+
+	// `name` is the canonical value sent to the (English) intake email; the
+	// dropdown shows the localized `countryLabel`.
 	const countries = [
 		{ code: 'de', name: 'Germany', dial: '+49' },
 		{ code: 'pl', name: 'Poland', dial: '+48' },
 		{ code: 'gb', name: 'United Kingdom', dial: '+44' },
 		{ code: 'us', name: 'United States', dial: '+1' }
 	];
+
+	const countryLabel: Record<string, () => string> = {
+		de: m.af_country_de,
+		pl: m.af_country_pl,
+		gb: m.af_country_gb,
+		us: m.af_country_us
+	};
 	const fallbackCountryCode = countries[0].code;
 	const supportedCountryCodes = countries.map((c) => c.code);
 
@@ -215,7 +240,8 @@
 					webUrl: isVenue ? undefined : webUrl,
 					fullName,
 					email,
-					phone: phone || undefined
+					phone: phone || undefined,
+					locale: getLocale()
 				})
 			});
 			if (!res.ok) {
@@ -265,21 +291,21 @@
 			</svg>
 		</div>
 		<h2 class="mb-2 text-xl font-medium tracking-tight text-black dark:text-white">
-			Demo request sent
+			{m.af_success_title()}
 		</h2>
 		<p class="mb-8 max-w-xs text-sm leading-relaxed text-black/40 dark:text-white/40">
-			A confirmation email has been sent. The team will follow up with available times.
+			{m.af_success_sub()}
 		</p>
-		<button onclick={close} class="btn-primary px-7 py-2.5 text-sm"> Done </button>
+		<button onclick={close} class="btn-primary px-7 py-2.5 text-sm"> {m.af_done()} </button>
 	</div>
 {/snippet}
 
 {#snippet step1()}
 	<div class="step-content">
 		<h2 class="mb-2 text-lg font-medium tracking-tight text-black dark:text-white">
-			What kind of business do you run?
+			{m.af_s1_title()}
 		</h2>
-		<p class="mb-8 text-[13px] text-black/50 dark:text-white/50">Choose the closest fit.</p>
+		<p class="mb-8 text-[13px] text-black/50 dark:text-white/50">{m.af_s1_sub()}</p>
 
 		<div class="grid grid-cols-3 gap-2.5 {shakeFields.has('type-grid') ? 'shake' : ''}">
 			{#each businessTypes as type (type)}
@@ -290,7 +316,7 @@
 						? 'border-black bg-black text-white dark:border-white dark:bg-white dark:text-black'
 						: 'border-cream-200 bg-white text-black/60 hover:border-cream-300 hover:text-black dark:bg-cream-50 dark:text-white/60 dark:hover:text-white'}"
 				>
-					{type}
+					{typeLabel[type]()}
 				</button>
 			{/each}
 		</div>
@@ -300,20 +326,21 @@
 {#snippet step2()}
 	<div class="step-content">
 		<h2 class="mb-2 text-lg font-medium tracking-tight text-black dark:text-white">
-			Add your business details
+			{m.af_s2_title()}
 		</h2>
-		<p class="mb-8 text-[13px] text-black/50 dark:text-white/50">Help us understand your needs.</p>
+		<p class="mb-8 text-[13px] text-black/50 dark:text-white/50">{m.af_s2_sub()}</p>
 
 		<div class="space-y-4">
 			<div>
 				<label
 					for="country"
-					class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Country</label
+					class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
+					>{m.af_country()}</label
 				>
 				<div class="relative">
 					<select id="country" bind:value={selectedCountry} class="field appearance-none pr-10">
 						{#each countries as c (c.code)}
-							<option value={c.code}>{c.name}</option>
+							<option value={c.code}>{countryLabel[c.code]()}</option>
 						{/each}
 					</select>
 					{@render selectChevron()}
@@ -324,7 +351,7 @@
 					<label
 						for="place-name"
 						class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-						>Place name</label
+						>{m.af_place_name()}</label
 					>
 					<input
 						id="place-name"
@@ -335,7 +362,7 @@
 							if (placeSuggestions.length) showSuggestions = true;
 						}}
 						onblur={() => setTimeout(() => (showSuggestions = false), 150)}
-						placeholder="The Corner Bistro"
+						placeholder={m.af_ph_place()}
 						autocomplete="off"
 						autocorrect="off"
 						spellcheck="false"
@@ -378,13 +405,13 @@
 					<label
 						for="business-name"
 						class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-						>Business name</label
+						>{m.af_business_name()}</label
 					>
 					<input
 						id="business-name"
 						type="text"
 						bind:value={businessName}
-						placeholder="Acme Inc."
+						placeholder={m.af_ph_business()}
 						data-invalid={shakeFields.has('business-name') ? 'true' : undefined}
 						class="field {shakeFields.has('business-name') ? 'shake' : ''}"
 					/>
@@ -395,7 +422,7 @@
 					<label
 						for="locations"
 						class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-						>Number of locations</label
+						>{m.af_locations()}</label
 					>
 					<div class="relative">
 						<select
@@ -404,11 +431,11 @@
 							data-invalid={shakeFields.has('locations') ? 'true' : undefined}
 							class="field appearance-none pr-10 {shakeFields.has('locations') ? 'shake' : ''}"
 						>
-							<option value="" disabled class="text-black/25">Select</option>
-							<option value="1">1 location</option>
-							<option value="2-5">2 – 5 locations</option>
-							<option value="6-20">6 – 20 locations</option>
-							<option value="20+">20+ locations</option>
+							<option value="" disabled class="text-black/25">{m.af_select()}</option>
+							<option value="1">{m.af_loc_1()}</option>
+							<option value="2-5">{m.af_loc_2_5()}</option>
+							<option value="6-20">{m.af_loc_6_20()}</option>
+							<option value="20+">{m.af_loc_20p()}</option>
 						</select>
 						{@render selectChevron()}
 					</div>
@@ -417,13 +444,14 @@
 				<div>
 					<label
 						for="web-url"
-						class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Web URL</label
+						class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
+						>{m.af_web_url()}</label
 					>
 					<input
 						id="web-url"
 						type="text"
 						bind:value={webUrl}
-						placeholder="example.com"
+						placeholder={m.af_ph_url()}
 						data-invalid={shakeFields.has('web-url') ? 'true' : undefined}
 						class="field {shakeFields.has('web-url') ? 'shake' : ''}"
 					/>
@@ -436,44 +464,46 @@
 {#snippet step3()}
 	<div class="step-content">
 		<h2 class="mb-2 text-lg font-medium tracking-tight text-black dark:text-white">
-			Your contact details
+			{m.af_s3_title()}
 		</h2>
 		<p class="mb-8 text-[13px] text-black/50 dark:text-white/50">
-			Available time slots will arrive by email.
+			{m.af_s3_sub()}
 		</p>
 
 		<div class="space-y-4">
 			<div>
 				<label
 					for="full-name"
-					class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60">Full name</label
+					class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
+					>{m.af_full_name()}</label
 				>
 				<input
 					id="full-name"
 					type="text"
 					bind:value={fullName}
-					placeholder="Jane Smith"
+					placeholder={m.af_ph_name()}
 					data-invalid={shakeFields.has('full-name') ? 'true' : undefined}
 					class="field {shakeFields.has('full-name') ? 'shake' : ''}"
 				/>
 			</div>
 			<div>
 				<label for="email" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-					>Work email</label
+					>{m.af_work_email()}</label
 				>
 				<input
 					id="email"
 					type="email"
 					bind:this={emailEl}
 					bind:value={email}
-					placeholder="jane@company.com"
+					placeholder={m.af_ph_email()}
 					data-invalid={shakeFields.has('email') ? 'true' : undefined}
 					class="field {shakeFields.has('email') ? 'shake' : ''}"
 				/>
 			</div>
 			<div>
 				<label for="phone" class="mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
-					>Phone <span class="text-black/25 dark:text-white/25">(optional)</span></label
+					>{m.af_phone()}
+					<span class="text-black/25 dark:text-white/25">{m.af_optional()}</span></label
 				>
 				<div class="flex gap-2">
 					<span
@@ -500,7 +530,7 @@
 
 		{#if submitError}
 			<p class="mt-4 text-sm text-red-500">
-				Something went wrong, please try again{#if submitErrorDetail}
+				{m.af_error()}{#if submitErrorDetail}
 					({submitErrorDetail}){/if}
 			</p>
 		{/if}
@@ -512,7 +542,7 @@
 <Modal
 	open={formState.visible}
 	onclose={close}
-	ariaLabel="Book a demo"
+	ariaLabel={m.nav_book_demo()}
 	maxWidth="max-w-[560px]"
 	z="z-[100]"
 	dismissible={!submitting}
@@ -570,12 +600,12 @@
 						>
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
 						</svg>
-						Back
+						{m.af_back()}
 					</button>
 				{/if}
 				{#if step < 3}
 					<button onclick={next} class={btnPrimary}>
-						Continue
+						{m.af_continue()}
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							class="h-3.5 w-3.5"
@@ -591,9 +621,9 @@
 					<button onclick={submit} disabled={submitting} class={btnPrimary}>
 						{#if submitting}
 							<Spinner class="h-4 w-4" />
-							Submitting...
+							{m.af_submitting()}
 						{:else}
-							Request demo
+							{m.af_request_demo()}
 						{/if}
 					</button>
 				{/if}

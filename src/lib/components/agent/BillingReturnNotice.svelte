@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { billing } from '$lib/billing-state.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	type NoticeState = 'confirming' | 'active' | 'pending';
 
@@ -83,19 +84,19 @@
 				</div>
 				<div class="min-w-0 flex-1">
 					<p class="text-[14px] font-medium text-black dark:text-white">
-						{noticeState === 'active' ? 'Welcome to Superextra Pro' : 'Activating Pro'}
+						{noticeState === 'active' ? m.brn_welcome() : m.brn_activating()}
 					</p>
 					<p class="mt-0.5 text-[12px] leading-snug text-black/50 dark:text-white/50">
 						{noticeState === 'active'
-							? 'Superextra Pro is active on this account.'
+							? m.brn_active()
 							: noticeState === 'confirming'
-								? 'Confirming the subscription with Stripe.'
-								: 'Subscription state will update in a moment.'}
+								? m.brn_confirming()
+								: m.brn_pending()}
 					</p>
 				</div>
 				<button
 					type="button"
-					aria-label="Dismiss"
+					aria-label={m.brn_dismiss()}
 					onclick={() => (visible = false)}
 					class="btn-icon h-7 w-7 shrink-0"
 				>

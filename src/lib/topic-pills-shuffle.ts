@@ -8,6 +8,8 @@
  */
 
 export interface TopicPillItem {
+	/** Stable identifier — survives localization (label/mobile/query are translated). */
+	id: string;
 	label: string;
 	mobile: string;
 	color: string;

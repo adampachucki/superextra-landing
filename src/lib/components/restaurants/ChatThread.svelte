@@ -9,6 +9,7 @@
 	import LiveActivity from '$lib/components/agent/LiveActivity.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import { renderMarkdown } from '$lib/markdown';
+	import * as m from '$lib/paraglide/messages';
 	import ChartBlock from './ChartBlock.svelte';
 	import SourceFavicon from './SourceFavicon.svelte';
 	import MessageFeedback from './MessageFeedback.svelte';
@@ -134,16 +135,15 @@
 		instagram: 'Instagram'
 	};
 	const ERROR_COPY: Record<string, string> = {
-		timeout: 'The analysis took longer than expected and was cut short.',
-		progress_stalled: 'The analysis stalled before a final answer was delivered. Please try again.',
-		heartbeat_lost:
-			'The analysis stopped because the research worker lost connection. Please try again.',
-		handoff_start_timeout: 'The analysis could not start. Please try again.',
-		handoff_failed: 'The analysis could not start. Please try again.',
-		empty_or_malformed_reply: 'The analysis finished without a usable answer. Please try again.',
-		finalize_failed: 'The analysis finished, but the answer could not be saved. Please try again.',
-		user_cancelled: 'Stopped.',
-		pipeline_error: 'The analysis could not be completed. Please try again.'
+		timeout: m.ct_err_timeout(),
+		progress_stalled: m.ct_err_stalled(),
+		heartbeat_lost: m.ct_err_disconnect(),
+		handoff_start_timeout: m.ct_err_start(),
+		handoff_failed: m.ct_err_start(),
+		empty_or_malformed_reply: m.ct_err_empty(),
+		finalize_failed: m.ct_err_finalize(),
+		user_cancelled: m.ct_err_cancelled(),
+		pipeline_error: m.ct_err_pipeline()
 	};
 
 	function errorMessage(code: string) {
@@ -306,7 +306,7 @@
 								disabled={billing.posting}
 								class="mr-auto inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full bg-black px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
 							>
-								<span>Upgrade to Pro</span>
+								<span>{m.am_upgrade()}</span>
 								<span class="text-white/60 dark:text-black/50">19 PLN / 9 EUR / £9 / $9</span>
 							</button>
 						{/if}
@@ -325,13 +325,13 @@
 						>
 							{#if tts.loading === i}
 								<Spinner class="h-3.5 w-3.5" />
-								<span>Loading…</span>
+								<span>{m.ct_loading()}</span>
 							{:else if tts.playingIndex === i}
 								<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
 									<rect x="6" y="5" width="4" height="14" rx="1" />
 									<rect x="14" y="5" width="4" height="14" rx="1" />
 								</svg>
-								<span>Stop</span>
+								<span>{m.ct_stop()}</span>
 							{:else}
 								<svg
 									class="h-3.5 w-3.5"
@@ -346,7 +346,7 @@
 									<path d="M15.54 8.46a5 5 0 010 7.07" />
 									<path d="M19.07 4.93a10 10 0 010 14.14" />
 								</svg>
-								<span>Read aloud</span>
+								<span>{m.ct_read_aloud()}</span>
 							{/if}
 						</button>
 					</div>

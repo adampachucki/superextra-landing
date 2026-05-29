@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { feedback } from '$lib/feedback.svelte';
 	import ReasonPicker from './ReasonPicker.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let { sid, turnIndex }: { sid: string | null; turnIndex: number } = $props();
 
@@ -41,14 +42,14 @@
 		class="rounded-2xl border border-black/[0.08] bg-black/[0.02] px-4 py-3 dark:border-white/[0.1] dark:bg-white/[0.03]"
 	>
 		{#if stage === 'done'}
-			<p class="text-[13px] text-black/55 dark:text-white/55">Thanks — noted.</p>
+			<p class="text-[13px] text-black/55 dark:text-white/55">{m.fb_thanks()}</p>
 		{:else}
 			<div class="flex items-center justify-between gap-3">
-				<p class="text-[14px] text-black/70 dark:text-white/70">Do you find this report useful?</p>
+				<p class="text-[14px] text-black/70 dark:text-white/70">{m.fb_useful_q()}</p>
 				<button
 					type="button"
 					onclick={() => feedback.closeSurvey(sid, turnIndex)}
-					aria-label="Dismiss"
+					aria-label={m.brn_dismiss()}
 					class="-mr-1 btn-icon h-6 w-6 text-[16px] leading-none"
 				>
 					×
@@ -56,13 +57,13 @@
 			</div>
 			{#if stage === 'ask'}
 				<div class="mt-3 flex gap-2">
-					<button type="button" onclick={yes} class={pill}>Yes</button>
-					<button type="button" onclick={no} class={pill}>No</button>
+					<button type="button" onclick={yes} class={pill}>{m.fb_yes()}</button>
+					<button type="button" onclick={no} class={pill}>{m.fb_no()}</button>
 				</div>
 			{:else}
 				<div class="mt-3">
 					<ReasonPicker
-						prompt="What was missing?"
+						prompt={m.fb_what_missing()}
 						bind:reasons
 						bind:note
 						onSend={send}

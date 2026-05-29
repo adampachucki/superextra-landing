@@ -8,6 +8,7 @@
 	title="Privacy Policy - Superextra"
 	description="Superextra Privacy Policy covering data collection, usage, protection, and retention."
 	canonicalPath="/privacy-policy"
+	localized={false}
 />
 
 <Navbar />

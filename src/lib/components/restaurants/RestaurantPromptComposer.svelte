@@ -4,30 +4,31 @@
 	import { createPlaceSearch, type PlaceSuggestion } from '$lib/place-search.svelte';
 	import PromptIcon from './PromptIcon.svelte';
 	import PlaceSearchWidget from './PlaceSearchWidget.svelte';
+	import * as m from '$lib/paraglide/messages';
 
-	const PREFIX = 'Ask Superextra ';
+	const PREFIX = m.composer_prefix();
 	const PROMPTS = [
-		'to compare prices in your area...',
-		'to analyze competitor reviews...',
-		'how was last month for others...',
-		'where to open next...',
-		'what line cooks earn nearby...',
-		'which platforms perform best...'
+		m.composer_prompt_1(),
+		m.composer_prompt_2(),
+		m.composer_prompt_3(),
+		m.composer_prompt_4(),
+		m.composer_prompt_5(),
+		m.composer_prompt_6()
 	];
 	const MOBILE_PROMPTS = [
-		'about local prices...',
-		'about competitor reviews...',
-		'how last month went...',
-		'where to open next...',
-		'what cooks earn nearby...',
-		'which platforms work...'
+		m.composer_prompt_m1(),
+		m.composer_prompt_m2(),
+		m.composer_prompt_m3(),
+		m.composer_prompt_m4(),
+		m.composer_prompt_m5(),
+		m.composer_prompt_m6()
 	];
 
 	let {
 		query = $bindable(''),
 		isMobile = false,
 		placeDirection = 'down',
-		placePlaceholder = 'Restaurant, address, neighborhood, or city',
+		placePlaceholder = m.composer_place_placeholder(),
 		autofocusMode = false,
 		focusOnQueryChange = false,
 		onSubmit
@@ -46,7 +47,7 @@
 	let placeInputEl: HTMLInputElement | undefined = $state();
 	let contextOpen = $state(false);
 	let contextVisible = $state(false);
-	let display = $state(PREFIX);
+	let display = $state<string>(PREFIX);
 	let dictationBase = '';
 	let previousQuery = '';
 
@@ -223,10 +224,10 @@
 				onkeydown={handleKeydown}
 				data-agent-prompt-input="true"
 				placeholder={dictation.active
-					? 'Start speaking...'
+					? m.composer_placeholder_speaking()
 					: isAnimating
 						? display
-						: 'What do you want to know about your market?'}
+						: m.composer_placeholder_default()}
 				rows="3"
 				class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black focus:outline-none dark:text-white {isAnimating
 					? 'placeholder:text-black/70 dark:placeholder:text-white/70'
@@ -239,7 +240,7 @@
 				<button
 					type="button"
 					onclick={toggleContext}
-					aria-label="Add focus"
+					aria-label={m.composer_add_focus()}
 					class="flex h-8 w-8 items-center justify-center rounded-full transition-colors {contextOpen ||
 					selectedPlace
 						? 'text-black/60 dark:text-white/60'
@@ -250,7 +251,7 @@
 				<button
 					type="button"
 					disabled
-					aria-label="Attach file"
+					aria-label={m.composer_attach()}
 					class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 				>
 					<PromptIcon name="attach" class="h-[18px] w-[18px] translate-y-px" />
@@ -268,7 +269,7 @@
 						<button
 							type="button"
 							onclick={removePlace}
-							aria-label="Remove focus"
+							aria-label={m.composer_remove_focus()}
 							class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.06]"
 						>
 							<PromptIcon name="close" class="h-3 w-3 text-black/30 dark:text-white/30" />
@@ -282,7 +283,7 @@
 					<button
 						type="button"
 						onclick={handleDictation}
-						aria-label={dictation.active ? 'Stop dictation' : 'Voice input'}
+						aria-label={dictation.active ? m.composer_stop_dictation() : m.composer_voice()}
 						class="relative flex h-8 w-8 items-center justify-center rounded-full transition-colors {dictation.active
 							? 'text-red-500'
 							: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'}"
@@ -300,7 +301,7 @@
 					<button
 						type="button"
 						disabled
-						aria-label="Voice input not supported"
+						aria-label={m.composer_voice_unsupported()}
 						class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 					>
 						<PromptIcon name="mic" class="h-[18px] w-[18px]" />
@@ -309,7 +310,7 @@
 				<button
 					type="button"
 					onclick={handleSubmit}
-					aria-label="Explore"
+					aria-label={m.composer_explore()}
 					class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
 				>
 					<PromptIcon name="send" class="h-4 w-4 text-white dark:text-black" />

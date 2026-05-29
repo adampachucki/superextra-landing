@@ -20,7 +20,11 @@ export function validatePlaceContext(pc) {
 // --- HTML helpers (email templates) ---
 
 export function esc(s) {
-	return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	return String(s)
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;');
 }
 
 export function row(label, value, raw = false) {
@@ -30,21 +34,77 @@ export function row(label, value, raw = false) {
 	</tr>`;
 }
 
-export function confirmationHtml(name) {
-	const firstName = esc(name.split(' ')[0] || 'there');
+// Per-locale copy for the personal confirmation email. The internal demo
+// notification (to the team) stays English and is not localized.
+const CONFIRMATION_COPY = {
+	en: {
+		subject: 'Superextra demo request received',
+		fallbackName: 'there',
+		greeting: (n) => `Hey ${n},`,
+		intro: "I'm Adam, co-founder of Superextra.",
+		thanks: 'Thanks for requesting a Superextra demo.',
+		auto: "This is an automated confirmation. I'll follow up personally with scheduling details soon.",
+		ask: 'In the meantime, it would help to know:',
+		q1: 'What business decision should the demo focus on?',
+		q2: 'Which locations, formats, or competitors should we understand?',
+		q3: 'Which pricing, guest, delivery, or expansion signals would be most useful?',
+		reply: 'Just hit reply and let me know.',
+		sign: 'Best,<br>Adam'
+	},
+	de: {
+		subject: 'Superextra Demo-Anfrage erhalten',
+		fallbackName: 'zusammen',
+		greeting: (n) => `Hallo ${n},`,
+		intro: 'ich bin Adam, Mitgründer von Superextra.',
+		thanks: 'Danke für deine Anfrage einer Superextra-Demo.',
+		auto: 'Das ist eine automatische Bestätigung. Ich melde mich persönlich mit Terminvorschlägen.',
+		ask: 'Bis dahin hilft es zu wissen:',
+		q1: 'Auf welche Geschäftsentscheidung soll sich die Demo konzentrieren?',
+		q2: 'Welche Standorte, Formate oder Wettbewerber sollten wir verstehen?',
+		q3: 'Welche Signale zu Preisen, Gästen, Lieferung oder Expansion wären am nützlichsten?',
+		reply: 'Antworte einfach auf diese E-Mail.',
+		sign: 'Beste Grüße,<br>Adam'
+	},
+	pl: {
+		subject: 'Prośba o demo Superextra otrzymana',
+		fallbackName: 'Tam',
+		greeting: (n) => `Cześć ${n},`,
+		intro: 'nazywam się Adam, jestem współzałożycielem Superextra.',
+		thanks: 'Dziękujemy za prośbę o demo Superextra.',
+		auto: 'To automatyczne potwierdzenie. Wkrótce odezwę się osobiście z propozycjami terminów.',
+		ask: 'W międzyczasie pomocne będzie:',
+		q1: 'Na jakiej decyzji biznesowej ma się skupić demo?',
+		q2: 'Jakie lokalizacje, formaty lub konkurentów powinniśmy zrozumieć?',
+		q3: 'Które sygnały o cenach, gościach, dostawach lub ekspansji byłyby najbardziej przydatne?',
+		reply: 'Po prostu odpisz na tę wiadomość.',
+		sign: 'Pozdrawiam,<br>Adam'
+	}
+};
+
+export function confirmationLocale(value) {
+	return Object.hasOwn(CONFIRMATION_COPY, value) ? value : 'en';
+}
+
+export function confirmationSubject(locale) {
+	return CONFIRMATION_COPY[confirmationLocale(locale)].subject;
+}
+
+export function confirmationHtml(name, locale = 'en') {
+	const t = CONFIRMATION_COPY[confirmationLocale(locale)];
+	const firstName = esc(name.split(' ')[0] || t.fallbackName);
 	return `<div style="font-family:sans-serif;max-width:520px;color:#1a1a1a;font-size:14px;line-height:1.6">
-<p>Hey ${firstName},</p>
-<p>I'm Adam, co-founder of Superextra.</p>
-<p>Thanks for requesting a Superextra demo.</p>
-<p>This is an automated confirmation. I'll follow up personally with scheduling details soon.</p>
-<p>In the meantime, it would help to know:</p>
+<p>${t.greeting(firstName)}</p>
+<p>${t.intro}</p>
+<p>${t.thanks}</p>
+<p>${t.auto}</p>
+<p>${t.ask}</p>
 <ol>
-<li>What business decision should the demo focus on?</li>
-<li>Which locations, formats, or competitors should we understand?</li>
-<li>Which pricing, guest, delivery, or expansion signals would be most useful?</li>
+<li>${t.q1}</li>
+<li>${t.q2}</li>
+<li>${t.q3}</li>
 </ol>
-<p>Just hit reply and let me know.</p>
-<p>Best,<br>Adam</p>
+<p>${t.reply}</p>
+<p>${t.sign}</p>
 </div>`;
 }
 

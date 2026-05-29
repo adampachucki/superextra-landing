@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { billing } from '$lib/billing-state.svelte';
 	import Modal from '$lib/components/Modal.svelte';
+	import * as m from '$lib/paraglide/messages';
 </script>
 
 <Modal
@@ -16,16 +17,14 @@
 			Superextra Pro
 		</h2>
 		<p class="mt-1 text-[13px] leading-snug text-black/50 dark:text-white/50">
-			{billing.mode === 'test'
-				? 'Stripe test mode. No real payment is collected.'
-				: 'Billing country sets currency. Tax is included where applicable.'}
+			{billing.mode === 'test' ? m.bill_test_mode() : m.bill_country_note()}
 		</p>
 
 		<label
 			for="billing-market"
 			class="mt-6 mb-1.5 block text-xs font-medium text-black/60 dark:text-white/60"
 		>
-			Billing country
+			{m.bill_country()}
 		</label>
 		<div class="relative">
 			<select
@@ -55,7 +54,7 @@
 		{/if}
 		{#if billing.mode === 'test'}
 			<p class="mt-3 text-[12px] text-black/45 dark:text-white/45">
-				Test card: 4242 4242 4242 4242
+				{m.bill_test_card()}
 			</p>
 		{/if}
 
@@ -66,7 +65,7 @@
 				disabled={billing.posting}
 				class="btn-secondary px-4 py-2 text-[13px]"
 			>
-				Cancel
+				{m.bill_cancel()}
 			</button>
 			<button
 				type="button"
@@ -74,7 +73,7 @@
 				disabled={billing.posting}
 				class="btn-primary px-4 py-2 text-[13px]"
 			>
-				{billing.posting ? 'Opening…' : 'Continue'}
+				{billing.posting ? m.bill_opening() : m.bill_continue()}
 			</button>
 		</div>
 	</div>

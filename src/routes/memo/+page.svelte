@@ -9,6 +9,7 @@
 	title="Memo - Superextra"
 	description="Superextra memo on the market intelligence layer restaurants have been missing."
 	canonicalPath="/memo"
+	localized={false}
 />
 
 <Navbar transparent />
@@ -200,7 +201,8 @@
 		small to have in-house analysts.
 	</p>
 	<p>
-		<strong>Our pricing:</strong> &euro;899 setup fee + &euro;299 quarterly subscription per location.
+		<strong>Our pricing:</strong> &euro;9 per location per month — local pricing in each market, taxes
+		included.
 	</p>
 
 	<h2>Superextra was pulled into existence</h2>

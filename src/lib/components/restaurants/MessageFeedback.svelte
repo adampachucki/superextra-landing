@@ -2,6 +2,7 @@
 	import { feedback } from '$lib/feedback.svelte';
 	import type { TurnFeedback } from '$lib/chat-types';
 	import ReasonPicker from './ReasonPicker.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let { sid, turnIndex, entry }: { sid: string | null; turnIndex: number; entry?: TurnFeedback } =
 		$props();
@@ -43,7 +44,7 @@
 	<button
 		type="button"
 		onclick={thumbUp}
-		aria-label="Helpful"
+		aria-label={m.fb_helpful()}
 		aria-pressed={selected === 'up'}
 		class="{thumbBase} {selected === 'up' ? thumbActive : thumbIdle}"
 	>
@@ -66,7 +67,7 @@
 	<button
 		type="button"
 		onclick={thumbDown}
-		aria-label="Not helpful"
+		aria-label={m.fb_not_helpful()}
 		aria-pressed={selected === 'down'}
 		class="{thumbBase} {selected === 'down' ? thumbActive : thumbIdle}"
 	>
@@ -91,7 +92,7 @@
 			class="absolute top-full right-0 z-10 mt-2 w-72 rounded-xl border border-cream-200 bg-cream-50 p-3 shadow-lg"
 		>
 			<ReasonPicker
-				prompt="What was off?"
+				prompt={m.fb_what_off()}
 				bind:reasons
 				bind:note
 				onSend={send}

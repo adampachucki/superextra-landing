@@ -12,11 +12,12 @@
 	import CTA from '$lib/components/CTA.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import AccessForm from '$lib/components/AccessForm.svelte';
+	import * as m from '$lib/paraglide/messages';
 </script>
 
 <Seo
-	title="Superextra - Restaurant Market Intelligence"
-	description="AI market intelligence for restaurants, synthesizing competitor, pricing, guest, delivery, and local market signals into operator-ready answers."
+	title={m.seo_home_title()}
+	description={m.seo_home_desc()}
 	robots="noindex, nofollow, noarchive, nosnippet"
 />
 

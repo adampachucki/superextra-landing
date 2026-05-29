@@ -5,6 +5,7 @@
 	import LoginForm from '$lib/components/agent/LoginForm.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	// Initial state is `completing` so the prerendered HTML ships with the
 	// neutral "Signing you in…" placeholder. Magic-link arrivals stay on this
@@ -80,7 +81,7 @@
 		e.preventDefault();
 		const trimmed = confirmEmail.trim();
 		if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-			confirmError = 'Enter the email you used to request the link.';
+			confirmError = m.login_confirm_err_enter();
 			return;
 		}
 		confirming = true;
@@ -98,10 +99,9 @@
 				return;
 			}
 			if (code === 'auth/invalid-email') {
-				confirmError =
-					'That email doesn’t match this sign-in link. Use the address you requested it from.';
+				confirmError = m.login_confirm_err_mismatch();
 			} else {
-				confirmError = 'Sign-in failed. Try again or request a new link.';
+				confirmError = m.login_confirm_err_failed();
 			}
 		} finally {
 			confirming = false;
@@ -135,10 +135,11 @@
 </script>
 
 <Seo
-	title="Sign in to Superextra"
-	description="Sign in to Superextra to continue your restaurant market research."
+	title={m.login_seo_title()}
+	description={m.login_seo_desc()}
 	canonicalPath="/login"
 	robots="noindex, nofollow, noarchive, nosnippet"
+	localized={false}
 />
 
 <main class="flex min-h-dvh items-center justify-center bg-[var(--color-cream)] px-4">
@@ -146,7 +147,7 @@
 		{#if phase === 'completing'}
 			<div class="flex flex-col items-center gap-3 text-center">
 				<Spinner class="h-5 w-5 text-black/40 dark:text-white/40" />
-				<p class="text-[14px] text-black/55 dark:text-white/55">Signing you in…</p>
+				<p class="text-[14px] text-black/55 dark:text-white/55">{m.login_signing_you_in()}</p>
 			</div>
 		{:else if phase === 'confirm-email'}
 			<div class="space-y-4">
@@ -176,16 +177,18 @@
 						</svg>
 						<span class="text-[20px] font-light tracking-tight">Superextra</span>
 					</a>
-					<h1 class="pt-4 text-[18px] font-light text-black dark:text-white">Confirm your email</h1>
+					<h1 class="pt-4 text-[18px] font-light text-black dark:text-white">
+						{m.login_confirm_title()}
+					</h1>
 					<p class="text-[13px] text-black/55 dark:text-white/55">
-						Enter the email you used to request this sign-in link.
+						{m.login_confirm_sub()}
 					</p>
 				</div>
 				<form onsubmit={handleConfirmEmail} class="space-y-3">
 					<input
 						type="email"
 						bind:value={confirmEmail}
-						placeholder="you@example.com"
+						placeholder={m.login_email_ph()}
 						autocomplete="email"
 						required
 						disabled={confirming}
@@ -196,7 +199,7 @@
 						disabled={confirming || !confirmEmail.trim()}
 						class="w-full rounded-xl bg-black px-4 py-3 text-[14px] font-medium text-white transition-colors hover:bg-black/85 disabled:opacity-30 dark:bg-white dark:text-black dark:hover:bg-white/85"
 					>
-						{confirming ? 'Signing in…' : 'Continue'}
+						{confirming ? m.login_signing_in() : m.af_continue()}
 					</button>
 				</form>
 				{#if confirmError}
@@ -235,8 +238,8 @@
 				<LoginForm
 					{returnTo}
 					initialError={errorCode}
-					title={returnTo ? 'Sign in to open this chat' : 'Sign in to Superextra'}
-					subtitle={returnTo ? 'Takes a few seconds.' : ''}
+					title={returnTo ? m.login_open_chat_title() : m.login_seo_title()}
+					subtitle={returnTo ? m.login_open_chat_sub() : ''}
 				/>
 			</div>
 		{/if}

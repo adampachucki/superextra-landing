@@ -58,3 +58,6 @@ agent/evals/logs/
 
 # One-shot legacy backups (kept outside git; regenerate via gcloud if needed)
 legacy-sessions-backup.json
+# Paraglide
+src/lib/paraglide
+project.inlang/cache/

@@ -8,27 +8,20 @@
 	import GuestIntelligenceV2 from './mockups/GuestIntelligenceV2.svelte';
 	import LocationTrafficV1 from './mockups/LocationTrafficV1.svelte';
 	import OperationsV1 from './mockups/OperationsV1.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let expanded = $state(false);
 </script>
 
 <section id="intelligence" class="border-t border-cream-200 py-24 md:py-32">
 	<div class="mx-auto max-w-[1200px] px-6">
-		<SectionHeader
-			subtitle="Extra Clarity"
-			title="Data and insights behind every restaurant decision"
-			titleClass="mb-4 max-w-2xl"
-		/>
+		<SectionHeader subtitle={m.pc_subtitle()} title={m.pc_title()} titleClass="mb-4 max-w-2xl" />
 		<p class="mb-16 max-w-lg text-lg text-black/60 dark:text-white/60">
-			Seven intelligence layers, combined.
+			{m.pc_lead()}
 		</p>
 
 		<div class="relative grid grid-cols-1 md:grid-cols-3" class:cards-grid={!expanded}>
-			<PlatformCard
-				title="Market Landscape"
-				desc="Restaurant openings and closings, cuisine trends and top-performing venues continuously tracked and benchmarked. With deep narrative reports that turn raw signals into actionable insights."
-				wide
-			>
+			<PlatformCard title={m.pc_market_title()} desc={m.pc_market_desc()} wide>
 				<MarketLandscapeWideV1 />
 			</PlatformCard>
 
@@ -36,36 +29,19 @@
 				<MarketLandscapeV3 />
 			</PlatformCard> -->
 
-			<PlatformCard
-				title="Menu & Pricing"
-				desc="Trending items, price tracking, competitor menus, delivery markups, and promotional activity across the market."
-				separator
-			>
+			<PlatformCard title={m.pc_menu_title()} desc={m.pc_menu_desc()} separator>
 				<MenuPricingV1 />
 			</PlatformCard>
 
-			<PlatformCard
-				title="Revenue & Sales"
-				desc="Revenue estimates, margin and food cost analysis, seasonality patterns, channel splits, and delivery platform markups."
-				mode="edge"
-			>
+			<PlatformCard title={m.pc_revenue_title()} desc={m.pc_revenue_desc()} mode="edge">
 				<RevenueSalesV2 />
 			</PlatformCard>
 
-			<PlatformCard
-				title="Guest Intelligence"
-				desc="Review sentiment, local guest preferences, tourist vs local mix, and payment method trends, all derived from real guest data."
-				mode="edge"
-				separator
-			>
+			<PlatformCard title={m.pc_guest_title()} desc={m.pc_guest_desc()} mode="edge" separator>
 				<GuestIntelligenceV2 />
 			</PlatformCard>
 
-			<PlatformCard
-				title="Operations"
-				desc="Labor pool availability, salary benchmarks, job market activity, staff turnover, commercial rent, and supplier pricing."
-				separator
-			>
+			<PlatformCard title={m.pc_ops_title()} desc={m.pc_ops_desc()} separator>
 				<OperationsV1 />
 			</PlatformCard>
 		</div>
@@ -78,17 +54,13 @@
 			class:opacity-0={!expanded}
 			class:opacity-100={expanded}
 		>
-			<PlatformCard
-				title="Location & Foot Traffic"
-				desc="Measured and projected foot traffic, demographic profiles, purchasing power, and visit time distribution."
-				mode="free"
-			>
+			<PlatformCard title={m.pc_location_title()} desc={m.pc_location_desc()} mode="free">
 				<LocationTrafficV1 />
 			</PlatformCard>
 
 			<PlatformCard
-				title="Marketing & Brand"
-				desc="Brand positioning, campaigns, social activity, marketing channels, and platform presence across competitors."
+				title={m.pc_marketing_title()}
+				desc={m.pc_marketing_desc()}
 				mode="free"
 				separator
 			>
@@ -100,7 +72,7 @@
 
 		<div class="mt-10 flex justify-center">
 			<button onclick={() => (expanded = !expanded)} class="btn-ghost px-6 py-2.5">
-				{expanded ? 'Show less' : 'Show more'}
+				{expanded ? m.pc_show_less() : m.pc_show_more()}
 			</button>
 		</div>
 	</div>

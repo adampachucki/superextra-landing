@@ -13,6 +13,7 @@
 import type { User } from 'firebase/auth';
 import { browser } from '$app/environment';
 import { getFirebase } from '$lib/firebase';
+import { getLocale } from '$lib/paraglide/runtime';
 
 export type AuthStatus = 'unknown' | 'signed-in' | 'signed-out';
 
@@ -124,7 +125,7 @@ async function sendMagicLink(email: string, returnTo?: string | null): Promise<v
 	const res = await fetch('/api/auth/send-magic-link', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ email, returnTo: returnTo ?? null })
+		body: JSON.stringify({ email, returnTo: returnTo ?? null, locale: getLocale() })
 	});
 	if (!res.ok) {
 		const body = await res.json().catch(() => null);

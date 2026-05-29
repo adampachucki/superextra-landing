@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/auth.svelte';
 	import { billing } from '$lib/billing-state.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	interface Props {
 		// `inline` (sidebar) renders the avatar + name+email row with a popover
@@ -17,11 +18,11 @@
 	let billingAction = $derived(
 		billing.mode === 'test'
 			? billing.canManage
-				? 'Manage test billing'
-				: 'Test Pro'
+				? m.am_manage_test()
+				: m.am_test_pro()
 			: billing.canManage
-				? 'Manage billing'
-				: 'Upgrade to Pro'
+				? m.am_manage()
+				: m.am_upgrade()
 	);
 
 	function handleWindowClick(e: MouseEvent) {
@@ -81,7 +82,7 @@
 	{#snippet menuItems()}
 		<div class="border-b border-black/[0.06] px-4 py-2 dark:border-white/[0.06]">
 			<p class="truncate text-[12px] text-black dark:text-white">
-				{user.displayName ?? user.email ?? 'Signed in'}
+				{user.displayName ?? user.email ?? m.am_signed_in()}
 			</p>
 			{#if user.displayName && user.email}
 				<p class="truncate text-[11px] text-black/40 dark:text-white/40">{user.email}</p>
@@ -90,14 +91,14 @@
 				<p class="mt-1 text-[11px] text-black/40 dark:text-white/40">
 					{billing.mode === 'test'
 						? billing.snapshot.cancelAtPeriodEnd
-							? 'Test Pro ends soon'
-							: 'Test Pro'
+							? m.am_test_pro_ends()
+							: m.am_test_pro()
 						: billing.snapshot.cancelAtPeriodEnd
-							? 'Pro ends soon'
-							: 'Pro'}
+							? m.am_pro_ends()
+							: m.am_pro()}
 				</p>
 			{:else if billing.mode === 'test'}
-				<p class="mt-1 text-[11px] text-black/40 dark:text-white/40">Test billing</p>
+				<p class="mt-1 text-[11px] text-black/40 dark:text-white/40">{m.am_test_billing()}</p>
 			{/if}
 		</div>
 		<button
@@ -107,7 +108,7 @@
 			class="popover-option text-[13px] text-black/70 hover:text-black disabled:opacity-50 dark:text-white/70 dark:hover:text-white"
 			role="menuitem"
 		>
-			{billing.posting ? 'Opening…' : billingAction}
+			{billing.posting ? m.bill_opening() : billingAction}
 		</button>
 		<button
 			type="button"
@@ -116,7 +117,7 @@
 			class="popover-option text-[13px] text-black/70 hover:text-black disabled:opacity-50 dark:text-white/70 dark:hover:text-white"
 			role="menuitem"
 		>
-			{signingOut ? 'Signing out…' : 'Sign out'}
+			{signingOut ? m.am_signing_out() : m.am_sign_out()}
 		</button>
 	{/snippet}
 
@@ -134,7 +135,7 @@
 				</span>
 				<div class="min-w-0 flex-1">
 					<p class="truncate text-[12px] text-black dark:text-white">
-						{user.displayName ?? user.email ?? 'Signed in'}
+						{user.displayName ?? user.email ?? m.am_signed_in()}
 					</p>
 					{#if user.displayName && user.email}
 						<p class="truncate text-[11px] text-black/40 dark:text-white/40">
@@ -157,7 +158,7 @@
 			<button
 				type="button"
 				onclick={() => (open = !open)}
-				aria-label="Account"
+				aria-label={m.am_account()}
 				class="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-black text-[11px] font-medium text-white transition-opacity hover:opacity-80 dark:bg-white dark:text-black"
 			>
 				{@render avatar()}

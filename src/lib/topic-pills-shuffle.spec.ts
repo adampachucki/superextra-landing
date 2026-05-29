@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { pickPills, type TopicPillItem } from './topic-pills-shuffle';
 
 function pill(label: string, mobile = label): TopicPillItem {
-	return { label, mobile, color: '#000', query: `q:${label}` };
+	return { id: label, label, mobile, color: '#000', query: `q:${label}` };
 }
 
 afterEach(() => {
@@ -54,8 +54,8 @@ describe('pickPills', () => {
 		// Pool where mobile and label lengths disagree — a mobile-unaware sort
 		// would interleave on label length, producing a different order.
 		const mixedPool: TopicPillItem[] = [
-			{ label: 'long desktop label', mobile: 'tiny', color: '#000', query: 'q' },
-			{ label: 'a', mobile: 'huge mobile label', color: '#000', query: 'q' }
+			{ id: 'd', label: 'long desktop label', mobile: 'tiny', color: '#000', query: 'q' },
+			{ id: 'm', label: 'a', mobile: 'huge mobile label', color: '#000', query: 'q' }
 		];
 		const out = pickPills(mixedPool, 2, true);
 		// mobile lengths: 4 ('tiny'), 17 ('huge mobile label'). Sort asc by

@@ -13,6 +13,7 @@
 	import { lockPageScroll } from '$lib/scroll-lock';
 	import type { PlaceSuggestion } from '$lib/place-search.svelte';
 	import { formatRelativeTime } from '$lib/format-time';
+	import * as m from '$lib/paraglide/messages';
 
 	let inputEl: HTMLTextAreaElement | undefined = $state();
 	let promptBarEl: HTMLDivElement | undefined = $state();
@@ -195,7 +196,7 @@
 			query = trimmed;
 			resizeTextarea();
 			// chat-state sets a friendly `lastError` already; show it.
-			sendError = chatState.lastError ?? 'Could not send message. Please try again.';
+			sendError = chatState.lastError ?? m.chat_err_send();
 		}
 	}
 
@@ -207,7 +208,7 @@
 		try {
 			await chatState.cancelActiveTurn();
 		} catch (err) {
-			sendError = err instanceof Error ? err.message : 'Could not stop research. Please try again.';
+			sendError = err instanceof Error ? err.message : m.chat_err_stop();
 		} finally {
 			cancelPosting = false;
 		}
@@ -327,7 +328,7 @@
 			await chatState.deleteSession(sid);
 			confirmDeleteId = null;
 		} catch (err) {
-			deleteError = err instanceof Error ? err.message : 'Could not delete. Please try again.';
+			deleteError = err instanceof Error ? err.message : m.chat_err_delete();
 		} finally {
 			deletingId = null;
 		}
@@ -337,9 +338,10 @@
 <svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
 
 <Seo
-	title="Chat - Superextra"
-	description="Restaurant market research chat powered by Superextra."
+	title={m.chat_seo_title()}
+	description={m.chat_seo_desc()}
 	canonicalPath="/chat"
+	localized={false}
 	robots="noindex, nofollow, noarchive, nosnippet"
 />
 
@@ -347,7 +349,7 @@
 <button
 	onclick={toggleSidebar}
 	onanimationend={() => (toggleBtnAnim = 'idle')}
-	aria-label="Open sidebar"
+	aria-label={m.chat_open_sidebar()}
 	class="toggle-float fixed top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80
 	{sidebarOpen ? 'pointer-events-none' : ''}
 	{toggleBtnAnim === 'fade-out'
@@ -399,7 +401,7 @@
 		</a>
 		<button
 			onclick={toggleSidebar}
-			aria-label="Close sidebar"
+			aria-label={m.chat_close_sidebar()}
 			class="btn-icon h-9 w-9"
 		>
 			<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none">
@@ -430,7 +432,7 @@
 			>
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
 			</svg>
-			New chat
+			{m.chat_new_chat()}
 		</button>
 
 		{#if chatState.sessionsList.length > 0}
@@ -476,7 +478,7 @@
 									? 'text-black dark:text-white'
 									: 'text-black/70 dark:text-white/70'}"
 							>
-								{sess.title ?? 'Untitled chat'}
+								{sess.title ?? m.chat_untitled()}
 							</p>
 							<div class="relative mt-0.5 text-[11px]">
 								<div
@@ -503,7 +505,7 @@
 								>
 									{#if isDeleting}
 										<span class="deleting-indicator text-black/60 dark:text-white/60"
-											>Deleting…</span
+											>{m.chat_deleting()}</span
 										>
 									{:else}
 										<span
@@ -521,7 +523,7 @@
 												}
 											}}
 											class="text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-											>Delete</span
+											>{m.chat_delete()}</span
 										>
 										<span class="text-black/20 dark:text-white/20">&middot;</span>
 										<span
@@ -541,7 +543,7 @@
 												}
 											}}
 											class="text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
-											>Cancel</span
+											>{m.bill_cancel()}</span
 										>
 									{/if}
 								</div>
@@ -561,7 +563,7 @@
 								confirmDeleteId = sess.sid;
 								deleteError = null;
 							}}
-								aria-label="Delete conversation"
+								aria-label={m.chat_delete_conversation()}
 								class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] dark:hover:bg-white/[0.06] {confirmDeleteId ===
 								sess.sid
 									? 'hidden'
@@ -608,17 +610,17 @@
 			<a
 				href="/privacy-policy"
 				class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70"
-				>Privacy</a
+				>{m.footer_privacy()}</a
 			>
 			<a
 				href="/terms"
 				class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70"
-				>Terms</a
+				>{m.footer_terms()}</a
 			>
 			<button
 				onclick={() => theme.cycle()}
 				class="ml-auto text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
-				aria-label="Toggle theme"
+				aria-label={m.footer_toggle_theme()}
 			>
 				{#if theme.mode === 'dark'}
 					<svg
@@ -734,10 +736,10 @@
 						onkeydown={handleKeydown}
 						disabled={activePromptInactive}
 						placeholder={activePromptInactive
-							? 'Awaiting final response...'
+							? m.chat_awaiting()
 							: dictation.active
-								? 'Start speaking...'
-								: 'Ask a follow-up...'}
+								? m.composer_placeholder_speaking()
+								: m.chat_follow_up()}
 						rows="1"
 						class="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-black placeholder:text-black/45 focus:outline-none disabled:cursor-not-allowed disabled:text-black/35 disabled:placeholder:text-black/35 dark:text-white dark:placeholder:text-white/45 dark:disabled:text-white/35 dark:disabled:placeholder:text-white/35"
 					></textarea>
@@ -748,10 +750,10 @@
 							onclick={handleDictation}
 							disabled={activePromptInactive}
 							aria-label={activePromptInactive
-								? 'Voice input disabled while response is pending'
+								? m.chat_voice_disabled()
 								: dictation.active
-									? 'Stop dictation'
-									: 'Voice input'}
+									? m.composer_stop_dictation()
+									: m.composer_voice()}
 							class="relative flex h-8 w-8 items-center justify-center rounded-full transition-colors {dictation.active
 								? 'text-red-500'
 								: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'} disabled:opacity-20"
@@ -768,7 +770,7 @@
 					{:else}
 						<button
 							disabled
-							aria-label="Voice input not supported"
+							aria-label={m.composer_voice_unsupported()}
 							class="flex h-8 w-8 items-center justify-center rounded-full text-black/15 dark:text-white/15"
 						>
 							<PromptIcon name="mic" class="h-[18px] w-[18px]" />
@@ -778,7 +780,7 @@
 							<button
 								onclick={handleCancel}
 								disabled={cancelPosting}
-								aria-label="Stop research"
+								aria-label={m.chat_stop_research()}
 								class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:opacity-40 dark:bg-white dark:hover:bg-white/80"
 							>
 								<PromptIcon name="stop" class="h-4 w-4 text-white dark:text-black" />
@@ -787,7 +789,7 @@
 							<button
 								onclick={handleSend}
 								disabled={!query.trim() || activePromptInactive}
-								aria-label="Send"
+								aria-label={m.chat_send()}
 								class="shrink-0 rounded-full bg-black p-2 transition-colors hover:bg-black/80 disabled:opacity-20 dark:bg-white dark:hover:bg-white/80"
 							>
 								<PromptIcon name="send" class="h-4 w-4 text-white dark:text-black" />

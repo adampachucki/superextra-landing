@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
+
 	function scrollToPrompt() {
 		const textarea = document.querySelector<HTMLTextAreaElement>('[data-agent-prompt-input]');
 		if (textarea) {
@@ -13,12 +15,12 @@
 		<h2
 			class="text-[clamp(1.75rem,3.5vw,2.75rem)] leading-[1.1] font-medium tracking-[-0.02em] text-black dark:text-white"
 		>
-			Start with a question
+			{m.cta_r_title()}
 		</h2>
-		<p class="mt-4 text-lg text-black/50 dark:text-white/50">Limited early access is now open.</p>
+		<p class="mt-4 text-lg text-black/50 dark:text-white/50">{m.cta_r_sub()}</p>
 		<button
 			onclick={scrollToPrompt}
-			aria-label="Scroll to prompt"
+			aria-label={m.cta_r_aria()}
 			class="mt-8 inline-flex items-center justify-center rounded-full bg-black p-4 transition-colors hover:bg-black/80 dark:bg-white dark:hover:bg-white/80"
 		>
 			<svg

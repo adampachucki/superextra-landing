@@ -13,6 +13,7 @@
 	import UseCases from '$lib/components/UseCases.svelte';
 	import DataSources from '$lib/components/DataSources.svelte';
 	import RestaurantCTA from '$lib/components/restaurants/RestaurantCTA.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let leaving = $state(false);
 	let heroQuery = $state('');
@@ -62,54 +63,18 @@
 	}
 
 	const agentUseCases = [
-		{
-			title: 'Market trends',
-			graphicIndex: 2,
-			description: `Track local demand cycles and competitor momentum. Separate venue performance from market movement, so decisions start from signal.`
-		},
-		{
-			title: 'Expansion strategy',
-			graphicIndex: 1,
-			description: `Evaluate locations with foot traffic, demographics, competition density, and rent data mapped around each site.`
-		},
-		{
-			title: 'Concept validation',
-			graphicIndex: 7,
-			description: `Validate new concepts against local signals. See what's working nearby and whether demand supports the idea before buildout.`
-		},
-		{
-			title: 'Financial planning',
-			graphicIndex: 3,
-			description: `Project revenue, occupancy, and labor costs against local benchmarks. Spot spend and staffing gaps before they hit margins.`
-		},
-		{
-			title: 'Price positioning',
-			graphicIndex: 4,
-			description: `Benchmark pricing against nearby competitors. See which price points, channels, and promos are driving results.`
-		},
-		{
-			title: 'Sentiment analysis',
-			graphicIndex: 5,
-			description: `Connect review signals across venues. See which themes are growing, fading, or unique to a single location before they become ratings.`
-		},
-		{
-			title: 'Competitor tracking',
-			graphicIndex: 6,
-			description:
-				'Monitor competitor moves as they happen — menu changes, price shifts, new launches, and format pivots. Stay current without relying on word of mouth.'
-		},
-		{
-			title: 'Market shifts',
-			graphicIndex: 0,
-			description: `Track openings, closures, and format changes across the local market. Spot white spaces where demand meets thin competition early.`
-		}
+		{ title: m.uc_market_trends_title(), graphicIndex: 2, description: m.uc_market_trends_desc() },
+		{ title: m.uc_expansion_title(), graphicIndex: 1, description: m.uc_expansion_desc() },
+		{ title: m.uc_concept_title(), graphicIndex: 7, description: m.uc_concept_desc() },
+		{ title: m.uc_financial_title(), graphicIndex: 3, description: m.uc_financial_desc() },
+		{ title: m.uc_price_title(), graphicIndex: 4, description: m.uc_price_desc() },
+		{ title: m.uc_sentiment_title(), graphicIndex: 5, description: m.uc_sentiment_desc() },
+		{ title: m.uc_competitor_title(), graphicIndex: 6, description: m.uc_competitor_desc() },
+		{ title: m.uc_shifts_title(), graphicIndex: 0, description: m.uc_shifts_desc() }
 	];
 </script>
 
-<Seo
-	title="Superextra - Restaurant Market Intelligence"
-	description="AI market intelligence for restaurants, synthesizing competitor, pricing, guest, delivery, and local market signals into operator-ready answers."
-/>
+<Seo title={m.seo_home_title()} description={m.seo_home_desc()} />
 
 <div class="page-exit" class:is-leaving={leaving}>
 	<Navbar minimal />
@@ -117,21 +82,18 @@
 	<main>
 		<RestaurantHero onleave={handleLeave} bind:userQuery={heroQuery} />
 		<About
-			headline="The market view your restaurant has been missing"
-			intro="Restaurant operators make critical decisions every day — where to open, how to price, when to hire — too often without a clear view of the market around them at all. Superextra changes that."
-			description="Our AI models synthesize competitor, pricing, guest, delivery, and market signals into an external intelligence layer for your restaurant. Better context behind better decisions."
+			headline={m.about_home_headline()}
+			intro={m.about_home_intro()}
+			description={m.about_home_desc()}
 			class="border-t border-cream-200 md:border-t-0"
 		/>
 		<UseCases
 			items={agentUseCases}
-			title="The questions you've been asking – answered"
+			title={m.uc_home_title()}
 			titleClass="max-w-2xl"
 			subtitleClass="text-xs"
 		/>
-		<DataSources
-			title="Only credible data sources"
-			subtitle="Reviewed and validated information you can rely on."
-		/>
+		<DataSources title={m.ds_home_title()} subtitle={m.ds_home_sub()} />
 		<RestaurantCTA />
 	</main>
 

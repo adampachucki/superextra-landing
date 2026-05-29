@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { theme } from '$lib/theme.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let { borderless = false }: { borderless?: boolean } = $props();
 
@@ -39,7 +40,7 @@
 					>
 				</div>
 				<p class="text-sm text-black/40 dark:text-white/40">
-					&copy; {year} Superextra. All rights reserved.
+					&copy; {year} Superextra. {m.footer_rights()}
 				</p>
 			</div>
 
@@ -47,7 +48,7 @@
 				<div class="flex flex-col items-center gap-4 md:flex-row md:gap-6">
 					<div class="flex items-center gap-6">
 						<div class="hidden items-center gap-2 md:flex">
-							<span class="text-xs text-black/40 dark:text-white/40">Supported by</span>
+							<span class="text-xs text-black/40 dark:text-white/40">{m.footer_supported()}</span>
 							<img
 								src="/google-for-startups.svg"
 								alt="Google for Startups"
@@ -63,12 +64,12 @@
 						<a
 							href="/privacy-policy"
 							class="text-sm text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
-							>Privacy</a
+							>{m.footer_privacy()}</a
 						>
 						<a
 							href="/terms"
 							class="text-sm text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
-							>Terms</a
+							>{m.footer_terms()}</a
 						>
 						<a
 							href="https://www.linkedin.com/company/superextra"
@@ -87,7 +88,7 @@
 						<button
 							onclick={() => theme.cycle()}
 							class="text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
-							aria-label="Toggle theme"
+							aria-label={m.footer_toggle_theme()}
 						>
 							{#if theme.mode === 'dark'}
 								<svg
@@ -142,9 +143,11 @@
 			</div>
 		</div>
 		<p class="mt-4 text-center text-xs text-black/40 md:hidden dark:text-white/40">
-			We use <a
+			{m.cookie_we_use()}
+			<a
 				href="/privacy-policy"
-				class="underline transition-colors hover:text-black/60 dark:hover:text-white/60">cookies</a
+				class="underline transition-colors hover:text-black/60 dark:hover:text-white/60"
+				>{m.cookie_link()}</a
 			>
 		</p>
 	</div>

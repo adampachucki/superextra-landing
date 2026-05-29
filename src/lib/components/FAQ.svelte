@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SectionHeader from './SectionHeader.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let {
 		items
@@ -8,46 +9,14 @@
 	} = $props();
 
 	const defaultFaqs = [
-		{
-			question: 'What types of restaurants is Superextra built for?',
-			answer:
-				"Superextra is built for every segment of the restaurant industry — from independent operators and fast-casual concepts to fine dining groups and growing multi-unit brands. It's also used by suppliers, tech platforms, agencies, and investors who need restaurant market intelligence."
-		},
-		{
-			question: 'How is the data collected and how accurate is it?',
-			answer:
-				'Superextra aggregates data from dozens of public and proprietary sources including review platforms, delivery apps, foot traffic providers, real estate databases, public filings, and more. AI models cross-reference and validate data continuously to deliver the most accurate picture of the market.'
-		},
-		{
-			question: 'How reliable are the AI agents? Do they hallucinate?',
-			answer:
-				"Superextra agents are built to report facts, not generate them. Every insight is grounded in real data. When information isn't available, the agent flags it as missing rather than inventing an answer."
-		},
-		{
-			question: 'Does Superextra connect to my POS or internal systems?',
-			answer:
-				"No — and that's by design. Superextra brings the market data to you, so there's no integration required. Think of it as an external intelligence layer: all the competitive, location, and industry data you need without sharing any of your own."
-		},
-		{
-			question: 'What markets and geographies are covered?',
-			answer:
-				'Superextra is launching with deep coverage in select European markets and expanding rapidly. If you want to check availability for a specific region, reach out to the team.'
-		},
-		{
-			question: 'How hyper-local is the intelligence?',
-			answer:
-				'Extremely. Intelligence is mapped down to precise trade areas, so you can understand the competitive dynamics of your exact neighborhood — not just a city or zip code. That granularity is what makes Superextra different.'
-		},
-		{
-			question: 'Can I benchmark against specific competitors?',
-			answer:
-				'Superextra uses cohort-based benchmarking rather than direct competitor comparisons. Performance is measured against relevant peer groups based on cuisine, price point, format, and location — giving a more reliable and statistically meaningful picture than one-to-one comparisons.'
-		},
-		{
-			question: 'What does pricing look like?',
-			answer:
-				'Engagement-based pricing tied to the number of locations and depth of intelligence needed. Early access customers get preferential pricing. Reach out to learn more.'
-		}
+		{ question: m.faq_q1(), answer: m.faq_a1() },
+		{ question: m.faq_q2(), answer: m.faq_a2() },
+		{ question: m.faq_q3(), answer: m.faq_a3() },
+		{ question: m.faq_q4(), answer: m.faq_a4() },
+		{ question: m.faq_q5(), answer: m.faq_a5() },
+		{ question: m.faq_q6(), answer: m.faq_a6() },
+		{ question: m.faq_q7(), answer: m.faq_a7() },
+		{ question: m.faq_q8(), answer: m.faq_a8() }
 	];
 
 	let faqs = $derived(items ?? defaultFaqs);
@@ -58,7 +27,7 @@
 	<div class="mx-auto max-w-[1200px] px-6">
 		<div class="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_1.5fr] lg:gap-20">
 			<div>
-				<SectionHeader subtitle="Learn More" title="Frequently asked questions" />
+				<SectionHeader subtitle={m.faq_subtitle()} title={m.faq_title()} />
 			</div>
 
 			<div class="divide-y divide-cream-200 border-t border-cream-200">

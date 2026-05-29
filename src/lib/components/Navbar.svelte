@@ -4,6 +4,8 @@
 	import { chatState } from '$lib/chat-state.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import AccountMenu from '$lib/components/agent/AccountMenu.svelte';
+	import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
+	import * as m from '$lib/paraglide/messages';
 	import { onMount } from 'svelte';
 
 	let {
@@ -54,7 +56,7 @@
 </script>
 
 {#snippet chatIcon()}
-	<a href="/chat" class={chatIconClass} aria-label="Chat history">
+	<a href="/chat" class={chatIconClass} aria-label={m.nav_chat_history()}>
 		<svg
 			class="h-6 w-6 translate-y-0.5"
 			fill="none"
@@ -112,7 +114,7 @@
 					class="text-sm transition-colors {over
 						? 'text-white/60 hover:text-white'
 						: 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}"
-					>Intelligence</a
+					>{m.nav_intelligence()}</a
 				>
 				<a
 					href="/landing#use-cases"
@@ -120,14 +122,15 @@
 					class="text-sm transition-colors {over
 						? 'text-white/60 hover:text-white'
 						: 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}"
-					>Use Cases</a
+					>{m.nav_use_cases()}</a
 				>
 				<a
 					href="/landing#faq"
 					onclick={smoothScroll}
 					class="text-sm transition-colors {over
 						? 'text-white/60 hover:text-white'
-						: 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}">FAQ</a
+						: 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}"
+					>{m.nav_faq()}</a
 				>
 			</div>
 		{/if}
@@ -144,12 +147,14 @@
 							? 'text-white/80 hover:text-white'
 							: 'text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white'}"
 					>
-						Sign in
+						{m.nav_sign_in()}
 					</button>
 				{/if}
 			{/if}
-			<button onclick={() => formState.open()} class="btn-primary px-5 py-2 text-sm"
-				>Book a demo</button
+			<LocaleSwitcher {over} />
+			<button
+				onclick={() => formState.open()}
+				class="btn-primary px-5 py-2 text-sm whitespace-nowrap">{m.nav_book_demo()}</button
 			>
 		</div>
 
@@ -165,18 +170,20 @@
 							? 'text-white/80 hover:text-white'
 							: 'text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white'}"
 					>
-						Sign in
+						{m.nav_sign_in()}
 					</button>
 				{/if}
 			{/if}
-			<button onclick={() => formState.open()} class="btn-primary px-4 py-1.5 text-sm"
-				>Book a demo</button
+			<LocaleSwitcher {over} />
+			<button
+				onclick={() => formState.open()}
+				class="btn-primary px-4 py-1.5 text-sm whitespace-nowrap">{m.nav_book_demo()}</button
 			>
 			{#if !minimal}
 				<button
 					class={over ? 'text-white' : 'text-black dark:text-white'}
 					onclick={() => (mobileOpen = !mobileOpen)}
-					aria-label="Toggle menu"
+					aria-label={m.nav_toggle_menu()}
 				>
 					{#if mobileOpen}
 						<svg
@@ -227,7 +234,7 @@
 							onclick={(e) => {
 								mobileOpen = false;
 								smoothScroll(e);
-							}}>Intelligence</a
+							}}>{m.nav_intelligence()}</a
 						>
 						<a
 							href="/landing#use-cases"
@@ -235,7 +242,7 @@
 							onclick={(e) => {
 								mobileOpen = false;
 								smoothScroll(e);
-							}}>Use Cases</a
+							}}>{m.nav_use_cases()}</a
 						>
 						<a
 							href="/landing#faq"
@@ -243,7 +250,7 @@
 							onclick={(e) => {
 								mobileOpen = false;
 								smoothScroll(e);
-							}}>FAQ</a
+							}}>{m.nav_faq()}</a
 						>
 					</div>
 				</div>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { formState } from '$lib/form-state.svelte';
 	import HeroCanvas from './HeroCanvas.svelte';
+	import * as m from '$lib/paraglide/messages';
 </script>
 
 <section class="relative overflow-hidden pt-30 pb-0 md:pt-36">
@@ -10,7 +11,7 @@
 				class="hero-scale relative z-10 mx-auto max-w-5xl text-center text-[clamp(4rem,9vw,9rem)] leading-[0.95] font-normal tracking-[-0.04em] text-black dark:text-white"
 				style="animation-delay: 0ms"
 			>
-				Market intelligence for restaurants
+				{m.hero_l_title()}
 			</h1>
 
 			<div class="relative z-0 mx-auto -mt-20 mb-8 flex justify-center md:-mt-40">
@@ -24,14 +25,13 @@
 
 		<div class="mx-auto max-w-2xl text-center">
 			<p class="mb-8 text-lg leading-snug text-black/60 md:text-xl dark:text-white/60">
-				Super local intelligence and competitor benchmarking for the restaurant industry. The extra
-				advantage behind smarter decisions.
+				{m.hero_l_sub()}
 			</p>
 			<button
 				onclick={() => formState.open()}
 				class="inline-flex btn-primary items-center gap-2 px-8 py-3.5 text-sm"
 			>
-				Book a demo
+				{m.nav_book_demo()}
 			</button>
 		</div>
 	</div>
@@ -54,10 +54,9 @@
 						/><path d="M12 9v6M9 12h6" stroke="currentColor" stroke-width="0.8" /></svg
 					>
 				</div>
-				<h3 class="text-xl font-medium text-black dark:text-white">Unrivaled data</h3>
+				<h3 class="text-xl font-medium text-black dark:text-white">{m.hero_feat1_title()}</h3>
 				<p class="mt-1 text-sm text-black/60 dark:text-white/60">
-					Dozens of public and proprietary sources combined into a single platform. Deeper than any
-					competitor can assemble alone.
+					{m.hero_feat1_desc()}
 				</p>
 			</div>
 			<div class="border-b border-cream-200 p-8 md:border-b-0 md:px-10 md:py-10">
@@ -76,10 +75,9 @@
 						/><circle cx="12" cy="12" r="1.2" fill="currentColor" /></svg
 					>
 				</div>
-				<h3 class="text-xl font-medium text-black dark:text-white">Hyper-local focus</h3>
+				<h3 class="text-xl font-medium text-black dark:text-white">{m.hero_feat2_title()}</h3>
 				<p class="mt-1 text-sm text-black/60 dark:text-white/60">
-					Country, city, area, neighbourhood. Every layer of the market mapped so decisions are
-					grounded at the right level of detail.
+					{m.hero_feat2_desc()}
 				</p>
 			</div>
 			<div class="p-8 md:py-10 md:pl-10">
@@ -96,10 +94,9 @@
 						/></svg
 					>
 				</div>
-				<h3 class="text-xl font-medium text-black dark:text-white">AI-native research</h3>
+				<h3 class="text-xl font-medium text-black dark:text-white">{m.hero_feat3_title()}</h3>
 				<p class="mt-1 text-sm text-black/60 dark:text-white/60">
-					Vast market data distilled into clear, actionable insights and custom reports. Delivered
-					hand-in-hand with our research team.
+					{m.hero_feat3_desc()}
 				</p>
 			</div>
 		</div>

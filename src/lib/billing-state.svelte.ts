@@ -3,6 +3,8 @@ import { browser } from '$app/environment';
 import { auth } from '$lib/auth.svelte';
 import { getFirebase } from '$lib/firebase';
 import { resolveSupportedBrowserCountry } from '$lib/browser-country';
+import { getLocale } from '$lib/paraglide/runtime';
+import * as m from '$lib/paraglide/messages';
 
 export type BillingMarket = 'us' | 'pl' | 'gb' | 'de' | 'other';
 export type BillingMode = 'live' | 'test';
@@ -47,11 +49,11 @@ export const billingMarkets: {
 	label: string;
 	currency: 'usd' | 'pln' | 'gbp' | 'eur';
 }[] = [
-	{ id: 'pl', label: 'Poland', currency: 'pln' },
-	{ id: 'de', label: 'Germany', currency: 'eur' },
-	{ id: 'gb', label: 'United Kingdom', currency: 'gbp' },
-	{ id: 'us', label: 'United States', currency: 'usd' },
-	{ id: 'other', label: 'Other country', currency: 'eur' }
+	{ id: 'pl', label: m.af_country_pl(), currency: 'pln' },
+	{ id: 'de', label: m.af_country_de(), currency: 'eur' },
+	{ id: 'gb', label: m.af_country_gb(), currency: 'gbp' },
+	{ id: 'us', label: m.af_country_us(), currency: 'usd' },
+	{ id: 'other', label: m.bill_market_other(), currency: 'eur' }
 ];
 
 const BILLING_MODE_STORAGE_KEY = 'superextra.billingMode';
@@ -331,11 +333,12 @@ async function startCheckout(market: BillingMarket = selectedMarket) {
 	try {
 		const url = await postBilling(billingEndpoint('checkout'), {
 			market,
+			locale: getLocale(),
 			returnPath: checkoutReturnPath()
 		});
 		window.location.assign(url);
 	} catch (err) {
-		error = 'Could not open Checkout. Please try again.';
+		error = m.bill_checkout_failed();
 		console.warn('[billing] checkout failed', err);
 	} finally {
 		posting = false;
@@ -353,11 +356,12 @@ async function openPortal() {
 	error = null;
 	try {
 		const url = await postBilling(billingEndpoint('portal'), {
+			locale: getLocale(),
 			returnPath: checkoutReturnPath()
 		});
 		window.location.assign(url);
 	} catch (err) {
-		error = 'Could not open billing management. Please try again.';
+		error = m.bill_portal_failed();
 		console.warn('[billing] portal failed', err);
 	} finally {
 		posting = false;

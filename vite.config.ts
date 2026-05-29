@@ -1,9 +1,83 @@
+import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-	plugins: [sveltekit(), tailwindcss()],
+	plugins: [
+		sveltekit(),
+		tailwindcss(),
+		paraglideVitePlugin({
+			project: './project.inlang',
+			outdir: './src/lib/paraglide',
+			// Marketing/public pages are localized by URL (/, /de, /pl) for SEO.
+			// The signed-in app resolves locale from the account (cookie), never the URL.
+			strategy: ['url', 'cookie', 'preferredLanguage', 'baseLocale'],
+			// App + English-only routes resolve locale from the cookie (account
+			// language), not the URL — so they stay on canonical, unprefixed paths.
+			routeStrategies: [
+				{ match: '/chat/:rest(.*)?', strategy: ['cookie', 'preferredLanguage', 'baseLocale'] },
+				{ match: '/login/:rest(.*)?', strategy: ['cookie', 'preferredLanguage', 'baseLocale'] },
+				// English-only pages — excluded from localization until translated.
+				{ match: '/memo/:rest(.*)?', exclude: true },
+				{ match: '/privacy-policy/:rest(.*)?', exclude: true },
+				{ match: '/terms/:rest(.*)?', exclude: true }
+			],
+			// These routes are never prefixed: every locale maps to the same path,
+			// so localizeHref() and the prerender crawl keep them unprefixed.
+			urlPatterns: [
+				{
+					pattern: ':protocol://:domain(.*)::port?/chat:rest(/.*)?',
+					localized: [
+						['en', ':protocol://:domain(.*)::port?/chat:rest(/.*)?'],
+						['de', ':protocol://:domain(.*)::port?/chat:rest(/.*)?'],
+						['pl', ':protocol://:domain(.*)::port?/chat:rest(/.*)?']
+					]
+				},
+				{
+					pattern: ':protocol://:domain(.*)::port?/login:rest(/.*)?',
+					localized: [
+						['en', ':protocol://:domain(.*)::port?/login:rest(/.*)?'],
+						['de', ':protocol://:domain(.*)::port?/login:rest(/.*)?'],
+						['pl', ':protocol://:domain(.*)::port?/login:rest(/.*)?']
+					]
+				},
+				{
+					pattern: ':protocol://:domain(.*)::port?/memo:rest(/.*)?',
+					localized: [
+						['en', ':protocol://:domain(.*)::port?/memo:rest(/.*)?'],
+						['de', ':protocol://:domain(.*)::port?/memo:rest(/.*)?'],
+						['pl', ':protocol://:domain(.*)::port?/memo:rest(/.*)?']
+					]
+				},
+				{
+					pattern: ':protocol://:domain(.*)::port?/privacy-policy:rest(/.*)?',
+					localized: [
+						['en', ':protocol://:domain(.*)::port?/privacy-policy:rest(/.*)?'],
+						['de', ':protocol://:domain(.*)::port?/privacy-policy:rest(/.*)?'],
+						['pl', ':protocol://:domain(.*)::port?/privacy-policy:rest(/.*)?']
+					]
+				},
+				{
+					pattern: ':protocol://:domain(.*)::port?/terms:rest(/.*)?',
+					localized: [
+						['en', ':protocol://:domain(.*)::port?/terms:rest(/.*)?'],
+						['de', ':protocol://:domain(.*)::port?/terms:rest(/.*)?'],
+						['pl', ':protocol://:domain(.*)::port?/terms:rest(/.*)?']
+					]
+				},
+				// Everything else: English at root, German under /de, Polish under /pl.
+				{
+					pattern: ':protocol://:domain(.*)::port?/:path(.*)?',
+					localized: [
+						['de', ':protocol://:domain(.*)::port?/de/:path(.*)?'],
+						['pl', ':protocol://:domain(.*)::port?/pl/:path(.*)?'],
+						['en', ':protocol://:domain(.*)::port?/:path(.*)?']
+					]
+				}
+			]
+		})
+	],
 	server: {
 		host: true,
 		port: 5199,
@@ -16,10 +90,7 @@ export default defineConfig({
 		// reload on reconnect entirely — only genuine server restarts (which send
 		// a "full-reload" message) trigger reloads. Without the patch, every
 		// Mobile Safari reconnect causes a full page reload.
-		hmr: {
-			timeout: 5000,
-			overlay: false
-		},
+		hmr: { timeout: 5000, overlay: false },
 		watch: {
 			// Exclude non-frontend dirs so changes there don't trigger full-page reloads
 			ignored: ['agent/**', 'functions/**', 'docs/**', '.firebase/**']
@@ -30,10 +101,7 @@ export default defineConfig({
 			// either, so we can't fetch it cross-origin from a dev page — proxy
 			// it same-origin instead. Works from localhost, private LAN, the
 			// public VM IP (mobile/remote testing), preview tunnels, etc.
-			'/__/firebase/init.json': {
-				target: 'https://agent.superextra.ai',
-				changeOrigin: true
-			},
+			'/__/firebase/init.json': { target: 'https://agent.superextra.ai', changeOrigin: true },
 			'/api/intake': 'https://superextra-landing.web.app',
 			'/api/agent/delete': {
 				target: 'https://us-central1-superextra-site.cloudfunctions.net',

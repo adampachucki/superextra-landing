@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { pickPills, type TopicPillItem } from '$lib/topic-pills-shuffle';
+	import * as m from '$lib/paraglide/messages';
 
 	let {
 		onPick,
@@ -9,168 +10,193 @@
 		isMobile?: boolean;
 	} = $props();
 
+	// Labels/queries come from the message catalog (localized). `id` is the
+	// stable key used for shuffling and the deterministic initial set.
 	const PILL_POOL: TopicPillItem[] = [
 		// Market trends
 		{
-			label: 'Market sales shifts',
-			mobile: 'Sales shifts',
+			id: 'sales_shifts',
+			label: m.pill_sales_shifts_label(),
+			mobile: m.pill_sales_shifts_short(),
 			color: '#818cf8',
-			query: 'Is a slow month just us or is the whole neighbourhood pulling back?'
+			query: m.pill_sales_shifts_q()
 		},
 		{
-			label: 'Seasonal demand patterns',
-			mobile: 'Demand cycles',
+			id: 'demand_cycles',
+			label: m.pill_demand_cycles_label(),
+			mobile: m.pill_demand_cycles_short(),
 			color: '#818cf8',
-			query: 'How does demand in my area shift across seasons — and how should I plan for it?'
+			query: m.pill_demand_cycles_q()
 		},
 		{
-			label: 'Local market performance',
-			mobile: 'Market pulse',
+			id: 'market_pulse',
+			label: m.pill_market_pulse_label(),
+			mobile: m.pill_market_pulse_short(),
 			color: '#818cf8',
-			query: 'How is the local food and drink market performing compared to six months ago?'
+			query: m.pill_market_pulse_q()
 		},
 		// Site selection
 		{
-			label: "Who's getting the traffic",
-			mobile: 'Foot traffic',
+			id: 'foot_traffic',
+			label: m.pill_foot_traffic_label(),
+			mobile: m.pill_foot_traffic_short(),
 			color: '#a78bfa',
-			query: 'What are the foot traffic patterns in my neighbourhood by day and daypart?'
+			query: m.pill_foot_traffic_q()
 		},
 		{
-			label: 'Best streets to open on',
-			mobile: 'Best streets',
+			id: 'best_streets',
+			label: m.pill_best_streets_label(),
+			mobile: m.pill_best_streets_short(),
 			color: '#a78bfa',
-			query: 'Which streets or blocks near me have the highest foot traffic for hospitality?'
+			query: m.pill_best_streets_q()
 		},
 		{
-			label: 'Competition density',
-			mobile: 'Competition',
+			id: 'competition',
+			label: m.pill_competition_label(),
+			mobile: m.pill_competition_short(),
 			color: '#a78bfa',
-			query: 'How saturated is the food and drink market within 1 km of this location?'
+			query: m.pill_competition_q()
 		},
 		// Concept validation
 		{
-			label: 'Cuisine gaps in the area',
-			mobile: 'Cuisine gaps',
+			id: 'cuisine_gaps',
+			label: m.pill_cuisine_gaps_label(),
+			mobile: m.pill_cuisine_gaps_short(),
 			color: '#f472b6',
-			query: 'What cuisine types are underrepresented near me that locals are searching for?'
+			query: m.pill_cuisine_gaps_q()
 		},
 		{
-			label: 'What concepts work here',
-			mobile: 'Concepts here',
+			id: 'concepts_here',
+			label: m.pill_concepts_here_label(),
+			mobile: m.pill_concepts_here_short(),
 			color: '#f472b6',
-			query: 'Which formats and cuisines are thriving in this neighbourhood?'
+			query: m.pill_concepts_here_q()
 		},
 		{
-			label: 'Delivery demand signals',
-			mobile: 'Delivery trends',
+			id: 'delivery_trends',
+			label: m.pill_delivery_trends_label(),
+			mobile: m.pill_delivery_trends_short(),
 			color: '#f472b6',
-			query: 'What delivery categories are growing fastest in my area right now?'
+			query: m.pill_delivery_trends_q()
 		},
 		// Wage benchmarking
 		{
-			label: 'Salary benchmarks',
-			mobile: 'Salaries',
+			id: 'salaries',
+			label: m.pill_salaries_label(),
+			mobile: m.pill_salaries_short(),
 			color: '#6ee7b3',
-			query: 'What are restaurants near us actually paying for every role?'
+			query: m.pill_salaries_q()
 		},
 		{
-			label: 'Chef pay in my area',
-			mobile: 'Chef pay',
+			id: 'chef_pay',
+			label: m.pill_chef_pay_label(),
+			mobile: m.pill_chef_pay_short(),
 			color: '#6ee7b3',
-			query: 'What are head chefs and sous chefs earning at comparable restaurants nearby?'
+			query: m.pill_chef_pay_q()
 		},
 		{
-			label: 'Server wage trends',
-			mobile: 'Server wages',
+			id: 'server_wages',
+			label: m.pill_server_wages_label(),
+			mobile: m.pill_server_wages_short(),
 			color: '#6ee7b3',
-			query: 'How have front-of-house wages changed in my area over the past year?'
+			query: m.pill_server_wages_q()
 		},
 		// Price positioning
 		{
-			label: 'Menu price gaps',
-			mobile: 'Price gaps',
+			id: 'price_gaps',
+			label: m.pill_price_gaps_label(),
+			mobile: m.pill_price_gaps_short(),
 			color: '#fbbf24',
-			query: 'How does our menu pricing compare to competitors within 1 km?'
+			query: m.pill_price_gaps_q()
 		},
 		{
-			label: 'Lunch price positioning',
-			mobile: 'Lunch pricing',
+			id: 'lunch_pricing',
+			label: m.pill_lunch_pricing_label(),
+			mobile: m.pill_lunch_pricing_short(),
 			color: '#fbbf24',
-			query: 'Where does my lunch menu sit price-wise compared to nearby competitors?'
+			query: m.pill_lunch_pricing_q()
 		},
 		{
-			label: 'Drinks pricing landscape',
-			mobile: 'Drinks pricing',
+			id: 'drinks_pricing',
+			label: m.pill_drinks_pricing_label(),
+			mobile: m.pill_drinks_pricing_short(),
 			color: '#fbbf24',
-			query: 'How do my cocktail and wine prices compare to similar bars in the area?'
+			query: m.pill_drinks_pricing_q()
 		},
 		// Sentiment analysis
 		{
-			label: 'What guests are saying',
-			mobile: 'Guest reviews',
+			id: 'guest_reviews',
+			label: m.pill_guest_reviews_label(),
+			mobile: m.pill_guest_reviews_short(),
 			color: '#fb923c',
-			query: 'What are the real sentiment themes across our reviews and competitors?'
+			query: m.pill_guest_reviews_q()
 		},
 		{
-			label: 'Service complaint trends',
-			mobile: 'Complaints',
+			id: 'complaints',
+			label: m.pill_complaints_label(),
+			mobile: m.pill_complaints_short(),
 			color: '#fb923c',
-			query: 'What service issues keep coming up in reviews of places like mine?'
+			query: m.pill_complaints_q()
 		},
 		{
-			label: 'What earns 5 stars nearby',
-			mobile: '5-star formula',
+			id: 'five_star',
+			label: m.pill_five_star_label(),
+			mobile: m.pill_five_star_short(),
 			color: '#fb923c',
-			query: 'What do the top-rated cafes near me have in common according to reviews?'
+			query: m.pill_five_star_q()
 		},
 		// Competitor tracking
 		{
-			label: 'Competitor menu changes',
-			mobile: 'Menu changes',
+			id: 'menu_changes',
+			label: m.pill_menu_changes_label(),
+			mobile: m.pill_menu_changes_short(),
 			color: '#06b6d4',
-			query: 'Have any competitors near me changed their menu or pricing recently?'
+			query: m.pill_menu_changes_q()
 		},
 		{
-			label: 'New launches nearby',
-			mobile: 'New launches',
+			id: 'new_launches',
+			label: m.pill_new_launches_label(),
+			mobile: m.pill_new_launches_short(),
 			color: '#06b6d4',
-			query: 'What new concepts have launched in my area in the last 3 months?'
+			query: m.pill_new_launches_q()
 		},
 		{
-			label: 'Who opened nearby',
-			mobile: 'New openings',
+			id: 'new_openings',
+			label: m.pill_new_openings_label(),
+			mobile: m.pill_new_openings_short(),
 			color: '#06b6d4',
-			query: 'What has opened or closed in my area recently?'
+			query: m.pill_new_openings_q()
 		},
 		// Market shifts
 		{
-			label: 'Closures in the area',
-			mobile: 'Closures',
+			id: 'closures',
+			label: m.pill_closures_label(),
+			mobile: m.pill_closures_short(),
 			color: '#f87171',
-			query: 'What has closed nearby recently and what can I learn from it?'
+			query: m.pill_closures_q()
 		},
 		{
-			label: 'Format shifts happening',
-			mobile: 'Format shifts',
+			id: 'format_shifts',
+			label: m.pill_format_shifts_label(),
+			mobile: m.pill_format_shifts_short(),
 			color: '#f87171',
-			query:
-				'Are restaurants in my area shifting formats — dine-in to fast-casual, adding delivery?'
+			query: m.pill_format_shifts_q()
 		},
 		{
-			label: 'Emerging food trends',
-			mobile: 'Food trends',
+			id: 'food_trends',
+			label: m.pill_food_trends_label(),
+			mobile: m.pill_food_trends_short(),
 			color: '#f87171',
-			query: 'What food trends are gaining traction in my market right now?'
+			query: m.pill_food_trends_q()
 		}
 	];
 
 	const VISIBLE_COUNT = 6;
 	const STAGGER = 50;
 
-	function byLabel(label: string): TopicPillItem {
-		const p = PILL_POOL.find((x) => x.label === label);
-		if (!p) throw new Error(`TopicPills: no pill with label "${label}"`);
+	function byId(id: string): TopicPillItem {
+		const p = PILL_POOL.find((x) => x.id === id);
+		if (!p) throw new Error(`TopicPills: no pill with id "${id}"`);
 		return p;
 	}
 
@@ -179,13 +205,13 @@
 	// 2nd-shortest, 2nd-longest, mid-short, mid-long) so flex-wrap rows stay
 	// balanced.
 	const INITIAL_TOPICS: TopicPillItem[] = [
-		'Who opened nearby',
-		"Who's getting the traffic",
-		'Emerging food trends',
-		'Local market performance',
-		'What guests are saying',
-		'Lunch price positioning'
-	].map(byLabel);
+		'new_openings',
+		'foot_traffic',
+		'food_trends',
+		'market_pulse',
+		'guest_reviews',
+		'lunch_pricing'
+	].map(byId);
 
 	let pillGen = $state(0);
 	let topics = $state<TopicPillItem[]>(INITIAL_TOPICS);
@@ -228,7 +254,7 @@
 		>
 			<button
 				onclick={reshuffle}
-				aria-label="Show different suggestions"
+				aria-label={m.pills_reshuffle()}
 				class="shuffle-btn group inline-flex h-[34px] w-[34px] items-center justify-center rounded-full border border-black/[0.12] dark:border-white/[0.12]"
 			>
 				<svg

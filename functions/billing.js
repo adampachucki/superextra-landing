@@ -34,6 +34,12 @@ const MARKET_TO_BILLING_COUNTRY = {
 	gb: 'GB',
 	de: 'DE'
 };
+// Stripe accepts these as Checkout/Portal `locale` and Customer `preferred_locales`.
+const SUPPORTED_LOCALES = new Set(['en', 'de', 'pl']);
+
+function normalizeLocale(value) {
+	return SUPPORTED_LOCALES.has(value) ? value : 'en';
+}
 
 const LIVE_BILLING = Object.freeze({
 	mode: 'live',
@@ -273,18 +279,28 @@ function subscriptionBillingUpdate(subscription, extra = {}, config = LIVE_BILLI
 	};
 }
 
-async function getOrCreateCustomer(user, config) {
+async function getOrCreateCustomer(user, config, locale = 'en') {
 	const userRef = db().collection('users').doc(user.uid);
 	const snap = await userRef.get();
 	const data = snap.exists ? snap.data() || {} : {};
 	const billing = billingMapFromUserData(data, config);
 	const existing = billing.stripeCustomerId;
-	if (existing) return existing;
+	if (existing) {
+		// Keep the customer's locale current so Stripe-sent invoices/receipts
+		// arrive in their language. Non-critical — don't block checkout on it.
+		try {
+			await stripe(config).customers.update(existing, { preferred_locales: [locale] });
+		} catch (err) {
+			console.warn('billing preferred_locales update failed:', err.message);
+		}
+		return existing;
+	}
 
 	const customer = await stripe(config).customers.create(
 		{
 			email: user.email || undefined,
 			name: user.displayName || undefined,
+			preferred_locales: [locale],
 			metadata: {
 				firebaseUid: user.uid,
 				app: 'superextra',
@@ -330,9 +346,10 @@ async function prefillCustomerBillingCountry(customerId, market, config) {
 	});
 }
 
-async function createPortalSessionUrl(customerId, baseUrl, returnPath, config) {
+async function createPortalSessionUrl(customerId, baseUrl, returnPath, config, locale = 'en') {
 	const session = await stripe(config).billingPortal.sessions.create({
 		customer: customerId,
+		locale,
 		return_url: `${baseUrl}${returnPath}`
 	});
 	return session.url;
@@ -464,6 +481,7 @@ function createCheckoutFunction(config) {
 
 		const market = normalizeMarket(req.body?.market);
 		const currency = currencyForMarket(market);
+		const locale = normalizeLocale(req.body?.locale);
 		const returnPath = normalizeReturnPath(req.body?.returnPath, config);
 		const userRef = db().collection('users').doc(user.uid);
 		const userSnap = await userRef.get();
@@ -476,7 +494,8 @@ function createCheckoutFunction(config) {
 					customerId,
 					requestBaseUrl(req),
 					returnPath,
-					config
+					config,
+					locale
 				);
 				res.json({ ok: true, url });
 			} catch (err) {
@@ -488,7 +507,7 @@ function createCheckoutFunction(config) {
 
 		try {
 			const [customerId, priceId] = await Promise.all([
-				getOrCreateCustomer(user, config),
+				getOrCreateCustomer(user, config, locale),
 				resolvePriceId(config)
 			]);
 			await prefillCustomerBillingCountry(customerId, market, config);
@@ -499,6 +518,7 @@ function createCheckoutFunction(config) {
 				client_reference_id: user.uid,
 				line_items: [{ price: priceId, quantity: 1 }],
 				currency,
+				locale,
 				success_url: checkoutReturnUrl(baseUrl, returnPath, 'success', true),
 				cancel_url: checkoutReturnUrl(baseUrl, returnPath, 'cancelled'),
 				automatic_tax: { enabled: true },
@@ -613,6 +633,7 @@ function createPortalFunction(config) {
 		const user = await requireUser(req, res);
 		if (!user) return;
 		if (!requireBillingModeAccess(config, user, res)) return;
+		const locale = normalizeLocale(req.body?.locale);
 		const returnPath = normalizeReturnPath(req.body?.returnPath, config);
 		const snap = await db().collection('users').doc(user.uid).get();
 		const billing = snap.exists ? billingMapFromUserData(snap.data() || {}, config) : {};
@@ -625,7 +646,13 @@ function createPortalFunction(config) {
 		}
 		const customerId = stripeCustomerIdFromBilling(billing);
 		try {
-			const url = await createPortalSessionUrl(customerId, requestBaseUrl(req), returnPath, config);
+			const url = await createPortalSessionUrl(
+				customerId,
+				requestBaseUrl(req),
+				returnPath,
+				config,
+				locale
+			);
 			res.json({ ok: true, url });
 		} catch (err) {
 			console.error('billingPortal failed:', err);
@@ -692,6 +719,7 @@ export const _billingTesting = {
 	LIVE_BILLING,
 	TEST_BILLING,
 	normalizeMarket,
+	normalizeLocale,
 	currencyForMarket,
 	billingCountryForMarket,
 	normalizeReturnPath,

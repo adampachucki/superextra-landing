@@ -2,6 +2,7 @@
 	import type { PlaceSuggestion } from '$lib/place-search.svelte';
 	import TopicPills from './TopicPills.svelte';
 	import RestaurantPromptComposer from './RestaurantPromptComposer.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let isMobile = $state(false);
 	$effect(() => {
@@ -38,7 +39,7 @@
 			class="hero-fade mx-auto text-center font-semibold tracking-[-0.04em] text-black md:max-w-none dark:text-white"
 			style="font-size: clamp(3rem, 6vw, 5.25rem); line-height: 1.02; animation-delay: 100ms;"
 		>
-			AI consultant <br class="max-md:hidden" />for every restaurant
+			{m.hero_r_line1()} <br class="max-md:hidden" />{m.hero_r_line2()}
 		</h1>
 
 		<!-- Subheadline -->
@@ -46,8 +47,7 @@
 			class="hero-fade mx-auto mt-6 text-center text-lg leading-snug text-black/60 md:text-xl dark:text-white/60"
 			style="max-width: 540px; animation-delay: 170ms;"
 		>
-			Stop relying on gossip and gut feel. Get clear answers about your competitors, pricing, and
-			demand in minutes.
+			{m.hero_r_sub()}
 		</p>
 
 		<!-- Prompt card -->

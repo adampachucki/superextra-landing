@@ -1,7 +1,9 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
+
 	let {
-		title = 'Powered by dozens of data sources',
-		subtitle = 'We aggregate, cross-reference, and validate data from public platforms, proprietary databases, and official registries across every market we cover.'
+		title = m.ds_def_title(),
+		subtitle = m.ds_def_sub()
 	}: { title?: string; subtitle?: string } = $props();
 
 	const sources = [
@@ -71,7 +73,7 @@
 
 			<!-- "And more" cell -->
 			<div class="flex items-center justify-center bg-cream px-3 py-5 sm:px-5 sm:py-8">
-				<span class="text-sm text-black/40 dark:text-white/40">And more</span>
+				<span class="text-sm text-black/40 dark:text-white/40">{m.ds_and_more()}</span>
 			</div>
 		</div>
 	</div>

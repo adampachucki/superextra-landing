@@ -10,6 +10,7 @@ import {
 	esc,
 	row,
 	confirmationHtml,
+	confirmationSubject,
 	stripMarkdown,
 	checkRateLimit,
 	validatePlaceContext
@@ -107,8 +108,8 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 			body: JSON.stringify({
 				from: 'Adam Pachucki <ap@superextra.ai>',
 				to: data.email,
-				subject: 'Superextra demo request received',
-				html: confirmationHtml(data.fullName)
+				subject: confirmationSubject(data.locale),
+				html: confirmationHtml(data.fullName, data.locale)
 			})
 		});
 	} catch (err) {
@@ -1194,18 +1195,58 @@ export const agentDelete = onRequest(
 
 const MAGIC_LINK_BASE_URL = process.env.MAGIC_LINK_BASE_URL || 'https://agent.superextra.ai/login';
 
-function magicLinkEmailHtml(link) {
+const MAGIC_LINK_COPY = {
+	en: {
+		subject: 'Sign in to Superextra',
+		heading: 'Sign in to Superextra',
+		body: 'Click the button below to sign in. The link expires in one hour.',
+		button: 'Sign in to Superextra',
+		ignore: 'If you didn’t request this, you can safely ignore this email.',
+		paste: 'Or paste this link into your browser:',
+		textBody: 'Click this link to sign in. It expires in one hour:'
+	},
+	de: {
+		subject: 'Bei Superextra anmelden',
+		heading: 'Bei Superextra anmelden',
+		body: 'Klicke auf den Button unten, um dich anzumelden. Der Link läuft in einer Stunde ab.',
+		button: 'Bei Superextra anmelden',
+		ignore: 'Wenn du das nicht angefordert hast, kannst du diese E-Mail ignorieren.',
+		paste: 'Oder füge diesen Link in deinen Browser ein:',
+		textBody: 'Klicke auf diesen Link, um dich anzumelden. Er läuft in einer Stunde ab:'
+	},
+	pl: {
+		subject: 'Zaloguj się do Superextra',
+		heading: 'Zaloguj się do Superextra',
+		body: 'Kliknij przycisk poniżej, aby się zalogować. Link wygasa za godzinę.',
+		button: 'Zaloguj się do Superextra',
+		ignore: 'Jeśli to nie Ty, możesz zignorować tę wiadomość.',
+		paste: 'Lub wklej ten link do przeglądarki:',
+		textBody: 'Kliknij ten link, aby się zalogować. Wygasa za godzinę:'
+	}
+};
+
+function magicLinkLocale(value) {
+	return Object.hasOwn(MAGIC_LINK_COPY, value) ? value : 'en';
+}
+
+function magicLinkEmailHtml(link, locale = 'en') {
+	const t = MAGIC_LINK_COPY[magicLinkLocale(locale)];
 	return `<div style="font-family: -apple-system, system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a; line-height: 1.5;">
-  <h1 style="font-size: 22px; margin: 0 0 8px; font-weight: 300;">Sign in to Superextra</h1>
-  <p style="font-size: 15px; margin: 0 0 24px; color: #555;">Click the button below to sign in. The link expires in one hour.</p>
-  <a href="${esc(link)}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 15px;">Sign in to Superextra</a>
-  <p style="font-size: 13px; margin: 24px 0 0; color: #888;">If you didn’t request this, you can safely ignore this email.</p>
-  <p style="font-size: 13px; margin: 24px 0 0; color: #888;">Or paste this link into your browser:<br><span style="color: #555; word-break: break-all;">${esc(link)}</span></p>
+  <h1 style="font-size: 22px; margin: 0 0 8px; font-weight: 300;">${t.heading}</h1>
+  <p style="font-size: 15px; margin: 0 0 24px; color: #555;">${t.body}</p>
+  <a href="${esc(link)}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 15px;">${t.button}</a>
+  <p style="font-size: 13px; margin: 24px 0 0; color: #888;">${t.ignore}</p>
+  <p style="font-size: 13px; margin: 24px 0 0; color: #888;">${t.paste}<br><span style="color: #555; word-break: break-all;">${esc(link)}</span></p>
 </div>`;
 }
 
-function magicLinkEmailText(link) {
-	return `Sign in to Superextra\n\nClick this link to sign in. It expires in one hour:\n\n${link}\n\nIf you didn't request this, you can safely ignore this email.\n`;
+function magicLinkEmailText(link, locale = 'en') {
+	const t = MAGIC_LINK_COPY[magicLinkLocale(locale)];
+	return `${t.heading}\n\n${t.textBody}\n\n${link}\n\n${t.ignore}\n`;
+}
+
+function magicLinkSubject(locale) {
+	return MAGIC_LINK_COPY[magicLinkLocale(locale)].subject;
 }
 
 function safeReturnTo(value) {
@@ -1238,6 +1279,7 @@ export const sendMagicLink = onRequest(
 		}
 
 		const { email, returnTo } = req.body || {};
+		const locale = magicLinkLocale(req.body?.locale);
 		if (
 			!email ||
 			typeof email !== 'string' ||
@@ -1294,9 +1336,9 @@ export const sendMagicLink = onRequest(
 				body: JSON.stringify({
 					from: 'Superextra <hello@superextra.ai>',
 					to: email,
-					subject: 'Sign in to Superextra',
-					html: magicLinkEmailHtml(link),
-					text: magicLinkEmailText(link)
+					subject: magicLinkSubject(locale),
+					html: magicLinkEmailHtml(link, locale),
+					text: magicLinkEmailText(link, locale)
 				})
 			});
 			if (!r.ok) {
