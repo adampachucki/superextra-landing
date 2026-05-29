@@ -108,10 +108,13 @@ async function checkoutSmoke({ mode, market, stripe, idToken, returnPath }) {
 	const sessionId = checkoutSessionIdFromUrl(checkoutUrl);
 	if (!sessionId) throw new Error(`${mode} Checkout URL did not include session_id`);
 	const session = await stripe.checkout.sessions.retrieve(sessionId);
+	const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+	const customer = customerId ? await stripe.customers.retrieve(customerId) : null;
 	await expectBillingError(`${prefix}/portal`, idToken, 'stripe_subscription_missing');
 	return {
 		sessionId: session.id,
-		customerId: typeof session.customer === 'string' ? session.customer : session.customer?.id,
+		customerId,
+		customerCountry: customer && !customer.deleted ? customer.address?.country : null,
 		livemode: session.livemode,
 		mode: session.mode,
 		currency: session.currency,
@@ -161,6 +164,12 @@ async function main() {
 		}
 		if (live.livemode !== true || live.currency !== 'pln' || live.amountTotal !== 1900) {
 			throw new Error(`Unexpected live checkout session: ${JSON.stringify(live)}`);
+		}
+		if (test.customerCountry !== 'DE') {
+			throw new Error(`Unexpected test customer country: ${JSON.stringify(test)}`);
+		}
+		if (live.customerCountry !== 'PL') {
+			throw new Error(`Unexpected live customer country: ${JSON.stringify(live)}`);
 		}
 		if (
 			test.successUrl !==

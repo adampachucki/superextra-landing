@@ -42,6 +42,13 @@ describe('billing helpers', () => {
 		assert.equal(_billingTesting.normalizeMarket(undefined), 'other');
 	});
 
+	it('maps supported markets to Stripe billing country defaults', () => {
+		assert.equal(_billingTesting.billingCountryForMarket('pl'), 'PL');
+		assert.equal(_billingTesting.billingCountryForMarket('de'), 'DE');
+		assert.equal(_billingTesting.billingCountryForMarket('us'), 'US');
+		assert.equal(_billingTesting.billingCountryForMarket('other'), null);
+	});
+
 	it('keeps checkout returns on the originating app path', () => {
 		assert.equal(
 			_billingTesting.normalizeReturnPath('/chat?sid=abc&billing=success&session_id=cs_test_x', {

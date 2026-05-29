@@ -27,6 +27,11 @@ const MARKET_TO_CURRENCY = {
 	de: 'eur',
 	other: 'usd'
 };
+const MARKET_TO_BILLING_COUNTRY = {
+	us: 'US',
+	pl: 'PL',
+	de: 'DE'
+};
 
 const LIVE_BILLING = Object.freeze({
 	mode: 'live',
@@ -109,6 +114,10 @@ function requestBaseUrl(req) {
 
 function normalizeMarket(value) {
 	return Object.hasOwn(MARKET_TO_CURRENCY, value) ? value : 'other';
+}
+
+function billingCountryForMarket(market) {
+	return MARKET_TO_BILLING_COUNTRY[market] || null;
 }
 
 function normalizeReturnPath(value, config) {
@@ -308,6 +317,14 @@ async function getOrCreateCustomer(user, config) {
 	return customer.id;
 }
 
+async function prefillCustomerBillingCountry(customerId, market, config) {
+	const country = billingCountryForMarket(market);
+	if (!country) return;
+	await stripe(config).customers.update(customerId, {
+		address: { country }
+	});
+}
+
 async function createPortalSessionUrl(customerId, baseUrl, returnPath, config) {
 	const session = await stripe(config).billingPortal.sessions.create({
 		customer: customerId,
@@ -469,6 +486,7 @@ function createCheckoutFunction(config) {
 				getOrCreateCustomer(user, config),
 				resolvePriceId(config)
 			]);
+			await prefillCustomerBillingCountry(customerId, market, config);
 			const baseUrl = requestBaseUrl(req);
 			const session = await stripe(config).checkout.sessions.create({
 				mode: 'subscription',
@@ -669,6 +687,7 @@ export const _billingTesting = {
 	LIVE_BILLING,
 	TEST_BILLING,
 	normalizeMarket,
+	billingCountryForMarket,
 	normalizeReturnPath,
 	checkoutReturnUrl,
 	planForSubscriptionStatus,
