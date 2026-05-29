@@ -118,8 +118,6 @@ export const intake = onRequest({ cors: true, secrets: [relayKey] }, async (req,
 	res.json({ ok: true });
 });
 
-// row, esc, confirmationHtml imported from ./utils.js
-
 // --- Agent chat endpoint (hands off directly to Vertex AI Agent Engine) ---
 
 const rateLimitMap = new Map();
@@ -342,6 +340,31 @@ function placeContextPrefix(placeContext) {
 	return `[Context: selected focus: ${focusLabel} (Google Place ID: ${placeContext.placeId || 'unknown'})] `;
 }
 
+/**
+ * Verify the Bearer ID token on a request, rejecting missing tokens and
+ * anonymous sign-ins. On failure writes the 401 response and returns null;
+ * on success returns the decoded token. `label` tags the rejection log line.
+ */
+async function verifyAuthedRequest(req, res, label) {
+	const tokenMatch = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
+	if (!tokenMatch) {
+		res.status(401).json({ ok: false, error: 'Authorization header required' });
+		return null;
+	}
+	try {
+		const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
+		if (decoded?.firebase?.sign_in_provider === 'anonymous') {
+			res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
+			return null;
+		}
+		return decoded;
+	} catch (e) {
+		console.warn(`${label} verifyIdToken rejected:`, e.code || e.message);
+		res.status(401).json({ ok: false, error: 'Invalid auth token' });
+		return null;
+	}
+}
+
 const agentStreamOptions = { cors: true, timeoutSeconds: 90, secrets: [googlePlacesKey] };
 
 export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
@@ -351,31 +374,14 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	}
 
 	// 1. Firebase ID token verification.
-	const authHeader = req.headers.authorization || '';
-	const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
-	if (!tokenMatch) {
-		res.status(401).json({ ok: false, error: 'Authorization header required' });
-		return;
-	}
-	let submitterUid;
-	let submitterClaims = null;
-	try {
-		const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
-		if (decoded?.firebase?.sign_in_provider === 'anonymous') {
-			res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
-			return;
-		}
-		submitterUid = decoded.uid;
-		submitterClaims = {
-			email: typeof decoded.email === 'string' ? decoded.email : null,
-			displayName: typeof decoded.name === 'string' ? decoded.name : null,
-			photoURL: typeof decoded.picture === 'string' ? decoded.picture : null
-		};
-	} catch (e) {
-		console.warn('verifyIdToken rejected:', e.code || e.message);
-		res.status(401).json({ ok: false, error: 'Invalid auth token' });
-		return;
-	}
+	const decoded = await verifyAuthedRequest(req, res, 'agentStream');
+	if (!decoded) return;
+	const submitterUid = decoded.uid;
+	const submitterClaims = {
+		email: typeof decoded.email === 'string' ? decoded.email : null,
+		displayName: typeof decoded.name === 'string' ? decoded.name : null,
+		photoURL: typeof decoded.picture === 'string' ? decoded.picture : null
+	};
 
 	// 2. Rate limits — IP first (pre-UID) then UID (authenticated scope).
 	// Rate limiting keys off the *submitter* UID from the request token,
@@ -583,9 +589,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 		});
 	} catch (err) {
 		if (err instanceof AgentStreamError) {
-			const body = { ok: false, error: err.code };
-			if (err.resetAt) body.resetAt = err.resetAt;
-			res.status(err.status).json(body);
+			res.status(err.status).json({ ok: false, error: err.code });
 		} else {
 			console.error('agentStream transaction failed:', err.message || err);
 			res.status(500).json({ ok: false, error: 'session_upsert_failed' });
@@ -792,8 +796,6 @@ export const sttToken = onRequest({ cors: true, secrets: [elevenlabsKey] }, asyn
 const TTS_VOICE_ID = 'SAz9YHcvj6GT2YYXdXww'; // River – Relaxed, Neutral, Informative
 const ttsRateLimitMap = new Map();
 
-// stripMarkdown imported from ./utils.js
-
 export const tts = onRequest({ cors: true, secrets: [elevenlabsKey] }, async (req, res) => {
 	if (req.method !== 'POST') {
 		res.status(405).json({ ok: false, error: 'Method not allowed' });
@@ -862,25 +864,9 @@ export const agentCancel = onRequest(
 			return;
 		}
 
-		const authHeader = req.headers.authorization || '';
-		const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
-		if (!tokenMatch) {
-			res.status(401).json({ ok: false, error: 'Authorization header required' });
-			return;
-		}
-		let uid;
-		try {
-			const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
-			if (decoded?.firebase?.sign_in_provider === 'anonymous') {
-				res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
-				return;
-			}
-			uid = decoded.uid;
-		} catch (e) {
-			console.warn('agentCancel verifyIdToken rejected:', e.code || e.message);
-			res.status(401).json({ ok: false, error: 'Invalid auth token' });
-			return;
-		}
+		const decoded = await verifyAuthedRequest(req, res, 'agentCancel');
+		if (!decoded) return;
+		const uid = decoded.uid;
 
 		const { sid, runId: requestedRunId, turnIndex: requestedTurnIndex } = req.body || {};
 		if (!sid || typeof sid !== 'string') {
@@ -1015,25 +1001,9 @@ export const agentFeedback = onRequest(
 			return;
 		}
 
-		const authHeader = req.headers.authorization || '';
-		const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
-		if (!tokenMatch) {
-			res.status(401).json({ ok: false, error: 'Authorization header required' });
-			return;
-		}
-		let uid;
-		try {
-			const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
-			if (decoded?.firebase?.sign_in_provider === 'anonymous') {
-				res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
-				return;
-			}
-			uid = decoded.uid;
-		} catch (e) {
-			console.warn('agentFeedback verifyIdToken rejected:', e.code || e.message);
-			res.status(401).json({ ok: false, error: 'Invalid auth token' });
-			return;
-		}
+		const decoded = await verifyAuthedRequest(req, res, 'agentFeedback');
+		if (!decoded) return;
+		const uid = decoded.uid;
 
 		const { sid, turnIndex, kind } = req.body || {};
 		if (!sid || typeof sid !== 'string') {
@@ -1161,25 +1131,9 @@ export const agentDelete = onRequest(
 		}
 
 		// 1. Firebase ID token verification.
-		const authHeader = req.headers.authorization || '';
-		const tokenMatch = /^Bearer\s+(.+)$/i.exec(authHeader);
-		if (!tokenMatch) {
-			res.status(401).json({ ok: false, error: 'Authorization header required' });
-			return;
-		}
-		let uid;
-		try {
-			const decoded = await getAuth().verifyIdToken(tokenMatch[1]);
-			if (decoded?.firebase?.sign_in_provider === 'anonymous') {
-				res.status(401).json({ ok: false, error: 'AUTH_REQUIRED' });
-				return;
-			}
-			uid = decoded.uid;
-		} catch (e) {
-			console.warn('agentDelete verifyIdToken rejected:', e.code || e.message);
-			res.status(401).json({ ok: false, error: 'Invalid auth token' });
-			return;
-		}
+		const decoded = await verifyAuthedRequest(req, res, 'agentDelete');
+		if (!decoded) return;
+		const uid = decoded.uid;
 
 		// 2. Input validation.
 		const { sid } = req.body || {};

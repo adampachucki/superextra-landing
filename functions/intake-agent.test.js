@@ -20,24 +20,13 @@ function place({
 }
 
 function modelJson(data) {
-	const payload = { ...data };
-	if (!payload.scopeKind) {
-		payload.scopeKind =
-			payload.action === 'lookup_place'
-				? 'anchor_place'
-				: payload.action === 'reply'
-					? 'insufficient_scope'
-					: payload.placeId
-						? 'candidate_selection'
-						: 'research_scope';
-	}
 	return {
 		ok: true,
 		json: async () => ({
 			candidates: [
 				{
 					content: {
-						parts: [{ text: JSON.stringify(payload) }]
+						parts: [{ text: JSON.stringify(data) }]
 					}
 				}
 			]

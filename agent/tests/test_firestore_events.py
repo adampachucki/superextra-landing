@@ -5,7 +5,6 @@ from typing import Any
 
 from superextra_agent.firestore_events import (
     extract_sources_from_grounding,
-    extract_sources_from_search_tool,
     map_event,
     map_tool_call,
     map_tool_result,
@@ -162,17 +161,15 @@ def test_thought_text_strips_provider_tool_aliases():
     ev = _event(
         author="dynamic_researcher_1",
         thoughts=[
-            "Use `google:search` first, then `default_api:page fetch` for the "
-            "source. If needed, default_api:fetch_web_content can read another page."
+            "Use `google:search` first, then `default_api:page fetch` for the source."
         ],
     )
     rows = map_event(ev, {})["timeline_events"]
     text = next(r["text"] for r in rows if r["kind"] == "thought")
     assert "google:search" not in text
     assert "default_api:page fetch" not in text
-    assert "default_api:fetch_web_content" not in text
     assert "source search" in text
-    assert text.count("source reading") == 2
+    assert text.count("source reading") == 1
     assert "Google search" not in text
     assert "page fetch" not in text
 
@@ -379,27 +376,6 @@ def test_non_durable_specialist_grounding_sources_are_captured():
     ]
 
 
-def test_public_search_tool_sources_are_captured_as_search_sources():
-    source = {
-        "url": "https://example.com/article",
-        "title": "Article",
-        "domain": "example.com",
-    }
-    ev = _event(
-        author="market_landscape",
-        function_responses=[
-            (
-                "search_public_web",
-                {"status": "success", "sources": [source]},
-            )
-        ],
-    )
-
-    expected = [{**source, "provider": "public_search"}]
-    assert extract_sources_from_search_tool(ev) == expected
-    assert map_event(ev, {})["grounding_sources"] == expected
-
-
 def test_research_lead_grounding_sources_are_captured():
     ev = _event(
         author="research_lead",
@@ -479,31 +455,17 @@ def test_compaction_event_emits_no_timeline_rows():
 def test_multi_tool_call_emits_multiple_detail_rows_in_order():
     rows = [
         map_tool_call("google_search", {"query": "best burgers berlin"}, {}, "call-1"),
-        map_tool_call("search_public_web", {"query": "new cafes gdynia"}, {}, "call-search"),
-        map_tool_call(
-            "read_web_pages",
-            {"urls": ["https://example.com/menu", "https://example.com/about"]},
-            {},
-            "call-2",
-        ),
-        map_tool_call(
-            "read_public_pages",
-            {"urls": ["https://example.com/a", "https://example.com/b"]},
-            {},
-            "call-jina",
-        ),
+        map_tool_call("search_serpapi", {"query": "new cafes gdynia"}, {}, "call-search"),
         map_tool_call("get_tripadvisor_reviews", {"url": "https://www.tripadvisor.com/Restaurant_Review-g187323-d6796040-Reviews-Umami_P_Berg-Berlin.html"}, {}, "call-3"),
     ]
     assert [row["family"] for row in rows] == [
         "Searching the web",
         "Searching the web",
-        "Public sources",
-        "Public sources",
         "TripAdvisor",
     ]
     # Per-venue label keeps rows human-distinguishable across a multi-venue
     # research run (dedup itself keys on the unique call id, not the text).
-    assert rows[4]["text"] == "Reading Umami P Berg-Berlin"
+    assert rows[2]["text"] == "Reading Umami P Berg-Berlin"
     assert rows[0]["text"] == "best burgers berlin"
     assert rows[1]["text"] == "new cafes gdynia"
 
@@ -557,23 +519,6 @@ def test_find_nearby_restaurants_keeps_nearby_label():
         "call-1",
     )
     assert rows[0]["text"] == "2 nearby places"
-
-
-def test_failed_fetch_batch_warning_preserves_failure_count():
-    rows = map_tool_result(
-        "fetch_web_content_batch",
-        {
-            "status": "error",
-            "results": [
-                {"status": "error", "error_message": "Timeout fetching https://a.example/x"},
-                {"status": "error", "error_message": "Timeout fetching https://b.example/y"},
-            ],
-        },
-        {},
-        "call-1",
-    )
-
-    assert rows[0]["text"] == "2/2 sources failed"
 
 
 def test_google_reviews_uses_saved_place_name():

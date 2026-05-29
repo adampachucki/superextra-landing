@@ -220,11 +220,11 @@ async def test_on_event_stops_when_timeline_writer_loses_ownership(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_tool_error_fetch_web_content_writes_warning():
+async def test_tool_error_writes_warning():
     plugin, state = _make_plugin_state()
 
     await plugin.on_tool_error_callback(
-        tool=_tool("fetch_web_content"),
+        tool=_tool("fetch_tripadvisor_page"),
         tool_args={"url": "https://example.invalid"},
         tool_context=_tool_context(call_id="call-fetch"),
         error=RuntimeError("boom"),
@@ -233,84 +233,12 @@ async def test_tool_error_fetch_web_content_writes_warning():
     state.timeline_writer.write_timeline.assert_awaited_once_with(
         {
             "kind": "detail",
-            "id": "tool:response:call-fetch:fetch_web_content",
+            "id": "tool:response:call-fetch:fetch_tripadvisor_page",
             "group": "warning",
             "family": "Warnings",
             "text": "Source fetch failed",
         }
     )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("tool_name", "tool_args", "result"),
-    [
-        (
-            "read_web_pages",
-            {"urls": ["https://example.com/menu"]},
-            {
-                "status": "success",
-                "sources": [
-                    {
-                        "url": "https://example.com/menu",
-                        "title": "Menu",
-                        "domain": "example.com",
-                    }
-                ],
-            },
-        ),
-        (
-            "read_public_page",
-            {"url": "https://example.com/menu"},
-            {
-                "status": "success",
-                "sources": [
-                    {
-                        "url": "https://example.com/menu",
-                        "title": "Menu",
-                        "domain": "example.com",
-                    }
-                ],
-            },
-        ),
-        (
-            "fetch_web_content",
-            {"url": "https://example.com/menu"},
-            {
-                "status": "success",
-                "url": "https://example.com/menu",
-                "content": "Title: Menu\n\nBody",
-            },
-        ),
-        (
-            "fetch_web_content_batch",
-            {"urls": ["https://example.com/menu"]},
-            {
-                "status": "success",
-                "results": [
-                    {
-                        "status": "success",
-                        "url": "https://example.com/menu",
-                        "content": "Title: Menu\n\nBody",
-                    }
-                ],
-            },
-        ),
-    ],
-)
-async def test_after_tool_page_reads_do_not_merge_source_pills(
-    tool_name, tool_args, result
-):
-    plugin, state = _make_plugin_state()
-
-    await plugin.after_tool_callback(
-        tool=_tool(tool_name),
-        tool_args=tool_args,
-        tool_context=_tool_context(call_id="call-read"),
-        result=result,
-    )
-
-    assert state.specialist_sources == []
 
 
 @pytest.mark.asyncio
@@ -332,16 +260,16 @@ async def test_tool_error_agent_level_fallback_does_not_duplicate_pill():
     context = _tool_context(call_id="call-fetch")
 
     await plugin.on_tool_error_callback(
-        tool=_tool("fetch_web_content"),
+        tool=_tool("fetch_tripadvisor_page"),
         tool_args={"url": "https://example.invalid"},
         tool_context=context,
         error=RuntimeError("boom"),
     )
     await plugin.after_tool_callback(
-        tool=_tool("fetch_web_content"),
+        tool=_tool("fetch_tripadvisor_page"),
         tool_args={"url": "https://example.invalid"},
         tool_context=context,
-        result={"error": "Tool fetch_web_content failed: RuntimeError"},
+        result={"error": "Tool fetch_tripadvisor_page failed: RuntimeError"},
     )
 
     assert state.timeline_writer.write_timeline.await_count == 1

@@ -27,13 +27,10 @@ const INTAKE_STATE_SCHEMA = {
 	propertyOrdering: ['summary', 'originalIntent', 'scopeSummary', 'pendingQuestion', 'candidateSet']
 };
 
-const SCOPE_KINDS = ['research_scope', 'anchor_place', 'candidate_selection', 'insufficient_scope'];
-
 const INTAKE_SCHEMA = {
 	type: 'OBJECT',
 	properties: {
 		action: { type: 'STRING', enum: ['reply', 'lookup_place', 'start_research'] },
-		scopeKind: { type: 'STRING', enum: SCOPE_KINDS },
 		reply: { type: 'STRING' },
 		placesQuery: { type: 'STRING' },
 		researchQuestion: { type: 'STRING' },
@@ -44,7 +41,6 @@ const INTAKE_SCHEMA = {
 	},
 	required: [
 		'action',
-		'scopeKind',
 		'reply',
 		'placesQuery',
 		'researchQuestion',
@@ -55,7 +51,6 @@ const INTAKE_SCHEMA = {
 	],
 	propertyOrdering: [
 		'action',
-		'scopeKind',
 		'reply',
 		'placesQuery',
 		'researchQuestion',
@@ -292,7 +287,7 @@ export function buildIntakePrompt({
 		'- reply: write reply and updated state.',
 		'- lookup_place: write placesQuery and updated state.',
 		'- start_research: write researchQuestion, optional placeId, acknowledgement, and updated state.',
-		'Always include scopeKind and every string field. Use an empty string when a field or acknowledgement is not relevant to the selected action.',
+		'Always include every string field. Use an empty string when a field or acknowledgement is not relevant to the selected action.',
 		'',
 		`Conversation before latest message: ${JSON.stringify(compactHistory(history))}`,
 		`Latest user message: ${JSON.stringify(compact(message))}`,
@@ -357,7 +352,6 @@ function normalizeDecision({
 }) {
 	const state = mergeState({ modelState: raw?.state, previousState, candidates });
 	const action = raw?.action;
-	const scopeKind = SCOPE_KINDS.includes(raw?.scopeKind) ? raw.scopeKind : '';
 	if (!['reply', 'lookup_place', 'start_research'].includes(action)) {
 		throw new Error('intake_model_invalid_action');
 	}
@@ -365,7 +359,6 @@ function normalizeDecision({
 	if (action === 'reply') {
 		return {
 			action,
-			scopeKind,
 			reply: compactReply(raw.reply, 1400) || FALLBACK_REPLY,
 			state,
 			reason: compact(raw.reason, 120)
@@ -377,7 +370,6 @@ function normalizeDecision({
 		if (!placesQuery) throw new Error('intake_model_missing_places_query');
 		return {
 			action,
-			scopeKind,
 			placesQuery,
 			state,
 			reason: compact(raw.reason, 120)
@@ -393,7 +385,6 @@ function normalizeDecision({
 	if (compact(raw.placeId) && !placeContext) {
 		return {
 			action: 'reply',
-			scopeKind,
 			reply: FALLBACK_REPLY,
 			state: resolutionState,
 			reason: 'invalid_place_id'
@@ -401,7 +392,6 @@ function normalizeDecision({
 	}
 	return {
 		action,
-		scopeKind,
 		researchQuestion: compact(raw.researchQuestion, 1600) || compact(message, 1600),
 		placeContext,
 		acknowledgement: normalizeAcknowledgement(raw.acknowledgement, {
@@ -475,7 +465,6 @@ export async function runIntakeConversation({
 	return decision.action === 'lookup_place'
 		? {
 				action: 'reply',
-				scopeKind: decision.scopeKind,
 				reply: FALLBACK_REPLY,
 				state: stateWithCandidates,
 				reason: 'lookup_loop_limit'

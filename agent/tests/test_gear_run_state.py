@@ -306,35 +306,6 @@ def test_partial_source_event_is_not_lost_if_no_aggregate_repeats_it():
     ]
 
 
-def test_observe_event_merges_search_tool_sources():
-    state = _make_state()
-    sources = [
-        {
-            "url": "https://example.com/a",
-            "title": "A",
-            "domain": "example.com",
-            "provider": "public_search",
-        },
-        {
-            "url": "https://example.com/b",
-            "title": "B",
-            "domain": "example.com",
-            "provider": "public_search",
-        },
-    ]
-
-    state.observe_event(
-        _fake_event(
-            function_responses=[
-                ("search_public_web", {"status": "success", "sources": sources})
-            ],
-            author="market_landscape",
-        )
-    )
-
-    assert state.specialist_sources == sources
-
-
 def test_source_dedupe_keeps_same_url_for_distinct_provider_or_place():
     state = _make_state()
     url = "https://www.google.com/maps/place/?q=place_id:ChIJtarget"

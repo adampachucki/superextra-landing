@@ -51,12 +51,7 @@ def _event(
     )
 
 
-def test_parse_run_keeps_source_drawer_as_provenance():
-    source = {
-        "url": "https://example.com/source",
-        "title": "Source",
-        "domain": "example.com",
-    }
+def test_parse_run_builds_drawer_from_grounding_and_provider_pills():
     provider = {
         "provider": "google_maps",
         "place_id": "ChIJtarget",
@@ -75,39 +70,7 @@ def test_parse_run_keeps_source_drawer_as_provenance():
                     }
                 ],
             ),
-            _event(
-                function_responses=[
-                    (
-                        "search_public_web",
-                        {
-                            "status": "success",
-                            "sources": [
-                                {
-                                    "url": "https://search.example/tool",
-                                    "title": "Tool source",
-                                    "domain": "search.example",
-                                }
-                            ],
-                        },
-                    ),
-                    (
-                        "read_web_pages",
-                        {
-                            "status": "success",
-                            "results": [
-                                {
-                                    "status": "success",
-                                    "url": source["url"],
-                                    "retrieved_url": source["url"],
-                                    "content": "# Source\n\nText",
-                                }
-                            ],
-                            "sources": [source],
-                        },
-                    )
-                ],
-                state_delta={"_tool_src_google_maps_abc": provider},
-            ),
+            _event(state_delta={"_tool_src_google_maps_abc": provider}),
         ]
     )
 
@@ -119,318 +82,25 @@ def test_parse_run_keeps_source_drawer_as_provenance():
             "provider": "grounding",
             "kind": "grounding",
         },
-        {
-            "url": "https://search.example/tool",
-            "domain": "search.example",
-            "title": "Tool source",
-            "provider": "public_search",
-            "kind": "grounding",
-        },
         {**provider, "kind": "provider", "domain": "maps.google.com"},
     ]
 
 
-def test_parse_run_builds_specialist_read_funnel_from_read_web_pages():
-    url = "https://example.com/source"
-
-    parsed = parse_run(
-        [
-            _event(
-                author="market_landscape",
-                grounding_chunks=[
-                    {"uri": url, "title": "Source", "domain": "example.com"}
-                ],
-            ),
-            _event(
-                author="market_landscape",
-                function_calls=[("read_web_pages", {"urls": [url]})],
-                function_responses=[
-                    (
-                        "read_web_pages",
-                        {
-                            "status": "success",
-                            "results": [
-                                {
-                                    "status": "success",
-                                    "url": url,
-                                    "retrieved_url": url,
-                                    "content": "# Source\n\nText",
-                                }
-                            ],
-                            "sources": [
-                                {
-                                    "url": url,
-                                    "title": "Source",
-                                    "domain": "example.com",
-                                }
-                            ],
-                            "success_count": 1,
-                        },
-                    )
-                ],
-                state_delta={"market_result": "Market report"},
-            ),
-        ]
-    )
-
-    funnel = parsed["source_funnel"]
-    assert funnel["specialist_output_count"] == 1
-    assert funnel["grounding_entry_url_count"] == 1
-    assert funnel["captured_source_url_count"] == 1
-    assert funnel["specialist_read_tool_call_count"] == 1
-    assert funnel["specialist_read_call_count"] == 1
-    assert funnel["specialist_read_effective_call_count"] == 1
-    assert funnel["specialist_read_noop_call_count"] == 0
-    assert funnel["specialist_read_requested_url_count"] == 1
-    assert funnel["specialist_read_attempted_url_count"] == 1
-    assert funnel["specialist_read_successful_url_count"] == 1
-    assert funnel["specialist_read_returned_source_urls"] == [url]
-    assert funnel["grounding_urls_attempted_by_specialists_count"] == 1
-    assert funnel["captured_urls_not_attempted"] == []
-    assert len(funnel["specialists"]) == 1
-    assert funnel["specialists"][0]["key"] == "market_landscape"
-    assert funnel["specialists"][0]["read_tool_call_count"] == 1
-    assert funnel["specialists"][0]["read_call_count"] == 1
-    assert funnel["specialists"][0]["noop_read_call_count"] == 0
-    assert funnel["specialists"][0]["successful_urls"] == [url]
-
-
-def test_parse_run_tracks_reader_failures_and_unattempted_grounding():
-    read = "https://example.com/read"
-    failed = "https://example.com/blocked"
-    omitted = "https://example.com/omitted"
-
-    parsed = parse_run(
-        [
-            _event(
-                author="guest_intelligence",
-                grounding_chunks=[
-                    {"uri": read, "title": "Read", "domain": "example.com"},
-                    {"uri": failed, "title": "Blocked", "domain": "example.com"},
-                    {"uri": omitted, "title": "Omitted", "domain": "example.com"},
-                ],
-            ),
-            _event(
-                author="guest_intelligence",
-                function_calls=[("read_public_pages", {"urls": [read, failed]})],
-                function_responses=[
-                    (
-                        "read_public_pages",
-                        {
-                            "status": "success",
-                            "results": [
-                                {
-                                    "status": "success",
-                                    "url": read,
-                                    "content": "# Read\n\nText",
-                                },
-                                {
-                                    "status": "error",
-                                    "url": failed,
-                                    "error_message": "upstream HTTP 403",
-                                },
-                            ],
-                            "sources": [
-                                {
-                                    "url": read,
-                                    "title": "Read",
-                                    "domain": "example.com",
-                                }
-                            ],
-                            "attempted_count": 2,
-                            "success_count": 1,
-                            "failed_count": 1,
-                        },
-                    )
-                ],
-            ),
-        ]
-    )
-
-    funnel = parsed["source_funnel"]
-    assert funnel["specialist_read_auto_appended_url_count"] == 0
-    assert funnel["specialist_read_omitted_url_count"] == 0
-    assert funnel["specialist_read_failed_sources"] == [
-        {
-            "url": failed,
-            "reason": "upstream HTTP 403",
-            "reason_bucket": "http_403",
-        }
-    ]
-    assert funnel["specialist_read_failure_reason_counts"] == {"http_403": 1}
-    assert funnel["grounding_urls_not_attempted"] == [omitted]
-
-
-def test_parse_run_uses_requested_url_for_resolved_reader_attempts():
-    requested = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc"
-    resolved = "https://example.com/article"
-
-    parsed = parse_run(
-        [
-            _event(
-                author="market_landscape",
-                grounding_chunks=[
-                    {
-                        "uri": requested,
-                        "title": "Article",
-                        "domain": "example.com",
-                    }
-                ],
-            ),
-            _event(
-                author="market_landscape",
-                function_calls=[("read_web_pages", {"urls": [requested]})],
-                function_responses=[
-                    (
-                        "read_web_pages",
-                        {
-                            "status": "success",
-                            "results": [
-                                {
-                                    "status": "success",
-                                    "url": requested,
-                                    "retrieved_url": resolved,
-                                    "content": "# Article\n\nText",
-                                }
-                            ],
-                            "sources": [
-                                {
-                                    "url": resolved,
-                                    "title": "Article",
-                                    "domain": "example.com",
-                                }
-                            ],
-                            "success_count": 1,
-                        },
-                    )
-                ],
-            ),
-        ]
-    )
-
-    funnel = parsed["source_funnel"]
-    assert funnel["grounding_urls_attempted_by_specialists_count"] == 1
-    assert funnel["specialist_read_successful_urls"] == [resolved]
-    assert funnel["specialist_read_returned_source_urls"] == [resolved]
-    assert funnel["specialist_read_attempted_urls_not_captured"] == []
-
-
-def test_parse_run_counts_specialists_without_reads():
-    parsed = parse_run(
-        [
-            _event(
-                author="market_landscape",
-                grounding_chunks=[
-                    {"uri": "https://example.com/a", "title": "A", "domain": "example.com"}
-                ],
-                state_delta={"market_result": "Market report"},
-            )
-        ]
-    )
-
-    funnel = parsed["source_funnel"]
-    assert funnel["specialist_read_call_count"] == 0
-    assert funnel["grounding_urls_not_attempted"] == ["https://example.com/a"]
-    row = next(row for row in funnel["specialists"] if row["key"] == "market_landscape")
-    assert row["grounding_url_count"] == 1
-    assert row["read_call_count"] == 0
-
-
-def test_parse_run_separates_noop_read_calls_from_effective_read_calls():
-    parsed = parse_run(
-        [
-            _event(
-                author="market_landscape",
-                function_calls=[("read_public_pages", {"urls": []})],
-                function_responses=[
-                    (
-                        "read_public_pages",
-                        {
-                            "status": "error",
-                            "error_message": "urls is empty",
-                        },
-                    )
-                ],
-            )
-        ]
-    )
-
-    funnel = parsed["source_funnel"]
-    assert funnel["specialist_read_tool_call_count"] == 1
-    assert funnel["specialist_read_call_count"] == 0
-    assert funnel["specialist_read_effective_call_count"] == 0
-    assert funnel["specialist_read_noop_call_count"] == 1
-    row = next(row for row in funnel["specialists"] if row["key"] == "market_landscape")
-    assert row["read_tool_call_count"] == 1
-    assert row["read_call_count"] == 0
-    assert row["noop_read_call_count"] == 1
-
-
-def test_parse_run_expands_top_level_reader_errors_across_requested_urls():
-    urls = [
-        "https://example.com/a",
-        "https://example.com/b",
-        "https://example.com/c",
-    ]
-
-    parsed = parse_run(
-        [
-            _event(
-                author="market_landscape",
-                function_calls=[("read_web_pages", {"urls": urls})],
-                function_responses=[
-                    (
-                        "read_web_pages",
-                        {
-                            "status": "error",
-                            "error_message": "Timeout reading pages with URL Context",
-                        },
-                    )
-                ],
-            )
-        ]
-    )
-
-    funnel = parsed["source_funnel"]
-    assert funnel["specialist_read_requested_url_count"] == 3
-    assert funnel["specialist_read_attempted_url_count"] == 3
-    assert funnel["specialist_read_failed_url_count"] == 3
-    assert funnel["specialist_read_failure_reason_counts"] == {"timeout": 3}
-    assert [item["url"] for item in funnel["specialist_read_failed_sources"]] == urls
-
-
-def test_parse_run_excludes_non_specialist_grounding_from_read_funnel():
-    lead_url = "https://example.com/lead"
-    specialist_url = "https://example.com/specialist"
-
+def test_parse_run_collects_dispatch_tokens_and_outputs():
     parsed = parse_run(
         [
             _event(
                 author="research_lead",
-                grounding_chunks=[
-                    {"uri": lead_url, "title": "Lead", "domain": "example.com"}
-                ],
+                function_calls=[("market_landscape", {})],
             ),
             _event(
                 author="market_landscape",
-                grounding_chunks=[
-                    {
-                        "uri": specialist_url,
-                        "title": "Specialist",
-                        "domain": "example.com",
-                    }
-                ],
-                state_delta={"market_result": "Market report"},
+                state_delta={"market_result": "findings"},
             ),
         ]
     )
 
-    assert [source["url"] for source in parsed["drawer_sources"]] == [
-        lead_url,
-        specialist_url,
-    ]
-    funnel = parsed["source_funnel"]
-    assert funnel["grounding_entry_url_count"] == 1
-    assert funnel["captured_source_url_count"] == 1
-    assert funnel["grounding_urls_not_attempted"] == [specialist_url]
-    assert lead_url not in funnel["grounding_urls_not_attempted"]
+    assert parsed["specialists_dispatched"] == ["market_landscape"]
+    assert parsed["specialist_outputs"] == {"market_result": "findings"}
+    assert parsed["tool_call_counts"] == {"market_landscape": 1}
+    assert parsed["final_outcome"] == "unknown"

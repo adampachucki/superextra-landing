@@ -30,8 +30,9 @@
  * status='error' atomically inside a `currentRunId`-fenced transaction.
  */
 
-import { GoogleAuth } from 'google-auth-library';
 import { FieldValue } from 'firebase-admin/firestore';
+
+import { getVertexAccessToken } from './vertex-auth.js';
 
 const VERTEX_BASE = 'https://us-central1-aiplatform.googleapis.com';
 
@@ -55,19 +56,6 @@ function getResource() {
 		);
 	}
 	return fromEnv;
-}
-
-let _auth = null;
-async function _getToken() {
-	if (_auth === null) {
-		_auth = new GoogleAuth({
-			scopes: ['https://www.googleapis.com/auth/cloud-platform']
-		});
-	}
-	const client = await _auth.getClient();
-	const { token } = await client.getAccessToken();
-	if (!token) throw new Error('failed to obtain access token');
-	return token;
 }
 
 /**
@@ -109,7 +97,7 @@ async function _doHandoff({
 	createEngineSession,
 	seedState
 }) {
-	const token = await _getToken();
+	const token = await getVertexAccessToken();
 	const adkSid = engineSessionId || `se-${sid}`;
 	const headers = {
 		Authorization: `Bearer ${token}`,

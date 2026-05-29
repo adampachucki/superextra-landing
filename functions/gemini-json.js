@@ -1,21 +1,7 @@
-import { GoogleAuth } from 'google-auth-library';
+import { getVertexAccessToken } from './vertex-auth.js';
 
 const VERTEX_BASE = 'https://aiplatform.googleapis.com';
 const MODEL = 'gemini-2.5-flash-lite';
-
-let _auth = null;
-
-async function _getToken() {
-	if (_auth === null) {
-		_auth = new GoogleAuth({
-			scopes: ['https://www.googleapis.com/auth/cloud-platform']
-		});
-	}
-	const client = await _auth.getClient();
-	const { token } = await client.getAccessToken();
-	if (!token) throw new Error('failed to obtain access token');
-	return token;
-}
 
 function _projectId() {
 	return process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'superextra-site';
@@ -40,7 +26,7 @@ export async function generateGeminiJson({
 	maxOutputTokens,
 	errorName,
 	fetchImpl = fetch,
-	getToken = _getToken
+	getToken = getVertexAccessToken
 }) {
 	const token = await getToken();
 	const response = await fetchImpl(modelUrl(), {

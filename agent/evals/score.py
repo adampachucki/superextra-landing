@@ -351,8 +351,8 @@ async def _score_with_gemini(run: dict) -> dict:
 async def _score_file(path: Path, no_judge: bool, venue_own: dict[str, set[str]]) -> dict:
     run = json.loads(path.read_text())
 
-    # Phase 1 evidence set: union of grounding entries + fetched URLs + provider pills.
-    # Grounding entries carry real domain from web.domain; fetched URLs parse directly.
+    # Phase 1 evidence set: union of grounding entries + provider pills.
+    # Grounding entries carry real domain from web.domain.
     p1_entries: list[dict] = []
     seen: set[str] = set()
     for e in run.get("grounding_entries") or []:
@@ -360,10 +360,6 @@ async def _score_file(path: Path, no_judge: bool, venue_own: dict[str, set[str]]
         if url and url not in seen:
             seen.add(url)
             p1_entries.append({"url": url, "domain": e.get("domain")})
-    for url in run.get("fetched_urls") or []:
-        if url and url not in seen:
-            seen.add(url)
-            p1_entries.append({"url": url, "domain": _domain_of(url)})
     for p in run.get("provider_pills") or []:
         url = p.get("url")
         if url and url not in seen:
