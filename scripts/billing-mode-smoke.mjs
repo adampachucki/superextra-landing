@@ -119,7 +119,7 @@ async function checkoutSmoke({ mode, market, stripe, idToken, returnPath }) {
 	return {
 		sessionId: session.id,
 		customerId,
-		customerCountry: customer && !customer.deleted ? customer.address?.country : null,
+		customerCountry: customer && !customer.deleted ? (customer.address?.country ?? null) : null,
 		livemode: session.livemode,
 		mode: session.mode,
 		currency: session.currency,
