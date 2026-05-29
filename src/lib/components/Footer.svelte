@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { theme } from '$lib/theme.svelte';
+	import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	let { borderless = false }: { borderless?: boolean } = $props();
@@ -130,6 +131,8 @@
 								>
 							{/if}
 						</button>
+						<span class="h-4 w-px bg-black/10 dark:bg-white/10"></span>
+						<LocaleSwitcher dropUp />
 					</div>
 					<div class="flex items-center gap-2 md:hidden">
 						<span class="text-xs text-black/40 dark:text-white/40">Supported by</span>

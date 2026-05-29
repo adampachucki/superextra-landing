@@ -5,6 +5,7 @@
 	import PromptIcon from '$lib/components/restaurants/PromptIcon.svelte';
 	import RestaurantPromptComposer from '$lib/components/restaurants/RestaurantPromptComposer.svelte';
 	import AccountMenu from '$lib/components/agent/AccountMenu.svelte';
+	import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { auth } from '$lib/auth.svelte';
@@ -617,10 +618,12 @@
 				class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70"
 				>{m.footer_terms()}</a
 			>
-			<button
-				onclick={() => theme.cycle()}
-				class="ml-auto text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
-				aria-label={m.footer_toggle_theme()}
+			<div class="ml-auto flex items-center gap-3">
+				<LocaleSwitcher dropUp />
+				<button
+					onclick={() => theme.cycle()}
+					class="text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+					aria-label={m.footer_toggle_theme()}
 			>
 				{#if theme.mode === 'dark'}
 					<svg
@@ -661,7 +664,8 @@
 						/></svg
 					>
 				{/if}
-			</button>
+				</button>
+			</div>
 		</div>
 		<p class="mt-2 text-[11px] text-black/35 dark:text-white/35">
 			&copy; {new Date().getFullYear()} Superextra

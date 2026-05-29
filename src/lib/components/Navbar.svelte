@@ -4,7 +4,6 @@
 	import { chatState } from '$lib/chat-state.svelte';
 	import { auth } from '$lib/auth.svelte';
 	import AccountMenu from '$lib/components/agent/AccountMenu.svelte';
-	import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
 	import * as m from '$lib/paraglide/messages';
 	import { onMount } from 'svelte';
 
@@ -151,7 +150,6 @@
 					</button>
 				{/if}
 			{/if}
-			<LocaleSwitcher {over} />
 			<button
 				onclick={() => formState.open()}
 				class="btn-primary px-5 py-2 text-sm whitespace-nowrap">{m.nav_book_demo()}</button
@@ -174,7 +172,6 @@
 					</button>
 				{/if}
 			{/if}
-			<LocaleSwitcher {over} />
 			<button
 				onclick={() => formState.open()}
 				class="btn-primary px-4 py-1.5 text-sm whitespace-nowrap">{m.nav_book_demo()}</button

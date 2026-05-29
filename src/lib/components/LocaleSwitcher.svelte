@@ -4,7 +4,9 @@
 	import * as m from '$lib/paraglide/messages';
 
 	// `over` matches the nav's transparent-hero state (white text on a dark image).
-	let { over = false }: { over?: boolean } = $props();
+	// `dropUp` opens the menu above the trigger — for footer/sidebar placements
+	// that sit at the bottom of their container.
+	let { over = false, dropUp = false }: { over?: boolean; dropUp?: boolean } = $props();
 
 	let open = $state(false);
 
@@ -57,7 +59,9 @@
 
 	{#if open}
 		<ul
-			class="absolute right-0 z-50 mt-2 min-w-[8rem] overflow-hidden rounded-lg border border-cream-200 bg-cream py-1 shadow-lg"
+			class="absolute right-0 z-50 min-w-[8rem] overflow-hidden rounded-lg border border-cream-200 bg-cream py-1 shadow-lg {dropUp
+				? 'bottom-full mb-2'
+				: 'top-full mt-2'}"
 			role="listbox"
 		>
 			{#each locales as locale (locale)}
