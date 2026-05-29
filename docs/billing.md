@@ -64,6 +64,9 @@ registration for the selected Stripe mode.
 
 The customer-facing Stripe product is **Superextra Pro**. The price lookup key
 remains `superextra_unlimited_monthly` as the stable internal billing identifier.
+Checkout prices are tax-inclusive: Poland is 19 PLN/month, the United Kingdom
+is 9 GBP/month, the United States is 9 USD/month, and Germany plus the fallback
+market are 9 EUR/month.
 
 ## Smoke Test
 
@@ -74,10 +77,10 @@ GOOGLE_CLOUD_QUOTA_PROJECT=superextra-site node scripts/billing-mode-smoke.mjs
 ```
 
 The smoke creates a disposable verified `@superextra.ai` Firebase user, creates
-one test Checkout Session and one live Checkout Session, verifies test EUR
-pricing and live PLN pricing, verifies Customer Portal creation in both modes,
-then deletes the disposable Stripe customers and Firebase user. It does not
-submit a card or charge money.
+test and live Checkout Sessions, verifies UK GBP pricing, fallback EUR pricing,
+live PLN pricing, Customer Portal creation in both modes, then deletes the
+disposable Stripe customers and Firebase user. It does not submit a card or
+charge money.
 
 Secrets used by the deployed functions:
 

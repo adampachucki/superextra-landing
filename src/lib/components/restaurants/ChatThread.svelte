@@ -306,7 +306,7 @@
 								class="mr-auto inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full bg-black px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
 							>
 								<span>Upgrade to Pro</span>
-								<span class="text-white/60 dark:text-black/50">19 PLN / 9 EUR / $9</span>
+								<span class="text-white/60 dark:text-black/50">19 PLN / 9 EUR / £9 / $9</span>
 							</button>
 						{/if}
 						<MessageFeedback

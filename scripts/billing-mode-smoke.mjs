@@ -140,67 +140,106 @@ async function main() {
 	const email = `${uid}@superextra.ai`;
 	const auth = admin.auth();
 	const db = admin.firestore();
-	let liveCustomerId = null;
-	let testCustomerId = null;
+	const liveCustomerIds = new Set();
+	const testCustomerIds = new Set();
 
 	try {
 		await auth.createUser({ uid, email, emailVerified: true });
 		const idToken = await idTokenFor(uid);
 
-		const test = await checkoutSmoke({
+		const testUk = await checkoutSmoke({
 			mode: 'test',
-			market: 'de',
+			market: 'gb',
 			stripe: testStripe,
 			idToken,
 			returnPath: '/chat?sid=smoke-test&billing=success&session_id=old'
 		});
-		testCustomerId = test.customerId;
+		if (testUk.customerId) testCustomerIds.add(testUk.customerId);
 
-		const live = await checkoutSmoke({
+		const testFallback = await checkoutSmoke({
+			mode: 'test',
+			market: 'other',
+			stripe: testStripe,
+			idToken,
+			returnPath: '/chat?sid=smoke-test-fallback'
+		});
+		if (testFallback.customerId) testCustomerIds.add(testFallback.customerId);
+
+		const livePl = await checkoutSmoke({
 			mode: 'live',
 			market: 'pl',
 			stripe: liveStripe,
 			idToken,
 			returnPath: '/chat?sid=smoke-live'
 		});
-		liveCustomerId = live.customerId;
+		if (livePl.customerId) liveCustomerIds.add(livePl.customerId);
 
-		if (test.livemode !== false || test.currency !== 'eur' || test.amountTotal !== 900) {
-			throw new Error(`Unexpected test checkout session: ${JSON.stringify(test)}`);
-		}
-		if (live.livemode !== true || live.currency !== 'pln' || live.amountTotal !== 1900) {
-			throw new Error(`Unexpected live checkout session: ${JSON.stringify(live)}`);
-		}
-		if (test.productName !== 'Superextra Pro') {
-			throw new Error(`Unexpected test product name: ${JSON.stringify(test)}`);
-		}
-		if (live.productName !== 'Superextra Pro') {
-			throw new Error(`Unexpected live product name: ${JSON.stringify(live)}`);
-		}
-		if (test.customerCountry !== 'DE') {
-			throw new Error(`Unexpected test customer country: ${JSON.stringify(test)}`);
-		}
-		if (live.customerCountry !== 'PL') {
-			throw new Error(`Unexpected live customer country: ${JSON.stringify(live)}`);
+		const liveFallback = await checkoutSmoke({
+			mode: 'live',
+			market: 'other',
+			stripe: liveStripe,
+			idToken,
+			returnPath: '/chat?sid=smoke-live-fallback'
+		});
+		if (liveFallback.customerId) liveCustomerIds.add(liveFallback.customerId);
+
+		if (testUk.livemode !== false || testUk.currency !== 'gbp' || testUk.amountTotal !== 900) {
+			throw new Error(`Unexpected test UK checkout session: ${JSON.stringify(testUk)}`);
 		}
 		if (
-			test.successUrl !==
+			testFallback.livemode !== false ||
+			testFallback.currency !== 'eur' ||
+			testFallback.amountTotal !== 900
+		) {
+			throw new Error(`Unexpected test fallback checkout session: ${JSON.stringify(testFallback)}`);
+		}
+		if (livePl.livemode !== true || livePl.currency !== 'pln' || livePl.amountTotal !== 1900) {
+			throw new Error(`Unexpected live PL checkout session: ${JSON.stringify(livePl)}`);
+		}
+		if (
+			liveFallback.livemode !== true ||
+			liveFallback.currency !== 'eur' ||
+			liveFallback.amountTotal !== 900
+		) {
+			throw new Error(`Unexpected live fallback checkout session: ${JSON.stringify(liveFallback)}`);
+		}
+		for (const session of [testUk, testFallback, livePl, liveFallback]) {
+			if (session.productName !== 'Superextra Pro') {
+				throw new Error(`Unexpected product name: ${JSON.stringify(session)}`);
+			}
+		}
+		if (testUk.customerCountry !== 'GB') {
+			throw new Error(`Unexpected test UK customer country: ${JSON.stringify(testUk)}`);
+		}
+		if (testFallback.customerCountry !== null) {
+			throw new Error(`Unexpected test fallback customer country: ${JSON.stringify(testFallback)}`);
+		}
+		if (livePl.customerCountry !== 'PL') {
+			throw new Error(`Unexpected live PL customer country: ${JSON.stringify(livePl)}`);
+		}
+		if (liveFallback.customerCountry !== null) {
+			throw new Error(`Unexpected live fallback customer country: ${JSON.stringify(liveFallback)}`);
+		}
+		if (
+			testUk.successUrl !==
 			`${BASE_URL}/chat?sid=smoke-test&billingMode=test&billing=success&session_id={CHECKOUT_SESSION_ID}`
 		) {
-			throw new Error(`Unexpected test success URL: ${test.successUrl}`);
+			throw new Error(`Unexpected test UK success URL: ${testUk.successUrl}`);
 		}
 		if (
-			live.successUrl !==
+			livePl.successUrl !==
 			`${BASE_URL}/chat?sid=smoke-live&billing=success&session_id={CHECKOUT_SESSION_ID}`
 		) {
-			throw new Error(`Unexpected live success URL: ${live.successUrl}`);
+			throw new Error(`Unexpected live PL success URL: ${livePl.successUrl}`);
 		}
 
-		process.stdout.write(`${JSON.stringify({ ok: true, uid, test, live }, null, 2)}\n`);
+		process.stdout.write(
+			`${JSON.stringify({ ok: true, uid, testUk, testFallback, livePl, liveFallback }, null, 2)}\n`
+		);
 	} finally {
 		await Promise.allSettled([
-			liveCustomerId ? liveStripe.customers.del(liveCustomerId) : null,
-			testCustomerId ? testStripe.customers.del(testCustomerId) : null,
+			...[...liveCustomerIds].map((customerId) => liveStripe.customers.del(customerId)),
+			...[...testCustomerIds].map((customerId) => testStripe.customers.del(customerId)),
 			db.collection('users').doc(uid).delete(),
 			auth.deleteUser(uid)
 		]);

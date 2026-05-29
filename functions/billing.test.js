@@ -35,16 +35,27 @@ mock.module('firebase-admin/firestore', {
 const { _billingTesting } = await import('./billing.js');
 
 describe('billing helpers', () => {
-	it('normalizes unsupported markets to the USD fallback', () => {
+	it('normalizes unsupported markets to the EUR fallback market', () => {
 		assert.equal(_billingTesting.normalizeMarket('pl'), 'pl');
 		assert.equal(_billingTesting.normalizeMarket('de'), 'de');
+		assert.equal(_billingTesting.normalizeMarket('gb'), 'gb');
 		assert.equal(_billingTesting.normalizeMarket('xx'), 'other');
 		assert.equal(_billingTesting.normalizeMarket(undefined), 'other');
+	});
+
+	it('maps markets to Checkout currencies', () => {
+		assert.equal(_billingTesting.currencyForMarket('pl'), 'pln');
+		assert.equal(_billingTesting.currencyForMarket('de'), 'eur');
+		assert.equal(_billingTesting.currencyForMarket('gb'), 'gbp');
+		assert.equal(_billingTesting.currencyForMarket('us'), 'usd');
+		assert.equal(_billingTesting.currencyForMarket('other'), 'eur');
+		assert.equal(_billingTesting.currencyForMarket('xx'), 'eur');
 	});
 
 	it('maps supported markets to Stripe billing country defaults', () => {
 		assert.equal(_billingTesting.billingCountryForMarket('pl'), 'PL');
 		assert.equal(_billingTesting.billingCountryForMarket('de'), 'DE');
+		assert.equal(_billingTesting.billingCountryForMarket('gb'), 'GB');
 		assert.equal(_billingTesting.billingCountryForMarket('us'), 'US');
 		assert.equal(_billingTesting.billingCountryForMarket('other'), null);
 	});

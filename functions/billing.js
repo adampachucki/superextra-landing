@@ -24,12 +24,14 @@ const CHECKOUT_ALLOWED_ORIGINS = new Set(['https://agent.superextra.ai', 'http:/
 const MARKET_TO_CURRENCY = {
 	us: 'usd',
 	pl: 'pln',
+	gb: 'gbp',
 	de: 'eur',
-	other: 'usd'
+	other: 'eur'
 };
 const MARKET_TO_BILLING_COUNTRY = {
 	us: 'US',
 	pl: 'PL',
+	gb: 'GB',
 	de: 'DE'
 };
 
@@ -114,6 +116,10 @@ function requestBaseUrl(req) {
 
 function normalizeMarket(value) {
 	return Object.hasOwn(MARKET_TO_CURRENCY, value) ? value : 'other';
+}
+
+function currencyForMarket(market) {
+	return MARKET_TO_CURRENCY[market] || MARKET_TO_CURRENCY.other;
 }
 
 function billingCountryForMarket(market) {
@@ -319,9 +325,8 @@ async function getOrCreateCustomer(user, config) {
 
 async function prefillCustomerBillingCountry(customerId, market, config) {
 	const country = billingCountryForMarket(market);
-	if (!country) return;
 	await stripe(config).customers.update(customerId, {
-		address: { country }
+		address: country ? { country } : ''
 	});
 }
 
@@ -458,7 +463,7 @@ function createCheckoutFunction(config) {
 		if (!requireBillingModeAccess(config, user, res)) return;
 
 		const market = normalizeMarket(req.body?.market);
-		const currency = MARKET_TO_CURRENCY[market];
+		const currency = currencyForMarket(market);
 		const returnPath = normalizeReturnPath(req.body?.returnPath, config);
 		const userRef = db().collection('users').doc(user.uid);
 		const userSnap = await userRef.get();
@@ -687,6 +692,7 @@ export const _billingTesting = {
 	LIVE_BILLING,
 	TEST_BILLING,
 	normalizeMarket,
+	currencyForMarket,
 	billingCountryForMarket,
 	normalizeReturnPath,
 	checkoutReturnUrl,

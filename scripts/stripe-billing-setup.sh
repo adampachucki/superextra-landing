@@ -173,6 +173,8 @@ if [[ -n "$PRICE_ID" ]]; then
 	price_out="$(api_raw prices update "$PRICE_ID" \
 		-d 'currency_options[eur][unit_amount]=900' \
 		-d 'currency_options[eur][tax_behavior]=inclusive' \
+		-d 'currency_options[gbp][unit_amount]=900' \
+		-d 'currency_options[gbp][tax_behavior]=inclusive' \
 		-d 'currency_options[pln][unit_amount]=1900' \
 		-d 'currency_options[pln][tax_behavior]=inclusive')"
 else
@@ -191,6 +193,8 @@ if jq -e '.error' >/dev/null <<<"$price_out"; then
 		--transfer-lookup-key true \
 		-d 'currency_options[eur][unit_amount]=900' \
 		-d 'currency_options[eur][tax_behavior]=inclusive' \
+		-d 'currency_options[gbp][unit_amount]=900' \
+		-d 'currency_options[gbp][tax_behavior]=inclusive' \
 		-d 'currency_options[pln][unit_amount]=1900' \
 		-d 'currency_options[pln][tax_behavior]=inclusive')"
 	PRICE_ID="$(jq -r '.id' <<<"$price_out")"

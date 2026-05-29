@@ -4,7 +4,7 @@ import { auth } from '$lib/auth.svelte';
 import { getFirebase } from '$lib/firebase';
 import { resolveSupportedBrowserCountry } from '$lib/browser-country';
 
-export type BillingMarket = 'us' | 'pl' | 'de' | 'other';
+export type BillingMarket = 'us' | 'pl' | 'gb' | 'de' | 'other';
 export type BillingMode = 'live' | 'test';
 export type BillingStatus =
 	| 'none'
@@ -23,7 +23,7 @@ export interface BillingSnapshot {
 	livePlan: 'free' | 'paid';
 	status: BillingStatus;
 	market: BillingMarket | null;
-	currency: 'usd' | 'pln' | 'eur' | null;
+	currency: 'usd' | 'pln' | 'gbp' | 'eur' | null;
 	currentPeriodEndMs: number | null;
 	cancelAtPeriodEnd: boolean;
 	stripeCustomerId: string | null;
@@ -45,12 +45,13 @@ export interface BillingConfirmResult {
 export const billingMarkets: {
 	id: BillingMarket;
 	label: string;
-	currency: 'usd' | 'pln' | 'eur';
+	currency: 'usd' | 'pln' | 'gbp' | 'eur';
 }[] = [
 	{ id: 'pl', label: 'Poland', currency: 'pln' },
 	{ id: 'de', label: 'Germany', currency: 'eur' },
+	{ id: 'gb', label: 'United Kingdom', currency: 'gbp' },
 	{ id: 'us', label: 'United States', currency: 'usd' },
-	{ id: 'other', label: 'Other country', currency: 'usd' }
+	{ id: 'other', label: 'Other country', currency: 'eur' }
 ];
 
 const BILLING_MODE_STORAGE_KEY = 'superextra.billingMode';
@@ -100,8 +101,8 @@ function toMillis(value: unknown): number | null {
 }
 
 function preferredMarket(): BillingMarket {
-	const code = resolveSupportedBrowserCountry(['pl', 'de', 'us'], 'other');
-	return code === 'pl' || code === 'de' || code === 'us' ? code : 'other';
+	const code = resolveSupportedBrowserCountry(['pl', 'de', 'gb', 'us'], 'other');
+	return code === 'pl' || code === 'de' || code === 'gb' || code === 'us' ? code : 'other';
 }
 
 function billingMarketOptions() {
