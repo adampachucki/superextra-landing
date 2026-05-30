@@ -51,8 +51,6 @@
 			</dd>
 		</div>
 	</dl>
-
-	<p class="mt-10 text-xs text-black/40 dark:text-white/40">{m.imprint_responsible_note()}</p>
 </article>
 
 <Footer />
