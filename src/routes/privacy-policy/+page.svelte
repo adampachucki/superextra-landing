@@ -9,29 +9,34 @@
 	description="Superextra Privacy Policy covering data collection, usage, protection, and retention."
 	canonicalPath="/privacy-policy"
 	localized={false}
+	origin="https://landing.superextra.ai"
 />
 
 <Navbar />
 
 <article class="mx-auto max-w-[720px] px-6 pt-32 pb-20">
 	<h1 class="text-3xl font-medium tracking-tight text-black dark:text-white">Privacy Policy</h1>
-	<p class="mt-2 text-sm text-black/40 dark:text-white/40">Last updated: April 23, 2026</p>
+	<p class="mt-2 text-sm text-black/40 dark:text-white/40">Last updated: May 30, 2026</p>
 
 	<div
 		class="prose prose-sm mt-10 max-w-none text-black/60 prose-neutral dark:text-white/60 dark:prose-invert prose-headings:font-medium prose-headings:text-black dark:prose-headings:text-white prose-h2:mt-10 prose-h2:mb-4 prose-h2:text-lg prose-p:leading-relaxed prose-a:text-black prose-a:underline dark:prose-a:text-white prose-li:leading-relaxed"
 	>
-		<h2>1. Introduction</h2>
+		<h2>1. Who we are</h2>
 		<p>
-			Superextra ("we", "our", or "us") operates the superextra.ai website and the Superextra
-			platform (collectively, the "Service"). This Privacy Policy explains how we collect, use,
-			disclose, and safeguard your information when you visit our website or use our Service.
+			Superextra is operated by <strong>PP2 Studio sp. z o.o.</strong>, a company registered in
+			Poland (ul. Żywiczna 9, 81-604 Gdynia; KRS 0001182088; NIP 5862419337). PP2 Studio sp. z o.o.
+			is the <strong>data controller</strong> for personal data processed through the Superextra
+			website and platform (collectively, the "Service"). Full company details are in our
+			<a href="/impressum">Legal Notice</a>.
 		</p>
 		<p>
-			By accessing or using the Service, you agree to this Privacy Policy. If you do not agree,
-			please do not use the Service.
+			This Privacy Policy explains how we collect, use, disclose, and safeguard personal data when
+			you use the Service. We process personal data in accordance with the EU General Data
+			Protection Regulation (GDPR) and applicable Polish law. For any privacy question, contact us
+			at <a href="mailto:privacy@superextra.ai">privacy@superextra.ai</a>.
 		</p>
 
-		<h2>2. Information We Collect</h2>
+		<h2>2. Information we collect</h2>
 		<h3>Information you provide</h3>
 		<ul>
 			<li>
@@ -39,12 +44,12 @@
 				access or create an account.
 			</li>
 			<li>
-				<strong>Communications</strong> — any information you include when you contact us via email or
+				<strong>Communications</strong> — any information you include when you contact us by email or
 				through the website.
 			</li>
 			<li>
-				<strong>Payment information</strong> — billing details processed by our third-party payment provider.
-				We do not store full payment card numbers.
+				<strong>Payment information</strong> — billing details processed by our payment provider. We do
+				not store full payment card numbers.
 			</li>
 		</ul>
 
@@ -55,30 +60,44 @@
 				the Service.
 			</li>
 			<li>
-				<strong>Device & browser data</strong> — IP address, browser type, operating system, device identifiers,
-				and referring URLs.
+				<strong>Device &amp; browser data</strong> — IP address, browser type, operating system, device
+				identifiers, and referring URLs.
 			</li>
 			<li>
-				<strong>Cookies & similar technologies</strong> — we use essential cookies to operate the Service
-				and analytics cookies to understand usage patterns. See Section 7 for details.
+				<strong>Cookies &amp; similar technologies</strong> — see Section 7.
 			</li>
 		</ul>
 
-		<h2>3. How We Use Your Information</h2>
-		<p>We use the information we collect to:</p>
+		<h2>3. How we use your information, and our legal bases</h2>
+		<p>Under the GDPR, we rely on the following legal bases (Article 6):</p>
 		<ul>
-			<li>Provide, maintain, and improve the Service.</li>
-			<li>Process your access request and manage your account.</li>
-			<li>Send transactional emails (e.g., confirmations, security alerts).</li>
 			<li>
-				Send marketing communications, where you have opted in. You can unsubscribe at any time.
+				<strong
+					>To provide and maintain the Service, manage your account, and process your access request</strong
+				> — performance of a contract with you or steps taken at your request before entering a contract
+				(Art. 6(1)(b)).
 			</li>
-			<li>Analyze usage trends to improve features and user experience.</li>
-			<li>Detect, prevent, and address technical issues or fraudulent activity.</li>
-			<li>Comply with legal obligations.</li>
+			<li>
+				<strong>To send transactional emails</strong> (confirmations, security alerts) — performance of
+				a contract (Art. 6(1)(b)).
+			</li>
+			<li>
+				<strong
+					>To analyse usage, improve features, and keep the Service secure and free of fraud</strong
+				>
+				— our legitimate interests in operating and improving the Service (Art. 6(1)(f)).
+			</li>
+			<li>
+				<strong>To send marketing communications</strong> — your consent, which you can withdraw at any
+				time (Art. 6(1)(a)).
+			</li>
+			<li>
+				<strong>To comply with legal obligations</strong> (e.g. tax and accounting) — compliance with
+				a legal obligation (Art. 6(1)(c)).
+			</li>
 		</ul>
 
-		<h2>4. Chat Conversations</h2>
+		<h2>4. Chat conversations</h2>
 		<p>
 			When you use the Superextra chat (research conversations with our AI agent), each chat is
 			given a unique URL. A few things about how chats are stored and shared are worth calling out:
@@ -112,97 +131,103 @@
 			</li>
 		</ul>
 
-		<h2>5. How We Share Your Information</h2>
-		<p>We do not sell your personal information. We may share data with:</p>
-		<ul>
-			<li>
-				<strong>Service providers</strong> — hosting, analytics, email delivery, and payment processing
-				partners who act on our behalf and are contractually bound to protect your data.
-			</li>
-			<li>
-				<strong>Legal requirements</strong> — when required by law, regulation, legal process, or governmental
-				request.
-			</li>
-			<li>
-				<strong>Business transfers</strong> — in connection with a merger, acquisition, or sale of assets,
-				your information may be transferred as part of that transaction.
-			</li>
-		</ul>
-
-		<h2>6. Data Retention</h2>
+		<h2>5. How we share your information</h2>
 		<p>
-			We retain personal information for as long as your account is active or as needed to provide
-			the Service. We may also retain data as necessary to comply with legal obligations, resolve
-			disputes, and enforce agreements. When data is no longer needed, we securely delete or
-			anonymize it.
+			We do not sell your personal data. We share it only with service providers who process it on
+			our behalf as processors under a data processing agreement, and only as needed to run the
+			Service:
 		</p>
-
-		<h2>7. Data Security</h2>
-		<p>
-			We implement industry-standard technical and organizational measures to protect your
-			information, including encryption in transit (TLS) and at rest, access controls, and regular
-			security assessments. However, no method of transmission or storage is 100% secure, and we
-			cannot guarantee absolute security.
-		</p>
-
-		<h2>8. Cookies</h2>
-		<p>We use the following types of cookies:</p>
 		<ul>
+			<li><strong>Google Cloud / Vertex AI</strong> — hosting and AI processing of the agent.</li>
+			<li><strong>Firebase (Google)</strong> — website hosting, authentication, and database.</li>
+			<li><strong>Stripe</strong> — payment processing.</li>
+			<li><strong>Resend</strong> — delivery of transactional and intake email.</li>
 			<li>
-				<strong>Essential cookies</strong> — required for the Service to function (e.g., authentication,
-				security).
-			</li>
-			<li>
-				<strong>Analytics cookies</strong> — help us understand how visitors interact with the website
-				so we can improve it.
+				<strong>ElevenLabs</strong> — speech-to-text and text-to-speech for optional voice features.
 			</li>
 		</ul>
 		<p>
-			You can manage cookie preferences through your browser settings. Disabling essential cookies
-			may affect Service functionality.
+			We may also disclose data where required by law, regulation, or valid legal process, or in
+			connection with a merger, acquisition, or sale of assets.
 		</p>
 
-		<h2>9. Your Rights</h2>
-		<p>Depending on your jurisdiction, you may have the right to:</p>
+		<h2>6. Data retention</h2>
+		<p>
+			We keep personal data for as long as your account is active or as needed to provide the
+			Service. We retain data longer only where necessary to comply with legal obligations (such as
+			tax and accounting rules), resolve disputes, and enforce our agreements. When data is no
+			longer needed, we securely delete or anonymize it.
+		</p>
+
+		<h2>7. Cookies and similar technologies</h2>
+		<p>We use:</p>
 		<ul>
-			<li>Access the personal data we hold about you.</li>
-			<li>Request correction of inaccurate data.</li>
-			<li>Request deletion of your data.</li>
-			<li>Object to or restrict certain processing.</li>
-			<li>Data portability — receive your data in a structured, machine-readable format.</li>
-			<li>Withdraw consent at any time, where processing is based on consent.</li>
+			<li>
+				<strong>Essential cookies and local storage</strong> — required for the Service to function (e.g.,
+				authentication, security, and remembering preferences such as your theme and language).
+			</li>
+			<li>
+				<strong>Analytics cookies</strong> — to understand how visitors use the website so we can improve
+				it. You can block or delete cookies through your browser settings; disabling essential cookies
+				may affect how the Service works.
+			</li>
+		</ul>
+
+		<h2>8. Data security</h2>
+		<p>
+			We implement industry-standard technical and organizational measures to protect personal data,
+			including encryption in transit (TLS) and at rest and access controls. However, no method of
+			transmission or storage is completely secure, and we cannot guarantee absolute security.
+		</p>
+
+		<h2>9. International transfers</h2>
+		<p>
+			Some of our providers process data outside the European Economic Area, including in the United
+			States. Where that happens, we rely on appropriate safeguards under the GDPR — primarily the
+			European Commission's Standard Contractual Clauses, and adequacy decisions where they apply —
+			to protect your data.
+		</p>
+
+		<h2>10. Your rights</h2>
+		<p>Under the GDPR, you have the right to:</p>
+		<ul>
+			<li>access the personal data we hold about you;</li>
+			<li>request correction of inaccurate data;</li>
+			<li>request deletion ("right to be forgotten");</li>
+			<li>object to or request restriction of certain processing;</li>
+			<li>data portability — receive your data in a structured, machine-readable format;</li>
+			<li>withdraw consent at any time, where processing is based on consent.</li>
 		</ul>
 		<p>
 			To exercise these rights, contact us at <a href="mailto:privacy@superextra.ai"
 				>privacy@superextra.ai</a
-			>. We will respond within 30 days.
+			>. We will respond within one month, as required by the GDPR.
 		</p>
-
-		<h2>10. International Transfers</h2>
 		<p>
-			Your information may be transferred to and processed in countries other than your country of
-			residence. We ensure appropriate safeguards are in place, such as standard contractual
-			clauses, to protect your data in accordance with applicable law.
+			You also have the right to lodge a complaint with a supervisory authority. Our lead authority
+			is the Polish Personal Data Protection Office (Urząd Ochrony Danych Osobowych), ul. Stanisława
+			Moniuszki 1A, 00-014 Warszawa, Poland — and you may also complain to the authority in your
+			country of residence.
 		</p>
 
-		<h2>11. Children's Privacy</h2>
+		<h2>11. Children's privacy</h2>
 		<p>
-			The Service is not directed to individuals under 16. We do not knowingly collect personal
-			information from children. If we learn we have collected data from a child, we will delete it
-			promptly.
+			The Service is not directed to individuals under 16. We do not knowingly collect personal data
+			from children. If we learn we have collected data from a child, we will delete it promptly.
 		</p>
 
-		<h2>12. Changes to This Policy</h2>
+		<h2>12. Changes to this policy</h2>
 		<p>
-			We may update this Privacy Policy from time to time. We will notify you of material changes by
-			posting the updated policy on this page and updating the "Last updated" date. Continued use of
-			the Service after changes constitutes acceptance of the revised policy.
+			We may update this Privacy Policy from time to time. We will post the updated policy on this
+			page and update the "Last updated" date, and will notify you of material changes. Continued
+			use of the Service after changes take effect constitutes acceptance of the revised policy.
 		</p>
 
-		<h2>13. Contact Us</h2>
+		<h2>13. Contact us</h2>
 		<p>If you have questions about this Privacy Policy, please contact us at:</p>
 		<p>
-			Superextra<br />
+			PP2 Studio sp. z o.o.<br />
+			ul. Żywiczna 9, 81-604 Gdynia, Poland<br />
 			Email: <a href="mailto:privacy@superextra.ai">privacy@superextra.ai</a>
 		</p>
 	</div>

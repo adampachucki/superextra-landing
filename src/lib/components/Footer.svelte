@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { theme } from '$lib/theme.svelte';
 	import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
+	import { getLocale, localizeHref } from '$lib/paraglide/runtime';
 	import * as m from '$lib/paraglide/messages';
 
 	let { borderless = false }: { borderless?: boolean } = $props();
@@ -58,12 +59,24 @@
 						</div>
 						<span class="mx-2 hidden h-4 w-px bg-black/10 md:block dark:bg-white/10"></span>
 						<!-- Text links -->
-						<div class="flex items-center gap-6">
+						<div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
 							<a
 								href="/memo"
 								class="text-sm text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
 								>Memo</a
 							>
+							<a
+								href={localizeHref('/contact')}
+								class="text-sm text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+								>{m.footer_contact()}</a
+							>
+							{#if getLocale() === 'de'}
+								<a
+									href={localizeHref('/impressum')}
+									class="text-sm text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
+									>{m.footer_impressum()}</a
+								>
+							{/if}
 							<a
 								href="/privacy-policy"
 								class="text-sm text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"

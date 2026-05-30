@@ -17,7 +17,17 @@ const config = {
 			// explicitly so every one is emitted at build time. App routes
 			// (/chat, /login) and English-only pages (/memo, /privacy-policy,
 			// /terms) stay unprefixed and are not localized yet.
-			entries: ['*', '/de', '/pl', '/de/landing', '/pl/landing']
+			entries: [
+				'*',
+				'/de',
+				'/pl',
+				'/de/landing',
+				'/pl/landing',
+				'/de/impressum',
+				'/pl/impressum',
+				'/de/contact',
+				'/pl/contact'
+			]
 		}
 	}
 };
