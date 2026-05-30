@@ -9,7 +9,6 @@
 	description="Superextra Privacy Policy covering data collection, usage, protection, and retention."
 	canonicalPath="/privacy-policy"
 	localized={false}
-	origin="https://landing.superextra.ai"
 />
 
 <Navbar />

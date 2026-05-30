@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { getLocale, locales, localizeHref, baseLocale } from '$lib/paraglide/runtime';
 
+	// agent.superextra.ai is the canonical, indexable domain (the landing site is
+	// noindex). All canonicals point here, regardless of which host serves the page.
+	const origin = 'https://agent.superextra.ai';
+
 	// OpenGraph locale tags per app locale.
 	const OG_LOCALE: Record<string, string> = {
 		en: 'en_US',
@@ -15,18 +19,13 @@
 		robots = 'index, follow',
 		// English-only pages (memo, legal, app shell) set this false: no hreflang
 		// alternates are emitted and the canonical is the plain unprefixed path.
-		localized = true,
-		// Marketing/legal pages live on landing.superextra.ai; the app shell
-		// defaults to agent.superextra.ai. Override per page so canonicals point
-		// at the domain that actually serves the content.
-		origin = 'https://agent.superextra.ai'
+		localized = true
 	}: {
 		title: string;
 		description: string;
 		canonicalPath?: string;
 		robots?: string;
 		localized?: boolean;
-		origin?: string;
 	} = $props();
 
 	// Canonical points at the current locale's URL; alternates cover every locale

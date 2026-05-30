@@ -9,7 +9,6 @@
 	description="Superextra Terms & Conditions governing access to and use of the platform."
 	canonicalPath="/terms"
 	localized={false}
-	origin="https://landing.superextra.ai"
 />
 
 <Navbar />

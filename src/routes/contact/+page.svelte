@@ -6,12 +6,7 @@
 	import * as m from '$lib/paraglide/messages';
 </script>
 
-<Seo
-	title={m.contact_seo_title()}
-	description={m.contact_seo_desc()}
-	canonicalPath="/contact"
-	origin="https://landing.superextra.ai"
-/>
+<Seo title={m.contact_seo_title()} description={m.contact_seo_desc()} canonicalPath="/contact" />
 
 <Navbar />
 

@@ -83,7 +83,7 @@
 >
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
 		<a
-			href={minimal ? '/' : '/landing'}
+			href={minimal ? '/' : 'https://agent.superextra.ai'}
 			onclick={(e) => {
 				if (!minimal) return;
 				e.preventDefault();

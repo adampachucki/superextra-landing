@@ -17,12 +17,7 @@
 	];
 </script>
 
-<Seo
-	title={m.imprint_seo_title()}
-	description={m.imprint_seo_desc()}
-	canonicalPath="/impressum"
-	origin="https://landing.superextra.ai"
-/>
+<Seo title={m.imprint_seo_title()} description={m.imprint_seo_desc()} canonicalPath="/impressum" />
 
 <Navbar />
 
