@@ -32,7 +32,7 @@
 		`flex items-center gap-1 text-sm transition-colors ${
 			over
 				? 'text-white/60 hover:text-white'
-				: 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'
+				: 'text-black/40 hover:text-black/60 dark:text-white/40 dark:hover:text-white/60'
 		}`
 	);
 </script>
