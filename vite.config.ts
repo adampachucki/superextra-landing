@@ -18,10 +18,8 @@ export default defineConfig({
 			routeStrategies: [
 				{ match: '/chat/:rest(.*)?', strategy: ['cookie', 'preferredLanguage', 'baseLocale'] },
 				{ match: '/login/:rest(.*)?', strategy: ['cookie', 'preferredLanguage', 'baseLocale'] },
-				// English-only pages — excluded from localization until translated.
-				{ match: '/memo/:rest(.*)?', exclude: true },
-				{ match: '/privacy-policy/:rest(.*)?', exclude: true },
-				{ match: '/terms/:rest(.*)?', exclude: true }
+				// English-only page — excluded from localization until translated.
+				{ match: '/memo/:rest(.*)?', exclude: true }
 			],
 			// These routes are never prefixed: every locale maps to the same path,
 			// so localizeHref() and the prerender crawl keep them unprefixed.
@@ -48,22 +46,6 @@ export default defineConfig({
 						['en', ':protocol://:domain(.*)::port?/memo:rest(/.*)?'],
 						['de', ':protocol://:domain(.*)::port?/memo:rest(/.*)?'],
 						['pl', ':protocol://:domain(.*)::port?/memo:rest(/.*)?']
-					]
-				},
-				{
-					pattern: ':protocol://:domain(.*)::port?/privacy-policy:rest(/.*)?',
-					localized: [
-						['en', ':protocol://:domain(.*)::port?/privacy-policy:rest(/.*)?'],
-						['de', ':protocol://:domain(.*)::port?/privacy-policy:rest(/.*)?'],
-						['pl', ':protocol://:domain(.*)::port?/privacy-policy:rest(/.*)?']
-					]
-				},
-				{
-					pattern: ':protocol://:domain(.*)::port?/terms:rest(/.*)?',
-					localized: [
-						['en', ':protocol://:domain(.*)::port?/terms:rest(/.*)?'],
-						['de', ':protocol://:domain(.*)::port?/terms:rest(/.*)?'],
-						['pl', ':protocol://:domain(.*)::port?/terms:rest(/.*)?']
 					]
 				},
 				// Everything else: English at root, German under /de, Polish under /pl.

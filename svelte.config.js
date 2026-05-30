@@ -15,8 +15,7 @@ const config = {
 			// Locale variants reroute to the same routes, so the crawler can't
 			// discover them by route alone. List the localized marketing pages
 			// explicitly so every one is emitted at build time. App routes
-			// (/chat, /login) and English-only pages (/memo, /privacy-policy,
-			// /terms) stay unprefixed and are not localized yet.
+			// (/chat, /login) and the English-only /memo stay unprefixed.
 			entries: [
 				'*',
 				'/de',
@@ -26,7 +25,11 @@ const config = {
 				'/de/impressum',
 				'/pl/impressum',
 				'/de/contact',
-				'/pl/contact'
+				'/pl/contact',
+				'/de/terms',
+				'/pl/terms',
+				'/de/privacy-policy',
+				'/pl/privacy-policy'
 			]
 		}
 	}
