@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scale } from 'svelte/transition';
 	import { formState } from '$lib/form-state.svelte';
 	import { resolveSupportedBrowserCountry } from '$lib/browser-country';
 	import { fetchPlaceSuggestions, type PlaceSuggestion } from '$lib/google-places';
@@ -380,7 +381,8 @@
 						<ul
 							id="place-suggestions"
 							role="listbox"
-							class="absolute top-full right-0 left-0 z-10 mt-1 max-h-40 popover"
+							class="absolute top-full right-0 left-0 z-10 mt-1 max-h-40 origin-top popover"
+							transition:scale={{ duration: 150, start: 0.97, opacity: 0 }}
 						>
 							{#each placeSuggestions as s (s.placeId)}
 								<li role="option" aria-selected="false">

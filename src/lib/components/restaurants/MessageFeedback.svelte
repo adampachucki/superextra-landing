@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scale } from 'svelte/transition';
 	import { feedback } from '$lib/feedback.svelte';
 	import type { TurnFeedback } from '$lib/chat-types';
 	import ReasonPicker from './ReasonPicker.svelte';
@@ -89,7 +90,8 @@
 
 	{#if reasonsOpen}
 		<div
-			class="absolute top-full right-0 z-10 mt-2 w-72 rounded-xl border border-cream-200 bg-cream-50 p-3 shadow-lg"
+			class="absolute top-full right-0 z-10 mt-2 w-72 origin-top-right rounded-xl border border-cream-200 bg-cream-50 p-3 shadow-lg"
+			transition:scale={{ duration: 150, start: 0.95, opacity: 0 }}
 		>
 			<ReasonPicker
 				prompt={m.fb_what_off()}

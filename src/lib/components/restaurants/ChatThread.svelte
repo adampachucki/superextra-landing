@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import { slide } from 'svelte/transition';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { tts } from '$lib/tts.svelte';
 	import { splitChartSegments } from '$lib/chart-blocks';
@@ -402,7 +403,9 @@
 					{/if}
 
 					{#if feedback.isSurveyActive(chatState.activeSid, msg.turnIndex)}
-						<FeedbackSurvey sid={chatState.activeSid} turnIndex={msg.turnIndex} />
+						<div transition:slide={{ duration: 200 }}>
+							<FeedbackSurvey sid={chatState.activeSid} turnIndex={msg.turnIndex} />
+						</div>
 					{/if}
 				</div>
 			{/if}

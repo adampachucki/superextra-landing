@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { scale } from 'svelte/transition';
 	import { getLocale, locales, localizeHref, setLocale, type Locale } from '$lib/paraglide/runtime';
 	import * as m from '$lib/paraglide/messages';
 
@@ -60,9 +61,10 @@
 	{#if open}
 		<ul
 			class="absolute right-0 z-50 min-w-[8rem] overflow-hidden rounded-lg border border-cream-200 bg-cream py-1 shadow-lg {dropUp
-				? 'bottom-full mb-2'
-				: 'top-full mt-2'}"
+				? 'bottom-full mb-2 origin-bottom-right'
+				: 'top-full mt-2 origin-top-right'}"
 			role="listbox"
+			transition:scale={{ duration: 150, start: 0.95, opacity: 0 }}
 		>
 			{#each locales as locale (locale)}
 				<li>

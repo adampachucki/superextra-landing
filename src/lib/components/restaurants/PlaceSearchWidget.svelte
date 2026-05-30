@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scale } from 'svelte/transition';
 	import type { PlaceSearch, PlaceSuggestion } from '$lib/place-search.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 
@@ -84,8 +85,9 @@
 	{#if place.showSuggestions && place.suggestions.length > 0}
 		<ul
 			class="absolute right-0 left-0 z-50 max-h-48 popover {direction === 'up'
-				? 'bottom-full mb-1'
-				: 'top-full mt-1'}"
+				? 'bottom-full mb-1 origin-bottom'
+				: 'top-full mt-1 origin-top'}"
+			transition:scale={{ duration: 150, start: 0.97, opacity: 0 }}
 		>
 			{#each place.suggestions as s, i (s.placeId)}
 				<li>

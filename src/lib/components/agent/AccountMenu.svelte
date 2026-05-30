@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { scale } from 'svelte/transition';
 	import { auth } from '$lib/auth.svelte';
 	import { billing } from '$lib/billing-state.svelte';
 	import * as m from '$lib/paraglide/messages';
@@ -146,8 +147,9 @@
 			</button>
 			{#if open}
 				<div
-					class="popover absolute right-3 bottom-full left-3 mb-2"
+					class="popover absolute right-3 bottom-full left-3 mb-2 origin-bottom"
 					role="menu"
+					transition:scale={{ duration: 150, start: 0.95, opacity: 0 }}
 				>
 					{@render menuItems()}
 				</div>
@@ -165,8 +167,9 @@
 			</button>
 			{#if open}
 				<div
-					class="popover absolute top-full right-0 mt-2 w-56"
+					class="popover absolute top-full right-0 mt-2 w-56 origin-top-right"
 					role="menu"
+					transition:scale={{ duration: 150, start: 0.95, opacity: 0 }}
 				>
 					{@render menuItems()}
 				</div>

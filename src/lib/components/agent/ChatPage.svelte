@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { slide } from 'svelte/transition';
 	import { goto } from '$app/navigation';
 	import ChatThread from '$lib/components/restaurants/ChatThread.svelte';
 	import PromptIcon from '$lib/components/restaurants/PromptIcon.svelte';
@@ -553,6 +554,7 @@
 								<div
 									class="mt-1 truncate text-[11px] text-red-600 dark:text-red-400"
 									role="alert"
+									transition:slide={{ duration: 150 }}
 								>
 									{deleteError}
 								</div>
@@ -721,7 +723,11 @@
 	></div>
 	<div class="mx-auto max-w-[800px] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6">
 		{#if sendError}
-			<div class="mb-2 px-1 text-[13px] text-red-600 dark:text-red-400" role="alert">
+			<div
+				class="mb-2 px-1 text-[13px] text-red-600 dark:text-red-400"
+				role="alert"
+				transition:slide={{ duration: 150 }}
+			>
 				{sendError}
 			</div>
 		{/if}
