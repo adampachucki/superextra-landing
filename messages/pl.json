@@ -381,6 +381,8 @@
 	"chat_err_stop": "Nie udało się zatrzymać badania. Spróbuj ponownie.",
 	"chat_err_delete": "Nie udało się usunąć. Spróbuj ponownie.",
 	"chat_awaiting": "Oczekiwanie na ostateczną odpowiedź...",
+	"chat_empty_start": "Rozpocznij nową rozmowę poniżej",
+	"modal_close": "Zamknij",
 	"chat_follow_up": "Zadaj pytanie uzupełniające...",
 	"chat_voice_disabled": "Wprowadzanie głosowe wyłączone, gdy trwa odpowiedź",
 	"chat_stop_research": "Zatrzymaj badanie",

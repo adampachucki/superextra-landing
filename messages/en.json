@@ -381,6 +381,8 @@
 	"chat_err_stop": "Could not stop research. Please try again.",
 	"chat_err_delete": "Could not delete. Please try again.",
 	"chat_awaiting": "Awaiting final response...",
+	"chat_empty_start": "Start a new conversation below",
+	"modal_close": "Close",
 	"chat_follow_up": "Ask a follow-up...",
 	"chat_voice_disabled": "Voice input disabled while response is pending",
 	"chat_stop_research": "Stop research",

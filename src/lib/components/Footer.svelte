@@ -141,7 +141,7 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-2 md:hidden">
-						<span class="text-xs text-black/40 dark:text-white/40">Supported by</span>
+						<span class="text-xs text-black/40 dark:text-white/40">{m.footer_supported()}</span>
 						<img
 							src="/google-for-startups.svg"
 							alt="Google for Startups"

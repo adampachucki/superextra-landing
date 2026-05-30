@@ -381,6 +381,8 @@
 	"chat_err_stop": "Recherche konnte nicht gestoppt werden. Bitte versuch es erneut.",
 	"chat_err_delete": "Löschen fehlgeschlagen. Bitte versuch es erneut.",
 	"chat_awaiting": "Warte auf finale Antwort...",
+	"chat_empty_start": "Unten eine neue Unterhaltung beginnen",
+	"modal_close": "Schließen",
 	"chat_follow_up": "Stell eine Folgefrage...",
 	"chat_voice_disabled": "Spracheingabe deaktiviert, während eine Antwort aussteht",
 	"chat_stop_research": "Recherche stoppen",

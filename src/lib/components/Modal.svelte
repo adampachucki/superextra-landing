@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { lockPageScroll } from '$lib/scroll-lock';
+	import * as m from '$lib/paraglide/messages';
 	import type { Snippet } from 'svelte';
 
 	let {
@@ -116,7 +117,7 @@
 				<button
 					type="button"
 					onclick={onclose}
-					aria-label="Close"
+					aria-label={m.modal_close()}
 					class="absolute top-4 right-4 z-10 btn-icon h-8 w-8"
 				>
 					<svg

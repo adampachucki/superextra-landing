@@ -702,7 +702,7 @@
 					? 'is-mounted'
 					: ''}"
 			>
-				<p class="text-[14px] text-black/40 dark:text-white/40">Start a new conversation below</p>
+				<p class="text-[14px] text-black/40 dark:text-white/40">{m.chat_empty_start()}</p>
 			</div>
 		{/if}
 	</div>
