@@ -6,7 +6,7 @@
 			"ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
 			"redirects": [
 				{
-					"source": "/:rest*",
+					"regex": "^/(?P<rest>.*)$",
 					"destination": "https://agent.superextra.ai/:rest",
 					"type": 301
 				}
