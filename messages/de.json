@@ -1,12 +1,8 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"nav_intelligence": "Intelligenz",
-	"nav_use_cases": "Anwendungen",
-	"nav_faq": "FAQ",
 	"nav_sign_in": "Anmelden",
 	"nav_book_demo": "Demo buchen",
 	"nav_chat_history": "Chatverlauf",
-	"nav_toggle_menu": "Menü umschalten",
 	"lang_english": "English",
 	"lang_german": "Deutsch",
 	"lang_polish": "Polski",

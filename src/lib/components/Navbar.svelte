@@ -11,12 +11,10 @@
 
 	let {
 		transparent = false,
-		minimal = false,
 		static: isStatic = false
-	}: { transparent?: boolean; minimal?: boolean; static?: boolean } = $props();
+	}: { transparent?: boolean; static?: boolean } = $props();
 
 	let scrolled = $state(false);
-	let mobileOpen = $state(false);
 
 	function handleScroll() {
 		scrolled = window.scrollY > 20;
@@ -24,10 +22,10 @@
 
 	onMount(() => {
 		handleScroll();
-		if (minimal) void auth.init();
+		void auth.init();
 	});
 
-	let over = $derived(transparent && !scrolled && !mobileOpen);
+	let over = $derived(transparent && !scrolled);
 	// The logo always points at the agent home (the canonical site). On the home
 	// route itself it just scrolls to top; on every other page it navigates there.
 	const homeHref = $derived(
@@ -36,7 +34,7 @@
 	// Only count sessions once the user is signed in — touching sessionsList
 	// kicks the listener attach, but the count is 0 for signed-out users so
 	// the badge stays hidden.
-	let chatCount = $derived(minimal && auth.user ? chatState.sessionsList.length : 0);
+	let chatCount = $derived(auth.user ? chatState.sessionsList.length : 0);
 
 	function handleLoginClick() {
 		auth.openModal({
@@ -44,16 +42,6 @@
 				goto('/chat');
 			}
 		});
-	}
-
-	function smoothScroll(e: MouseEvent) {
-		const href = (e.currentTarget as HTMLAnchorElement).getAttribute('href');
-		const hash = href?.split('#')[1];
-		if (!hash) return;
-		const el = document.getElementById(hash);
-		if (!el) return;
-		e.preventDefault();
-		el.scrollIntoView({ behavior: 'smooth' });
 	}
 
 	const chatIconClass = $derived(
@@ -79,6 +67,25 @@
 			>
 		{/if}
 	</a>
+{/snippet}
+
+{#snippet actions(demoClass: string)}
+	{#if auth.user}
+		{@render chatIcon()}
+		<AccountMenu />
+	{:else}
+		<button
+			onclick={handleLoginClick}
+			class="text-sm transition-colors {over
+				? 'text-white/80 hover:text-white'
+				: 'text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white'}"
+		>
+			{m.nav_sign_in()}
+		</button>
+	{/if}
+	<button onclick={() => formState.open()} class="btn-primary {demoClass} text-sm whitespace-nowrap"
+		>{m.nav_book_demo()}</button
+	>
 {/snippet}
 
 <svelte:window onscroll={handleScroll} />
@@ -112,153 +119,12 @@
 			<span class="text-[22px] font-light tracking-tight">Superextra</span>
 		</a>
 
-		{#if !minimal}
-			<div class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
-				<a
-					href="/landing#intelligence"
-					onclick={smoothScroll}
-					class="text-sm transition-colors {over
-						? 'text-white/60 hover:text-white'
-						: 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}"
-					>{m.nav_intelligence()}</a
-				>
-				<a
-					href="/landing#use-cases"
-					onclick={smoothScroll}
-					class="text-sm transition-colors {over
-						? 'text-white/60 hover:text-white'
-						: 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}"
-					>{m.nav_use_cases()}</a
-				>
-				<a
-					href="/landing#faq"
-					onclick={smoothScroll}
-					class="text-sm transition-colors {over
-						? 'text-white/60 hover:text-white'
-						: 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'}"
-					>{m.nav_faq()}</a
-				>
-			</div>
-		{/if}
-
 		<div class="hidden items-center gap-3 md:flex">
-			{#if minimal}
-				{#if auth.user}
-					{@render chatIcon()}
-					<AccountMenu />
-				{:else}
-					<button
-						onclick={handleLoginClick}
-						class="text-sm transition-colors {over
-							? 'text-white/80 hover:text-white'
-							: 'text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white'}"
-					>
-						{m.nav_sign_in()}
-					</button>
-				{/if}
-			{/if}
-			<button
-				onclick={() => formState.open()}
-				class="btn-primary px-5 py-2 text-sm whitespace-nowrap">{m.nav_book_demo()}</button
-			>
+			{@render actions('px-5 py-2')}
 		</div>
 
 		<div class="flex items-center gap-3 md:hidden">
-			{#if minimal}
-				{#if auth.user}
-					{@render chatIcon()}
-					<AccountMenu />
-				{:else}
-					<button
-						onclick={handleLoginClick}
-						class="text-sm transition-colors {over
-							? 'text-white/80 hover:text-white'
-							: 'text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white'}"
-					>
-						{m.nav_sign_in()}
-					</button>
-				{/if}
-			{/if}
-			<button
-				onclick={() => formState.open()}
-				class="btn-primary px-4 py-1.5 text-sm whitespace-nowrap">{m.nav_book_demo()}</button
-			>
-			{#if !minimal}
-				<button
-					class={over ? 'text-white' : 'text-black dark:text-white'}
-					onclick={() => (mobileOpen = !mobileOpen)}
-					aria-label={m.nav_toggle_menu()}
-				>
-					{#if mobileOpen}
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-6 w-6"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="1.5"
-								d="M6 18L18 6M6 6l12 12"
-							/></svg
-						>
-					{:else}
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-6 w-6"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="1.5"
-								d="M4 6h16M4 12h16M4 18h16"
-							/></svg
-						>
-					{/if}
-				</button>
-			{/if}
+			{@render actions('px-4 py-1.5')}
 		</div>
 	</div>
-
-	{#if !minimal}
-		<div
-			class="grid transition-[grid-template-rows] duration-300 md:hidden {mobileOpen
-				? 'grid-rows-[1fr]'
-				: 'grid-rows-[0fr]'}"
-		>
-			<div class="overflow-hidden">
-				<div class="border-t border-cream-100 bg-cream">
-					<div class="flex flex-col gap-4 px-6 py-6">
-						<a
-							href="/landing#intelligence"
-							class="text-sm text-black/60 dark:text-white/60"
-							onclick={(e) => {
-								mobileOpen = false;
-								smoothScroll(e);
-							}}>{m.nav_intelligence()}</a
-						>
-						<a
-							href="/landing#use-cases"
-							class="text-sm text-black/60 dark:text-white/60"
-							onclick={(e) => {
-								mobileOpen = false;
-								smoothScroll(e);
-							}}>{m.nav_use_cases()}</a
-						>
-						<a
-							href="/landing#faq"
-							class="text-sm text-black/60 dark:text-white/60"
-							onclick={(e) => {
-								mobileOpen = false;
-								smoothScroll(e);
-							}}>{m.nav_faq()}</a
-						>
-					</div>
-				</div>
-			</div>
-		</div>
-	{/if}
 </nav>

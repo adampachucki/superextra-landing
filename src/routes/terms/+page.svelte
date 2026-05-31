@@ -35,7 +35,7 @@
 
 <Seo title={seoTitle[loc]} description={seoDesc[loc]} canonicalPath="/terms" />
 
-<Navbar minimal />
+<Navbar />
 
 <article class="mx-auto max-w-[720px] px-6 pt-32 pb-20">
 	<h1 class="text-3xl font-medium tracking-tight text-black dark:text-white">{heading[loc]}</h1>

@@ -78,7 +78,7 @@
 <Seo title={m.seo_home_title()} description={m.seo_home_desc()} />
 
 <div class="page-exit" class:is-leaving={leaving}>
-	<Navbar minimal />
+	<Navbar />
 
 	<main>
 		<RestaurantHero onleave={handleLeave} bind:userQuery={heroQuery} />

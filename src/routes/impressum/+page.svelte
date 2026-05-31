@@ -19,7 +19,7 @@
 
 <Seo title={m.imprint_seo_title()} description={m.imprint_seo_desc()} canonicalPath="/impressum" />
 
-<Navbar minimal />
+<Navbar />
 
 <article class="mx-auto max-w-[720px] px-6 pt-32 pb-20">
 	<h1 class="text-3xl font-medium tracking-tight text-black dark:text-white">
