@@ -11,8 +11,11 @@
 	import LoginModal from '$lib/components/agent/LoginModal.svelte';
 	import BillingModal from '$lib/components/agent/BillingModal.svelte';
 	import BillingReturnNotice from '$lib/components/agent/BillingReturnNotice.svelte';
+	import { stampFirstTouch } from '$lib/campaign';
 
 	onMount(() => {
+		stampFirstTouch();
+
 		const onBeforeUnload = () => {
 			sessionStorage.setItem('se:scroll', String(scrollY));
 		};

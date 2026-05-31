@@ -10,6 +10,8 @@
 export interface TopicPillItem {
 	/** Stable identifier — survives localization (label/mobile/query are translated). */
 	id: string;
+	/** Hook-pillar grouping (e.g. 'pricing', 'site_selection'). Drives campaign-aware initial sets. */
+	category: string;
 	label: string;
 	mobile: string;
 	color: string;
@@ -25,20 +27,47 @@ function shuffle<T>(arr: readonly T[]): T[] {
 	return a;
 }
 
+function interleaveByLabelLength(
+	items: readonly TopicPillItem[],
+	mobile: boolean
+): TopicPillItem[] {
+	const key = (p: TopicPillItem) => (mobile ? p.mobile : p.label).length;
+	const sorted = [...items].sort((a, b) => key(a) - key(b));
+	const ordered: TopicPillItem[] = [];
+	let lo = 0;
+	let hi = sorted.length - 1;
+	while (lo <= hi) {
+		ordered.push(sorted[lo++]);
+		if (lo <= hi) ordered.push(sorted[hi--]);
+	}
+	return ordered;
+}
+
 export function pickPills(
 	pool: readonly TopicPillItem[],
 	visibleCount: number,
 	mobile = false
 ): TopicPillItem[] {
-	const picked = shuffle(pool).slice(0, visibleCount);
-	const key = (p: TopicPillItem) => (mobile ? p.mobile : p.label).length;
-	picked.sort((a, b) => key(a) - key(b));
-	const ordered: TopicPillItem[] = [];
-	let lo = 0;
-	let hi = picked.length - 1;
-	while (lo <= hi) {
-		ordered.push(picked[lo++]);
-		if (lo <= hi) ordered.push(picked[hi--]);
-	}
-	return ordered;
+	return interleaveByLabelLength(shuffle(pool).slice(0, visibleCount), mobile);
+}
+
+/**
+ * Campaign-aware initial set: all pills in `category` go in first; the rest of
+ * the row is filled with random pills from other categories. Same wrap-balance
+ * interleave as `pickPills`. Falls back to `pickPills` when category is null.
+ */
+export function pickPillsWithCategory(
+	pool: readonly TopicPillItem[],
+	category: string | null,
+	visibleCount: number,
+	mobile = false
+): TopicPillItem[] {
+	if (!category) return pickPills(pool, visibleCount, mobile);
+	const inCategory = pool.filter((p) => p.category === category);
+	const others = pool.filter((p) => p.category !== category);
+	const filled = [
+		...inCategory,
+		...shuffle(others).slice(0, Math.max(0, visibleCount - inCategory.length))
+	].slice(0, visibleCount);
+	return interleaveByLabelLength(filled, mobile);
 }

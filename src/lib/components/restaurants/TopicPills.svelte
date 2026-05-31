@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { pickPills, type TopicPillItem } from '$lib/topic-pills-shuffle';
+	import { browser } from '$app/environment';
+	import { pickPills, pickPillsWithCategory, type TopicPillItem } from '$lib/topic-pills-shuffle';
+	import { campaignCategory } from '$lib/campaign';
 	import * as m from '$lib/paraglide/messages';
 
 	let {
@@ -11,11 +13,13 @@
 	} = $props();
 
 	// Labels/queries come from the message catalog (localized). `id` is the
-	// stable key used for shuffling and the deterministic initial set.
+	// stable key used for shuffling and the deterministic initial set;
+	// `category` maps to a hook pillar so ad clicks land on a matching set.
 	const PILL_POOL: TopicPillItem[] = [
 		// Market trends
 		{
 			id: 'sales_shifts',
+			category: 'market_trends',
 			label: m.pill_sales_shifts_label(),
 			mobile: m.pill_sales_shifts_short(),
 			color: '#818cf8',
@@ -23,6 +27,7 @@
 		},
 		{
 			id: 'demand_cycles',
+			category: 'market_trends',
 			label: m.pill_demand_cycles_label(),
 			mobile: m.pill_demand_cycles_short(),
 			color: '#818cf8',
@@ -30,6 +35,7 @@
 		},
 		{
 			id: 'market_pulse',
+			category: 'market_trends',
 			label: m.pill_market_pulse_label(),
 			mobile: m.pill_market_pulse_short(),
 			color: '#818cf8',
@@ -38,6 +44,7 @@
 		// Site selection
 		{
 			id: 'foot_traffic',
+			category: 'site_selection',
 			label: m.pill_foot_traffic_label(),
 			mobile: m.pill_foot_traffic_short(),
 			color: '#a78bfa',
@@ -45,6 +52,7 @@
 		},
 		{
 			id: 'best_streets',
+			category: 'site_selection',
 			label: m.pill_best_streets_label(),
 			mobile: m.pill_best_streets_short(),
 			color: '#a78bfa',
@@ -52,6 +60,7 @@
 		},
 		{
 			id: 'competition',
+			category: 'site_selection',
 			label: m.pill_competition_label(),
 			mobile: m.pill_competition_short(),
 			color: '#a78bfa',
@@ -60,6 +69,7 @@
 		// Concept validation
 		{
 			id: 'cuisine_gaps',
+			category: 'concept',
 			label: m.pill_cuisine_gaps_label(),
 			mobile: m.pill_cuisine_gaps_short(),
 			color: '#f472b6',
@@ -67,6 +77,7 @@
 		},
 		{
 			id: 'concepts_here',
+			category: 'concept',
 			label: m.pill_concepts_here_label(),
 			mobile: m.pill_concepts_here_short(),
 			color: '#f472b6',
@@ -74,6 +85,7 @@
 		},
 		{
 			id: 'delivery_trends',
+			category: 'concept',
 			label: m.pill_delivery_trends_label(),
 			mobile: m.pill_delivery_trends_short(),
 			color: '#f472b6',
@@ -82,6 +94,7 @@
 		// Wage benchmarking
 		{
 			id: 'salaries',
+			category: 'wage',
 			label: m.pill_salaries_label(),
 			mobile: m.pill_salaries_short(),
 			color: '#6ee7b3',
@@ -89,6 +102,7 @@
 		},
 		{
 			id: 'chef_pay',
+			category: 'wage',
 			label: m.pill_chef_pay_label(),
 			mobile: m.pill_chef_pay_short(),
 			color: '#6ee7b3',
@@ -96,6 +110,7 @@
 		},
 		{
 			id: 'server_wages',
+			category: 'wage',
 			label: m.pill_server_wages_label(),
 			mobile: m.pill_server_wages_short(),
 			color: '#6ee7b3',
@@ -104,6 +119,7 @@
 		// Price positioning
 		{
 			id: 'price_gaps',
+			category: 'pricing',
 			label: m.pill_price_gaps_label(),
 			mobile: m.pill_price_gaps_short(),
 			color: '#fbbf24',
@@ -111,6 +127,7 @@
 		},
 		{
 			id: 'lunch_pricing',
+			category: 'pricing',
 			label: m.pill_lunch_pricing_label(),
 			mobile: m.pill_lunch_pricing_short(),
 			color: '#fbbf24',
@@ -118,6 +135,7 @@
 		},
 		{
 			id: 'drinks_pricing',
+			category: 'pricing',
 			label: m.pill_drinks_pricing_label(),
 			mobile: m.pill_drinks_pricing_short(),
 			color: '#fbbf24',
@@ -126,6 +144,7 @@
 		// Sentiment analysis
 		{
 			id: 'guest_reviews',
+			category: 'sentiment',
 			label: m.pill_guest_reviews_label(),
 			mobile: m.pill_guest_reviews_short(),
 			color: '#fb923c',
@@ -133,6 +152,7 @@
 		},
 		{
 			id: 'complaints',
+			category: 'sentiment',
 			label: m.pill_complaints_label(),
 			mobile: m.pill_complaints_short(),
 			color: '#fb923c',
@@ -140,6 +160,7 @@
 		},
 		{
 			id: 'five_star',
+			category: 'sentiment',
 			label: m.pill_five_star_label(),
 			mobile: m.pill_five_star_short(),
 			color: '#fb923c',
@@ -148,6 +169,7 @@
 		// Competitor tracking
 		{
 			id: 'menu_changes',
+			category: 'competitor',
 			label: m.pill_menu_changes_label(),
 			mobile: m.pill_menu_changes_short(),
 			color: '#06b6d4',
@@ -155,6 +177,7 @@
 		},
 		{
 			id: 'new_launches',
+			category: 'competitor',
 			label: m.pill_new_launches_label(),
 			mobile: m.pill_new_launches_short(),
 			color: '#06b6d4',
@@ -162,6 +185,7 @@
 		},
 		{
 			id: 'new_openings',
+			category: 'competitor',
 			label: m.pill_new_openings_label(),
 			mobile: m.pill_new_openings_short(),
 			color: '#06b6d4',
@@ -170,6 +194,7 @@
 		// Market shifts
 		{
 			id: 'closures',
+			category: 'market_shifts',
 			label: m.pill_closures_label(),
 			mobile: m.pill_closures_short(),
 			color: '#f87171',
@@ -177,6 +202,7 @@
 		},
 		{
 			id: 'format_shifts',
+			category: 'market_shifts',
 			label: m.pill_format_shifts_label(),
 			mobile: m.pill_format_shifts_short(),
 			color: '#f87171',
@@ -184,6 +210,7 @@
 		},
 		{
 			id: 'food_trends',
+			category: 'market_shifts',
 			label: m.pill_food_trends_label(),
 			mobile: m.pill_food_trends_short(),
 			color: '#f87171',
@@ -204,7 +231,7 @@
 	// interleave that pickPills applies on reshuffle (shortest, longest,
 	// 2nd-shortest, 2nd-longest, mid-short, mid-long) so flex-wrap rows stay
 	// balanced.
-	const INITIAL_TOPICS: TopicPillItem[] = [
+	const DEFAULT_INITIAL: TopicPillItem[] = [
 		'new_openings',
 		'foot_traffic',
 		'food_trends',
@@ -212,6 +239,15 @@
 		'guest_reviews',
 		'lunch_pricing'
 	].map(byId);
+
+	// If the visitor arrived via a recognized ad campaign, seed the initial
+	// pills with that hook's category so the click→prompt path is coherent.
+	// Mobile-length interleave only applies to reshuffle; the initial render
+	// is one-shot, so desktop wrap-balance is fine.
+	const initialCategory = browser ? campaignCategory() : null;
+	const INITIAL_TOPICS: TopicPillItem[] = initialCategory
+		? pickPillsWithCategory(PILL_POOL, initialCategory, VISIBLE_COUNT)
+		: DEFAULT_INITIAL;
 
 	let pillGen = $state(0);
 	let topics = $state<TopicPillItem[]>(INITIAL_TOPICS);

@@ -29,6 +29,8 @@
 
 	onMount(() => {
 		void auth.init();
+		const q = new URLSearchParams(window.location.search).get('q');
+		if (q) heroQuery = q;
 	});
 
 	function proceedToChat(
