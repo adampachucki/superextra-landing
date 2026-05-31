@@ -305,7 +305,7 @@
 								type="button"
 								onclick={() => billing.openUpgrade()}
 								disabled={billing.posting}
-								class="ml-1.5 align-baseline text-[0.9em] font-medium text-black/45 underline decoration-black/20 underline-offset-[3px] transition-colors hover:text-black/75 hover:decoration-black/40 disabled:opacity-50 dark:text-white/45 dark:decoration-white/20 dark:hover:text-white/75 dark:hover:decoration-white/40"
+								class="ml-1 underline decoration-black/25 underline-offset-[3px] transition-colors hover:text-black hover:decoration-black/60 disabled:opacity-50 dark:decoration-white/25 dark:hover:text-white dark:hover:decoration-white/60"
 								>{m.am_upgrade()}</button
 							>{/if}
 					</div>
