@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
+	import { onMount } from 'svelte';
 	import { pickPills, pickPillsWithCategory, type TopicPillItem } from '$lib/topic-pills-shuffle';
 	import { campaignCategory } from '$lib/campaign';
 	import * as m from '$lib/paraglide/messages';
@@ -230,7 +230,8 @@
 	// Deterministic, wrap-balanced initial set. Order follows the short/long
 	// interleave that pickPills applies on reshuffle (shortest, longest,
 	// 2nd-shortest, 2nd-longest, mid-short, mid-long) so flex-wrap rows stay
-	// balanced.
+	// balanced. Used by both prerender and the post-hydration default to
+	// avoid an SSR/CSR mismatch — campaign-biased pills swap in via onMount.
 	const DEFAULT_INITIAL: TopicPillItem[] = [
 		'new_openings',
 		'foot_traffic',
@@ -240,20 +241,22 @@
 		'lunch_pricing'
 	].map(byId);
 
-	// If the visitor arrived via a recognized ad campaign, seed the initial
-	// pills with that hook's category so the click→prompt path is coherent.
-	// Mobile-length interleave only applies to reshuffle; the initial render
-	// is one-shot, so desktop wrap-balance is fine.
-	const initialCategory = browser ? campaignCategory() : null;
-	const INITIAL_TOPICS: TopicPillItem[] = initialCategory
-		? pickPillsWithCategory(PILL_POOL, initialCategory, VISIBLE_COUNT)
-		: DEFAULT_INITIAL;
-
 	let pillGen = $state(0);
-	let topics = $state<TopicPillItem[]>(INITIAL_TOPICS);
+	let topics = $state<TopicPillItem[]>(DEFAULT_INITIAL);
 
 	const firstDelay = $derived(pillGen === 0 ? 350 : 150);
 	const buttonDelay = $derived(firstDelay + (VISIBLE_COUNT + 1) * STAGGER);
+
+	onMount(() => {
+		// If the visitor arrived via a recognized ad campaign, swap in the
+		// matching hook category. Pre-paint timing for the static-prerendered
+		// site means this happens before the staggered fade-in completes, so
+		// the user sees the campaign pills animate in, not a flicker.
+		const category = campaignCategory();
+		if (category) {
+			topics = pickPillsWithCategory(PILL_POOL, category, VISIBLE_COUNT, isMobile);
+		}
+	});
 
 	function reshuffle() {
 		pillGen++;

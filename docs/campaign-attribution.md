@@ -36,17 +36,21 @@ landing, the first three visible pills are drawn from that category; the
 remaining three are random fillers from other categories. Same wrap-balanced
 interleave as the default set.
 
-| `utm_content`                        | Pill category    | Pills shown                                                        |
-| ------------------------------------ | ---------------- | ------------------------------------------------------------------ |
-| `price`, `pricing`, `how-to-price`   | `pricing`        | Menu price gaps, Lunch price positioning, Drinks pricing landscape |
-| `hire`, `wages`, `when-to-hire`      | `wage`           | Salary benchmarks, Chef pay, Server wages                          |
-| `open`, `site`, `where-to-open`      | `site_selection` | Foot traffic, Best streets, Competition density                    |
-| `shifts`, `market`, `whats-shifting` | `market_shifts`  | Closures, Format shifts, Food trends                               |
+| `utm_content` | Pill category    | Pills shown                                                        |
+| ------------- | ---------------- | ------------------------------------------------------------------ |
+| `price`       | `pricing`        | Menu price gaps, Lunch price positioning, Drinks pricing landscape |
+| `hire`        | `wage`           | Salary benchmarks, Chef pay, Server wages                          |
+| `open`        | `site_selection` | Foot traffic, Best streets, Competition density                    |
+| `shifts`      | `market_shifts`  | Closures, Format shifts, Food trends                               |
 
-Unrecognized `utm_content` values are accepted and stamped, but the pill set
-falls back to the deterministic default. To add a new pillar, extend
-`CONTENT_TO_PILL_CATEGORY` in `src/lib/campaign.ts` and tag a pill category
-to match.
+One canonical key per pillar — no aliases. Mixing `price` and `pricing` in
+campaign URLs would fragment reporting cohorts. Stick to these four.
+
+Unrecognized `utm_content` values are still accepted and stamped (so the
+analytics layer never loses attribution), but the pill set falls back to
+the deterministic default. To add a new pillar, extend
+`CONTENT_TO_PILL_CATEGORY` in `src/lib/campaign.ts` and tag a pill
+category to match.
 
 ## The `?q=` prefill
 
@@ -114,11 +118,12 @@ user signs up.
 - **Key**: `se_first_touch`
 - **Shape**: JSON-encoded `FirstTouch` interface (see `src/lib/campaign.ts`)
 - **TTL**: 30 days from `stampedAt`
-- **Scope**: localStorage on the landing-page origin
-  (`landing.superextra.ai`). The agent UI lives on a different subdomain
-  (`agent.superextra.ai`) and does not see this storage. If we want
-  cross-subdomain attribution, the data needs to move to a first-party
-  cookie scoped to `.superextra.ai`, or a server-side hand-off at signup.
+- **Origin**: in production, `landing.superextra.ai/*` 301-redirects to
+  `agent.superextra.ai/:rest` (see `firebase.json`), so every ad click is
+  served from `agent.superextra.ai` directly. The marketing landing and the
+  agent UI share that origin — the same `localStorage` is visible to both
+  the prompt-area landing and the post-signup chat flow. No cross-subdomain
+  handoff needed.
 
 ## Adding a new hook pillar
 

@@ -32,23 +32,14 @@ export interface FirstTouch {
 	stampedAt: number;
 }
 
+// One canonical key per hook pillar from the memo. Don't add aliases —
+// matching reporting cohorts hinges on a single stable utm_content value
+// per pillar.
 const CONTENT_TO_PILL_CATEGORY: Record<string, string> = {
-	// How to price
 	price: 'pricing',
-	pricing: 'pricing',
-	'how-to-price': 'pricing',
-	// When to hire
 	hire: 'wage',
-	wages: 'wage',
-	'when-to-hire': 'wage',
-	// Where to open
 	open: 'site_selection',
-	site: 'site_selection',
-	'where-to-open': 'site_selection',
-	// What's shifting
-	shifts: 'market_shifts',
-	market: 'market_shifts',
-	'whats-shifting': 'market_shifts'
+	shifts: 'market_shifts'
 };
 
 function read(): FirstTouch | null {
