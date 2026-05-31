@@ -5,7 +5,6 @@
 	import { auth } from '$lib/auth.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
-	import AccessForm from '$lib/components/AccessForm.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import RestaurantHero from '$lib/components/restaurants/RestaurantHero.svelte';
 	import About from '$lib/components/About.svelte';
@@ -98,7 +97,6 @@
 	</main>
 
 	<Footer borderless />
-	<AccessForm />
 </div>
 
 <style>

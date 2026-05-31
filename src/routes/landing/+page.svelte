@@ -11,7 +11,6 @@
 	import DataSources from '$lib/components/DataSources.svelte';
 	import CTA from '$lib/components/CTA.svelte';
 	import Footer from '$lib/components/Footer.svelte';
-	import AccessForm from '$lib/components/AccessForm.svelte';
 	import * as m from '$lib/paraglide/messages';
 </script>
 
@@ -36,4 +35,3 @@
 </main>
 
 <Footer />
-<AccessForm />

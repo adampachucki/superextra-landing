@@ -7,6 +7,7 @@
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import CookieBanner from '$lib/components/CookieBanner.svelte';
+	import AccessForm from '$lib/components/AccessForm.svelte';
 	import LoginModal from '$lib/components/agent/LoginModal.svelte';
 	import BillingModal from '$lib/components/agent/BillingModal.svelte';
 	import BillingReturnNotice from '$lib/components/agent/BillingReturnNotice.svelte';
@@ -43,6 +44,7 @@
 
 {@render children()}
 <CookieBanner />
+<AccessForm />
 <LoginModal />
 <BillingModal />
 <BillingReturnNotice />
