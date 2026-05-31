@@ -305,8 +305,11 @@
 								type="button"
 								onclick={() => billing.openUpgrade()}
 								disabled={billing.posting}
-								class="ml-1 underline decoration-black/25 underline-offset-[3px] transition-colors hover:text-black hover:decoration-black/60 disabled:opacity-50 dark:decoration-white/25 dark:hover:text-white dark:hover:decoration-white/60"
-								>{m.am_upgrade()}</button
+								class="group ml-1 transition-colors hover:text-black disabled:opacity-50 dark:hover:text-white"
+								>{m.am_upgrade()}<span
+									aria-hidden="true"
+									class="ml-1 inline-block transition-transform group-hover:translate-x-0.5">→</span
+								></button
 							>{/if}
 					</div>
 					<div class="mt-4 flex max-w-[700px] items-center justify-end gap-2">
