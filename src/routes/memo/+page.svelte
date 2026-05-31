@@ -12,7 +12,7 @@
 	localized={false}
 />
 
-<Navbar transparent />
+<Navbar minimal transparent />
 
 <header
 	class="relative overflow-hidden"

@@ -35,7 +35,7 @@
 
 <Seo title={seoTitle[loc]} description={seoDesc[loc]} canonicalPath="/privacy-policy" />
 
-<Navbar />
+<Navbar minimal />
 
 <article class="mx-auto max-w-[720px] px-6 pt-32 pb-20">
 	<h1 class="text-3xl font-medium tracking-tight text-black dark:text-white">{heading[loc]}</h1>

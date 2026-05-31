@@ -40,6 +40,21 @@
 					"source": "/chat{,/**}",
 					"destination": "https://agent.superextra.ai/chat",
 					"type": 301
+				},
+				{
+					"source": "/landing",
+					"destination": "https://agent.superextra.ai/",
+					"type": 301
+				},
+				{
+					"source": "/de/landing",
+					"destination": "https://agent.superextra.ai/de",
+					"type": 301
+				},
+				{
+					"source": "/pl/landing",
+					"destination": "https://agent.superextra.ai/pl",
+					"type": 301
 				}
 			],
 			"rewrites": [
@@ -104,6 +119,21 @@
 				{
 					"source": "/agent",
 					"destination": "/",
+					"type": 301
+				},
+				{
+					"source": "/landing",
+					"destination": "/",
+					"type": 301
+				},
+				{
+					"source": "/de/landing",
+					"destination": "/de",
+					"type": 301
+				},
+				{
+					"source": "/pl/landing",
+					"destination": "/pl",
 					"type": 301
 				}
 			],

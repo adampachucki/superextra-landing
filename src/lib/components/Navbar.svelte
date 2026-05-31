@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { getLocale, localizeHref } from '$lib/paraglide/runtime';
 	import { formState } from '$lib/form-state.svelte';
 	import { chatState } from '$lib/chat-state.svelte';
 	import { auth } from '$lib/auth.svelte';
@@ -26,6 +28,11 @@
 	});
 
 	let over = $derived(transparent && !scrolled && !mobileOpen);
+	// The logo always points at the agent home (the canonical site). On the home
+	// route itself it just scrolls to top; on every other page it navigates there.
+	const homeHref = $derived(
+		`https://agent.superextra.ai${localizeHref('/', { locale: getLocale() })}`
+	);
 	// Only count sessions once the user is signed in — touching sessionsList
 	// kicks the listener attach, but the count is 0 for signed-out users so
 	// the badge stays hidden.
@@ -83,9 +90,9 @@
 >
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
 		<a
-			href={minimal ? '/' : 'https://agent.superextra.ai'}
+			href={homeHref}
 			onclick={(e) => {
-				if (!minimal) return;
+				if (page.route.id !== '/') return;
 				e.preventDefault();
 				window.scrollTo({ top: 0, behavior: 'smooth' });
 			}}

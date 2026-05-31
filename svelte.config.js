@@ -16,12 +16,12 @@ const config = {
 			// discover them by route alone. List the localized marketing pages
 			// explicitly so every one is emitted at build time. App routes
 			// (/chat, /login) and the English-only /memo stay unprefixed.
+			// /landing is retired (redirected to the agent home in firebase.json),
+			// so its locale variants are no longer emitted.
 			entries: [
 				'*',
 				'/de',
 				'/pl',
-				'/de/landing',
-				'/pl/landing',
 				'/de/impressum',
 				'/pl/impressum',
 				'/de/contact',
