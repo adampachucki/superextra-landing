@@ -283,9 +283,12 @@
 					</div>
 				</div>
 			{:else}
+				{@const showUpgrade = msg.turnKind === 'quota_block' && !billing.entitled}
 				<div class="assistant-row min-w-0 px-1 py-1">
 					<div
-						class="chat-markdown prose max-w-none min-w-0 text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white"
+						class="chat-markdown prose max-w-none min-w-0 text-[15px] leading-relaxed text-black/80 dark:text-white/80 prose-headings:text-black dark:prose-headings:text-white prose-a:text-black prose-a:underline dark:prose-a:text-white prose-strong:text-black dark:prose-strong:text-white {showUpgrade
+							? 'quota-upgrade'
+							: ''}"
 						use:finalAnswerReveal={msg.animateReveal
 							? () => chatState.markReplyRevealed(msg.turnIndex)
 							: undefined}
@@ -298,19 +301,15 @@
 								{@html renderMarkdown(seg.text)}
 							{/if}
 						{/each}
-					</div>
-					<div class="mt-4 flex max-w-[700px] items-center justify-end gap-2">
-						{#if msg.turnKind === 'quota_block' && !billing.entitled}
-							<button
+						{#if showUpgrade}<button
 								type="button"
 								onclick={() => billing.openUpgrade()}
 								disabled={billing.posting}
-								class="mr-auto inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full bg-black px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
-							>
-								<span>{m.am_upgrade()}</span>
-								<span class="text-white/60 dark:text-black/50">19 PLN / 9 EUR / £9 / $9</span>
-							</button>
-						{/if}
+								class="ml-1.5 align-baseline text-[0.9em] font-medium text-black/45 underline decoration-black/20 underline-offset-[3px] transition-colors hover:text-black/75 hover:decoration-black/40 disabled:opacity-50 dark:text-white/45 dark:decoration-white/20 dark:hover:text-white/75 dark:hover:decoration-white/40"
+								>{m.am_upgrade()}</button
+							>{/if}
+					</div>
+					<div class="mt-4 flex max-w-[700px] items-center justify-end gap-2">
 						<MessageFeedback
 							sid={chatState.activeSid}
 							turnIndex={msg.turnIndex}
@@ -455,6 +454,12 @@
 	:global(.chat-markdown > hr),
 	:global(.chat-markdown > .chart-block) {
 		max-width: 700px;
+	}
+
+	/* Quota-limit message: let the upgrade link flow on from the end of the
+	 * message's last paragraph instead of sitting on its own line. */
+	:global(.chat-markdown.quota-upgrade > p:last-of-type) {
+		display: inline;
 	}
 
 	:global(.chat-markdown code) {
