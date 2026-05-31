@@ -16,6 +16,7 @@
 	import type { PlaceSuggestion } from '$lib/place-search.svelte';
 	import { formatRelativeTime } from '$lib/format-time';
 	import * as m from '$lib/paraglide/messages';
+	import { localizeHref } from '$lib/paraglide/runtime';
 
 	let inputEl: HTMLTextAreaElement | undefined = $state();
 	let promptBarEl: HTMLDivElement | undefined = $state();
@@ -611,12 +612,12 @@
 	>
 		<div class="flex items-center gap-4">
 			<a
-				href="/privacy-policy"
+				href={localizeHref('/privacy-policy')}
 				class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70"
 				>{m.footer_privacy()}</a
 			>
 			<a
-				href="/terms"
+				href={localizeHref('/terms')}
 				class="text-[12px] text-black/50 transition-colors hover:text-black/70 dark:text-white/50 dark:hover:text-white/70"
 				>{m.footer_terms()}</a
 			>

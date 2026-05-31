@@ -78,12 +78,12 @@
 								>
 							{/if}
 							<a
-								href="/privacy-policy"
+								href={localizeHref('/privacy-policy')}
 								class="text-sm text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
 								>{m.footer_privacy()}</a
 							>
 							<a
-								href="/terms"
+								href={localizeHref('/terms')}
 								class="text-sm text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
 								>{m.footer_terms()}</a
 							>
@@ -167,7 +167,7 @@
 		<p class="mt-4 text-center text-xs text-black/40 md:hidden dark:text-white/40">
 			{m.cookie_we_use()}
 			<a
-				href="/privacy-policy"
+				href={localizeHref('/privacy-policy')}
 				class="underline transition-colors hover:text-black/60 dark:hover:text-white/60"
 				>{m.cookie_link()}</a
 			>

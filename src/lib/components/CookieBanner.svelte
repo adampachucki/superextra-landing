@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
 	import { browser } from '$app/environment';
+	import { localizeHref } from '$lib/paraglide/runtime';
 	import * as m from '$lib/paraglide/messages';
 
 	let dismissed = $state(!browser ? true : localStorage.getItem('se_cookies') === '1');
@@ -19,7 +20,7 @@
 		<span
 			>{m.cookie_we_use()}
 			<a
-				href="/privacy-policy"
+				href={localizeHref('/privacy-policy')}
 				class="underline transition-colors hover:text-black dark:hover:text-white"
 				>{m.cookie_link()}</a
 			></span

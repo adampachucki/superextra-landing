@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { auth } from '$lib/auth.svelte';
+	import { localizeHref } from '$lib/paraglide/runtime';
 	import * as m from '$lib/paraglide/messages';
 
 	interface Props {
@@ -172,7 +173,7 @@
 		<p class="pt-1 text-[12px] leading-snug text-black/45 dark:text-white/45">
 			{m.login_terms_pre()}
 			<a
-				href="/terms"
+				href={localizeHref('/terms')}
 				target="_blank"
 				rel="noopener"
 				class="italic transition-colors hover:text-black dark:hover:text-white"
@@ -180,7 +181,7 @@
 			>
 			{m.login_and()}
 			<a
-				href="/privacy-policy"
+				href={localizeHref('/privacy-policy')}
 				target="_blank"
 				rel="noopener"
 				class="italic transition-colors hover:text-black dark:hover:text-white"
