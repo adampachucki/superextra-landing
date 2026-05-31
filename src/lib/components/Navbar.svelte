@@ -9,10 +9,7 @@
 	import * as m from '$lib/paraglide/messages';
 	import { onMount } from 'svelte';
 
-	let {
-		transparent = false,
-		static: isStatic = false
-	}: { transparent?: boolean; static?: boolean } = $props();
+	let { transparent = false }: { transparent?: boolean } = $props();
 
 	let scrolled = $state(false);
 
@@ -91,9 +88,7 @@
 <svelte:window onscroll={handleScroll} />
 
 <nav
-	class="{isStatic
-		? 'relative'
-		: 'fixed top-0 right-0 left-0 z-50'} transition-colors duration-300 {over ? '' : 'bg-cream'}"
+	class="fixed top-0 right-0 left-0 z-50 transition-colors duration-300 {over ? '' : 'bg-cream'}"
 >
 	<div class="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
 		<a
