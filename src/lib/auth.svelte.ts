@@ -65,7 +65,9 @@ function firstTouchProps(): Record<string, string | undefined> {
 /** Identify the PostHog person on every authenticated tick (idempotent), and
  *  fire `return_visit` the first time we see this user on a new calendar day. */
 function onAuthenticated(u: User): void {
-	analytics.identify(u.uid, { email: u.email ?? undefined, ...firstTouchProps() });
+	// First-touch attribution is `$set_once` (3rd arg) so a later campaign can't
+	// overwrite the original source; email is a normal `$set`.
+	analytics.identify(u.uid, { email: u.email ?? undefined }, firstTouchProps());
 	if (!browser) return;
 	const today = new Date().toISOString().slice(0, 10);
 	let last: string | null;

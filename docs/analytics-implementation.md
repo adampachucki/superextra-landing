@@ -33,10 +33,10 @@ Ten events cover the funnel end-to-end. The behavioral events live in the client
 | -------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `$pageview`          | PostHog autocapture                                             | path, utm\_\*, referrer (initial UTM captured automatically on the anon profile) |
 | `prompt_focus`       | Prompt textarea focus                                           | is_first_session                                                                 |
-| `prompt_submitted`   | Question submitted                                              | prompt_length, is_first_query, suggested_chip_used, pillar                       |
+| `prompt_submitted`   | Question submitted                                              | prompt_length, is_first_message, pillar                                          |
 | `research_started`   | Agent run begins                                                | session_id, run_id                                                               |
 | `research_completed` | Agent returns final report                                      | session_id, run_id, duration_ms                                                  |
-| `quota_block_hit`    | A turn returns `turnKind === 'quota_block'`                     | lifetime_research_count                                                          |
+| `quota_block_hit`    | A turn returns `turnKind === 'quota_block'`                     | session_id                                                                       |
 | `checkout_started`   | `billing.startCheckout()` fires (`billing-state.svelte.ts:324`) | market, currency, billing_mode                                                   |
 | `signup`             | First-time auth resolves (new Firebase user)                    | first*touch*\* props                                                             |
 | `return_visit`       | Authed user lands on a new calendar day                         | days_since_signup                                                                |

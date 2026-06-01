@@ -27,9 +27,13 @@ export function initAnalytics(): void {
 	});
 }
 
-export function identify(distinctId: string, props?: Record<string, unknown>): void {
+export function identify(
+	distinctId: string,
+	setProps?: Record<string, unknown>,
+	setOnceProps?: Record<string, unknown>
+): void {
 	if (!started) return;
-	posthog.identify(distinctId, props);
+	posthog.identify(distinctId, setProps, setOnceProps);
 }
 
 export function reset(): void {
