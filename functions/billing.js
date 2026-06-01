@@ -289,7 +289,12 @@ async function getOrCreateCustomer(user, config, locale = 'en') {
 		// Keep the customer's locale current so Stripe-sent invoices/receipts
 		// arrive in their language. Non-critical — don't block checkout on it.
 		try {
-			await stripe(config).customers.update(existing, { preferred_locales: [locale] });
+			await stripe(config).customers.update(existing, {
+				preferred_locales: [locale],
+				// Backfill PostHog stitching on customers created before this field
+				// existed. Stripe merges metadata keys, so other keys are preserved.
+				metadata: { posthog_person_distinct_id: user.uid }
+			});
 		} catch (err) {
 			console.warn('billing preferred_locales update failed:', err.message);
 		}
@@ -304,7 +309,10 @@ async function getOrCreateCustomer(user, config, locale = 'en') {
 			metadata: {
 				firebaseUid: user.uid,
 				app: 'superextra',
-				stripeMode: billingModeLabel(config)
+				stripeMode: billingModeLabel(config),
+				// Stitches Stripe revenue to the PostHog person (= Firebase uid,
+				// the distinct_id we identify with). See analytics-implementation.md.
+				posthog_person_distinct_id: user.uid
 			}
 		},
 		{
@@ -536,7 +544,8 @@ function createCheckoutFunction(config) {
 						firebaseUid: user.uid,
 						market,
 						app: 'superextra',
-						stripeMode: billingModeLabel(config)
+						stripeMode: billingModeLabel(config),
+						posthog_person_distinct_id: user.uid
 					}
 				}
 			});

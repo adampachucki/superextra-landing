@@ -23,6 +23,8 @@ import type { Unsubscribe } from 'firebase/firestore';
 import type { ChatSource, TimelineEvent, TurnFeedback, TurnSummary } from '$lib/chat-types';
 import { getFirebase } from '$lib/firebase';
 import { auth } from '$lib/auth.svelte';
+import { campaignCategory } from '$lib/campaign';
+import * as analytics from '$lib/analytics';
 
 // Cache the dynamic firestore import so every attach path resolves to the
 // same module object. Avoids racing parallel dynamic imports under test
@@ -237,6 +239,13 @@ const previousTurnStatus = new Map<number, Turn['status']>();
 const replyRevealTurns = new Set<number>();
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
 const completedActivityByTurn = new Map<number, TimelineEvent[]>();
+// Analytics dedup — keyed by runId (globally unique), kept for the whole browser
+// session (NOT cleared on session switch) so `research_started`/`research_completed`
+// each fire exactly once per run even when switching between sessions.
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const analyticsStartedRuns = new Set<string>();
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const analyticsCompletedRuns = new Set<string>();
 
 // Sidebar listener state — attached lazily on first consumer access.
 let sidebarAttachStarted = false;
@@ -602,6 +611,40 @@ async function attachActiveListeners(sid: string) {
 					replyRevealTurns.add(turnIndex);
 				}
 				if (!fromCache) previousTurnStatus.set(turnIndex, status);
+				// Analytics — agent run lifecycle, deduped per runId for the whole
+				// browser session so each fires exactly once even across session
+				// switches. Terminal fire requires a prior in-flight sighting so
+				// historical turns loaded fresh aren't counted.
+				if (
+					!fromCache &&
+					status === 'running' &&
+					turn.runId &&
+					!analyticsStartedRuns.has(turn.runId)
+				) {
+					analyticsStartedRuns.add(turn.runId);
+					analytics.capture('research_started', { session_id: sid, run_id: turn.runId });
+				}
+				if (
+					!fromCache &&
+					status === 'complete' &&
+					turn.runId &&
+					!analyticsCompletedRuns.has(turn.runId) &&
+					((prev && IN_FLIGHT_STATUSES.has(prev)) || analyticsStartedRuns.has(turn.runId))
+				) {
+					analyticsCompletedRuns.add(turn.runId);
+					if (turn.turnKind === 'quota_block') {
+						analytics.capture('quota_block_hit', { session_id: sid });
+					} else if (turn.reply) {
+						analytics.capture('research_completed', {
+							session_id: sid,
+							run_id: turn.runId,
+							duration_ms:
+								turn.completedAtMs && turn.createdAtMs
+									? turn.completedAtMs - turn.createdAtMs
+									: undefined
+						});
+					}
+				}
 			});
 			// A send can receive a cache/server snapshot before agentStream's
 			// transaction-created turn is observed. For follow-ups this snapshot
@@ -840,6 +883,11 @@ function friendlyAgentError(code: string): string {
 function startNewChat(query: string, place: PlaceContext | null): string {
 	const trimmed = query.trim();
 	if (!trimmed) throw new Error('empty_message');
+	analytics.capture('prompt_submitted', {
+		prompt_length: trimmed.length,
+		is_first_message: true,
+		pillar: campaignCategory() ?? undefined
+	});
 	const sid = uuid();
 	// Optimistic submission. Flip local state FIRST so the chat panel
 	// renders immediately; the snapshot listener attaches with
@@ -896,6 +944,11 @@ async function sendFollowUp(message: string): Promise<void> {
 	if (!trimmed) return;
 	const sid = activeSid;
 	if (!sid) throw new Error('no_active_session');
+	analytics.capture('prompt_submitted', {
+		prompt_length: trimmed.length,
+		is_first_message: false,
+		pillar: campaignCategory() ?? undefined
+	});
 	const turnIndex = Math.max(activeSession?.lastTurnIndex ?? 0, turns.at(-1)?.turnIndex ?? 0) + 1;
 	installOptimisticTurn(sid, trimmed, turnIndex);
 	try {

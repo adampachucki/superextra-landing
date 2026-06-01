@@ -4,6 +4,7 @@ import { auth } from '$lib/auth.svelte';
 import { getFirebase } from '$lib/firebase';
 import { resolveSupportedBrowserCountry } from '$lib/browser-country';
 import { getLocale } from '$lib/paraglide/runtime';
+import * as analytics from '$lib/analytics';
 import * as m from '$lib/paraglide/messages';
 
 export type BillingMarket = 'us' | 'pl' | 'gb' | 'de' | 'other';
@@ -330,6 +331,11 @@ async function startCheckout(market: BillingMarket = selectedMarket) {
 	}
 	posting = true;
 	error = null;
+	analytics.capture('checkout_started', {
+		market,
+		currency: billingMarkets.find((opt) => opt.id === market)?.currency ?? null,
+		billing_mode: billingMode
+	});
 	try {
 		const url = await postBilling(billingEndpoint('checkout'), {
 			market,
