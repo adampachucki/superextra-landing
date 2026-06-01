@@ -4,6 +4,7 @@
 	import { createPlaceSearch, type PlaceSuggestion } from '$lib/place-search.svelte';
 	import PromptIcon from './PromptIcon.svelte';
 	import PlaceSearchWidget from './PlaceSearchWidget.svelte';
+	import { capture } from '$lib/analytics';
 	import * as m from '$lib/paraglide/messages';
 
 	const PREFIX = m.composer_prefix();
@@ -117,6 +118,20 @@
 		onSubmit({ query: trimmed, place: selectedPlace });
 	}
 
+	let promptFocusTracked = false;
+	function handlePromptFocus() {
+		if (promptFocusTracked) return;
+		promptFocusTracked = true;
+		let firstSession = true;
+		try {
+			firstSession = !localStorage.getItem('se_ph_focused');
+			localStorage.setItem('se_ph_focused', '1');
+		} catch {
+			// localStorage unavailable (private mode) — treat as first session.
+		}
+		capture('prompt_focus', { is_first_session: firstSession });
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
@@ -222,6 +237,7 @@
 				bind:this={inputEl}
 				bind:value={query}
 				onkeydown={handleKeydown}
+				onfocus={handlePromptFocus}
 				data-agent-prompt-input="true"
 				placeholder={dictation.active
 					? m.composer_placeholder_speaking()

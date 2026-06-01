@@ -304,7 +304,10 @@ async function getOrCreateCustomer(user, config, locale = 'en') {
 			metadata: {
 				firebaseUid: user.uid,
 				app: 'superextra',
-				stripeMode: billingModeLabel(config)
+				stripeMode: billingModeLabel(config),
+				// Stitches Stripe revenue to the PostHog person (= Firebase uid,
+				// the distinct_id we identify with). See analytics-implementation.md.
+				posthog_person_distinct_id: user.uid
 			}
 		},
 		{
@@ -536,7 +539,8 @@ function createCheckoutFunction(config) {
 						firebaseUid: user.uid,
 						market,
 						app: 'superextra',
-						stripeMode: billingModeLabel(config)
+						stripeMode: billingModeLabel(config),
+						posthog_person_distinct_id: user.uid
 					}
 				}
 			});

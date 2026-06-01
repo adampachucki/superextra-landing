@@ -10,10 +10,12 @@
  * `firebase.sign_in_provider === 'anonymous'` reject).
  */
 
-import type { User } from 'firebase/auth';
+import type { User, UserCredential } from 'firebase/auth';
 import { browser } from '$app/environment';
 import { getFirebase } from '$lib/firebase';
 import { getLocale } from '$lib/paraglide/runtime';
+import { firstTouch } from '$lib/campaign';
+import * as analytics from '$lib/analytics';
 
 export type AuthStatus = 'unknown' | 'signed-in' | 'signed-out';
 
@@ -42,6 +44,56 @@ let initPromise: Promise<void> | null = null;
 type AuthChangeListener = (uid: string | null) => void;
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
 const authChangeListeners = new Set<AuthChangeListener>();
+
+// --- Analytics --------------------------------------------------------------
+// First-touch campaign attribution is forwarded into PostHog so a Meta/Reddit
+// click that converts days later stitches to the same person. See
+// docs/analytics-implementation.md.
+
+const LAST_SEEN_KEY = 'se_ph_last_seen';
+
+function firstTouchProps(): Record<string, string | undefined> {
+	const ft = firstTouch();
+	return {
+		first_touch_source: ft?.utm_source,
+		first_touch_medium: ft?.utm_medium,
+		first_touch_campaign: ft?.utm_campaign,
+		first_touch_content: ft?.utm_content
+	};
+}
+
+/** Identify the PostHog person on every authenticated tick (idempotent), and
+ *  fire `return_visit` the first time we see this user on a new calendar day. */
+function onAuthenticated(u: User): void {
+	analytics.identify(u.uid, { email: u.email ?? undefined, ...firstTouchProps() });
+	if (!browser) return;
+	const today = new Date().toISOString().slice(0, 10);
+	let last: string | null;
+	try {
+		last = localStorage.getItem(LAST_SEEN_KEY);
+		localStorage.setItem(LAST_SEEN_KEY, today);
+	} catch {
+		return;
+	}
+	if (!last || last === today) return; // first sighting in this browser, or same day
+	const createdMs = u.metadata?.creationTime ? Date.parse(u.metadata.creationTime) : NaN;
+	const daysSinceSignup = Number.isFinite(createdMs)
+		? Math.floor((Date.now() - createdMs) / 86_400_000)
+		: undefined;
+	analytics.capture('return_visit', { days_since_signup: daysSinceSignup });
+}
+
+/** Fire `signup` only for genuinely new Firebase users, so returning sign-ins
+ *  don't re-count. */
+function trackSignupIfNew(authMod: typeof import('firebase/auth'), result: UserCredential): void {
+	try {
+		if (authMod.getAdditionalUserInfo(result)?.isNewUser) {
+			analytics.capture('signup', firstTouchProps());
+		}
+	} catch (err) {
+		console.warn('[auth] signup tracking failed', err);
+	}
+}
 
 async function doInit(): Promise<void> {
 	if (!browser) return;
@@ -76,6 +128,8 @@ async function doInit(): Promise<void> {
 			}
 			user = next;
 			status = next ? 'signed-in' : 'signed-out';
+			if (next) onAuthenticated(next);
+			else analytics.reset();
 			const uid = next?.uid ?? null;
 			for (const listener of authChangeListeners) {
 				try {
@@ -108,6 +162,7 @@ async function signInWithGoogle(): Promise<User> {
 	const authMod = await import('firebase/auth');
 	const provider = new authMod.GoogleAuthProvider();
 	const result = await authMod.signInWithPopup(fbAuth, provider);
+	trackSignupIfNew(authMod, result);
 	return result.user;
 }
 
@@ -159,6 +214,7 @@ async function finishMagicLinkSignIn(url: string, email: string): Promise<User> 
 	const { auth: fbAuth } = await getFirebase();
 	const authMod = await import('firebase/auth');
 	const result = await authMod.signInWithEmailLink(fbAuth, email, url);
+	trackSignupIfNew(authMod, result);
 	if (browser) {
 		try {
 			localStorage.removeItem(MAGIC_LINK_EMAIL_KEY);

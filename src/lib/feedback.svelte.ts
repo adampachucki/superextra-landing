@@ -20,6 +20,7 @@
 
 import { browser } from '$app/environment';
 import { auth } from '$lib/auth.svelte';
+import * as analytics from '$lib/analytics';
 
 const FEEDBACK_URL = '/api/agent/feedback';
 const LAST_PROMPT_KEY = 'se_feedback_lastPromptAt';
@@ -42,6 +43,12 @@ async function post(body: Record<string, unknown>): Promise<void> {
 		body: JSON.stringify(body)
 	});
 	if (!res.ok) throw new Error(`feedback_${res.status}`);
+	analytics.capture('feedback_submitted', {
+		kind: body.kind,
+		rating: body.rating ?? body.useful,
+		reason: body.reasons,
+		text: body.note
+	});
 }
 
 // --- Per-answer thumbs -----------------------------------------------------
