@@ -25,7 +25,9 @@ class TestLanguageDirective:
         result = _research_lead_instruction(MockCtx(state={"promptLanguage": "pl"}))
         assert result.startswith("## Language")
         assert "Polish" in result
-        assert "thoughts" in result
+        assert "thinking" in result
+        # Reinforced at both ends: directive (front) + reminder (end).
+        assert result.rstrip().endswith("Polish is English.")
 
     def test_specialist_directive_present(self):
         provider = _make_instruction("market_landscape")
