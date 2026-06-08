@@ -60,6 +60,7 @@ from .firestore_events import (
 from .gear_run_state import GearRunState
 from .notes import _generate_title
 from .timeline import TimelineOwnershipLost
+from .translate import localize_thought
 
 log = logging.getLogger(__name__)
 
@@ -397,6 +398,7 @@ def _build_state(
         # firestoreSid state key.
         firestore_sid = normalize_firestore_sid(sid) or sid
     user_id = getattr(invocation_context, "user_id", None) or ""
+    prompt_language = state.get("promptLanguage") if isinstance(state, dict) else None
     return GearRunState(
         sid=firestore_sid,
         invocation_id=invocation_context.invocation_id,
@@ -405,6 +407,7 @@ def _build_state(
         user_id=user_id,
         query_text=_query_text(invocation_context),
         fs=fs,
+        prompt_language=prompt_language if isinstance(prompt_language, str) else None,
     )
 
 
@@ -751,6 +754,12 @@ class FirestoreProgressPlugin(BasePlugin):
         # Best-effort timeline writes. TimelineWriter has its own internal
         # lock so concurrent writers don't interleave.
         for ev in timeline_events:
+            # Gemini emits its generic procedural thought-summaries in English
+            # even when instructed otherwise; translate them into the prompt
+            # language so the live feed matches the report. Best-effort — falls
+            # back to the original text on any error/timeout.
+            if ev.get("kind") == "thought" and per.prompt_language:
+                ev["text"] = await localize_thought(ev["text"], per.prompt_language)
             try:
                 await per.timeline_writer.write_timeline(ev)
             except TimelineOwnershipLost:
