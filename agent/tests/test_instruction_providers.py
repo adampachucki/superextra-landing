@@ -17,6 +17,39 @@ from superextra_agent.specialists import _make_instruction
 INSTRUCTIONS_DIR = Path(__file__).resolve().parent.parent / "superextra_agent" / "instructions"
 
 
+class TestLanguageDirective:
+    """Every agent prepends one uniform language directive anchored to the
+    detected prompt language (`promptLanguage` in session state)."""
+
+    def test_research_lead_directive_uses_resolved_language_name(self):
+        result = _research_lead_instruction(MockCtx(state={"promptLanguage": "pl"}))
+        assert result.startswith("## Language")
+        assert "Polish" in result
+        assert "thoughts" in result
+
+    def test_specialist_directive_present(self):
+        provider = _make_instruction("market_landscape")
+        result = provider(MockCtx(state={"promptLanguage": "de"}))
+        assert result.startswith("## Language")
+        assert "German" in result
+
+    def test_defaults_to_english_when_unset(self):
+        result = _report_writer_instruction(MockCtx(state={}))
+        assert "English" in result.split("\n\n")[1]
+
+    def test_old_scattered_language_lines_removed(self):
+        for fname in (
+            "specialist_base.md",
+            "router.md",
+            "context_enricher.md",
+            "continue_research.md",
+            "report_writer.md",
+        ):
+            text = (INSTRUCTIONS_DIR / fname).read_text()
+            assert "use the user's language" not in text.lower()
+            assert "respond in the user's language" not in text.lower()
+
+
 class MockCtx:
     def __init__(self, state=None):
         self.state = state or {}

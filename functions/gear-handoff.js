@@ -95,7 +95,8 @@ async function _doHandoff({
 	quotaUid,
 	message,
 	createEngineSession,
-	seedState
+	seedState,
+	promptLanguage
 }) {
 	const token = await getVertexAccessToken();
 	const adkSid = engineSessionId || `se-${sid}`;
@@ -114,7 +115,7 @@ async function _doHandoff({
 			headers,
 			body: JSON.stringify({
 				userId,
-				sessionState: { ...(seedState || {}), runId, turnIdx, firestoreSid: sid }
+				sessionState: { ...(seedState || {}), runId, turnIdx, firestoreSid: sid, promptLanguage }
 			})
 		});
 		if (!r.ok) {
@@ -143,7 +144,11 @@ async function _doHandoff({
 			// (which stays pinned to the original creator). The quota gate reads
 			// `quotaUid` so shared-URL contributors are charged on their own
 			// daily allotment, not the creator's.
-			actions: { stateDelta: { runId, turnIdx, firestoreSid: sid, quotaUid } }
+			// `promptLanguage` (detected per turn by agentStream) drives the
+			// language every agent thinks and writes in — read in the instruction
+			// providers. Set on the per-turn stateDelta so follow-ups in a
+			// different language update it, not just the first turn's sessionState.
+			actions: { stateDelta: { runId, turnIdx, firestoreSid: sid, quotaUid, promptLanguage } }
 		})
 	});
 	if (!ar.ok) {
@@ -200,6 +205,7 @@ export async function gearHandoff({
 	isEngineFirstMessage,
 	createEngineSession = isEngineFirstMessage,
 	seedState = null,
+	promptLanguage = 'en',
 	deadlineMs = HANDOFF_DEADLINE_MS
 }) {
 	const resource = getResource();
@@ -232,7 +238,8 @@ export async function gearHandoff({
 				quotaUid,
 				message,
 				createEngineSession,
-				seedState
+				seedState,
+				promptLanguage
 			}),
 			deadlinePromise
 		]);

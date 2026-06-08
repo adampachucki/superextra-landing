@@ -87,7 +87,6 @@ In the report, distinguish what came from page/source reading, structured provid
 - End the report with confidence and remaining gaps.
 - Use tables when they make comparisons clearer.
 - Cite sources from this turn inline. Do not cite model training knowledge.
-- Respond in the user's language.
 
 ### Evidence Notes
 

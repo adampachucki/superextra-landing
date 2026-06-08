@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { fade, fly, slide } from 'svelte/transition';
 	import { formatDuration } from '$lib/time';
+	import * as m from '$lib/paraglide/messages';
+	import {
+		labelLocale,
+		familyLabel,
+		authorLabel as authorLabelFor,
+		detailText,
+		statusDetailLabel,
+		idleLabels
+	} from '$lib/activity-i18n';
 	import type { TimelineEvent } from '$lib/chat-types';
 
 	let {
@@ -8,32 +17,30 @@
 		startedAtMs = null,
 		elapsedMs = null,
 		completed = false,
-		statusLabel = null
+		statusLabel = null,
+		language = null
 	}: {
 		events: TimelineEvent[];
 		startedAtMs?: number | null;
 		elapsedMs?: number | null;
 		completed?: boolean;
 		statusLabel?: string | null;
+		language?: string | null;
 	} = $props();
+
+	const locale = $derived(labelLocale(language));
 
 	let now = $state(Date.now());
 	let expanded = $state(false);
 	let expandedTools: Record<string, boolean> = $state({});
 	let expandedStepBodies: Record<string, boolean> = $state({});
 
-	const IDLE_LABELS = ['Thinking', 'Working', 'Analyzing'] as const;
-	type IdleLabel = (typeof IDLE_LABELS)[number];
-
-	let idleLabel = $state<IdleLabel>(IDLE_LABELS[0]);
+	const IDLE_COUNT = 3;
+	let idleIndex = $state(0);
+	const idleLabel = $derived(idleLabels(locale)[idleIndex] ?? '');
 
 	function idleLabelDelay() {
 		return 4000 + Math.random() * 4000;
-	}
-
-	function nextIdleLabel(label: IdleLabel): IdleLabel {
-		const index = IDLE_LABELS.indexOf(label);
-		return IDLE_LABELS[(index + 1) % IDLE_LABELS.length];
 	}
 
 	$effect(() => {
@@ -48,11 +55,11 @@
 	$effect(() => {
 		const latest = events[events.length - 1];
 		if (completed || (latest && (!isRunStartStatus(latest) || statusLabel))) return;
-		idleLabel = IDLE_LABELS[0];
+		idleIndex = 0;
 		let timer: ReturnType<typeof setTimeout>;
 		const schedule = () => {
 			timer = setTimeout(() => {
-				idleLabel = nextIdleLabel(idleLabel);
+				idleIndex = (idleIndex + 1) % IDLE_COUNT;
 				schedule();
 			}, idleLabelDelay());
 		};
@@ -72,47 +79,16 @@
 		);
 	}
 
-	const FAMILY_LABEL: Record<DetailEvent['family'], string> = {
-		'Google Maps': 'Checking Google Maps',
-		'Google reviews': 'Reading reviews',
-		TripAdvisor: 'Cross-referencing TripAdvisor',
-		'Searching the web': 'Searching the web',
-		Analysis: 'Continuing research',
-		'Public sources': 'Reading sources',
-		Warnings: 'Checking sources'
-	};
-	const AUTHOR_LABEL: Record<string, string> = {
-		router: 'Choosing next steps',
-		context_enricher: 'Building context',
-		research_lead: 'Reasoning',
-		report_writer: 'Drafting final report',
-		continue_research: 'Continuing research',
-		market_landscape: 'Researching market signals',
-		menu_pricing: 'Researching menu and pricing',
-		revenue_sales: 'Researching revenue signals',
-		guest_intelligence: 'Researching guest signals',
-		location_traffic: 'Researching location and traffic',
-		operations: 'Researching operating signals',
-		marketing_brand: 'Researching marketing signals',
-		review_analyst: 'Analyzing review patterns',
-		dynamic_researcher_1: 'Researching focused angle',
-		dynamic_researcher_2: 'Researching focused angle',
-		dynamic_researcher_3: 'Researching focused angle'
-	};
-	function authorLabel(author: string | null | undefined): string {
-		if (!author) return 'Reasoning';
-		if (AUTHOR_LABEL[author]) return AUTHOR_LABEL[author];
-		return 'Researching';
-	}
-
 	const label = $derived.by<string>(() => {
 		const latest = events[events.length - 1];
 		if (!latest) return statusLabel ?? idleLabel;
 		if (isRunStartStatus(latest)) return statusLabel ?? idleLabel;
 		if (latest.kind === 'detail') {
-			return latest.family === 'Analysis' ? latest.text : FAMILY_LABEL[latest.family];
+			return latest.family === 'Analysis'
+				? statusDetailLabel(latest, locale)
+				: familyLabel(latest.family, locale);
 		}
-		return authorLabel(latest.author);
+		return authorLabelFor(latest.author, locale);
 	});
 
 	const LEAD_AUTHORS = new Set([
@@ -324,9 +300,11 @@
 			>
 				<path d="M6 4l4 4-4 4" />
 			</svg>
-			<span>Analysis activity</span>
+			<span>{m.act_chrome_activity({}, { locale })}</span>
 		</span>
-		<span class="shrink-0 text-[12px] text-black/40 dark:text-white/40">{durationLabel} total</span>
+		<span class="shrink-0 text-[12px] text-black/40 dark:text-white/40"
+			>{m.act_chrome_total_duration({ duration: durationLabel }, { locale })}</span
+		>
 	</button>
 {/snippet}
 
@@ -376,7 +354,8 @@
 													type="button"
 													onclick={() => expandStepBody(step.id)}
 													class="inline cursor-pointer p-0 align-baseline text-black/38 transition-colors hover:text-black/64 hover:underline dark:text-white/38 dark:hover:text-white/64"
-												>…more</button>{/if}
+													>{m.act_chrome_more({}, { locale })}</button
+												>{/if}
 										</div>
 									{/each}
 								</div>
@@ -391,7 +370,7 @@
 											in:fly={{ y: 4, duration: 200 }}
 											class="flex items-start text-[13px] leading-snug text-black/54 dark:text-white/56"
 										>
-											<span class="break-words">{tool.text}</span>
+											<span class="break-words">{detailText(tool, locale)}</span>
 										</div>
 									{/each}
 									{#if hiddenToolCount(step)}
@@ -400,7 +379,9 @@
 											onclick={() => toggleTools(step.id)}
 											class="mt-0.5 w-fit text-left text-[13px] leading-snug text-black/38 transition-colors hover:text-black/58 dark:text-white/38 dark:hover:text-white/58"
 										>
-											{expandedTools[step.id] ? 'Show fewer' : `Show ${hiddenToolCount(step)} more`}
+											{expandedTools[step.id]
+												? m.act_chrome_show_fewer({}, { locale })
+												: m.act_chrome_show_more({ count: hiddenToolCount(step) }, { locale })}
 										</button>
 									{/if}
 								</div>

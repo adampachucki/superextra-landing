@@ -364,6 +364,21 @@ def test_continue_gate_research_scope_block_message_lifetime():
     assert "tomorrow" not in text  # ever → no reset phrase
 
 
+def test_research_gate_block_message_follows_prompt_language():
+    today_key = _period_key("day", datetime.now(timezone.utc))
+    ctx = _callback_context("u1", state={"promptLanguage": "pl"})
+    fs = _gate_fs(
+        config_doc=_config(),
+        user_doc={"plan": "free", "researchCount": 1, "researchPeriodKey": today_key},
+    )
+    out = _run(research_quota_gate, ctx, fs)
+    assert out is not None
+    text = out.parts[0].text
+    assert "limit badań" in text  # Polish
+    assert "w planie darmowym" in text  # localized free-plan suffix
+    assert "free plan" not in text
+
+
 def test_continue_gate_account_scope_message_has_no_per_chat_wording():
     # Account-scoped follow-ups (paid) must NOT say "for this chat".
     ctx = _callback_context("u-paid")

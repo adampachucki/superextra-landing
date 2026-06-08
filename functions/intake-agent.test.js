@@ -85,6 +85,27 @@ describe('buildIntakePrompt', () => {
 		assert.doesNotMatch(prompt, /first round/i);
 		assert.doesNotMatch(prompt, /second round/i);
 	});
+
+	it('anchors user-visible text to the detected language', () => {
+		const prompt = buildIntakePrompt({ history: [], message: 'Gdzie?', language: 'pl' });
+		assert.match(prompt, /ISO code "pl"/);
+	});
+});
+
+describe('runIntakeConversation localized fallbacks', () => {
+	it('uses the Polish fallback reply when the model returns an empty reply', async () => {
+		const fetchImpl = fetchSequence([
+			modelJson({ action: 'reply', reply: '', state: emptyState, reason: 'ask' })
+		]);
+		const result = await runIntakeConversation({
+			message: 'Sprawdź coś',
+			language: 'pl',
+			fetchImpl,
+			getToken: async () => 'tok'
+		});
+		assert.equal(result.action, 'reply');
+		assert.match(result.reply, /restaurację|ulicę|rynek/);
+	});
 });
 
 describe('normalizeIntakeState', () => {

@@ -11,6 +11,7 @@
 	import Spinner from '$lib/components/Spinner.svelte';
 	import { renderMarkdown } from '$lib/markdown';
 	import * as m from '$lib/paraglide/messages';
+	import { labelLocale } from '$lib/activity-i18n';
 	import ChartBlock from './ChartBlock.svelte';
 	import SourceFavicon from './SourceFavicon.svelte';
 	import MessageFeedback from './MessageFeedback.svelte';
@@ -362,6 +363,7 @@
 							<LiveActivity
 								events={msg.activityEvents ?? []}
 								elapsedMs={msg.turnSummary.elapsedMs}
+								language={msg.language ?? null}
 								completed
 							/>
 						</div>
@@ -371,9 +373,10 @@
 						{@const showAll = expandedSources[msg.turnIndex]}
 						{@const displaySources = varietyFirstSources(msg.sources, msg.turnIndex)}
 						{@const visible = showAll ? displaySources : displaySources.slice(0, SOURCES_LIMIT)}
+						{@const srcLocale = labelLocale(msg.language)}
 						<div class="mt-5 max-w-[700px]">
 							<span class="mb-2 block text-[12px] font-medium text-black/40 dark:text-white/40"
-								>Sources ({msg.sources.length})</span
+								>{m.act_sources_label({ count: msg.sources.length }, { locale: srcLocale })}</span
 							>
 							<div class="flex flex-wrap gap-1.5">
 								{#each visible as src (`${src.url}:${src.title}`)}
@@ -400,7 +403,10 @@
 										}}
 										class="inline-flex items-center rounded-full border border-black/5 px-2.5 py-1 text-[12px] leading-snug text-black/40 transition-colors hover:border-black/10 hover:bg-black/[0.02] hover:text-black/60 dark:border-white/5 dark:text-white/40 dark:hover:border-white/10 dark:hover:bg-white/[0.02] dark:hover:text-white/60"
 									>
-										+{msg.sources.length - SOURCES_LIMIT} more
+										{m.act_sources_more(
+											{ count: msg.sources.length - SOURCES_LIMIT },
+											{ locale: srcLocale }
+										)}
 									</button>
 								{/if}
 							</div>
@@ -422,6 +428,7 @@
 					events={chatState.liveTimeline}
 					startedAtMs={chatState.currentTurnStartedAtMs}
 					statusLabel={chatState.liveStatusLabel}
+					language={chatState.activeLanguage}
 				/>
 			</div>
 		{/if}

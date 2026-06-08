@@ -108,10 +108,69 @@ def _period_key(period: str, now: datetime) -> str:
     return now.strftime("%Y-%m-%d")  # day, and the safe fallback for unknown
 
 
-def _reset_phrase(period: str) -> str:
-    return {"day": "tomorrow", "week": "next week", "month": "next month", "year": "next year"}.get(
-        period, ""
-    )
+# Quota-block replies follow the prompt language (en/de/pl, English otherwise).
+# These run inside the agent, where `promptLanguage` is in session state.
+_RESET_PHRASE_BY_LANG = {
+    "en": {"day": "tomorrow", "week": "next week", "month": "next month", "year": "next year"},
+    "de": {
+        "day": "morgen",
+        "week": "nächste Woche",
+        "month": "nächsten Monat",
+        "year": "nächstes Jahr",
+    },
+    "pl": {
+        "day": "jutro",
+        "week": "w przyszłym tygodniu",
+        "month": "w przyszłym miesiącu",
+        "year": "w przyszłym roku",
+    },
+}
+_FREE_SUFFIX_BY_LANG = {
+    "en": " on the free plan",
+    "de": " im kostenlosen Tarif",
+    "pl": " w planie darmowym",
+}
+_FOR_THIS_CHAT_BY_LANG = {"en": " for this chat", "de": " für diesen Chat", "pl": " w tym czacie"}
+
+_RESEARCH_BLOCK_BY_LANG = {
+    "en": {
+        "phrase": "Research limit reached{suffix}. Try again {phrase}.",
+        "exhausted": "You've used your research allowance{suffix}.",
+    },
+    "de": {
+        "phrase": "Recherchelimit erreicht{suffix}. Bitte {phrase} erneut versuchen.",
+        "exhausted": "Das Recherchekontingent ist aufgebraucht{suffix}.",
+    },
+    "pl": {
+        "phrase": "Osiągnięto limit badań{suffix}. Spróbuj ponownie {phrase}.",
+        "exhausted": "Wykorzystano limit badań{suffix}.",
+    },
+}
+_CONTINUE_BLOCK_BY_LANG = {
+    "en": {
+        "phrase": "Follow-up limit reached{where}{suffix}. Try again {phrase}.",
+        "exhausted_chat": "You've used the follow-ups for this chat{suffix}.",
+        "exhausted": "You've used your follow-up allowance{suffix}.",
+    },
+    "de": {
+        "phrase": "Limit für Folgefragen erreicht{where}{suffix}. Bitte {phrase} erneut versuchen.",
+        "exhausted_chat": "Die Folgefragen für diesen Chat sind aufgebraucht{suffix}.",
+        "exhausted": "Das Kontingent für Folgefragen ist aufgebraucht{suffix}.",
+    },
+    "pl": {
+        "phrase": "Osiągnięto limit pytań uzupełniających{where}{suffix}. Spróbuj ponownie {phrase}.",
+        "exhausted_chat": "Wykorzystano pytania uzupełniające w tym czacie{suffix}.",
+        "exhausted": "Wykorzystano limit pytań uzupełniających{suffix}.",
+    },
+}
+
+
+def _lang(language: str | None) -> str:
+    return language if language in _RESET_PHRASE_BY_LANG else "en"
+
+
+def _reset_phrase(period: str, language: str | None = None) -> str:
+    return _RESET_PHRASE_BY_LANG[_lang(language)].get(period, "")
 
 
 def _resolve_spec(config: dict[str, Any], plan: str, quota: str, user_doc: dict | None) -> dict[str, Any]:
@@ -187,23 +246,28 @@ def _reserve(
 _reserve_txn = firestore.transactional(_reserve)
 
 
-def _research_block_message(plan: str, period: str, scope: str) -> str:
-    suffix = "" if plan == "paid" else " on the free plan"  # research is always account-scoped
-    phrase = _reset_phrase(period)
+def _research_block_message(plan: str, period: str, scope: str, language: str | None = None) -> str:
+    lang = _lang(language)
+    # research is always account-scoped
+    suffix = "" if plan == "paid" else _FREE_SUFFIX_BY_LANG[lang]
+    phrase = _reset_phrase(period, lang)
+    tpl = _RESEARCH_BLOCK_BY_LANG[lang]
     if phrase:
-        return f"Research limit reached{suffix}. Try again {phrase}."
-    return f"You've used your research allowance{suffix}."
+        return tpl["phrase"].format(suffix=suffix, phrase=phrase)
+    return tpl["exhausted"].format(suffix=suffix)
 
 
-def _continue_block_message(plan: str, period: str, scope: str) -> str:
-    suffix = "" if plan == "paid" else " on the free plan"
-    where = " for this chat" if scope == "research" else ""
-    phrase = _reset_phrase(period)
+def _continue_block_message(plan: str, period: str, scope: str, language: str | None = None) -> str:
+    lang = _lang(language)
+    suffix = "" if plan == "paid" else _FREE_SUFFIX_BY_LANG[lang]
+    where = _FOR_THIS_CHAT_BY_LANG[lang] if scope == "research" else ""
+    phrase = _reset_phrase(period, lang)
+    tpl = _CONTINUE_BLOCK_BY_LANG[lang]
     if phrase:
-        return f"Follow-up limit reached{where}{suffix}. Try again {phrase}."
+        return tpl["phrase"].format(where=where, suffix=suffix, phrase=phrase)
     if scope == "research":
-        return f"You've used the follow-ups for this chat{suffix}."
-    return f"You've used your follow-up allowance{suffix}."
+        return tpl["exhausted_chat"].format(suffix=suffix)
+    return tpl["exhausted"].format(suffix=suffix)
 
 
 def _make_gate(
@@ -211,7 +275,7 @@ def _make_gate(
     quota: str,
     count_field: str,
     period_field: str,
-    block_message: Callable[[str, str, str], str],
+    block_message: Callable[[str, str, str, str | None], str],
 ):
     """Build a `before_agent_callback` that reserves one credit of `quota` in
     a single transaction, or halts the agent with a friendly block reply."""
@@ -247,7 +311,8 @@ def _make_gate(
         if reserved:
             return None
 
-        reply = block_message(plan, period, scope)
+        language = callback_context.state.get("promptLanguage")
+        reply = block_message(plan, period, scope, language)
         callback_context.state[QUOTA_BLOCK_REPLY_KEY] = reply
         return types.Content(role="model", parts=[types.Part(text=reply)])
 

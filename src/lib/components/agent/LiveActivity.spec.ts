@@ -25,6 +25,31 @@ describe('LiveActivity', () => {
 		expect(body).not.toContain('Starting research');
 	});
 
+	it('localizes detail rows and family labels to the prompt language', () => {
+		const { body } = render(LiveActivity, {
+			props: {
+				events: [
+					{
+						kind: 'detail',
+						id: 'tool:resp:1',
+						group: 'platform',
+						family: 'Google reviews',
+						text: '5 reviews loaded',
+						labelKey: 'act_detail_reviews_loaded',
+						vars: { count: 5 }
+					}
+				],
+				startedAtMs: 1000,
+				language: 'pl'
+			}
+		});
+
+		// Localized detail row (interpolated) and headline family label, no English.
+		expect(body).toContain('Załadowano opinie: 5');
+		expect(body).toContain('Czytam opinie');
+		expect(body).not.toContain('5 reviews loaded');
+	});
+
 	it('keeps real timeline events ahead of the live status label', () => {
 		const { body } = render(LiveActivity, {
 			props: {

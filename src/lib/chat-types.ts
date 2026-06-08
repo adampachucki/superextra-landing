@@ -53,6 +53,11 @@ export type TimelineEvent =
 				| 'Public sources'
 				| 'Warnings';
 			text: string;
+			// Backend sets these on prose rows so the frontend can localize to
+			// the prompt language; `text` is the English fallback. Pure-data rows
+			// (search queries, URLs) omit them and render `text` verbatim.
+			labelKey?: string;
+			vars?: Record<string, string | number>;
 	  }
 	| {
 			kind: 'thought';
