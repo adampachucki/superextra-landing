@@ -68,6 +68,10 @@ class GearRunState:
     # from the Firestore client construction path).
     fs: firestore.Client | None = None
 
+    # Detected prompt language (ISO-639-1). Drives thought translation and the
+    # safe-thought fallback. Read from session.state in `_build_state`.
+    prompt_language: str | None = None
+
     def __post_init__(self) -> None:
         # `fs` is required in practice (the plugin always passes it). Earlier
         # versions had a defensive `raise RuntimeError(...)` here; dropped per
@@ -85,6 +89,10 @@ class GearRunState:
             run_id=self.run_id,
             attempt=1,
         )
+        # Expose the language to the event mapper too, so the safe-thought
+        # fallback localizes (map_event reads it from mapping_state).
+        if self.prompt_language:
+            self.mapping_state.setdefault("promptLanguage", self.prompt_language)
 
     # ── Per-event observation ────────────────────────────────────────────────
 

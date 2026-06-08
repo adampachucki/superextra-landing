@@ -196,6 +196,54 @@ async def test_before_tool_returns_cancelled_result_when_run_no_longer_owns_sess
 
 
 @pytest.mark.asyncio
+async def test_on_event_translates_thought_to_prompt_language(monkeypatch):
+    plugin, state = _make_plugin_state()
+    state.prompt_language = "pl"
+    state.observe_event = MagicMock(
+        return_value=[{"kind": "thought", "author": "review_analyst", "text": "**Reading reviews**"}]
+    )
+    monkeypatch.setattr(firestore_progress, "fenced_session_update", AsyncMock())
+    localize = AsyncMock(return_value="**Czytam opinie**")
+    monkeypatch.setattr(firestore_progress, "localize_thought", localize)
+    invocation_context = SimpleNamespace(
+        invocation_id="inv-parent",
+        agent_name="review_analyst",
+        session=SimpleNamespace(id="se-sid-test", state={"runId": "run-test"}),
+    )
+
+    await plugin.on_event_callback(
+        invocation_context=invocation_context, event=SimpleNamespace(partial=False)
+    )
+
+    localize.assert_awaited_once_with("**Reading reviews**", "pl")
+    written = state.timeline_writer.write_timeline.await_args.args[0]
+    assert written["text"] == "**Czytam opinie**"
+
+
+@pytest.mark.asyncio
+async def test_on_event_skips_translation_without_prompt_language(monkeypatch):
+    plugin, state = _make_plugin_state()
+    state.prompt_language = None
+    state.observe_event = MagicMock(
+        return_value=[{"kind": "thought", "author": "x", "text": "**Reading reviews**"}]
+    )
+    monkeypatch.setattr(firestore_progress, "fenced_session_update", AsyncMock())
+    localize = AsyncMock()
+    monkeypatch.setattr(firestore_progress, "localize_thought", localize)
+    invocation_context = SimpleNamespace(
+        invocation_id="inv-parent",
+        agent_name="x",
+        session=SimpleNamespace(id="se-sid-test", state={"runId": "run-test"}),
+    )
+
+    await plugin.on_event_callback(
+        invocation_context=invocation_context, event=SimpleNamespace(partial=False)
+    )
+
+    localize.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_on_event_stops_when_timeline_writer_loses_ownership(monkeypatch):
     plugin, state = _make_plugin_state()
     state.observe_event = MagicMock(return_value=[{"kind": "detail", "text": "late"}])
