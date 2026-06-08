@@ -17,7 +17,7 @@
 		description,
 		canonicalPath = '/',
 		robots = 'index, follow',
-		// English-only pages (memo, legal, app shell) set this false: no hreflang
+		// English-only pages (about, legal, app shell) set this false: no hreflang
 		// alternates are emitted and the canonical is the plain unprefixed path.
 		localized = true
 	}: {

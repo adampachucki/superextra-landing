@@ -61,6 +61,11 @@
 					"source": "/pl/landing",
 					"destination": "/pl",
 					"type": 301
+				},
+				{
+					"source": "/memo",
+					"destination": "/about",
+					"type": 301
 				}
 			],
 			"rewrites": [

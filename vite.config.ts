@@ -19,7 +19,7 @@ export default defineConfig({
 				{ match: '/chat/:rest(.*)?', strategy: ['cookie', 'preferredLanguage', 'baseLocale'] },
 				{ match: '/login/:rest(.*)?', strategy: ['cookie', 'preferredLanguage', 'baseLocale'] },
 				// English-only page — excluded from localization until translated.
-				{ match: '/memo/:rest(.*)?', exclude: true }
+				{ match: '/about/:rest(.*)?', exclude: true }
 			],
 			// These routes are never prefixed: every locale maps to the same path,
 			// so localizeHref() and the prerender crawl keep them unprefixed.
@@ -41,11 +41,11 @@ export default defineConfig({
 					]
 				},
 				{
-					pattern: ':protocol://:domain(.*)::port?/memo:rest(/.*)?',
+					pattern: ':protocol://:domain(.*)::port?/about:rest(/.*)?',
 					localized: [
-						['en', ':protocol://:domain(.*)::port?/memo:rest(/.*)?'],
-						['de', ':protocol://:domain(.*)::port?/memo:rest(/.*)?'],
-						['pl', ':protocol://:domain(.*)::port?/memo:rest(/.*)?']
+						['en', ':protocol://:domain(.*)::port?/about:rest(/.*)?'],
+						['de', ':protocol://:domain(.*)::port?/about:rest(/.*)?'],
+						['pl', ':protocol://:domain(.*)::port?/about:rest(/.*)?']
 					]
 				},
 				// Everything else: English at root, German under /de, Polish under /pl.

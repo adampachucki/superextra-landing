@@ -61,9 +61,9 @@
 						<!-- Text links -->
 						<div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
 							<a
-								href="/memo"
+								href="/about"
 								class="text-sm text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
-								>Memo</a
+								>{m.footer_about()}</a
 							>
 							<a
 								href={localizeHref('/contact')}

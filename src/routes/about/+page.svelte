@@ -6,9 +6,9 @@
 </script>
 
 <Seo
-	title="Memo - Superextra"
-	description="Superextra memo on the market intelligence layer restaurants have been missing."
-	canonicalPath="/memo"
+	title="About - Superextra"
+	description="Superextra on the market intelligence layer restaurants have been missing."
+	canonicalPath="/about"
 	localized={false}
 />
 
@@ -51,7 +51,7 @@
 	</div>
 </header>
 
-<article class="memo mx-auto px-6 pb-32" style="max-width: 780px; padding-top: 3.5rem;">
+<article class="about mx-auto px-6 pb-32" style="max-width: 780px; padding-top: 3.5rem;">
 	<!-- <h2>The missing context</h2> -->
 	<p>
 		Every restaurant operator already knows their internal numbers: covers, average tickets, labor
@@ -317,7 +317,7 @@
 <Footer />
 
 <style>
-	.memo :global(h2) {
+	.about :global(h2) {
 		font-size: clamp(1.75rem, 3.5vw, 2.5rem);
 		line-height: 1.15;
 		font-weight: 400;
@@ -327,40 +327,40 @@
 		margin-bottom: 1.25rem;
 	}
 
-	.memo :global(h2:first-child) {
+	.about :global(h2:first-child) {
 		margin-top: 0;
 	}
 
-	.memo :global(p) {
+	.about :global(p) {
 		font-size: 17px;
 		line-height: 1.75;
 		color: color-mix(in srgb, var(--color-text) 60%, transparent);
 		margin-top: 1.25rem;
 	}
 
-	.memo :global(strong) {
+	.about :global(strong) {
 		font-weight: 500;
 		color: var(--color-text);
 	}
 
-	.memo :global(ul) {
+	.about :global(ul) {
 		margin-top: 1.25rem;
 		padding-left: 1.25rem;
 		list-style: disc;
 	}
 
-	.memo :global(li) {
+	.about :global(li) {
 		font-size: 17px;
 		line-height: 1.75;
 		color: color-mix(in srgb, var(--color-text) 60%, transparent);
 		margin-top: 0.5rem;
 	}
 
-	.memo :global(li)::marker {
+	.about :global(li)::marker {
 		color: color-mix(in srgb, var(--color-text) 20%, transparent);
 	}
 
-	.memo :global(blockquote) {
+	.about :global(blockquote) {
 		border-left: 2px solid var(--color-cream-300);
 		padding-left: 1.5rem;
 		margin: 1.5rem 0;
@@ -370,37 +370,37 @@
 		color: color-mix(in srgb, var(--color-text) 70%, transparent);
 	}
 
-	.memo :global(table) {
+	.about :global(table) {
 		width: 100%;
 		margin-top: 1.5rem;
 		border-collapse: collapse;
 	}
 
-	.memo :global(tr) {
+	.about :global(tr) {
 		border-bottom: 1px solid var(--color-cream-200);
 	}
 
-	.memo :global(tr:last-child) {
+	.about :global(tr:last-child) {
 		border-bottom: none;
 	}
 
-	.memo :global(td) {
+	.about :global(td) {
 		padding: 0.75rem 0;
 		font-size: 15px;
 		vertical-align: baseline;
 	}
 
-	.memo :global(td:first-child) {
+	.about :global(td:first-child) {
 		width: 11rem;
 		padding-right: 1.5rem;
 		white-space: nowrap;
 	}
 
-	.memo :global(td:last-child) {
+	.about :global(td:last-child) {
 		color: color-mix(in srgb, var(--color-text) 50%, transparent);
 	}
 
-	.memo :global(.signature) {
+	.about :global(.signature) {
 		margin-top: 4rem;
 		width: 180px;
 		height: auto;

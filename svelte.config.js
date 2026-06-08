@@ -15,7 +15,7 @@ const config = {
 			// Locale variants reroute to the same routes, so the crawler can't
 			// discover them by route alone. List the localized marketing pages
 			// explicitly so every one is emitted at build time. App routes
-			// (/chat, /login) and the English-only /memo stay unprefixed.
+			// (/chat, /login) and the English-only /about stay unprefixed.
 			// /landing is retired (redirected to the agent home in firebase.json),
 			// so its locale variants are no longer emitted.
 			entries: [
