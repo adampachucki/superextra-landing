@@ -12,7 +12,25 @@ const TEXT_SEARCH_FIELDS = [
 const MAX_TEXT = 900;
 const MAX_CANDIDATES = 5;
 const ACKNOWLEDGEMENT_TEXT_LIMIT = 320;
-const FALLBACK_REPLY = 'Which restaurant, street, neighborhood, city, or market should I check?';
+
+// Deterministic fallbacks fire only when the model call fails or returns
+// unusable text, so they can't rely on the model to self-localize. Keyed by
+// the detected prompt language (en/de/pl), English otherwise.
+const FALLBACK_REPLY_BY_LANG = {
+	en: 'Which restaurant, street, neighborhood, city, or market should I check?',
+	de: 'Welches Restaurant, welche Straße, welches Viertel, welche Stadt oder welchen Markt soll ich prüfen?',
+	pl: 'Którą restaurację, ulicę, dzielnicę, miasto lub rynek mam sprawdzić?'
+};
+
+const ACK_FRAME_BY_LANG = {
+	en: (focus) => `Reviewing ${focus}. The report will take a few minutes.`,
+	de: (focus) => `Ich prüfe ${focus}. Der Bericht dauert ein paar Minuten.`,
+	pl: (focus) => `Sprawdzam ${focus}. Raport zajmie kilka minut.`
+};
+
+function fallbackReply(language) {
+	return FALLBACK_REPLY_BY_LANG[language] || FALLBACK_REPLY_BY_LANG.en;
+}
 
 const INTAKE_STATE_SCHEMA = {
 	type: 'OBJECT',
@@ -114,7 +132,8 @@ function acknowledgementFocus({ state, researchQuestion, placeContext, message }
 
 function fallbackAcknowledgement(context) {
 	const focus = acknowledgementFocus(context);
-	return `Reviewing ${focus}. The report will take a few minutes.`;
+	const frame = ACK_FRAME_BY_LANG[context?.language] || ACK_FRAME_BY_LANG.en;
+	return frame(focus);
 }
 
 function normalizeAcknowledgement(acknowledgement, context) {
@@ -264,10 +283,12 @@ export function buildIntakePrompt({
 	message,
 	intakeState = null,
 	selectedPlaceContext = null,
-	toolResult = null
+	toolResult = null,
+	language = 'en'
 }) {
 	return [
 		'You are Superextra intake, the fast conversation layer before restaurant market research.',
+		`Write all user-visible text (reply, acknowledgement) in the language with ISO code "${language}".`,
 		'Help the user reach a research-ready request. Do not research, browse, or answer the business question.',
 		'Use the conversation naturally. Do not assume fixed rounds or that the latest message only answers the previous question.',
 		'Use your knowledge of restaurants, brands, geography, and districts to interpret the user. Recognise known chains as multi-branch, known districts as areas, and obvious typos as repair opportunities — without overthinking the classification.',
@@ -303,6 +324,7 @@ async function callIntakeModel({
 	intakeState,
 	selectedPlaceContext,
 	toolResult,
+	language,
 	fetchImpl,
 	getToken
 }) {
@@ -312,7 +334,8 @@ async function callIntakeModel({
 			message,
 			intakeState,
 			selectedPlaceContext,
-			toolResult
+			toolResult,
+			language
 		}),
 		responseSchema: INTAKE_SCHEMA,
 		maxOutputTokens: 900,
@@ -348,7 +371,8 @@ function normalizeDecision({
 	previousState,
 	selectedPlaceContext,
 	candidates = null,
-	message
+	message,
+	language = 'en'
 }) {
 	const state = mergeState({ modelState: raw?.state, previousState, candidates });
 	const action = raw?.action;
@@ -359,7 +383,7 @@ function normalizeDecision({
 	if (action === 'reply') {
 		return {
 			action,
-			reply: compactReply(raw.reply, 1400) || FALLBACK_REPLY,
+			reply: compactReply(raw.reply, 1400) || fallbackReply(language),
 			state,
 			reason: compact(raw.reason, 120)
 		};
@@ -385,7 +409,7 @@ function normalizeDecision({
 	if (compact(raw.placeId) && !placeContext) {
 		return {
 			action: 'reply',
-			reply: FALLBACK_REPLY,
+			reply: fallbackReply(language),
 			state: resolutionState,
 			reason: 'invalid_place_id'
 		};
@@ -398,7 +422,8 @@ function normalizeDecision({
 			state,
 			researchQuestion: raw.researchQuestion,
 			placeContext,
-			message
+			message,
+			language
 		}),
 		state,
 		reason: compact(raw.reason, 120)
@@ -411,6 +436,7 @@ export async function runIntakeConversation({
 	intakeState = null,
 	selectedPlaceContext = null,
 	apiKey,
+	language = 'en',
 	fetchImpl = fetch,
 	getToken
 }) {
@@ -421,6 +447,7 @@ export async function runIntakeConversation({
 		intakeState: previousState,
 		selectedPlaceContext,
 		toolResult: null,
+		language,
 		fetchImpl,
 		getToken
 	});
@@ -428,7 +455,8 @@ export async function runIntakeConversation({
 		raw: first,
 		previousState,
 		selectedPlaceContext,
-		message
+		message,
+		language
 	});
 
 	if (decision.action !== 'lookup_place') return decision;
@@ -452,6 +480,7 @@ export async function runIntakeConversation({
 		intakeState: stateWithCandidates,
 		selectedPlaceContext,
 		toolResult,
+		language,
 		fetchImpl,
 		getToken
 	});
@@ -460,12 +489,13 @@ export async function runIntakeConversation({
 		previousState: stateWithCandidates,
 		selectedPlaceContext,
 		candidates,
-		message
+		message,
+		language
 	});
 	return decision.action === 'lookup_place'
 		? {
 				action: 'reply',
-				reply: FALLBACK_REPLY,
+				reply: fallbackReply(language),
 				state: stateWithCandidates,
 				reason: 'lookup_loop_limit'
 			}

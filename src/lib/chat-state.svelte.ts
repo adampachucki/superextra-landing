@@ -21,6 +21,8 @@
 
 import type { Unsubscribe } from 'firebase/firestore';
 import type { ChatSource, TimelineEvent, TurnFeedback, TurnSummary } from '$lib/chat-types';
+import { liveStatusLabel, labelLocale } from '$lib/activity-i18n';
+import { getLocale } from '$lib/paraglide/runtime';
 import { getFirebase } from '$lib/firebase';
 import { auth } from '$lib/auth.svelte';
 import { campaignCategory } from '$lib/campaign';
@@ -65,6 +67,8 @@ export interface ChatMessage {
 	sources?: ChatSource[];
 	turnSummary?: TurnSummary;
 	activityEvents?: TimelineEvent[];
+	/** Prompt language of this turn; locale for its activity labels. */
+	language?: string | null;
 	feedback?: TurnFeedback;
 }
 
@@ -85,6 +89,8 @@ export interface Session {
 	currentRunId: string | null;
 	activeAgent: string | null;
 	activeStage: string | null;
+	/** ISO-639-1 prompt language detected for the latest turn; drives activity-label locale. */
+	language: string | null;
 	lastTurnIndex: number;
 	createdAtMs: number | null;
 	updatedAtMs: number | null;
@@ -106,6 +112,8 @@ export interface Turn {
 	turnIndex: number;
 	runId: string;
 	userMessage: string;
+	/** ISO-639-1 prompt language detected for this turn; locale for its activity labels. */
+	language: string | null;
 	status: 'pending' | 'running' | 'complete' | 'error';
 	reply: string | null;
 	acknowledgement: string | null;
@@ -131,42 +139,9 @@ export type LoadState = 'idle' | 'loading' | 'loaded' | 'missing';
 /** Events listener attaches only while latest turn is in these statuses. */
 const IN_FLIGHT_STATUSES = new Set(['queued', 'running', 'pending']);
 
-const ACTIVE_AGENT_LABEL: Record<string, string> = {
-	router: 'Choosing next steps',
-	context_enricher: 'Building context',
-	research_lead: 'Planning research',
-	report_writer: 'Drafting final report',
-	continue_research: 'Continuing research',
-	market_landscape: 'Researching market landscape',
-	menu_pricing: 'Researching menu and pricing',
-	revenue_sales: 'Researching revenue and sales',
-	guest_intelligence: 'Researching guest signals',
-	location_traffic: 'Researching location and traffic',
-	operations: 'Researching operations',
-	marketing_brand: 'Researching marketing and brand',
-	review_analyst: 'Analyzing reviews',
-	social_analyst: 'Analyzing social platforms',
-	dynamic_researcher_1: 'Researching focused angle',
-	dynamic_researcher_2: 'Researching focused angle',
-	dynamic_researcher_3: 'Researching focused angle'
-};
-
-const ACTIVE_STAGE_LABEL: Record<string, string> = {
-	routing: 'Choosing next steps',
-	building_context: 'Building context',
-	planning_research: 'Planning research',
-	writing_final_report: 'Drafting final report',
-	continuing_research: 'Continuing research',
-	specialist_research: 'Researching market signals',
-	agent_work: 'Working'
-};
-
 function activeStatusLabel(session: Session | null): string | null {
 	if (session?.status !== 'running') return null;
-	const agentLabel = session.activeAgent ? ACTIVE_AGENT_LABEL[session.activeAgent] : null;
-	if (agentLabel) return agentLabel;
-	const stageLabel = session.activeStage ? ACTIVE_STAGE_LABEL[session.activeStage] : null;
-	return stageLabel ?? null;
+	return liveStatusLabel(session.activeAgent, session.activeStage, labelLocale(session.language));
 }
 
 function toMillis(value: unknown): number | null {
@@ -288,6 +263,7 @@ function flattenTurnsToMessages(turnList: Turn[]): ChatMessage[] {
 				sources: turn.sources?.length ? turn.sources : undefined,
 				turnSummary: turn.turnSummary ?? undefined,
 				activityEvents: activityEvents?.length ? activityEvents : undefined,
+				language: turn.language,
 				feedback: currentUid ? turn.feedback?.[currentUid] : undefined
 			});
 		}
@@ -427,6 +403,7 @@ function makeOptimisticTurn(turnIndex: number, userMessage: string, startedAtMs:
 		turnIndex,
 		runId: '',
 		userMessage,
+		language: null,
 		status: 'pending',
 		reply: null,
 		acknowledgement: null,
@@ -539,6 +516,7 @@ async function attachActiveListeners(sid: string) {
 				currentRunId: (data.currentRunId as string | undefined) ?? null,
 				activeAgent: (data.activeAgent as string | undefined) ?? null,
 				activeStage: (data.activeStage as string | undefined) ?? null,
+				language: (data.language as string | undefined) ?? null,
 				lastTurnIndex: (data.lastTurnIndex as number | undefined) ?? 0,
 				createdAtMs: toMillis(data.createdAt),
 				updatedAtMs: toMillis(data.updatedAt)
@@ -572,6 +550,7 @@ async function attachActiveListeners(sid: string) {
 					turnIndex,
 					runId: (data.runId as string | undefined) ?? '',
 					userMessage: (data.userMessage as string | undefined) ?? '',
+					language: (data.language as string | undefined) ?? null,
 					status,
 					reply: (data.reply as string | null | undefined) ?? null,
 					acknowledgement: (data.acknowledgement as string | null | undefined) ?? null,
@@ -858,7 +837,9 @@ async function postAgentStream(body: Record<string, unknown>): Promise<void> {
 			'Content-Type': 'application/json',
 			Authorization: `Bearer ${idToken}`
 		},
-		body: JSON.stringify(body)
+		// The UI locale is the fallback when the server can't classify the
+		// prompt's language (detect-language.js).
+		body: JSON.stringify({ locale: getLocale(), ...body })
 	});
 	if (!res.ok) {
 		const payload = await res.json().catch(() => null);
@@ -1123,6 +1104,10 @@ export const chatState = {
 	},
 	get liveStatusLabel(): string | null {
 		return activeStatusLabel(activeSession);
+	},
+	/** Detected prompt language of the active session; locale for activity labels. */
+	get activeLanguage(): string | null {
+		return activeSession?.language ?? null;
 	},
 	get canDelete(): boolean {
 		if (!currentUid || !activeSession) return false;

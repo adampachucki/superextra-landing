@@ -164,6 +164,14 @@ mock.module('./intake-agent.js', {
 		runIntakeConversation: runIntakeConversationMock
 	}
 });
+// Mock language detection so agentStream tests don't make a real Gemini call.
+const detectLanguageMock = mock.fn(async () => 'en');
+mock.module('./detect-language.js', {
+	namedExports: {
+		detectLanguage: detectLanguageMock,
+		SUPPORTED_LOCALES: ['en', 'de', 'pl']
+	}
+});
 
 const {
 	intake,
@@ -569,6 +577,7 @@ describe('agentStream', () => {
 		assert.equal(turnDoc.turnIndex, 1);
 		assert.equal(turnDoc.runId, res._json.runId);
 		assert.equal(turnDoc.userMessage, 'What is the menu like?');
+		assert.equal(turnDoc.language, 'en'); // detected per turn (mock returns 'en')
 		assert.equal(turnDoc.status, 'pending');
 		assert.equal(turnDoc.acknowledgement, null);
 		assert.equal(turnDoc.acknowledgedAt, null);

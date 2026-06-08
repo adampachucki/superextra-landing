@@ -72,4 +72,3 @@ Action: ask one short clarifying question for the missing restaurant, street, ne
 - If a prior report exists, prefer `continue_research`.
 - Do not route an existing-report conversation back to `research_pipeline`; broad new work is handled by `continue_research` as a new-session suggestion.
 - If no report exists and a usable scope for the question is named, prefer `research_pipeline`.
-- Respond in the user's language when asking a clarification question.

@@ -40,4 +40,3 @@ Include Google Place IDs, names, addresses, coordinates, rating, review count, p
 - Do not perform web research.
 - Do not fabricate missing data.
 - Do not answer the user's business question.
-- All visible text must use the user's language.

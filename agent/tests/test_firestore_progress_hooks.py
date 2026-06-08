@@ -237,6 +237,7 @@ async def test_tool_error_writes_warning():
             "group": "warning",
             "family": "Warnings",
             "text": "Source fetch failed",
+            "labelKey": "act_detail_source_fetch_failed",
         }
     )
 

@@ -20,14 +20,35 @@ def _place_name(state: dict[str, Any] | None, place_id: str | None) -> str | Non
     return name if isinstance(name, str) and name.strip() else None
 
 
-def _detail(kind_id: str, group: str, family: str, text: str) -> dict[str, Any]:
-    return {
+def _detail(
+    kind_id: str,
+    group: str,
+    family: str,
+    text: str,
+    *,
+    label_key: str | None = None,
+    vars: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """One activity detail row.
+
+    `text` stays English for back-compat and as a fallback. When `label_key`
+    is set the frontend renders that localized message (interpolating `vars`)
+    instead, so prose like "5 reviews loaded" follows the prompt language.
+    Pure-data rows (search queries, URLs) carry no label_key — their text IS
+    user content and must not be translated.
+    """
+    row: dict[str, Any] = {
         "kind": "detail",
         "id": kind_id,
         "group": group,
         "family": family,
         "text": text,
     }
+    if label_key is not None:
+        row["labelKey"] = label_key
+        if vars:
+            row["vars"] = vars
+    return row
 
 
 def _normalize_space(text: str) -> str:
@@ -72,7 +93,7 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
     # model's thought summary. Each ADK event with thought
     # parts produces one timeline row keyed by `(author, event_id)` so the
     # client doesn't dedupe across genuine multi-thought events.
-    thought_text = _collect_thought_text(event)
+    thought_text = _collect_thought_text(event, state)
     if thought_text:
         mapping["timeline_events"].append(
             {
@@ -110,7 +131,7 @@ def map_event(event: Any, state: dict[str, Any] | None = None) -> dict[str, Any]
     return mapping
 
 
-def _collect_thought_text(event: Any) -> str:
+def _collect_thought_text(event: Any, state: dict[str, Any] | None = None) -> str:
     """Concatenate `thought` parts and run them through the sanitizer."""
     pieces: list[str] = []
     for part in _iter_parts(event):
@@ -120,7 +141,8 @@ def _collect_thought_text(event: Any) -> str:
         if isinstance(text, str) and text.strip():
             pieces.append(text)
     cleaned = _strip_tool_names(_normalize_newlines("".join(pieces))).strip()
-    return _safe_thought_text(cleaned)
+    lang = state.get("promptLanguage") if isinstance(state, dict) else None
+    return _safe_thought_text(cleaned, lang)
 
 
 # Map internal function-tool identifiers to public research-language labels.
@@ -180,9 +202,18 @@ def _tool_name_pattern(labels: dict[str, str]) -> str:
 
 _BACKTICKED_TOOL_NAME_RE = re.compile(r"`(" + _tool_name_pattern(_TOOL_LABELS) + r")`")
 _BARE_TOOL_NAME_RE = re.compile(r"\b(" + _tool_name_pattern(_BARE_TOOL_LABELS) + r")\b")
-_SAFE_THOUGHT_FALLBACK = (
-    "**Checking Context**\n\nReviewing public venue information and nearby market signals."
-)
+_SAFE_THOUGHT_FALLBACK_BY_LANG = {
+    "en": "**Checking Context**\n\nReviewing public venue information and nearby market signals.",
+    "de": (
+        "**Kontext wird geprüft**\n\nÖffentliche Standortinformationen und "
+        "Marktsignale aus der Umgebung werden ausgewertet."
+    ),
+    "pl": (
+        "**Sprawdzanie kontekstu**\n\nPrzeglądam publiczne informacje o lokalu "
+        "i sygnały rynkowe z okolicy."
+    ),
+}
+_SAFE_THOUGHT_FALLBACK = _SAFE_THOUGHT_FALLBACK_BY_LANG["en"]
 _OPAQUE_ID_RE = re.compile(
     r"\b(?=[A-Za-z0-9_-]{16,}\b)(?=[A-Za-z0-9_-]*[A-Za-z])"
     r"(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{16,}\b"
@@ -234,19 +265,21 @@ def _redact_identifiers(text: str) -> str:
     return text
 
 
-def _safe_thought_text(text: str) -> str:
+def _safe_thought_text(text: str, language: str | None = None) -> str:
     """Sanitize a streamed thought for the activity panel.
 
     Internal-platform jargon (state_delta, runId, reasoning engine, …) signals
-    the whole thought is narrating internals — fall back to a public line.
-    Otherwise mask identifier-shaped tokens in place and truncate at
-    `_MAX_THOUGHT_CHARS` to stay well under Firestore's 1 MiB field limit
-    (timeline writes are best-effort and would otherwise silently fail).
+    the whole thought is narrating internals — fall back to a public line in the
+    prompt language. Otherwise mask identifier-shaped tokens in place and
+    truncate at `_MAX_THOUGHT_CHARS` to stay well under Firestore's 1 MiB field
+    limit (timeline writes are best-effort and would otherwise silently fail).
     """
     if not text:
         return ""
     if _INTERNAL_THOUGHT_TERM_RE.search(text):
-        return _SAFE_THOUGHT_FALLBACK
+        return _SAFE_THOUGHT_FALLBACK_BY_LANG.get(
+            language or "en", _SAFE_THOUGHT_FALLBACK
+        )
     redacted = _redact_identifiers(text)
     if len(redacted) > _MAX_THOUGHT_CHARS:
         return redacted[:_MAX_THOUGHT_CHARS]
@@ -355,28 +388,59 @@ def map_tool_call(
         query = _normalize_space(str(args.get("query") or "")).strip()
         if query:
             return _detail(row_id, "search", "Searching the web", query)
-        return _detail(row_id, "search", "Searching the web", "Public web")
+        return _detail(
+            row_id, "search", "Searching the web", "Public web", label_key="act_detail_public_web"
+        )
     if name == "search_restaurants":
         query = _normalize_space(str(args.get("query") or "")).strip()
         if query:
             return _detail(row_id, "platform", "Google Maps", query)
-        return _detail(row_id, "platform", "Google Maps", "Searching places")
+        return _detail(
+            row_id,
+            "platform",
+            "Google Maps",
+            "Searching places",
+            label_key="act_detail_searching_places",
+        )
     if name == "get_google_reviews":
         place_id = str(args.get("place_id") or "").strip()
         place = _place_name(state, place_id)
+        if place:
+            return _detail(
+                row_id,
+                "platform",
+                "Google reviews",
+                f"Checking {place}",
+                label_key="act_detail_checking_place",
+                vars={"place": place},
+            )
         return _detail(
             row_id,
             "platform",
             "Google reviews",
-            f"Checking {place}" if place else "Checking reviews",
+            "Checking reviews",
+            label_key="act_detail_checking_reviews",
         )
     if name == "get_tripadvisor_reviews":
         url = str(args.get("url") or "").strip()
         match = _TA_REVIEW_RE.search(url) if url else None
         if match:
             slug = match.group("slug").replace("_", " ").strip()
-            return _detail(row_id, "platform", "TripAdvisor", f"Reading {slug}")
-        return _detail(row_id, "platform", "TripAdvisor", "Reading reviews")
+            return _detail(
+                row_id,
+                "platform",
+                "TripAdvisor",
+                f"Reading {slug}",
+                label_key="act_detail_reading_named",
+                vars={"name": slug},
+            )
+        return _detail(
+            row_id,
+            "platform",
+            "TripAdvisor",
+            "Reading reviews",
+            label_key="act_detail_reading_reviews",
+        )
     if name in (
         "fetch_tripadvisor_page",
         "fetch_facebook_page",
@@ -403,12 +467,15 @@ def map_tool_result(
         place = response.get("place") if isinstance(response.get("place"), dict) else {}
         display_name = _get(place.get("displayName") if isinstance(place, dict) else None, "text")
         if isinstance(display_name, str) and display_name.strip():
+            name_text = display_name.strip()
             return [
                 _detail(
                     row_id,
                     "platform",
                     "Google Maps",
-                    f"Profile for {display_name.strip()}",
+                    f"Profile for {name_text}",
+                    label_key="act_detail_profile_for",
+                    vars={"name": name_text},
                 )
             ]
         return []
@@ -416,37 +483,101 @@ def map_tool_result(
     if name == "get_batch_restaurant_details" and status == "success":
         places = response.get("places")
         if isinstance(places, list):
-            return [_detail(row_id, "platform", "Google Maps", f"{len(places)} place profiles")]
+            return [
+                _detail(
+                    row_id,
+                    "platform",
+                    "Google Maps",
+                    f"{len(places)} place profiles",
+                    label_key="act_detail_place_profiles",
+                    vars={"count": len(places)},
+                )
+            ]
         return []
 
     if name in ("find_nearby_restaurants", "search_restaurants"):
         if status == "error":
-            return [_detail(row_id, "warning", "Warnings", "Venue search failed")]
+            return [
+                _detail(
+                    row_id,
+                    "warning",
+                    "Warnings",
+                    "Venue search failed",
+                    label_key="act_detail_venue_search_failed",
+                )
+            ]
         if status != "success":
             return []
         results = response.get("results")
         if not isinstance(results, list):
             return []
         if name == "find_nearby_restaurants":
-            return [_detail(row_id, "platform", "Google Maps", f"{len(results)} nearby places")]
+            return [
+                _detail(
+                    row_id,
+                    "platform",
+                    "Google Maps",
+                    f"{len(results)} nearby places",
+                    label_key="act_detail_nearby_places",
+                    vars={"count": len(results)},
+                )
+            ]
         count = len(results)
         if count == 1:
             first = results[0] if isinstance(results[0], dict) else {}
             display_name = _get(first.get("displayName"), "text")
             if isinstance(display_name, str) and display_name.strip():
-                text = f"1 place match: {display_name.strip()}"
+                name_text = display_name.strip()
+                row = _detail(
+                    row_id,
+                    "platform",
+                    "Google Maps",
+                    f"1 place match: {name_text}",
+                    label_key="act_detail_one_match_named",
+                    vars={"name": name_text},
+                )
             else:
-                text = "1 place match"
+                row = _detail(
+                    row_id,
+                    "platform",
+                    "Google Maps",
+                    "1 place match",
+                    label_key="act_detail_one_match",
+                )
         else:
-            text = f"{count} place matches"
-        return [_detail(row_id, "platform", "Google Maps", text)]
+            row = _detail(
+                row_id,
+                "platform",
+                "Google Maps",
+                f"{count} place matches",
+                label_key="act_detail_place_matches",
+                vars={"count": count},
+            )
+        return [row]
 
     if name == "get_tripadvisor_reviews":
         if status == "success":
             count = int(response.get("fetched_reviews") or 0)
-            return [_detail(row_id, "platform", "TripAdvisor", f"{count} reviews loaded")]
+            return [
+                _detail(
+                    row_id,
+                    "platform",
+                    "TripAdvisor",
+                    f"{count} reviews loaded",
+                    label_key="act_detail_reviews_loaded",
+                    vars={"count": count},
+                )
+            ]
         if status == "error":
-            return [_detail(row_id, "warning", "Warnings", "TripAdvisor reviews unavailable")]
+            return [
+                _detail(
+                    row_id,
+                    "warning",
+                    "Warnings",
+                    "TripAdvisor reviews unavailable",
+                    label_key="act_detail_tripadvisor_unavailable",
+                )
+            ]
         return []
 
     if name == "get_google_reviews":
@@ -454,17 +585,46 @@ def map_tool_result(
         place = _place_name(state, place_id)
         if status == "success":
             count = int(response.get("total_fetched") or 0)
-            label = f"{count} reviews for {place}" if place else f"{count} Google reviews"
-            return [_detail(row_id, "platform", "Google reviews", label)]
+            if place:
+                return [
+                    _detail(
+                        row_id,
+                        "platform",
+                        "Google reviews",
+                        f"{count} reviews for {place}",
+                        label_key="act_detail_reviews_for_place",
+                        vars={"count": count, "place": place},
+                    )
+                ]
+            return [
+                _detail(
+                    row_id,
+                    "platform",
+                    "Google reviews",
+                    f"{count} Google reviews",
+                    label_key="act_detail_google_reviews",
+                    vars={"count": count},
+                )
+            ]
         if status == "error":
+            if place:
+                return [
+                    _detail(
+                        row_id,
+                        "warning",
+                        "Warnings",
+                        f"Google reviews unavailable for {place}",
+                        label_key="act_detail_google_unavailable_for",
+                        vars={"place": place},
+                    )
+                ]
             return [
                 _detail(
                     row_id,
                     "warning",
                     "Warnings",
-                    f"Google reviews unavailable for {place}"
-                    if place
-                    else "Google reviews unavailable",
+                    "Google reviews unavailable",
+                    label_key="act_detail_google_unavailable",
                 )
             ]
         return []
@@ -475,7 +635,15 @@ def map_tool_result(
         "fetch_facebook_posts",
         "fetch_instagram_profile",
     ) and status == "error":
-        return [_detail(row_id, "warning", "Warnings", "Source fetch failed")]
+        return [
+            _detail(
+                row_id,
+                "warning",
+                "Warnings",
+                "Source fetch failed",
+                label_key="act_detail_source_fetch_failed",
+            )
+        ]
 
     return []
 

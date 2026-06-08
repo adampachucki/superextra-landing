@@ -6,6 +6,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { gearHandoff, gearHandoffCleanup } from './gear-handoff.js';
 import { runIntakeConversation } from './intake-agent.js';
+import { detectLanguage, SUPPORTED_LOCALES } from './detect-language.js';
 import {
 	esc,
 	row,
@@ -419,6 +420,14 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	}
 	let placeContext = submittedPlaceContext;
 
+	// Detect the prompt language up front (best-effort, fail-open). It drives
+	// the language of every agent's thoughts/report and the localized activity
+	// labels. The UI locale the client sends is the fallback when the message
+	// is too short/ambiguous to classify. Detection runs on the raw message,
+	// before the `[Date: …]` query-text prefix is added.
+	const uiLocale = SUPPORTED_LOCALES.includes(req.body?.locale) ? req.body.locale : 'en';
+	const promptLanguage = await detectLanguage({ message, fallback: uiLocale });
+
 	// 4. Server-generated runId — never trust a client-supplied one.
 	const runId = crypto.randomUUID();
 	const sessionRef = db.collection('sessions').doc(sessionId);
@@ -514,6 +523,8 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				lastTurnIndex: newTurnIdx,
 				engineSessionId,
 				engineSessionGeneration,
+				// Detected per turn; the frontend localizes activity labels to it.
+				language: promptLanguage,
 				updatedAt: FieldValue.serverTimestamp()
 			};
 
@@ -550,6 +561,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				turnIndex: newTurnIdx,
 				runId,
 				userMessage: message,
+				language: promptLanguage,
 				status: 'pending',
 				reply: null,
 				acknowledgement: null,
@@ -608,7 +620,8 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				message,
 				intakeState,
 				selectedPlaceContext: placeContext,
-				apiKey: googlePlacesKey.value()
+				apiKey: googlePlacesKey.value(),
+				language: promptLanguage
 			});
 			intakeState = decision.state || null;
 
@@ -713,7 +726,8 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 			message: queryText,
 			isEngineFirstMessage: createEngineSession,
 			createEngineSession,
-			seedState
+			seedState,
+			promptLanguage
 		});
 		if (createEngineSession) {
 			try {

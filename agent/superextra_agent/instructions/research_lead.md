@@ -62,7 +62,7 @@ Each specialist tool call receives a `request` brief. Make it specific.
 
 Include:
 
-- The user question, operator decision or learning goal, and response language.
+- The user question, operator decision or learning goal.
 - The target restaurant or set, area, date, relevant Places facts, and competitor names.
 - The evidence surface to investigate and the specific question the specialist should answer.
 - Likely causes, mechanisms, or drivers to explore.
@@ -125,7 +125,7 @@ does not read it. Keep it open and procedural, not findings-shaped.
 
 Include:
 
-- User question and response language.
+- User question.
 - Target restaurant, market, area, and competitor set.
 - Operator decision or learning goal.
 - Specialists called.
@@ -145,4 +145,3 @@ Do not decide which specialist findings matter most.
 - Do not use reconnaissance alone as final evidence.
 - Do not mention unused specialists.
 - Do not expose internal labels such as router, specialist, agent, tool, dispatch, handoff, function, or stage in user-visible prose.
-- All visible text must use the user's language.

@@ -536,6 +536,38 @@ def test_google_reviews_uses_saved_place_name():
     assert rows[0]["text"] == "12 reviews for Noma"
 
 
+def test_tool_result_carries_label_key_and_vars_for_localization():
+    state = {"place_names": {"abc123": "Noma"}}
+    rows = map_tool_result(
+        "get_google_reviews",
+        {"status": "success", "place_id": "abc123", "total_fetched": 12},
+        state,
+        "call-1",
+    )
+    # English text stays as the fallback; labelKey + vars let the frontend
+    # render the row in the prompt language.
+    assert rows[0]["text"] == "12 reviews for Noma"
+    assert rows[0]["labelKey"] == "act_detail_reviews_for_place"
+    assert rows[0]["vars"] == {"count": 12, "place": "Noma"}
+
+
+def test_pure_data_detail_row_has_no_label_key():
+    # A search query is user content, not translatable — no labelKey.
+    row = map_tool_call("google_search", {"query": "pizza Warszawa"}, {}, "call-2")
+    assert row["text"] == "pizza Warszawa"
+    assert "labelKey" not in row
+
+
+def test_safe_thought_fallback_follows_prompt_language():
+    ev = _event(
+        author="research_lead",
+        thoughts=["Reading the runId and state_delta for the reasoning engine."],
+    )
+    rows = map_event(ev, {"promptLanguage": "pl"})["timeline_events"]
+    assert rows[0]["kind"] == "thought"
+    assert "Sprawdzanie kontekstu" in rows[0]["text"]  # Polish fallback
+
+
 def test_specialist_grounding_sources_are_exposed():
     research = map_event(
         _event(

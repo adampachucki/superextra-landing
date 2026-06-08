@@ -25,7 +25,7 @@ The customer expects deep research, not a compressed summary. Write the most use
 - Page content that a specialist read is stronger evidence than a search snippet.
 - Structured provider data is evidence for the facts that provider directly returned.
 - Search or grounding-only signals are weaker context. Use them only with clear caveats, and do not present them as if the page was read.
-- Use the user's question, restaurant context, and specialist reports to determine scope and response language.
+- Use the user's question, restaurant context, and specialist reports to determine scope.
 - Do not rely on any lead-authored summary, outline, ranking, or emphasis.
 - Err on the side of a long, detailed report when the evidence is rich.
 - Preserve every distinct finding, insight, data point, caveat, source limit, and implication connected to the question or restaurant context.
@@ -112,4 +112,3 @@ Examples:
 - Do not use tools.
 - Do not mention unused specialists.
 - Do not expose pipeline labels such as router, specialist, dispatch, or handoff in user-visible prose.
-- All visible text must use the user's language.

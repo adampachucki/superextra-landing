@@ -193,14 +193,16 @@ describe('gearHandoff', () => {
 		assert.deepEqual(createBody.sessionState, {
 			runId: 'run1',
 			turnIdx: 1,
-			firestoreSid: 'sid1'
+			firestoreSid: 'sid1',
+			promptLanguage: 'en'
 		});
 		const appendBody = JSON.parse(fetchMock.mock.calls[1].arguments[1].body);
 		assert.deepEqual(appendBody.actions.stateDelta, {
 			runId: 'run1',
 			turnIdx: 1,
 			firestoreSid: 'sid1',
-			quotaUid: 'submitter1'
+			quotaUid: 'submitter1',
+			promptLanguage: 'en'
 		});
 		// streamQuery still passes the creator UID as user_id — engine session
 		// ownership stays pinned regardless of which submitter charges the quota.
@@ -257,7 +259,8 @@ describe('gearHandoff', () => {
 			previous_stopped_request: 'Stopped request',
 			runId: 'run3',
 			turnIdx: 3,
-			firestoreSid: 'sid1'
+			firestoreSid: 'sid1',
+			promptLanguage: 'en'
 		});
 		const streamBody = JSON.parse(fetchMock.mock.calls[2].arguments[1].body);
 		assert.equal(streamBody.input.session_id, 'se-sid1-g2');
