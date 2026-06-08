@@ -61,42 +61,18 @@ def language_clause(code) -> str:
     return "English"
 
 
-def _state_language(state) -> str:
-    getter = getattr(state, "get", None)
-    code = getter(PROMPT_LANGUAGE_KEY) if callable(getter) else None
-    return language_clause(code)
-
-
 def language_directive(state) -> str:
     """The directive every agent prepends. `state` is the ADK session state
     dict (`ctx.state` / `callback_context.state`)."""
-    lang = _state_language(state)
+    getter = getattr(state, "get", None)
+    code = getter(PROMPT_LANGUAGE_KEY) if callable(getter) else None
+    lang = language_clause(code)
     return (
-        "## Language — ABSOLUTE RULE\n\n"
-        f"Write 100% of your output in {lang}, with no exceptions. This includes "
-        "EVERY thinking step and thought summary — including the short **bold "
-        f"title** that opens each thinking step — every status line, every "
-        f"specialist brief you write, and the final report. Think in {lang}, not "
-        f"in English. Even when the tools, place data, search results, briefs, or "
-        f"context are in English, you still reason and write in {lang}. Never open "
-        "a thought, title, or section in English. Keep proper nouns — venue and "
-        "brand names, URLs — in their original form.\n\n"
+        "## Language\n\n"
+        f"The user's language for this request is {lang}. Write EVERYTHING in {lang}: "
+        "internal reasoning and thoughts, every status update, any specialist briefs "
+        "you write, and the final report. Do not switch to English (or any other "
+        "language) for any part, even when source material, tools, place data, or "
+        "context appear in English. Keep proper nouns — venue and brand names, URLs — "
+        "in their original form.\n\n"
     )
-
-
-def language_reminder(state) -> str:
-    """A short recency reinforcement appended to the END of every instruction —
-    thought-summary language follows the most recent instruction more than the
-    first, so the rule is stated at both ends."""
-    lang = _state_language(state)
-    return (
-        f"\n\n## Reminder\n\nWrite everything — your thinking, every **bold "
-        f"thinking-step title**, and the report — in {lang}. Do not start any "
-        f"thought or title in English unless {lang} is English."
-    )
-
-
-def with_language(state, body: str) -> str:
-    """Wrap an instruction body with the language directive (front, for
-    prominence) and reminder (end, for recency)."""
-    return language_directive(state) + body + language_reminder(state)

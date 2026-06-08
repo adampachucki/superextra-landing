@@ -16,7 +16,7 @@ from .apify_tools import (
     fetch_tripadvisor_page,
     get_google_reviews,
 )
-from .language import with_language
+from .language import language_directive
 from .place_state import format_known_places_context
 from .serpapi_search import search_serpapi
 from .specialist_catalog import (
@@ -131,7 +131,7 @@ def _make_instruction(name: str):
             places_context=places_context,
             known_places_context=format_known_places_context(ctx.state),
         )
-        return with_language(ctx.state, instruction)
+        return language_directive(ctx.state) + instruction
 
     return provider
 

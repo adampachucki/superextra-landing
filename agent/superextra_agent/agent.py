@@ -11,7 +11,7 @@ from google.genai import types
 
 from .chat_logger import ChatLoggerPlugin
 from .firestore_progress import FirestoreProgressPlugin
-from .language import with_language
+from .language import language_directive
 from .quota_gate import continue_quota_gate, research_quota_gate
 from .places_tools import (
     find_nearby_restaurants,
@@ -66,14 +66,10 @@ def _research_lead_instruction(ctx):
             "Reuse prior results where they still fit. Call specialists that "
             "update, deepen, or add a complementary angle for the latest question."
         )
-    return with_language(
-        ctx.state,
-        _RESEARCH_LEAD_TEMPLATE.format(
-            places_context=places_context,
-            market_source_profiles=_MARKET_SOURCE_PROFILES,
-        )
-        + follow_up_note,
-    )
+    return language_directive(ctx.state) + _RESEARCH_LEAD_TEMPLATE.format(
+        places_context=places_context,
+        market_source_profiles=_MARKET_SOURCE_PROFILES,
+    ) + follow_up_note
 
 
 # --- Shared agent config ---
@@ -82,8 +78,8 @@ _ENRICHER_INSTRUCTION = (INSTRUCTIONS_DIR / "context_enricher.md").read_text()
 
 
 def _enricher_instruction(ctx):
-    """Wrap the enricher instructions with the per-turn language directive."""
-    return with_language(ctx.state, _ENRICHER_INSTRUCTION)
+    """Prepend the per-turn language directive to the enricher instructions."""
+    return language_directive(ctx.state) + _ENRICHER_INSTRUCTION
 
 
 _ENRICHER_TOOLS = [
@@ -224,7 +220,7 @@ def _continue_research_instruction(ctx):
         "places_context": ctx.state.get("places_context", "No Google Places data available."),
         "known_places_context": format_known_places_context(ctx.state),
     }
-    return with_language(ctx.state, _CONTINUE_RESEARCH_TEMPLATE.format(**values))
+    return language_directive(ctx.state) + _CONTINUE_RESEARCH_TEMPLATE.format(**values)
 
 
 def _report_writer_instruction(ctx):
@@ -236,7 +232,7 @@ def _report_writer_instruction(ctx):
             default="No specialist reports available.",
         ),
     }
-    return with_language(ctx.state, _REPORT_WRITER_TEMPLATE.format(**values))
+    return language_directive(ctx.state) + _REPORT_WRITER_TEMPLATE.format(**values)
 
 
 continue_research = LlmAgent(
@@ -281,7 +277,7 @@ def _router_instruction(ctx):
         )
     else:
         note = "\n\n## Session state\n\nNo research has been done yet in this conversation."
-    return with_language(ctx.state, _ROUTER_TEMPLATE + note)
+    return language_directive(ctx.state) + _ROUTER_TEMPLATE + note
 
 
 # --- Agent definitions ---
