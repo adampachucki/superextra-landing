@@ -1,7 +1,6 @@
 """Tests for specialist error callbacks in specialists.py."""
 
 from google.adk.models.llm_response import LlmResponse
-from google.genai import types
 
 from superextra_agent.specialists import _on_model_error, _on_tool_error
 

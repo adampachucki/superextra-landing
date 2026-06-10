@@ -1,7 +1,5 @@
 import re
 
-import httpx
-
 from .apify_tools import _run_actor_sync
 from .http_client import LazyAsyncClient
 from .place_state import tool_source_key

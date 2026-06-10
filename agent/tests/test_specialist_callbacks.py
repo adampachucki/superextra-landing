@@ -2,9 +2,9 @@
 
 from google.adk.tools import google_search, url_context
 
-from superextra_agent.specialists import ALL_SPECIALISTS, CONTINUATION_SPECIALISTS
 from superextra_agent.agent import _skip_enricher_if_cached
 from superextra_agent.specialist_catalog import SPECIALISTS
+from superextra_agent.specialists import ALL_SPECIALISTS, CONTINUATION_SPECIALISTS
 
 _SPECIALISTS_WITH_CUSTOM_TOOLS = {
     "review_analyst",

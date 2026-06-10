@@ -22,8 +22,6 @@ from __future__ import annotations
 import argparse
 import datetime
 import os
-import sys
-
 
 PROJECT = "superextra-site"
 # Two thresholds: research turns (0001) use the full report length floor;

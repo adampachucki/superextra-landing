@@ -22,7 +22,6 @@ import pytest
 from superextra_agent import gear_run_state
 from superextra_agent.gear_run_state import GearRunState
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 

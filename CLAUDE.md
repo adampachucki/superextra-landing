@@ -170,7 +170,7 @@ Browser state is driven by **four live Firestore listeners** (`src/lib/chat-stat
 
 Watchdog (`watchdog.js`, scheduled by Cloud Scheduler every 2 min) flips stuck sessions to `status=error` inside a fenced transaction.
 
-Historical migration plans are archived outside this repo; current deployment gotchas live in `docs/deployment-gotchas.md`.
+The sessions/turns/events doc shapes and their writer/reader map live in `docs/firestore-contract.md` — update it when transport fields change. Historical migration plans are archived outside this repo; current deployment gotchas live in `docs/deployment-gotchas.md`.
 
 ## Domains & hosting sites
 
@@ -183,12 +183,15 @@ Historical migration plans are archived outside this repo; current deployment go
 
 ## Commands
 
+- `scripts/bootstrap.sh` — sync all three runtimes (root npm, functions npm, agent venv). Stale node_modules masquerade as test failures — run this first when tests fail unexpectedly after a pull.
+- `npm run test:all` — all suites via `scripts/ci-test.sh`, the same script CI runs
 - `npm run build` / `npm run check`
 - `npm run lint` — Prettier check + ESLint
 - `npm run format` — auto-format all files
 - `npm run test` — run Vitest unit tests (Firestore stream client, chat state)
 - `cd functions && npm test` — run Cloud Function tests (agentStream, gearHandoff, watchdog, utils)
 - `cd agent && PYTHONPATH=. .venv/bin/pytest tests/ -v` — run agent Python tests
+- `cd agent && .venv/bin/ruff check .` — agent Python lint (also in lint-staged + CI)
 - `npm run test:rules` — Firestore rules emulator tests (needs Java + Firestore emulator)
 - Deploy: push to `main` → GitHub Actions → Firebase (project: superextra-site)
 
@@ -218,7 +221,7 @@ Push to `main` → `.github/workflows/deploy.yml`:
 1. **test** — lint, format check, svelte-check, Vitest, functions tests, rules emulator, agent tests
 2. **deploy-hosting** — Firebase Hosting + Cloud Functions + Firestore rules/indexes.
 
-The agent app itself is hosted as a Vertex AI Agent Engine Reasoning Engine; redeploy via `agent_engines.update(...)` from the agent venv when the agent code changes.
+The agent app itself is hosted as a Vertex AI Agent Engine Reasoning Engine; redeploy via `agent/scripts/redeploy_engine.py --yes` from the agent venv when the agent code changes, then verify with `agent/scripts/smoke_run.py` (live probe turn against the deployed engine; cleans up after itself, `--keep` to retain the probe docs).
 
 Manual deploy invariant: **commit before deploy**. Do not run `firebase deploy`, `firebase-tools deploy`, or `agent/scripts/redeploy_engine.py` from an uncommitted worktree. For Agent Engine deploys, confirm the script reports the current commit as `runtime commit` and records that same SHA after the update.
 

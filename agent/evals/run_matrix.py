@@ -107,8 +107,8 @@ async def _run_single(
     too (they don't bubble up through the parent runner's iterator). Both
     Variant A and Variant B runs use the same capture path — apples-to-apples.
     """
-    from google.adk.runners import Runner
     from google.adk.apps import App
+    from google.adk.runners import Runner
     from google.genai import types
 
     from evals.parse_events import parse_run
@@ -189,7 +189,7 @@ async def _run_matrix_in_process(args: argparse.Namespace) -> int:
 
     from superextra_agent.agent import app
 
-    print(f"[runner] using superextra_agent.agent:app", flush=True)
+    print("[runner] using superextra_agent.agent:app", flush=True)
 
     queries = json.loads(Path(args.queries).read_text())["queries"]
     venues_data = json.loads(Path(args.venues).read_text())["venues"]

@@ -12,14 +12,14 @@ from google.genai import types
 from .chat_logger import ChatLoggerPlugin
 from .firestore_progress import FirestoreProgressPlugin
 from .language import language_directive
-from .quota_gate import continue_quota_gate, research_quota_gate
+from .place_state import format_known_places_context
 from .places_tools import (
     find_nearby_restaurants,
     get_batch_restaurant_details,
     get_restaurant_details,
     search_restaurants,
 )
-from .place_state import format_known_places_context
+from .quota_gate import continue_quota_gate, research_quota_gate
 from .specialist_catalog import SPECIALIST_RESULT_KEYS
 from .specialists import (
     ALL_SPECIALISTS,

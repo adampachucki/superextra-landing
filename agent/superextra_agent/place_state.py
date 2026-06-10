@@ -9,7 +9,6 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-
 PLACES_BY_ID_KEY = "places_by_id"
 ORIGINAL_TARGET_PLACE_ID_KEY = "original_target_place_id"
 TOOL_SOURCE_PREFIX = "_tool_src_"

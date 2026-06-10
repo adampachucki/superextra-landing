@@ -5,11 +5,7 @@ from __future__ import annotations
 import time
 import traceback
 from datetime import datetime, timezone
-from typing import Any, TYPE_CHECKING
-
-from google.genai import types
-from pydantic import BaseModel
-from typing_extensions import override
+from typing import TYPE_CHECKING, Any
 
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.callback_context import CallbackContext
@@ -18,6 +14,9 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
 from google.adk.tools.base_tool import BaseTool
+from google.genai import types
+from pydantic import BaseModel
+from typing_extensions import override
 
 from .cloud_logging import emit_cloud_log
 from .correlation import (

@@ -1,8 +1,9 @@
 """Tests for Apify-backed tools in apify_tools.py."""
 
+from unittest.mock import AsyncMock, patch
+
 import httpx
 import pytest
-from unittest.mock import AsyncMock, patch
 
 from superextra_agent.apify_tools import (
     fetch_facebook_page,
@@ -11,7 +12,6 @@ from superextra_agent.apify_tools import (
     fetch_tripadvisor_page,
     get_google_reviews,
 )
-
 
 # --- Fixtures ---
 

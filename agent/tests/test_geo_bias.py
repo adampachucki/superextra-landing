@@ -1,7 +1,8 @@
 """Tests for _inject_geo_bias callback."""
 
-from superextra_agent.specialists import _inject_geo_bias
 from google.genai import types
+
+from superextra_agent.specialists import _inject_geo_bias
 
 
 class MockCallbackContext:

@@ -4,8 +4,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from google.cloud import firestore
 from google.adk.models.llm_response import LlmResponse
+from google.cloud import firestore
+
 from superextra_agent import firestore_progress
 from superextra_agent.firestore_progress import FirestoreProgressPlugin
 from superextra_agent.gear_run_state import GearRunState

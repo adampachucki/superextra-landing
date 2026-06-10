@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from google.api_core.exceptions import DeadlineExceeded, GoogleAPICallError
@@ -43,7 +43,6 @@ from superextra_agent.firestore_progress import (
 )
 from superextra_agent.gear_run_state import GearRunState
 from superextra_agent.timeline import TimelineOwnershipLost, _timeline_write_logic
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 

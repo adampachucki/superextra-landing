@@ -1,8 +1,9 @@
 """Tests for SerpAPI-backed search tool in serpapi_search.py."""
 
+from unittest.mock import AsyncMock, patch
+
 import httpx
 import pytest
-from unittest.mock import AsyncMock, patch
 
 from superextra_agent.serpapi_search import search_serpapi
 

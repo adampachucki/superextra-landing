@@ -8,7 +8,6 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-
 log = logging.getLogger(__name__)
 _cloud_logger: Any | None = None
 

@@ -16,8 +16,10 @@ from superextra_agent.firestore_events import (
     _state_delta,
     extract_sources_from_grounding,
 )
-from superextra_agent.specialist_catalog import AUTHOR_TO_OUTPUT_KEY, SPECIALIST_RESULT_KEYS
-
+from superextra_agent.specialist_catalog import (
+    AUTHOR_TO_OUTPUT_KEY,
+    SPECIALIST_RESULT_KEYS,
+)
 
 SPECIALIST_NAMES = set(AUTHOR_TO_OUTPUT_KEY)
 

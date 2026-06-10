@@ -8,8 +8,6 @@ canonicalizes the result so the UI can show and dedupe a stable public URL.
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
-import httpx
-
 from .http_client import LazyAsyncClient
 
 TIMEOUT_S = 15.0

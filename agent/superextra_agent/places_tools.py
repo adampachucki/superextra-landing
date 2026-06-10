@@ -1,6 +1,4 @@
 import asyncio
-import os
-import httpx
 
 from .http_client import LazyAsyncClient
 from .place_state import (

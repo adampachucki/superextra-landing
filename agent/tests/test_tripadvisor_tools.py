@@ -1,8 +1,9 @@
 """Tests for TripAdvisor tools in tripadvisor_tools.py."""
 
+from unittest.mock import AsyncMock, patch
+
 import httpx
 import pytest
-from unittest.mock import AsyncMock, patch
 
 from superextra_agent.tripadvisor_tools import get_tripadvisor_reviews
 

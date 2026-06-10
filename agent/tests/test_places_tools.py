@@ -1,16 +1,16 @@
 """Tests for places_tools.py — Google Places API wrappers."""
 
+import httpx
 import pytest
 import respx
-import httpx
 
 from superextra_agent.places_tools import (
+    BASE_URL,
+    _get_api_key,
+    find_nearby_restaurants,
     get_batch_restaurant_details,
     get_restaurant_details,
-    find_nearby_restaurants,
     search_restaurants,
-    _get_api_key,
-    BASE_URL,
 )
 
 

@@ -19,7 +19,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 PROJECT = "superextra-site"
 LOCATION = "us-central1"
 STAGING_BUCKET = "gs://superextra-site-agent-engine-staging"
