@@ -27,10 +27,11 @@ log = logging.getLogger(__name__)
 
 PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "superextra-site")
 TRANSLATE_MODEL = os.environ.get("THOUGHT_TRANSLATE_MODEL", "gemini-2.5-flash-lite")
-# Two short attempts rather than one long one — a single timeout/blip otherwise
-# leaks the original English line through (observed ~1/12 on a live run). Total
-# budget stays bounded so a flushing run isn't held hostage by translation.
-TRANSLATE_TIMEOUT_S = 4.0
+# Two attempts rather than one — a single timeout/blip otherwise leaks the
+# original English line through. 5s per attempt gives flash-lite enough headroom
+# under load (4s leaked ~2/10) while keeping the 2x budget bounded so a flushing
+# run isn't held hostage by translation.
+TRANSLATE_TIMEOUT_S = 5.0
 TRANSLATE_ATTEMPTS = 2
 
 _genai_client: Optional[GenaiClient] = None
