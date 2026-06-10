@@ -62,13 +62,15 @@ async def localize_thought(text: str, target_code: str | None) -> str:
         return text
     lang = language_clause(target)
     prompt = (
-        f"You localize a product's activity-feed text into {lang}.\n"
-        f"If the text below is already written entirely in {lang}, return it "
-        f"verbatim. Otherwise translate it into {lang}.\n"
+        # No "return verbatim if already in {lang}" escape — flash-lite was
+        # taking it for English lines and passing them through untranslated.
+        # Force a translation every time; an already-{lang} line just round-trips.
+        f"Translate the activity-feed line below into {lang}. Output it entirely "
+        f"in {lang}, translating every word even if parts already look like {lang}.\n"
         "Rules:\n"
         "- Preserve Markdown exactly, including the leading **bold title**.\n"
-        "- Keep proper nouns (venue and brand names, URLs) unchanged.\n"
-        "- Return ONLY the resulting text, with no preamble or quotes.\n\n"
+        "- Keep proper nouns (venue and brand names, URLs) in their original form.\n"
+        "- Return ONLY the translated line, with no preamble or quotes.\n\n"
         f"Text:\n{text}"
     )
 
