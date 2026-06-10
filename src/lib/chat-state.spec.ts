@@ -39,6 +39,16 @@ vi.mock('$lib/auth.svelte', () => {
 			},
 			init: vi.fn(async () => {}),
 			getIdToken: vi.fn(async () => 'mock-id-token'),
+			authedPost: vi.fn(async (url: string, body?: Record<string, unknown>) =>
+				fetch(url, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: 'Bearer mock-id-token'
+					},
+					body: JSON.stringify(body ?? {})
+				})
+			),
 			signInWithGoogle: vi.fn(),
 			sendMagicLink: vi.fn(),
 			completeMagicLinkSignIn: vi.fn(),

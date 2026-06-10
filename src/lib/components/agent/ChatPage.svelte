@@ -306,15 +306,18 @@
 
 	// --- Request-action error state (Fix 1: surface transport failures) ---
 	let sendError = $state<string | null>(null);
-	let deleteError = $state<string | null>(null);
 
-	let confirmDeleteId = $state<string | null>(null);
-	let deletingId = $state<string | null>(null);
+	// At most one session-delete flow is active at a time.
+	let deleteOp = $state<{
+		sid: string;
+		state: 'confirming' | 'deleting';
+		error: string | null;
+	} | null>(null);
 
 	function handleWindowClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
-		if (!confirmDeleteId || deletingId) return;
-		if (!target.closest('.sb-item')) confirmDeleteId = null;
+		if (!deleteOp || deleteOp.state === 'deleting') return;
+		if (!target.closest('.sb-item')) deleteOp = null;
 	}
 
 	function handleWindowKeydown(e: KeyboardEvent) {
@@ -324,16 +327,17 @@
 	}
 
 	async function performDelete(sid: string) {
-		if (deletingId) return;
-		deleteError = null;
-		deletingId = sid;
+		if (deleteOp?.state === 'deleting') return;
+		deleteOp = { sid, state: 'deleting', error: null };
 		try {
 			await chatState.deleteSession(sid);
-			confirmDeleteId = null;
+			deleteOp = null;
 		} catch (err) {
-			deleteError = err instanceof Error ? err.message : m.chat_err_delete();
-		} finally {
-			deletingId = null;
+			deleteOp = {
+				sid,
+				state: 'confirming',
+				error: err instanceof Error ? err.message : m.chat_err_delete()
+			};
 		}
 	}
 </script>
@@ -449,7 +453,7 @@
 			<div class="flex flex-col gap-0.5">
 				{#each chatState.sessionsList as sess, i (sess.sid)}
 					{@const canDeleteRow = sess.userId === chatState.currentUid}
-					{@const isDeleting = deletingId === sess.sid}
+					{@const isDeleting = deleteOp?.sid === sess.sid && deleteOp.state === 'deleting'}
 					<div
 						class="sb-item group relative transition-opacity duration-200 {isDeleting
 							? 'opacity-60'
@@ -461,18 +465,15 @@
 						<button
 							onclick={() => {
 								if (isDeleting) return;
-								if (confirmDeleteId && confirmDeleteId !== sess.sid) {
-									confirmDeleteId = null;
-									deleteError = null;
-								}
-								if (confirmDeleteId === sess.sid) return;
+								if (deleteOp?.sid === sess.sid) return;
+								if (deleteOp?.state === 'confirming') deleteOp = null;
 								chatState.selectSession(sess.sid);
 								if (!isDesktop) sidebarOpen = false;
 							}}
 							class="w-full rounded-lg px-2 py-2 pr-8 text-left transition-colors {sess.sid ===
 							chatState.activeSid
 								? 'bg-cream-100 dark:bg-cream-100'
-								: confirmDeleteId === sess.sid
+								: deleteOp?.sid === sess.sid
 									? 'bg-cream-100/50 dark:bg-cream-50/50'
 									: 'hover:bg-cream-100/50 dark:hover:bg-cream-50/50'}"
 						>
@@ -485,7 +486,7 @@
 							</p>
 							<div class="relative mt-0.5 text-[11px]">
 								<div
-									class="flex items-center gap-1.5 transition-opacity duration-150 {confirmDeleteId ===
+									class="flex items-center gap-1.5 transition-opacity duration-150 {deleteOp?.sid ===
 									sess.sid
 										? 'pointer-events-none opacity-0'
 										: 'opacity-100'}"
@@ -501,7 +502,7 @@
 									</span>
 								</div>
 								<div
-									class="absolute inset-0 flex items-center gap-1.5 transition-all duration-150 {confirmDeleteId ===
+									class="absolute inset-0 flex items-center gap-1.5 transition-all duration-150 {deleteOp?.sid ===
 									sess.sid
 										? 'translate-x-0 opacity-100'
 										: 'pointer-events-none -translate-x-1.5 opacity-0'}"
@@ -534,15 +535,13 @@
 											tabindex="0"
 											onclick={(e) => {
 												e.stopPropagation();
-												confirmDeleteId = null;
-												deleteError = null;
+												deleteOp = null;
 											}}
 											onkeydown={(e) => {
 												if (e.key === 'Enter' || e.key === ' ') {
 													e.preventDefault();
 													e.stopPropagation();
-													confirmDeleteId = null;
-													deleteError = null;
+													deleteOp = null;
 												}
 											}}
 											class="text-black/40 transition-colors hover:text-black/60 dark:text-white/40 dark:hover:text-white/60"
@@ -551,24 +550,24 @@
 									{/if}
 								</div>
 							</div>
-							{#if confirmDeleteId === sess.sid && deleteError && !isDeleting}
+							{#if deleteOp?.sid === sess.sid && deleteOp.error}
 								<div
 									class="mt-1 truncate text-[11px] text-red-600 dark:text-red-400"
 									role="alert"
 									transition:slide={{ duration: 150 }}
 								>
-									{deleteError}
+									{deleteOp.error}
 								</div>
 							{/if}
 						</button>
 						{#if canDeleteRow}
 							<button
 								onclick={() => {
-								confirmDeleteId = sess.sid;
-								deleteError = null;
-							}}
+									if (deleteOp?.state === 'deleting') return;
+									deleteOp = { sid: sess.sid, state: 'confirming', error: null };
+								}}
 								aria-label={m.chat_delete_conversation()}
-								class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] dark:hover:bg-white/[0.06] {confirmDeleteId ===
+								class="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full transition-opacity hover:bg-black/[0.06] dark:hover:bg-white/[0.06] {deleteOp?.sid ===
 								sess.sid
 									? 'hidden'
 									: sess.sid === chatState.activeSid

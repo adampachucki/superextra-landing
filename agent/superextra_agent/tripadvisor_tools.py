@@ -3,6 +3,7 @@ import re
 import httpx
 
 from .apify_tools import _run_actor_sync
+from .http_client import LazyAsyncClient
 from .place_state import tool_source_key
 from .secrets import get_secret
 
@@ -20,14 +21,7 @@ _TA_REVIEW_RE = re.compile(
     re.IGNORECASE,
 )
 
-_client: httpx.AsyncClient | None = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(timeout=30.0)
-    return _client
+_get_client = LazyAsyncClient(timeout=30.0)
 
 
 def _get_api_key() -> str:

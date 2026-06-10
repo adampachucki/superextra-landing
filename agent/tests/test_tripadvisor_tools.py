@@ -283,7 +283,6 @@ class TestGetTripadvisorReviews:
     async def test_missing_api_key_returns_error(self):
         # Clear env AND block the Secret Manager fallback so the test stays hermetic.
         with patch.dict("os.environ", {}, clear=True), \
-             patch("superextra_agent.tripadvisor_tools._client", None), \
              patch("superextra_agent.secrets._get_client",
                    side_effect=RuntimeError("sm unreachable in test")):
             result = await get_tripadvisor_reviews(TA_URL, max_reviews=10)

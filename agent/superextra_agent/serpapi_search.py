@@ -12,39 +12,18 @@ Used by social_analyst (IG/FB/TA URL discovery) and review_analyst
 via get_tripadvisor_reviews). One reliable discovery backend instead
 of mixing grounding + specialized resolvers per platform.
 """
-import atexit
 from urllib.parse import urlparse
 
 import httpx
 
+from .http_client import LazyAsyncClient
 from .secrets import get_secret
 
 SERPAPI_BASE = "https://serpapi.com/search.json"
 TIMEOUT_S = 30.0
 DEFAULT_NUM_RESULTS = 10
 
-_client: httpx.AsyncClient | None = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(timeout=TIMEOUT_S)
-    return _client
-
-
-def _cleanup_client():
-    global _client
-    if _client is not None:
-        try:
-            import asyncio
-            asyncio.run(_client.aclose())
-        except RuntimeError:
-            pass
-        _client = None
-
-
-atexit.register(_cleanup_client)
+_get_client = LazyAsyncClient(timeout=TIMEOUT_S)
 
 
 def _domain(url: str) -> str:

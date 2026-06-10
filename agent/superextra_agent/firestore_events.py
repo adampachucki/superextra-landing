@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlparse
 
@@ -454,198 +455,264 @@ def map_tool_call(
     return None
 
 
+# --- Per-tool result rows. Each handler returns the activity rows for one
+# --- tool's response; `map_tool_result` dispatches on tool name.
+
+ToolResultHandler = Callable[
+    [str, dict[str, Any], str, str, dict[str, Any] | None], list[dict[str, Any]]
+]
+
+
+def _restaurant_details_rows(
+    name: str,
+    response: dict[str, Any],
+    status: str,
+    row_id: str,
+    state: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if status != "success":
+        return []
+    place = response.get("place") if isinstance(response.get("place"), dict) else {}
+    display_name = _get(place.get("displayName") if isinstance(place, dict) else None, "text")
+    if isinstance(display_name, str) and display_name.strip():
+        name_text = display_name.strip()
+        return [
+            _detail(
+                row_id,
+                "platform",
+                "Google Maps",
+                f"Profile for {name_text}",
+                label_key="act_detail_profile_for",
+                vars={"name": name_text},
+            )
+        ]
+    return []
+
+
+def _batch_details_rows(
+    name: str,
+    response: dict[str, Any],
+    status: str,
+    row_id: str,
+    state: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if status != "success":
+        return []
+    places = response.get("places")
+    if isinstance(places, list):
+        return [
+            _detail(
+                row_id,
+                "platform",
+                "Google Maps",
+                f"{len(places)} place profiles",
+                label_key="act_detail_place_profiles",
+                vars={"count": len(places)},
+            )
+        ]
+    return []
+
+def _place_search_rows(
+    name: str,
+    response: dict[str, Any],
+    status: str,
+    row_id: str,
+    state: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if status == "error":
+        return [
+            _detail(
+                row_id,
+                "warning",
+                "Warnings",
+                "Venue search failed",
+                label_key="act_detail_venue_search_failed",
+            )
+        ]
+    if status != "success":
+        return []
+    results = response.get("results")
+    if not isinstance(results, list):
+        return []
+    if name == "find_nearby_restaurants":
+        return [
+            _detail(
+                row_id,
+                "platform",
+                "Google Maps",
+                f"{len(results)} nearby places",
+                label_key="act_detail_nearby_places",
+                vars={"count": len(results)},
+            )
+        ]
+    count = len(results)
+    if count == 1:
+        first = results[0] if isinstance(results[0], dict) else {}
+        display_name = _get(first.get("displayName"), "text")
+        if isinstance(display_name, str) and display_name.strip():
+            name_text = display_name.strip()
+            row = _detail(
+                row_id,
+                "platform",
+                "Google Maps",
+                f"1 place match: {name_text}",
+                label_key="act_detail_one_match_named",
+                vars={"name": name_text},
+            )
+        else:
+            row = _detail(
+                row_id,
+                "platform",
+                "Google Maps",
+                "1 place match",
+                label_key="act_detail_one_match",
+            )
+    else:
+        row = _detail(
+            row_id,
+            "platform",
+            "Google Maps",
+            f"{count} place matches",
+            label_key="act_detail_place_matches",
+            vars={"count": count},
+        )
+    return [row]
+
+
+def _tripadvisor_reviews_rows(
+    name: str,
+    response: dict[str, Any],
+    status: str,
+    row_id: str,
+    state: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if status == "success":
+        count = int(response.get("fetched_reviews") or 0)
+        return [
+            _detail(
+                row_id,
+                "platform",
+                "TripAdvisor",
+                f"{count} reviews loaded",
+                label_key="act_detail_reviews_loaded",
+                vars={"count": count},
+            )
+        ]
+    if status == "error":
+        return [
+            _detail(
+                row_id,
+                "warning",
+                "Warnings",
+                "TripAdvisor reviews unavailable",
+                label_key="act_detail_tripadvisor_unavailable",
+            )
+        ]
+    return []
+
+
+def _google_reviews_rows(
+    name: str,
+    response: dict[str, Any],
+    status: str,
+    row_id: str,
+    state: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    place_id = str(response.get("place_id") or "").strip()
+    place = _place_name(state, place_id)
+    if status == "success":
+        count = int(response.get("total_fetched") or 0)
+        if place:
+            return [
+                _detail(
+                    row_id,
+                    "platform",
+                    "Google reviews",
+                    f"{count} reviews for {place}",
+                    label_key="act_detail_reviews_for_place",
+                    vars={"count": count, "place": place},
+                )
+            ]
+        return [
+            _detail(
+                row_id,
+                "platform",
+                "Google reviews",
+                f"{count} Google reviews",
+                label_key="act_detail_google_reviews",
+                vars={"count": count},
+            )
+        ]
+    if status == "error":
+        if place:
+            return [
+                _detail(
+                    row_id,
+                    "warning",
+                    "Warnings",
+                    f"Google reviews unavailable for {place}",
+                    label_key="act_detail_google_unavailable_for",
+                    vars={"place": place},
+                )
+            ]
+        return [
+            _detail(
+                row_id,
+                "warning",
+                "Warnings",
+                "Google reviews unavailable",
+                label_key="act_detail_google_unavailable",
+            )
+        ]
+    return []
+
+
+def _source_fetch_rows(
+    name: str,
+    response: dict[str, Any],
+    status: str,
+    row_id: str,
+    state: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if status != "error":
+        return []
+    return [
+        _detail(
+            row_id,
+            "warning",
+            "Warnings",
+            "Source fetch failed",
+            label_key="act_detail_source_fetch_failed",
+        )
+    ]
+
+
+_TOOL_RESULT_ROWS: dict[str, ToolResultHandler] = {
+    "get_restaurant_details": _restaurant_details_rows,
+    "get_batch_restaurant_details": _batch_details_rows,
+    "find_nearby_restaurants": _place_search_rows,
+    "search_restaurants": _place_search_rows,
+    "get_tripadvisor_reviews": _tripadvisor_reviews_rows,
+    "get_google_reviews": _google_reviews_rows,
+    "fetch_tripadvisor_page": _source_fetch_rows,
+    "fetch_facebook_page": _source_fetch_rows,
+    "fetch_facebook_posts": _source_fetch_rows,
+    "fetch_instagram_profile": _source_fetch_rows,
+}
+
+
 def map_tool_result(
     name: str,
     response: dict[str, Any],
     state: dict[str, Any] | None,
     call_id: str | None,
 ) -> list[dict[str, Any]]:
+    handler = _TOOL_RESULT_ROWS.get(name)
+    if handler is None:
+        return []
     row_id = _tool_row_id(call_id=call_id, phase="response", name=name)
     status = str(response.get("status") or "").strip().lower()
-
-    if name == "get_restaurant_details" and status == "success":
-        place = response.get("place") if isinstance(response.get("place"), dict) else {}
-        display_name = _get(place.get("displayName") if isinstance(place, dict) else None, "text")
-        if isinstance(display_name, str) and display_name.strip():
-            name_text = display_name.strip()
-            return [
-                _detail(
-                    row_id,
-                    "platform",
-                    "Google Maps",
-                    f"Profile for {name_text}",
-                    label_key="act_detail_profile_for",
-                    vars={"name": name_text},
-                )
-            ]
-        return []
-
-    if name == "get_batch_restaurant_details" and status == "success":
-        places = response.get("places")
-        if isinstance(places, list):
-            return [
-                _detail(
-                    row_id,
-                    "platform",
-                    "Google Maps",
-                    f"{len(places)} place profiles",
-                    label_key="act_detail_place_profiles",
-                    vars={"count": len(places)},
-                )
-            ]
-        return []
-
-    if name in ("find_nearby_restaurants", "search_restaurants"):
-        if status == "error":
-            return [
-                _detail(
-                    row_id,
-                    "warning",
-                    "Warnings",
-                    "Venue search failed",
-                    label_key="act_detail_venue_search_failed",
-                )
-            ]
-        if status != "success":
-            return []
-        results = response.get("results")
-        if not isinstance(results, list):
-            return []
-        if name == "find_nearby_restaurants":
-            return [
-                _detail(
-                    row_id,
-                    "platform",
-                    "Google Maps",
-                    f"{len(results)} nearby places",
-                    label_key="act_detail_nearby_places",
-                    vars={"count": len(results)},
-                )
-            ]
-        count = len(results)
-        if count == 1:
-            first = results[0] if isinstance(results[0], dict) else {}
-            display_name = _get(first.get("displayName"), "text")
-            if isinstance(display_name, str) and display_name.strip():
-                name_text = display_name.strip()
-                row = _detail(
-                    row_id,
-                    "platform",
-                    "Google Maps",
-                    f"1 place match: {name_text}",
-                    label_key="act_detail_one_match_named",
-                    vars={"name": name_text},
-                )
-            else:
-                row = _detail(
-                    row_id,
-                    "platform",
-                    "Google Maps",
-                    "1 place match",
-                    label_key="act_detail_one_match",
-                )
-        else:
-            row = _detail(
-                row_id,
-                "platform",
-                "Google Maps",
-                f"{count} place matches",
-                label_key="act_detail_place_matches",
-                vars={"count": count},
-            )
-        return [row]
-
-    if name == "get_tripadvisor_reviews":
-        if status == "success":
-            count = int(response.get("fetched_reviews") or 0)
-            return [
-                _detail(
-                    row_id,
-                    "platform",
-                    "TripAdvisor",
-                    f"{count} reviews loaded",
-                    label_key="act_detail_reviews_loaded",
-                    vars={"count": count},
-                )
-            ]
-        if status == "error":
-            return [
-                _detail(
-                    row_id,
-                    "warning",
-                    "Warnings",
-                    "TripAdvisor reviews unavailable",
-                    label_key="act_detail_tripadvisor_unavailable",
-                )
-            ]
-        return []
-
-    if name == "get_google_reviews":
-        place_id = str(response.get("place_id") or "").strip()
-        place = _place_name(state, place_id)
-        if status == "success":
-            count = int(response.get("total_fetched") or 0)
-            if place:
-                return [
-                    _detail(
-                        row_id,
-                        "platform",
-                        "Google reviews",
-                        f"{count} reviews for {place}",
-                        label_key="act_detail_reviews_for_place",
-                        vars={"count": count, "place": place},
-                    )
-                ]
-            return [
-                _detail(
-                    row_id,
-                    "platform",
-                    "Google reviews",
-                    f"{count} Google reviews",
-                    label_key="act_detail_google_reviews",
-                    vars={"count": count},
-                )
-            ]
-        if status == "error":
-            if place:
-                return [
-                    _detail(
-                        row_id,
-                        "warning",
-                        "Warnings",
-                        f"Google reviews unavailable for {place}",
-                        label_key="act_detail_google_unavailable_for",
-                        vars={"place": place},
-                    )
-                ]
-            return [
-                _detail(
-                    row_id,
-                    "warning",
-                    "Warnings",
-                    "Google reviews unavailable",
-                    label_key="act_detail_google_unavailable",
-                )
-            ]
-        return []
-
-    if name in (
-        "fetch_tripadvisor_page",
-        "fetch_facebook_page",
-        "fetch_facebook_posts",
-        "fetch_instagram_profile",
-    ) and status == "error":
-        return [
-            _detail(
-                row_id,
-                "warning",
-                "Warnings",
-                "Source fetch failed",
-                label_key="act_detail_source_fetch_failed",
-            )
-        ]
-
-    return []
+    return handler(name, response, status, row_id, state)
 
 
 def map_tool_error(

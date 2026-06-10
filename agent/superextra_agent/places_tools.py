@@ -1,8 +1,8 @@
-import atexit
 import asyncio
 import os
 import httpx
 
+from .http_client import LazyAsyncClient
 from .place_state import (
     get_original_target_place_id,
     set_original_target_once,
@@ -107,28 +107,7 @@ FOOD_DRINK_PLACE_TYPES = {
     "winery",
 }
 
-# Lazy-initialized client and API key
-_client: httpx.AsyncClient | None = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(timeout=15.0)
-    return _client
-
-
-def _cleanup_client():
-    global _client
-    if _client is not None:
-        try:
-            asyncio.run(_client.aclose())
-        except RuntimeError:
-            pass
-        _client = None
-
-
-atexit.register(_cleanup_client)
+_get_client = LazyAsyncClient(timeout=15.0)
 
 
 def _get_api_key() -> str:

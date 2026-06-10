@@ -5,12 +5,12 @@ Gemini grounding exposes article URLs as tokenized redirects on
 `resolve_source_display_url` unwraps those to the real destination and
 canonicalizes the result so the UI can show and dedupe a stable public URL.
 """
-import asyncio
-import atexit
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 import httpx
+
+from .http_client import LazyAsyncClient
 
 TIMEOUT_S = 15.0
 
@@ -20,9 +20,6 @@ TIMEOUT_S = 15.0
 VERTEX_REDIRECT_HOST = "vertexaisearch.cloud.google.com"
 VERTEX_REDIRECT_PATH_PREFIX = "/grounding-api-redirect/"
 VERTEX_UNWRAP_TIMEOUT_S = 5.0
-
-_client: httpx.AsyncClient | None = None
-
 
 def _is_vertex_redirect(url: str) -> bool:
     """True if `url` is a Vertex grounding-api-redirect URL.
@@ -43,24 +40,7 @@ def _is_vertex_redirect(url: str) -> bool:
     )
 
 
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(timeout=TIMEOUT_S)
-    return _client
-
-
-def _cleanup_client():
-    global _client
-    if _client is not None:
-        try:
-            asyncio.run(_client.aclose())
-        except RuntimeError:
-            pass
-        _client = None
-
-
-atexit.register(_cleanup_client)
+_get_client = LazyAsyncClient(timeout=TIMEOUT_S)
 
 
 def _strip_fragment(url: str) -> str:

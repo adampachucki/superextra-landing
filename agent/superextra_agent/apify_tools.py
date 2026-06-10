@@ -11,10 +11,11 @@ per-turn source list. Per-platform trimming happens inline in each
 function — raw actor responses can be 100s of KB and embed image URL
 arrays the model can't use.
 """
-import atexit
+from collections.abc import Callable
 
 import httpx
 
+from .http_client import LazyAsyncClient
 from .place_state import source_title, tool_source_key
 from .secrets import get_secret
 
@@ -26,29 +27,8 @@ FACEBOOK_POSTS_ACTOR = "apify~facebook-posts-scraper"
 INSTAGRAM_ACTOR = "apify~instagram-scraper"
 GOOGLE_REVIEWS_MAX_REVIEWS = 200
 
-_client: httpx.AsyncClient | None = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        # Sync endpoint can take a while — generous timeout
-        _client = httpx.AsyncClient(timeout=120.0)
-    return _client
-
-
-def _cleanup_client():
-    global _client
-    if _client is not None:
-        try:
-            import asyncio
-            asyncio.run(_client.aclose())
-        except RuntimeError:
-            pass
-        _client = None
-
-
-atexit.register(_cleanup_client)
+# Sync endpoint can take a while — generous timeout
+_get_client = LazyAsyncClient(timeout=120.0)
 
 
 def _get_api_key() -> str:
@@ -114,6 +94,30 @@ def _emit_source_pill(
         "url": url,
         "domain": domain,
     }
+
+
+async def _fetch_and_emit(
+    *,
+    actor: str,
+    payload: dict,
+    trim_item: Callable[[dict], dict],
+    empty_error: str,
+    provider: str,
+    url: str,
+    title: str,
+    domain: str,
+    tool_context,
+) -> dict:
+    """Shared body of the social/page fetchers: run the actor, propagate its
+    error shape, trim items, error on empty, emit a source pill on success."""
+    result = await _run_actor_sync(actor, payload)
+    if result["status"] != "success":
+        return result
+    items = [trim_item(i) for i in result["items"] if isinstance(i, dict)]
+    if not items:
+        return {"status": "error", "error_message": empty_error}
+    _emit_source_pill(tool_context, provider=provider, url=url, title=title, domain=domain)
+    return {"status": "success", "url": url, "items": items}
 
 
 def _compact_google_review(item: dict) -> dict:
@@ -225,27 +229,21 @@ async def fetch_tripadvisor_page(url: str, tool_context=None) -> dict:
     Args:
         url: Full TripAdvisor restaurant/hotel page URL from search results.
     """
-    result = await _run_actor_sync(
-        TRIPADVISOR_PAGE_ACTOR,
-        {
+    return await _fetch_and_emit(
+        actor=TRIPADVISOR_PAGE_ACTOR,
+        payload={
             "startUrls": [{"url": url}],
             "maxItemsPerQuery": 1,
             "includeReviews": False,
         },
-    )
-    if result["status"] != "success":
-        return result
-    items = [_trim_tripadvisor_item(i) for i in result["items"] if isinstance(i, dict)]
-    if not items:
-        return {"status": "error", "error_message": f"No TripAdvisor data at {url}"}
-    _emit_source_pill(
-        tool_context,
+        trim_item=_trim_tripadvisor_item,
+        empty_error=f"No TripAdvisor data at {url}",
         provider="tripadvisor",
         url=url,
         title="TripAdvisor",
         domain="tripadvisor.com",
+        tool_context=tool_context,
     )
-    return {"status": "success", "url": url, "items": items}
 
 
 def _trim_facebook_page_item(item: dict) -> dict:
@@ -273,23 +271,17 @@ async def fetch_facebook_page(url: str, tool_context=None) -> dict:
     Args:
         url: Full Facebook page URL (e.g. https://www.facebook.com/pagename/).
     """
-    result = await _run_actor_sync(
-        FACEBOOK_PAGE_ACTOR,
-        {"startUrls": [{"url": url}]},
-    )
-    if result["status"] != "success":
-        return result
-    items = [_trim_facebook_page_item(i) for i in result["items"] if isinstance(i, dict)]
-    if not items:
-        return {"status": "error", "error_message": f"No Facebook page data at {url}"}
-    _emit_source_pill(
-        tool_context,
+    return await _fetch_and_emit(
+        actor=FACEBOOK_PAGE_ACTOR,
+        payload={"startUrls": [{"url": url}]},
+        trim_item=_trim_facebook_page_item,
+        empty_error=f"No Facebook page data at {url}",
         provider="facebook",
         url=url,
         title="Facebook page",
         domain="facebook.com",
+        tool_context=tool_context,
     )
-    return {"status": "success", "url": url, "items": items}
 
 
 def _trim_facebook_post_item(item: dict) -> dict:
@@ -315,23 +307,17 @@ async def fetch_facebook_posts(url: str, tool_context=None) -> dict:
     Args:
         url: Full Facebook page URL (e.g. https://www.facebook.com/pagename/).
     """
-    result = await _run_actor_sync(
-        FACEBOOK_POSTS_ACTOR,
-        {"startUrls": [{"url": url}], "resultsLimit": 10},
-    )
-    if result["status"] != "success":
-        return result
-    items = [_trim_facebook_post_item(i) for i in result["items"] if isinstance(i, dict)]
-    if not items:
-        return {"status": "error", "error_message": f"No Facebook posts at {url}"}
-    _emit_source_pill(
-        tool_context,
+    return await _fetch_and_emit(
+        actor=FACEBOOK_POSTS_ACTOR,
+        payload={"startUrls": [{"url": url}], "resultsLimit": 10},
+        trim_item=_trim_facebook_post_item,
+        empty_error=f"No Facebook posts at {url}",
         provider="facebook",
         url=url,
         title="Facebook page",
         domain="facebook.com",
+        tool_context=tool_context,
     )
-    return {"status": "success", "url": url, "items": items}
 
 
 def _trim_instagram_post(post: dict) -> dict:
@@ -372,20 +358,14 @@ async def fetch_instagram_profile(url: str, tool_context=None) -> dict:
     Args:
         url: Full Instagram profile URL (e.g. https://www.instagram.com/username/).
     """
-    result = await _run_actor_sync(
-        INSTAGRAM_ACTOR,
-        {"directUrls": [url], "resultsLimit": 5, "resultsType": "details"},
-    )
-    if result["status"] != "success":
-        return result
-    items = [_trim_instagram_item(i) for i in result["items"] if isinstance(i, dict)]
-    if not items:
-        return {"status": "error", "error_message": f"No Instagram profile data at {url}"}
-    _emit_source_pill(
-        tool_context,
+    return await _fetch_and_emit(
+        actor=INSTAGRAM_ACTOR,
+        payload={"directUrls": [url], "resultsLimit": 5, "resultsType": "details"},
+        trim_item=_trim_instagram_item,
+        empty_error=f"No Instagram profile data at {url}",
         provider="instagram",
         url=url,
         title="Instagram",
         domain="instagram.com",
+        tool_context=tool_context,
     )
-    return {"status": "success", "url": url, "items": items}

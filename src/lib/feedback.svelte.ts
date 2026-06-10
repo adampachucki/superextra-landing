@@ -36,12 +36,7 @@ export const DOWNVOTE_REASONS = [
 const keyOf = (sid: string, turnIndex: number) => `${sid}:${turnIndex}`;
 
 async function post(body: Record<string, unknown>): Promise<void> {
-	const idToken = await auth.getIdToken();
-	const res = await fetch(FEEDBACK_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-		body: JSON.stringify(body)
-	});
+	const res = await auth.authedPost(FEEDBACK_URL, body);
 	if (!res.ok) throw new Error(`feedback_${res.status}`);
 	analytics.capture('feedback_submitted', {
 		kind: body.kind,

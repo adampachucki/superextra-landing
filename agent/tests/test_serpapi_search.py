@@ -129,7 +129,8 @@ class TestSearchSerpapi:
     @pytest.mark.asyncio
     async def test_missing_api_key_returns_error(self):
         with patch.dict("os.environ", {}, clear=True), \
-             patch("superextra_agent.serpapi_search._client", None), \
+             patch("superextra_agent.serpapi_search._get_client",
+                   side_effect=AssertionError("unexpected HTTP call")), \
              patch("superextra_agent.secrets._get_client",
                    side_effect=RuntimeError("sm unreachable in test")):
             result = await search_serpapi("anything")

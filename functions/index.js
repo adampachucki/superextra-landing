@@ -167,6 +167,28 @@ function finishAfterRunOwnershipLost(res, sessionId, runId) {
 	res.status(202).json({ ok: true, sessionId, runId, cancelled: true });
 }
 
+// Shared recovery for agentStream catch blocks: if `err` — or a re-read of the
+// session — shows this run no longer owns the turn, respond accordingly.
+// Returns true when a response was sent and the caller must stop.
+async function respondIfRunOwnershipLost(err, sessionRef, res, sessionId, runId) {
+	if (err instanceof RunOwnershipLost) {
+		finishAfterRunOwnershipLost(res, sessionId, runId);
+		return true;
+	}
+	try {
+		await assertRunStillCurrent(sessionRef, runId);
+	} catch (ownershipErr) {
+		if (ownershipErr instanceof RunOwnershipLost) {
+			finishAfterRunOwnershipLost(res, sessionId, runId);
+			return true;
+		}
+		console.error('agentStream ownership check failed:', ownershipErr.message || ownershipErr);
+		res.status(500).json({ ok: false, error: 'session_ownership_check_failed' });
+		return true;
+	}
+	return false;
+}
+
 function titleFromMessage(message) {
 	const words = message
 		.replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
@@ -668,21 +690,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 				});
 			}
 		} catch (err) {
-			if (err instanceof RunOwnershipLost) {
-				finishAfterRunOwnershipLost(res, sessionId, runId);
-				return;
-			}
-			try {
-				await assertRunStillCurrent(sessionRef, runId);
-			} catch (ownershipErr) {
-				if (ownershipErr instanceof RunOwnershipLost) {
-					finishAfterRunOwnershipLost(res, sessionId, runId);
-					return;
-				}
-				console.error('agentStream ownership check failed:', ownershipErr.message || ownershipErr);
-				res.status(500).json({ ok: false, error: 'session_ownership_check_failed' });
-				return;
-			}
+			if (await respondIfRunOwnershipLost(err, sessionRef, res, sessionId, runId)) return;
 			console.warn('intake failed; falling back to Agent Engine:', err.message || err);
 		}
 	}
@@ -738,21 +746,7 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 		}
 		res.status(202).json({ ok: true, sessionId, runId });
 	} catch (err) {
-		if (err instanceof RunOwnershipLost) {
-			finishAfterRunOwnershipLost(res, sessionId, runId);
-			return;
-		}
-		try {
-			await assertRunStillCurrent(sessionRef, runId);
-		} catch (ownershipErr) {
-			if (ownershipErr instanceof RunOwnershipLost) {
-				finishAfterRunOwnershipLost(res, sessionId, runId);
-				return;
-			}
-			console.error('agentStream ownership check failed:', ownershipErr.message || ownershipErr);
-			res.status(500).json({ ok: false, error: 'session_ownership_check_failed' });
-			return;
-		}
+		if (await respondIfRunOwnershipLost(err, sessionRef, res, sessionId, runId)) return;
 		console.error('gearHandoff failed:', err.message || err);
 		try {
 			await gearHandoffCleanup(

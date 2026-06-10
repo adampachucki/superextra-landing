@@ -242,6 +242,17 @@ async function getIdToken(): Promise<string> {
 	return u.getIdToken(/* forceRefresh */ false);
 }
 
+/** POST JSON to an API endpoint with the signed-in user's ID token. Returns
+ *  the raw Response — callers own status handling and body parsing. */
+async function authedPost(url: string, body?: Record<string, unknown>): Promise<Response> {
+	const idToken = await getIdToken();
+	return fetch(url, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+		body: JSON.stringify(body ?? {})
+	});
+}
+
 function saveDraft(input: { prompt: string; placeContext: DraftPrompt['placeContext'] }) {
 	if (!browser) return;
 	const draft: DraftPrompt = {
@@ -355,6 +366,7 @@ export const auth = {
 	finishMagicLinkSignIn,
 	signOut: signOutUser,
 	getIdToken,
+	authedPost,
 	saveDraft,
 	consumeDraft,
 	peekDraft,

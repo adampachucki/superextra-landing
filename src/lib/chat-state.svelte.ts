@@ -187,10 +187,14 @@ let lastError = $state<string | null>(null);
 // still in flight. Cleared on POST success (listener takes over) or on
 // pre-Firestore-failure local rollback.
 let optimisticPendingSid: string | null = null;
-let optimisticTurnSid: string | null = null;
-let optimisticTurnStartedAtMs: number | null = null;
-let optimisticTurnIndex: number | null = null;
-let optimisticTurnMessage: string | null = null;
+// The locally-installed pending turn awaiting its server counterpart; null
+// when no optimistic turn is in flight.
+let optimisticTurn: {
+	sid: string;
+	turnIndex: number;
+	message: string;
+	startedAtMs: number;
+} | null = null;
 
 // Listener unsubscribes — kept outside $state because they're opaque cleanup
 // handles, not reactive values.
@@ -388,10 +392,7 @@ function clearActiveState() {
 	liveTimeline = [];
 	loadState = 'idle';
 	placeContextState = null;
-	optimisticTurnSid = null;
-	optimisticTurnStartedAtMs = null;
-	optimisticTurnIndex = null;
-	optimisticTurnMessage = null;
+	optimisticTurn = null;
 	renderedEventKeys.clear();
 	previousTurnStatus.clear();
 	replyRevealTurns.clear();
@@ -420,10 +421,7 @@ function makeOptimisticTurn(turnIndex: number, userMessage: string, startedAtMs:
 
 function installOptimisticTurn(sid: string, userMessage: string, turnIndex = 1) {
 	const nowMs = Date.now();
-	optimisticTurnStartedAtMs = nowMs;
-	optimisticTurnSid = sid;
-	optimisticTurnIndex = turnIndex;
-	optimisticTurnMessage = userMessage;
+	optimisticTurn = { sid, turnIndex, message: userMessage, startedAtMs: nowMs };
 	if (activeSid !== sid) return;
 	const optimistic = makeOptimisticTurn(turnIndex, userMessage, nowMs);
 	turns = [...turns.filter((turn) => turn.turnIndex !== turnIndex), optimistic].sort(
@@ -434,14 +432,12 @@ function installOptimisticTurn(sid: string, userMessage: string, turnIndex = 1) 
 }
 
 function clearOptimisticTurn() {
-	optimisticTurnSid = null;
-	optimisticTurnStartedAtMs = null;
-	optimisticTurnIndex = null;
-	optimisticTurnMessage = null;
+	optimisticTurn = null;
 }
 
 function removeOptimisticTurn(sid: string, turnIndex: number) {
-	if (optimisticTurnSid !== sid || optimisticTurnIndex !== turnIndex) return;
+	if (!optimisticTurn || optimisticTurn.sid !== sid || optimisticTurn.turnIndex !== turnIndex)
+		return;
 	clearOptimisticTurn();
 	if (activeSid === sid) {
 		turns = turns.filter(
@@ -629,27 +625,18 @@ async function attachActiveListeners(sid: string) {
 			// transaction-created turn is observed. For follow-ups this snapshot
 			// often contains older completed turns, so preserve the local pending
 			// turn until the matching server turn appears.
-			if (
-				optimisticTurnSid === sid &&
-				optimisticTurnIndex !== null &&
-				optimisticTurnStartedAtMs !== null &&
-				optimisticTurnMessage !== null
-			) {
-				const serverOptimistic = next.find((turn) => turn.turnIndex === optimisticTurnIndex);
+			if (optimisticTurn && optimisticTurn.sid === sid) {
+				const { turnIndex, message, startedAtMs } = optimisticTurn;
+				const serverOptimistic = next.find((turn) => turn.turnIndex === turnIndex);
 				if (!serverOptimistic) {
-					next = [
-						...next,
-						makeOptimisticTurn(
-							optimisticTurnIndex,
-							optimisticTurnMessage,
-							optimisticTurnStartedAtMs
-						)
-					].sort((a, b) => a.turnIndex - b.turnIndex);
+					next = [...next, makeOptimisticTurn(turnIndex, message, startedAtMs)].sort(
+						(a, b) => a.turnIndex - b.turnIndex
+					);
 				} else if (!IN_FLIGHT_STATUSES.has(serverOptimistic.status)) {
 					clearOptimisticTurn();
 				}
 			}
-			if (next.length > 0 || optimisticTurnSid !== sid || turns.length === 0) {
+			if (next.length > 0 || optimisticTurn?.sid !== sid || turns.length === 0) {
 				turns = next;
 			}
 			maybeAttachEventsListener();
@@ -830,17 +817,9 @@ function agentCancelUrl() {
 }
 
 async function postAgentStream(body: Record<string, unknown>): Promise<void> {
-	const idToken = await auth.getIdToken();
-	const res = await fetch(agentStreamUrl(), {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${idToken}`
-		},
-		// The UI locale is the fallback when the server can't classify the
-		// prompt's language (detect-language.js).
-		body: JSON.stringify({ locale: getLocale(), ...body })
-	});
+	// The UI locale is the fallback when the server can't classify the
+	// prompt's language (detect-language.js).
+	const res = await auth.authedPost(agentStreamUrl(), { locale: getLocale(), ...body });
 	if (!res.ok) {
 		const payload = await res.json().catch(() => null);
 		const reason = (payload as { error?: string } | null)?.error ?? `http_${res.status}`;
@@ -1091,11 +1070,12 @@ export const chatState = {
 		if (!latest) return null;
 		if (!IN_FLIGHT_STATUSES.has(latest.status)) return null;
 		if (
-			optimisticTurnSid === activeSid &&
-			optimisticTurnStartedAtMs !== null &&
-			optimisticTurnIndex === latest.turnIndex
+			optimisticTurn &&
+			optimisticTurn.sid === activeSid &&
+			optimisticTurn.turnIndex === latest.turnIndex
 		) {
-			return Math.min(latest.createdAtMs ?? optimisticTurnStartedAtMs, optimisticTurnStartedAtMs);
+			const { startedAtMs } = optimisticTurn;
+			return Math.min(latest.createdAtMs ?? startedAtMs, startedAtMs);
 		}
 		return latest.createdAtMs ?? null;
 	},

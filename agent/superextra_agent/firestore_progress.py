@@ -492,7 +492,9 @@ class FirestoreProgressPlugin(BasePlugin):
     async def _observe_typed_pill(
         self, per: GearRunState, pill: dict[str, Any]
     ) -> None:
-        if not await self._still_owns_running_turn(per):
+        # No pre-write ownership read here: the timeline write itself runs in a
+        # currentRunId-fenced transaction and raises TimelineOwnershipLost.
+        if per.cancelled:
             return
         try:
             await per.observe_typed_pill(pill)

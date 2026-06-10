@@ -131,7 +131,6 @@ class TestGetGoogleReviews:
         # the no-secret-anywhere path. Without the SM patch this test
         # would reach production Secret Manager from CI.
         with patch.dict("os.environ", {}, clear=True), \
-             patch("superextra_agent.apify_tools._client", None), \
              patch("superextra_agent.secrets._get_client",
                    side_effect=RuntimeError("sm unreachable in test")):
             result = await get_google_reviews("ChIJtest123")

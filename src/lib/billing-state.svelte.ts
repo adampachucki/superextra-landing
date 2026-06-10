@@ -305,15 +305,7 @@ async function postBilling(path: string, body?: Record<string, unknown>): Promis
 }
 
 async function postBillingJson<T>(path: string, body?: Record<string, unknown>): Promise<T> {
-	const idToken = await auth.getIdToken();
-	const res = await fetch(path, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${idToken}`
-		},
-		body: JSON.stringify(body ?? {})
-	});
+	const res = await auth.authedPost(path, body);
 	const payload = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
 	if (!res.ok || !payload) {
 		const reason = payload?.error ?? `http_${res.status}`;

@@ -14,9 +14,9 @@ def reset_places_client():
     """Reset the lazy-initialized httpx client between tests."""
     from superextra_agent import places_tools
 
-    places_tools._client = None
+    places_tools._get_client.reset()
     yield
-    places_tools._client = None
+    places_tools._get_client.reset()
 
 
 @pytest.fixture(autouse=True)
