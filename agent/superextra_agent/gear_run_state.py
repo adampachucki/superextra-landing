@@ -59,6 +59,10 @@ class GearRunState:
     specialist_sources_seen: set[str] = field(default_factory=set)
     mapping_state: dict[str, Any] = field(default_factory=lambda: {"place_names": {}})
     partial_thought_pending: bool = False
+    # In-flight thought translate-and-write tasks, run off the event loop so a
+    # slow translate call never blocks the agent. Drained in after_run before
+    # the terminal write so end-of-run thoughts aren't lost.
+    thought_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
 
     # Lifecycle
     heartbeat_task: asyncio.Task[Any] | None = None

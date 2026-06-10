@@ -27,7 +27,11 @@ log = logging.getLogger(__name__)
 
 PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "superextra-site")
 TRANSLATE_MODEL = os.environ.get("THOUGHT_TRANSLATE_MODEL", "gemini-2.5-flash-lite")
-TRANSLATE_TIMEOUT_S = 6.0
+# Two short attempts rather than one long one — a single timeout/blip otherwise
+# leaks the original English line through (observed ~1/12 on a live run). Total
+# budget stays bounded so a flushing run isn't held hostage by translation.
+TRANSLATE_TIMEOUT_S = 4.0
+TRANSLATE_ATTEMPTS = 2
 
 _genai_client: Optional[GenaiClient] = None
 
@@ -74,10 +78,16 @@ async def localize_thought(text: str, target_code: str | None) -> str:
         )
         return getattr(resp, "text", None)
 
-    try:
-        result = await asyncio.wait_for(_call(), timeout=TRANSLATE_TIMEOUT_S)
-        cleaned = (result or "").strip()
-        return cleaned or text
-    except Exception:  # noqa: BLE001
-        log.warning("thought translation failed; using original text", exc_info=True)
-        return text
+    for attempt in range(TRANSLATE_ATTEMPTS):
+        try:
+            result = await asyncio.wait_for(_call(), timeout=TRANSLATE_TIMEOUT_S)
+            cleaned = (result or "").strip()
+            if cleaned:
+                return cleaned
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            log.warning(
+                "thought translation attempt %d failed", attempt + 1, exc_info=True
+            )
+    return text
