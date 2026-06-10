@@ -81,7 +81,7 @@ const CONFIRMATION_COPY = {
 	}
 };
 
-export function confirmationLocale(value) {
+function confirmationLocale(value) {
 	return Object.hasOwn(CONFIRMATION_COPY, value) ? value : 'en';
 }
 
