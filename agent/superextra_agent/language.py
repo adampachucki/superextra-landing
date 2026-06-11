@@ -69,10 +69,12 @@ def language_directive(state) -> str:
     lang = language_clause(code)
     return (
         "## Language\n\n"
-        f"The user's language for this request is {lang}. Write EVERYTHING in {lang}: "
-        "internal reasoning and thoughts, every status update, any specialist briefs "
-        "you write, and the final report. Do not switch to English (or any other "
-        "language) for any part, even when source material, tools, place data, or "
-        "context appear in English. Keep proper nouns — venue and brand names, URLs — "
-        "in their original form.\n\n"
+        f"The whole conversation is in {lang}. Write 100% of your output in {lang} — "
+        f"the report, every reply and status line, specialist briefs, and your "
+        f"thoughts. Each thinking step opens with a short **bold title**; write that "
+        f"title in {lang}, not English. Concretely, never produce English thinking "
+        f"titles like '**Searching for…**', '**Gathering data**', '**Analyzing the "
+        f"market**', '**Investigating…**' — write them in {lang}. Tools, place data, "
+        f"and sources are often in English; narrate your thinking in {lang} anyway. "
+        "Keep proper nouns — venue and brand names, URLs — unchanged.\n\n"
     )
