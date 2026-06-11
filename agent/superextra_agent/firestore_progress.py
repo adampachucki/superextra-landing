@@ -60,14 +60,8 @@ from .firestore_events import (
 from .gear_run_state import GearRunState
 from .notes import _generate_title
 from .timeline import TimelineOwnershipLost
-from .translate import localize_thought
 
 log = logging.getLogger(__name__)
-
-# How long after_run waits for off-loop thought translations to finish writing
-# before cancelling stragglers. Kept short so completion isn't held hostage —
-# at completion at most the final thought or two is usually still in flight.
-_THOUGHT_FLUSH_TIMEOUT_S = 3.0
 
 
 class OwnershipLost(Exception):
@@ -761,17 +755,6 @@ class FirestoreProgressPlugin(BasePlugin):
         # Best-effort timeline writes. TimelineWriter has its own internal
         # lock so concurrent writers don't interleave.
         for ev in timeline_events:
-            # Gemini writes its generic procedural thought-summaries ("Fetching
-            # reviews") in English even when instructed otherwise, so we
-            # translate thoughts into the prompt language. ADK awaits this
-            # callback before the agent continues, so translating inline would
-            # stall the research loop — instead fire the translate-and-write off
-            # the loop and return immediately; `after_run` flushes stragglers.
-            if ev.get("kind") == "thought" and per.prompt_language:
-                task = asyncio.create_task(self._localize_and_write_thought(per, dict(ev)))
-                per.thought_tasks.add(task)
-                task.add_done_callback(per.thought_tasks.discard)
-                continue
             try:
                 await per.timeline_writer.write_timeline(ev)
             except TimelineOwnershipLost:
@@ -803,38 +786,6 @@ class FirestoreProgressPlugin(BasePlugin):
             )
         return None
 
-    async def _flush_thought_tasks(self, per: GearRunState) -> None:
-        """Wait briefly for in-flight thought translations to finish writing,
-        then cancel any leftovers. A cancelled run drops them immediately."""
-        pending = list(per.thought_tasks)
-        if not pending:
-            return
-        if per.cancelled:
-            for task in pending:
-                task.cancel()
-            return
-        done, leftover = await asyncio.wait(pending, timeout=_THOUGHT_FLUSH_TIMEOUT_S)
-        for task in leftover:
-            task.cancel()
-
-    async def _localize_and_write_thought(
-        self, per: GearRunState, ev: dict[str, Any]
-    ) -> None:
-        """Translate a thought into the prompt language, then write it. Runs off
-        the event loop (see ``on_event_callback``) so it never blocks the agent.
-        Same write/ownership semantics as the inline timeline writes."""
-        ev["text"] = await localize_thought(ev["text"], per.prompt_language)
-        try:
-            await per.timeline_writer.write_timeline(ev)
-        except TimelineOwnershipLost:
-            await self._mark_cancelled(per)
-        except Exception:  # noqa: BLE001
-            log.exception(
-                "thought timeline write failed sid=%s runId=%s; continuing",
-                per.sid,
-                per.run_id,
-            )
-
     @override
     async def after_run_callback(self, *, invocation_context: InvocationContext):
         if is_nested_invocation(invocation_context):
@@ -845,13 +796,6 @@ class FirestoreProgressPlugin(BasePlugin):
             return None
         self._states_by_run_id.pop(per.run_id, None)
         corr = build_run_correlation(per)
-
-        # Flush thoughts still translating off the loop so the last lines land
-        # before finalize() closes the writer and the terminal write flips the
-        # status off 'running'. Short and best-effort: a slow straggler must not
-        # hold the user-visible completion hostage, and a cancelled run drops
-        # them outright.
-        await self._flush_thought_tasks(per)
 
         # Order matters:
         #   1. stop_heartbeat — late ticks can't clobber the terminal write
