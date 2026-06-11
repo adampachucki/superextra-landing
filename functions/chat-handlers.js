@@ -596,18 +596,23 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	// session does not have prior hidden state, so any Firestore-visible
 	// place/stopped-request context needed after rotation is injected into
 	// the user-visible query text.
-	const todayLabel = new Date(now).toLocaleDateString('en-US', {
-		year: 'numeric',
-		month: 'long',
-		day: 'numeric'
-	});
-	let queryText = `[Date: ${todayLabel}] ${researchQuestion || message}`;
-	if (createEngineSession && previousStoppedRequest) {
-		queryText = `[Previous stopped request: ${compactForAgentState(previousStoppedRequest, 1000)}] ${queryText}`;
-	}
+	// Put the user's own words FIRST so the model anchors to the prompt language,
+	// then append the bracketed context. Leading English prefixes biased the
+	// model toward English narration (thoughts). An ISO date avoids the English
+	// month name; the [Date:]/[Context:] markers the instructions reference work
+	// anywhere in the message.
+	const isoDate = new Date(now).toISOString().slice(0, 10);
+	const contextParts = [];
 	if (createEngineSession && placeContext && placeContext.name) {
-		queryText = `${placeContextPrefix(placeContext)}${queryText}`;
+		contextParts.push(placeContextPrefix(placeContext).trim());
 	}
+	if (createEngineSession && previousStoppedRequest) {
+		contextParts.push(
+			`[Previous stopped request: ${compactForAgentState(previousStoppedRequest, 1000)}]`
+		);
+	}
+	contextParts.push(`[Date: ${isoDate}]`);
+	const queryText = `${researchQuestion || message} ${contextParts.join(' ')}`;
 	const seedState = rotatedAfterCancel
 		? await readRotationSeedState(sessionRef, newTurnIdx, previousStoppedRequest)
 		: null;
