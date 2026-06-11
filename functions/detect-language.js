@@ -21,25 +21,24 @@ function normalizeCode(value) {
 }
 
 /**
- * Detect the primary ISO-639-1 language of `message`. Best-effort and
- * fail-open: returns `fallback` (then 'en') on any error, empty input, or an
- * undetermined result, so language detection never blocks a run.
+ * Detect the ISO-639-1 language the user is writing in. Judges only ordinary
+ * prose and ignores proper nouns, so a place/venue name does not register as a
+ * language. Returns `null` when undetermined (only a place name, etc.), empty,
+ * or on any error — the caller resolves the fallback (established chat language,
+ * then UI locale). Best-effort and fail-open so detection never blocks a run.
  *
- * Detection runs on the raw user message — NOT the agentStream query text,
- * which carries an English `[Date: …]` / place-context prefix that would bias
- * the result toward English.
+ * Runs on the raw user message — NOT the agentStream query text, which carries
+ * an English `[Date: …]` / place-context prefix that would bias the result.
  */
 const DETECT_TIMEOUT_MS = 4000;
 
 export async function detectLanguage({
 	message,
-	fallback = 'en',
 	generate = generateGeminiJson,
 	timeoutMs = DETECT_TIMEOUT_MS
 }) {
-	const fb = normalizeCode(fallback) || 'en';
 	const text = String(message || '').trim();
-	if (!text) return fb;
+	if (!text) return null;
 	// Fail open on a hung call as well as a thrown one: detection sits on the
 	// agentStream hot path before the session transaction and must not stall the
 	// run. `generateGeminiJson` has no abort, so bound it with a race.
@@ -51,9 +50,14 @@ export async function detectLanguage({
 		const result = await Promise.race([
 			generate({
 				prompt: [
-					'Identify the primary natural language of the user message below.',
-					'Reply with ONLY its ISO 639-1 two-letter code in lowercase (e.g. en, de, pl, fr, es).',
-					"If the message is only a name, number, URL, or symbols with no clear language, reply with 'und'.",
+					'Determine the language the user is WRITING IN, judging only ordinary words',
+					'(verbs, pronouns, articles, connectors, everyday nouns).',
+					'IGNORE proper nouns — place names, neighborhoods, cities, streets, addresses,',
+					'brand and venue names. A location the user mentions is NOT evidence of the',
+					'language they write in (e.g. "openings near Garnizon in Gdańsk" is English).',
+					'Reply with ONLY the ISO 639-1 two-letter code in lowercase (e.g. en, de, pl, fr).',
+					'If there is no ordinary prose to judge — only a place/proper name, a number, an',
+					"address, or symbols — reply with 'und'.",
 					'',
 					`Message: ${JSON.stringify(text.slice(0, 600))}`
 				].join('\n'),
@@ -63,9 +67,9 @@ export async function detectLanguage({
 			}),
 			timeout
 		]);
-		return normalizeCode(result?.language) || fb;
+		return normalizeCode(result?.language);
 	} catch {
-		return fb;
+		return null;
 	} finally {
 		clearTimeout(timer);
 	}
