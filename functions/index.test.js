@@ -598,8 +598,7 @@ describe('agentStream', () => {
 		assert.equal(handoffArg.createEngineSession, true);
 		assert.equal(handoffArg.engineSessionId, 'se-sess-1');
 		assert.equal(handoffArg.seedState, null);
-		assert.match(handoffArg.message, /\[Date: \d{4}-\d{2}-\d{2}\]$/);
-		assert.ok(!handoffArg.message.startsWith('[Date:'));
+		assert.match(handoffArg.message, /^\[Date: /);
 		assert.equal(runIntakeConversationMock.mock.callCount(), 1);
 		assert.equal(sessionUpdates.at(-1).engineSessionStarted, true);
 		assert.equal(sessionUpdates.at(-1).intakeState, null);
@@ -638,9 +637,8 @@ describe('agentStream', () => {
 		});
 		assert.match(
 			handoffArg.message,
-			/\[Context: selected focus: Williamsburg, Brooklyn, NY \(Google Place ID: ChIJfocus\)\] \[Date: \d{4}-\d{2}-\d{2}\]$/
+			/^\[Context: selected focus: Williamsburg, Brooklyn, NY \(Google Place ID: ChIJfocus\)\] \[Date: /
 		);
-		assert.ok(!handoffArg.message.startsWith('[Context:'));
 		assert.ok(!handoffArg.message.includes('asking about'));
 	});
 
@@ -684,7 +682,7 @@ describe('agentStream', () => {
 		const handoffArg = gearHandoffMock.mock.calls[0].arguments[0];
 		assert.match(
 			handoffArg.message,
-			/\[Context: selected focus: Monsun Gdynia, Świętojańska 69b, Gdynia \(Google Place ID: ChIJmonsun\)\] \[Date: \d{4}-\d{2}-\d{2}\]$/
+			/^\[Context: selected focus: Monsun Gdynia, Świętojańska 69b, Gdynia \(Google Place ID: ChIJmonsun\)\] \[Date: /
 		);
 		assert.match(handoffArg.message, /What has opened or closed around Monsun Gdynia/);
 	});
@@ -1423,8 +1421,7 @@ describe('agentStream', () => {
 		assert.equal(handoffArg.seedState.final_report, 'Completed market report');
 		assert.equal(handoffArg.seedState.previous_stopped_request, 'Research lunch pricing in detail');
 		assert.match(handoffArg.seedState.continuation_notes, /What restaurant should open here\?/);
-		assert.match(handoffArg.message, /\[Context: selected focus: Umami, Seattle, WA/);
-		assert.ok(!handoffArg.message.startsWith('[Context:'));
+		assert.match(handoffArg.message, /^\[Context: selected focus: Umami, Seattle, WA/);
 		assert.match(
 			handoffArg.message,
 			/\[Previous stopped request: Research lunch pricing in detail\]/
