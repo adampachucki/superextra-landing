@@ -67,6 +67,17 @@ def language_directive(state) -> str:
     getter = getattr(state, "get", None)
     code = getter(PROMPT_LANGUAGE_KEY) if callable(getter) else None
     lang = language_clause(code)
+    if lang == "English":
+        return (
+            "## Language\n\n"
+            "The whole conversation is in English. Write everything in English — "
+            "the report, every reply and status line, specialist briefs, and your "
+            "thoughts (including the short **bold title** that opens each thinking "
+            "step). Keep proper nouns — venue and brand names, URLs — unchanged.\n\n"
+        )
+    # Non-English: the model leaks specific procedural thinking titles into
+    # English ("Searching for…", "Gathering data") even when told to use {lang},
+    # so name those patterns explicitly.
     return (
         "## Language\n\n"
         f"The whole conversation is in {lang}. Write 100% of your output in {lang} — "
