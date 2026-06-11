@@ -14,35 +14,30 @@ describe('detectLanguage', () => {
 		assert.equal(await detectLanguage({ message: 'Wo?', generate }), 'de');
 	});
 
-	it("falls back to the UI locale on 'und'", async () => {
+	it("returns null on 'und' (only a place/proper name) so the caller keeps the established language", async () => {
 		const generate = async () => ({ language: 'und' });
-		assert.equal(await detectLanguage({ message: 'Trattoria', fallback: 'de', generate }), 'de');
+		assert.equal(await detectLanguage({ message: 'Garnizon Gdańsk', generate }), null);
 	});
 
-	it('falls back on an unusable model value', async () => {
+	it('returns null on an unusable model value', async () => {
 		const generate = async () => ({ language: '123' });
-		assert.equal(await detectLanguage({ message: 'x', fallback: 'pl', generate }), 'pl');
+		assert.equal(await detectLanguage({ message: 'x', generate }), null);
 	});
 
-	it('fails open to the fallback when the model throws', async () => {
+	it('fails open to null when the model throws', async () => {
 		const generate = async () => {
 			throw new Error('vertex_down');
 		};
-		assert.equal(await detectLanguage({ message: 'hello', fallback: 'de', generate }), 'de');
+		assert.equal(await detectLanguage({ message: 'hello', generate }), null);
 	});
 
-	it('returns the fallback for empty input without calling the model', async () => {
+	it('returns null for empty input without calling the model', async () => {
 		let called = false;
 		const generate = async () => {
 			called = true;
 			return { language: 'pl' };
 		};
-		assert.equal(await detectLanguage({ message: '   ', fallback: 'de', generate }), 'de');
+		assert.equal(await detectLanguage({ message: '   ', generate }), null);
 		assert.equal(called, false);
-	});
-
-	it("defaults the fallback to 'en' when none is usable", async () => {
-		const generate = async () => ({ language: 'und' });
-		assert.equal(await detectLanguage({ message: '???', fallback: '!!', generate }), 'en');
 	});
 });

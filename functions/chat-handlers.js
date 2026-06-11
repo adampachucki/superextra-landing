@@ -333,17 +333,19 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 	}
 	let placeContext = submittedPlaceContext;
 
-	// Detect the prompt language up front (best-effort, fail-open). It drives
-	// the language of every agent's thoughts/report and the localized activity
-	// labels. The UI locale the client sends is the fallback when the message
-	// is too short/ambiguous to classify. Detection runs on the raw message,
-	// before the `[Date: …]` query-text prefix is added.
-	const uiLocale = SUPPORTED_LOCALES.includes(req.body?.locale) ? req.body.locale : 'en';
-	const promptLanguage = await detectLanguage({ message, fallback: uiLocale });
-
 	// 4. Server-generated runId — never trust a client-supplied one.
 	const runId = crypto.randomUUID();
 	const sessionRef = db.collection('sessions').doc(sessionId);
+
+	// Language follows what the user WRITES, not the location they ask about.
+	// The detector judges only ordinary prose and returns null when a message
+	// is just a place name; the conversation's language is then resolved inside
+	// the upsert txn as: detected ?? language already on the session ?? UI
+	// locale (first turn). So a location can never flip the language; only the
+	// user actually writing in a different language can.
+	const uiLocale = SUPPORTED_LOCALES.includes(req.body?.locale) ? req.body.locale : 'en';
+	const detectedLanguage = await detectLanguage({ message });
+	let promptLanguage = detectedLanguage || uiLocale;
 
 	// 5. Atomic session upsert + turn-doc creation under capability-URL rules
 	// (plan §5 / §6 / §8). Two UID roles are explicit here:
@@ -370,6 +372,10 @@ export const agentStream = onRequest(agentStreamOptions, async (req, res) => {
 		await db.runTransaction(async (t) => {
 			const snap = await t.get(sessionRef);
 			const existing = snap.exists ? snap.data() : null;
+			// Resolve the conversation language: this message's detected prose
+			// language, else the language already on the chat, else the UI locale.
+			// A place-name message (detected null) keeps the established language.
+			promptLanguage = detectedLanguage || existing?.language || uiLocale;
 			const lastTurnIndex = existing?.lastTurnIndex ?? 0;
 			let previousTurn = null;
 			if (existing && lastTurnIndex > 0) {
