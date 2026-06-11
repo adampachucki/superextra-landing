@@ -13,10 +13,12 @@
 	import BillingReturnNotice from '$lib/components/agent/BillingReturnNotice.svelte';
 	import { stampFirstTouch } from '$lib/campaign';
 	import { initAnalytics } from '$lib/analytics';
+	import { initMetaPixel } from '$lib/meta-pixel';
 
 	onMount(() => {
 		stampFirstTouch();
 		initAnalytics();
+		initMetaPixel();
 
 		const onBeforeUnload = () => {
 			sessionStorage.setItem('se:scroll', String(scrollY));

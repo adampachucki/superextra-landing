@@ -7,6 +7,7 @@
 	import Spinner from '$lib/components/Spinner.svelte';
 	import * as m from '$lib/paraglide/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
+	import { trackLead } from '$lib/meta-pixel';
 
 	// --- Shared constants ---
 
@@ -258,6 +259,7 @@
 		}
 		submitting = false;
 		submitted = true;
+		trackLead();
 	}
 </script>
 
