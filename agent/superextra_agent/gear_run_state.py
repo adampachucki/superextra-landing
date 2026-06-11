@@ -68,8 +68,9 @@ class GearRunState:
     # from the Firestore client construction path).
     fs: firestore.Client | None = None
 
-    # Detected prompt language (ISO-639-1). Drives thought translation and the
-    # safe-thought fallback. Read from session.state in `_build_state`.
+    # Detected prompt language (ISO-639-1). Localizes the safe-thought fallback
+    # (seeded into `mapping_state` for the event mapper). Read from
+    # session.state in `_build_state`.
     prompt_language: str | None = None
 
     def __post_init__(self) -> None:

@@ -480,3 +480,13 @@ async def test_finalize_does_not_set_title():
     session_update, _t, status = await state.finalize()
     assert status == "complete"
     assert "title" not in session_update
+
+
+# ── prompt_language seeds the event mapper (localized safe-thought fallback) ──
+
+
+def test_prompt_language_seeds_mapping_state():
+    """`prompt_language` is exposed to the event mapper via `mapping_state` so
+    the safe-thought fallback can localize. No language → key absent."""
+    assert _make_state(prompt_language="pl").mapping_state.get("promptLanguage") == "pl"
+    assert "promptLanguage" not in _make_state().mapping_state
