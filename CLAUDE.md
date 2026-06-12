@@ -2,7 +2,7 @@
 
 Superextra is an AI consultant for every restaurant — a market-intelligence agent that synthesizes competitor, pricing, guest, delivery, and market signals into operator-ready answers about where to open, how to price, when to hire, and what's shifting around them.
 
-This repo is a prerendered static SvelteKit site (landing + agent UI) on Firebase Hosting. The agent itself runs as a Vertex AI Agent Engine Reasoning Engine.
+This repo is a prerendered static SvelteKit site (the agent UI, served at `agent.superextra.ai`) on Firebase Hosting. The agent itself runs as a Vertex AI Agent Engine Reasoning Engine.
 
 ## Engineering principles — apply to every change
 
@@ -174,12 +174,18 @@ The sessions/turns/events doc shapes and their writer/reader map live in `docs/f
 
 ## Domains & hosting sites
 
-- **This repo** deploys to two Firebase Hosting sites (both in project `superextra-site`):
-  - `superextra-landing` → **`landing.superextra.ai`** (marketing landing page)
-  - `superextra-agent` → **`agent.superextra.ai`** (agent UI)
-- `superextra-site` is a separate hosting site serving `superextra.ai` (main marketing page) — not part of this repo
-- Agent UI routes: `agent.superextra.ai/` (agent landing) and `agent.superextra.ai/chat`
-- `landing.superextra.ai/agent` 301-redirects to `agent.superextra.ai`
+- **This repo** deploys the live site at **`agent.superextra.ai`** (the `superextra-agent` hosting target in project `superextra-site`). Routes: `agent.superextra.ai/` (agent landing) and `agent.superextra.ai/chat`.
+- The old `superextra-landing` target (`landing.superextra.ai`) is **retired** — in `firebase.json` it 301-redirects all paths to `agent.superextra.ai`. Don't treat it as a live site or deploy target.
+- `superextra.ai` (main marketing page, incl. the PIN-gated `/memo`) is a **separate repo** (`superextra/`, React/Vite, hosting site `superextra-site`) — not part of this repo.
+
+## Gated `/brand` page
+
+`agent.superextra.ai/brand` is a PIN-gated brand-assets collection, mirroring the memo page's encryption pattern (AES-256-GCM, PBKDF2 key from the PIN; only the ciphertext ships; the browser decrypts client-side via `crypto.subtle`).
+
+- **Content is generated** by `scripts/build-brand-content.mjs` → `src/lib/brand/brand-content.html` (pure HTML/CSS; gallery tiles use container-query `cqw` units, colorful backgrounds are `static/brand-assets/*.jpg`). Edit the generator, not the HTML.
+- **Re-encrypt after any content change:** `npm run encrypt-brand <PIN>` (runs the generator, then encrypts → `src/lib/brand/brand-encrypted.ts`). The PIN is the **same as the memo PIN** and is never committed.
+- `crypto.subtle` needs a secure context — works on `agent.superextra.ai` and `localhost`, **not** over the LAN-IP dev URL (`http://<ip>:5199`).
+- Route: `src/routes/brand/+page.svelte`. `noindex` via `<meta>` + a `firebase.json` `X-Robots-Tag` header.
 
 ## Commands
 

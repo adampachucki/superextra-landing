@@ -44,6 +44,12 @@
 			(function () {
 				var t = localStorage.getItem('se_theme');
 				if (t === 'dark') document.documentElement.classList.add('dark');
+				// If /brand was unlocked this session, suppress the PIN fields before
+				// first paint so a cached reload shows the splash, not the prompt.
+				try {
+					if (sessionStorage.getItem('brand_html') !== null)
+						document.documentElement.dataset.brandUnlocked = '1';
+				} catch (e) {}
 			})();
 		</script>
 		%sveltekit.head%
