@@ -1,0 +1,222 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+			html,
+			body {
+				width: 1640px;
+				height: 624px;
+				overflow: hidden;
+			}
+			#stage {
+				position: relative;
+				width: 1640px;
+				height: 624px;
+			}
+			canvas,
+			#solid {
+				position: absolute;
+				inset: 0;
+				width: 1640px;
+				height: 624px;
+			}
+			/* editorial lockup — left-aligned, anchored lower-left */
+			.wm {
+				position: absolute;
+				left: 120px;
+				bottom: 104px;
+				z-index: 5;
+				display: flex;
+				flex-direction: column;
+				align-items: flex-start;
+				font-family:
+					-apple-system, BlinkMacSystemFont, 'Inter', ui-sans-serif, system-ui, sans-serif;
+			}
+			.row {
+				display: flex;
+				align-items: center;
+				gap: 8.73px;
+			}
+			.row svg {
+				width: 78.55px;
+				height: 78.55px;
+				margin-top: -34.91px;
+			}
+			.name {
+				font-size: 96px;
+				font-weight: 300;
+				letter-spacing: -0.025em;
+			}
+			.tag {
+				margin-top: 20px;
+				font-size: 30px;
+				font-weight: 300;
+				letter-spacing: 0.01em;
+				text-align: left;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="stage">
+			<canvas id="c" width="1640" height="624" style="display: none"></canvas>
+			<div id="solid"></div>
+			<div class="wm">
+				<div class="row">
+					<svg id="mk" viewBox="0 0 12 12" fill="none">
+						<line x1="6" y1="0.5" x2="6" y2="11.5" stroke-width="1.5" />
+						<line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke-width="1.5" />
+						<line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke-width="1.5" />
+					</svg>
+					<span class="name">Superextra</span>
+				</div>
+				<div class="tag">AI consultant for every restaurant</div>
+			</div>
+		</div>
+		<script>
+			const CANVAS_COLORS = [
+				[110, 231, 183],
+				[167, 139, 250],
+				[244, 114, 182],
+				[251, 191, 36],
+				[6, 182, 212],
+				[99, 102, 241]
+			];
+			const noise = (t, s) =>
+				Math.sin(t * 0.67 + s * 7.13) * 0.4 +
+				Math.sin(t * 1.13 + s * 3.37) * 0.35 +
+				Math.sin(t * 0.31 + s * 11.71) * 0.25;
+			const lerp = (a, b, t) => a + (b - a) * t,
+				lerpC = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)],
+				smooth = (t) => t * t * (3 - 2 * t);
+			const W = 1640,
+				H = 624,
+				colors = CANVAS_COLORS;
+			const P = new URLSearchParams(location.search);
+			const BG = P.get('bg') || 'white';
+			let _r = (parseInt(P.get('s')) || 3) * 1000 + 1;
+			const rnd = () => {
+				_r = (_r * 1103515245 + 12345) & 0x7fffffff;
+				return _r / 0x7fffffff;
+			};
+
+			const INK = '#1a1a1a',
+				CREAM = '#fefdf9',
+				BLACK = '#141210';
+			function setInk(c) {
+				document
+					.getElementById('mk')
+					.querySelectorAll('line')
+					.forEach((l) => l.setAttribute('stroke', c));
+				document.querySelector('.name').style.color = c;
+				document.querySelector('.tag').style.color =
+					c === INK ? 'rgba(26,26,26,0.55)' : 'rgba(254,253,249,0.72)';
+			}
+
+			const solid = document.getElementById('solid');
+			if (BG === 'white') {
+				solid.style.background = CREAM;
+				setInk(INK);
+			} else if (BG === 'black') {
+				solid.style.background = BLACK;
+				setInk(CREAM);
+			} else {
+				solid.style.display = 'none';
+				const cvs = document.getElementById('c');
+				cvs.style.display = 'block';
+				const ctx = cvs.getContext('2d');
+				const blobs = Array.from({ length: 18 }, () => ({
+					seed: rnd() * 100,
+					bx: rnd() * (W - 200) + 100,
+					by: rnd() * (H - 120) + 60,
+					br: 140 + rnd() * 180,
+					ar: 0.6 + rnd() * 0.5
+				}));
+				const t = 9;
+				const bgPhase = t * 0.04,
+					bi = Math.floor(Math.abs(bgPhase)) % colors.length,
+					bn = (bi + 1) % colors.length,
+					bt = smooth(bgPhase - Math.floor(bgPhase));
+				const c1 = lerpC(colors[bi], colors[bn], bt),
+					i2 = (bi + 3) % colors.length,
+					n2 = (i2 + 1) % colors.length,
+					c2 = lerpC(colors[i2], colors[n2], bt);
+				const ang = noise(t * 0.08, 0.5) * Math.PI * 2,
+					cx = W / 2,
+					cy = H / 2,
+					rad = Math.max(W, H) * 0.6;
+				const g = ctx.createLinearGradient(
+					cx + Math.cos(ang) * rad,
+					cy + Math.sin(ang) * rad,
+					cx - Math.cos(ang) * rad,
+					cy - Math.sin(ang) * rad
+				);
+				g.addColorStop(0, `rgb(${c1[0]},${c1[1]},${c1[2]})`);
+				g.addColorStop(
+					0.5,
+					`rgb(${lerp(c1[0], c2[0], 0.5)},${lerp(c1[1], c2[1], 0.5)},${lerp(c1[2], c2[2], 0.5)})`
+				);
+				g.addColorStop(1, `rgb(${c2[0]},${c2[1]},${c2[2]})`);
+				ctx.fillStyle = g;
+				ctx.fillRect(0, 0, W, H);
+				for (const b of blobs) {
+					const s = b.seed;
+					const x = b.bx + noise(t * 0.15, s) * 80,
+						y = b.by + noise(t * 0.12, s + 100) * 50;
+					const r = b.br * (1 + noise(t * 0.1, s + 200) * 0.4),
+						ry = r * (b.ar + noise(t * 0.08, s + 300) * 0.3);
+					const rot = noise(t * 0.06, s + 400) * Math.PI * 0.25,
+						op = 0.15 + noise(t * 0.07, s + 500) * 0.15 + 0.15;
+					const cp = t * (0.03 + (s % 5) * 0.005) + s * 0.8,
+						ci = Math.floor(Math.abs(cp)) % colors.length,
+						cn = (ci + 1) % colors.length;
+					const col = lerpC(colors[ci], colors[cn], smooth(cp - Math.floor(cp)));
+					ctx.save();
+					ctx.globalAlpha = Math.max(0, Math.min(1, op));
+					ctx.translate(x, y);
+					ctx.rotate(rot);
+					ctx.scale(1, ry / r);
+					const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+					rg.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},0.7)`);
+					rg.addColorStop(0.4, `rgba(${col[0]},${col[1]},${col[2]},0.3)`);
+					rg.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`);
+					ctx.fillStyle = rg;
+					ctx.beginPath();
+					ctx.arc(0, 0, r, 0, Math.PI * 2);
+					ctx.fill();
+					ctx.restore();
+				}
+				const off = document.createElement('canvas');
+				off.width = W;
+				off.height = H;
+				const o = off.getContext('2d');
+				const img = o.createImageData(W, H);
+				for (let i = 0; i < img.data.length; i += 4) {
+					const v = Math.random() * 255;
+					img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+					img.data[i + 3] = 255;
+				}
+				o.putImageData(img, 0, 0);
+				ctx.save();
+				ctx.globalCompositeOperation = 'overlay';
+				ctx.globalAlpha = 0.55;
+				ctx.drawImage(off, 0, 0);
+				ctx.restore();
+				ctx.save();
+				ctx.globalAlpha = 0.05;
+				ctx.fillStyle = '#000';
+				for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
+				ctx.restore();
+				setInk(CREAM);
+			}
+			document.title = 'ready';
+		</script>
+	</body>
+</html>
