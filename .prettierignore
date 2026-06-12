@@ -18,3 +18,7 @@ agent/
 
 # Miscellaneous
 /static/
+
+# Generated brand-page content (built by scripts/build-brand-content.mjs, encrypted by encrypt-brand.mjs)
+src/lib/brand/brand-content.html
+src/lib/brand/brand-encrypted.ts
