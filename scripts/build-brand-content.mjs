@@ -75,7 +75,7 @@ function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note, bgUrl
 		const ta = layout === 'splitbr' ? `right:${M}cqw` : `left:${M}cqw`;
 		inner = `<div style="position:absolute;left:${M}cqw;top:${M}cqw">${mark}</div><div style="position:absolute;${ta};bottom:${M}cqw">${tag()}</div>`;
 	} else {
-		inner = `<div style="position:absolute;left:${M}cqw;bottom:${M}cqw;display:flex;flex-direction:column;align-items:flex-start">${mark}${tag(`margin-top:${r(WORD * 0.14)}cqw;margin-left:${r(MARKW + GAP)}cqw`)}</div>`;
+		inner = `<div style="position:absolute;left:${M}cqw;bottom:${M}cqw;display:flex;flex-direction:column;align-items:flex-start">${mark}${tag(`margin-top:${r(WORD * 0.05)}cqw;margin-left:${r(MARKW + GAP)}cqw`)}</div>`;
 	}
 	const aspect = h > w ? 'portrait' : w === h ? 'square' : 'wide';
 	const bgcss =
