@@ -15,8 +15,50 @@ const A = '/brand-assets'; // served from static/brand-assets
 const MK = (c) =>
 	`<svg viewBox="0 0 12 12" fill="none"><line x1="6" y1="0.5" x2="6" y2="11.5" stroke="${c}" stroke-width="1.5"/><line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="${c}" stroke-width="1.5"/><line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="${c}" stroke-width="1.5"/></svg>`;
 
+// ── Temp exploration: asterisk with extra arms ───────────────────────────────
+// Each variant is a set of lines through the center (6,6), radius ≈5.5 (matches MK).
+const LN = ([x1, y1, x2, y2], c, sw = 1.5) =>
+	`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${sw}"/>`;
+const AST = (lines, c, style = '', sw = 1.5) =>
+	`<svg viewBox="0 0 12 12" fill="none" style="${style}">${lines.map((l) => LN(l, c, sw)).join('')}</svg>`;
+const V = [6, 0.5, 6, 11.5]; // 90° (vertical)
+const H = [0.5, 6, 11.5, 6]; // 0° (horizontal)
+const D1 = [1.24, 3.25, 10.76, 8.75]; // ±30° diagonals (today's mark)
+const D2 = [1.24, 8.75, 10.76, 3.25];
+const X1 = [2.11, 2.11, 9.89, 9.89]; // 45° diagonals (even 8-point)
+const X2 = [2.11, 9.89, 9.89, 2.11]; // 135°
+const ARM_VARIANTS = [
+	{ name: '6-point — current', lines: [V, D1, D2], note: "today's mark · 3 lines, arms every 60°" },
+	// Thinner stroke: four lines cross at one point, so 1.5 reads heavier here.
+	{
+		name: '8-point — even',
+		lines: [V, H, X1, X2],
+		sw: 1.3,
+		note: '+2 arms · 4 lines, arms every 45°'
+	}
+];
+function armCard(v) {
+	const sw = v.sw ?? 1.5;
+	const r = (n) => n.toFixed(2);
+	// Lockup mark/gap/raise locked to the logo system's exact ratios — mark 18/22,
+	// gap 2/22, raise 8/22 of the wordmark size (same as tile() and the Logo section).
+	const WORD = 38,
+		MARKW = WORD * (18 / 22),
+		GAP = WORD * (2 / 22),
+		RAISE = WORD * (8 / 22);
+	const big = AST(v.lines, '#1a1a1a', 'width:92px;height:92px', sw);
+	const lk = AST(
+		v.lines,
+		'#1a1a1a',
+		`width:${r(MARKW)}px;height:${r(MARKW)}px;margin-top:-${r(RAISE)}px`,
+		sw
+	);
+	const sm = AST(v.lines, '#1a1a1a', 'width:18px;height:18px', sw);
+	return `<div class="card"><div class="frame cream" style="min-height:230px;flex-direction:column;gap:20px">${big}<div style="display:flex;align-items:center;gap:${r(GAP)}px;color:#1a1a1a">${lk}<span class="wm" style="font-size:${WORD}px">Superextra</span></div><div style="display:flex;align-items:center;gap:8px">${sm}<span style="font-size:12px;color:#6f6a62">18px · sidebar size</span></div></div><div class="cap"><b>${v.name}</b> · <span>${v.note}</span></div></div>`;
+}
+
 // One gallery tile, sized entirely in cqw (% of the tile's own width).
-function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note }) {
+function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note, bgUrl }) {
 	const WORD = 5.85 * k,
 		MARKW = WORD * (18 / 22),
 		GAP = WORD * (2 / 22),
@@ -41,7 +83,7 @@ function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note }) {
 			? 'background:#fefdf9'
 			: bg === 'black'
 				? 'background:#141210'
-				: `background:url(${A}/superextra-bg-color-${aspect}.jpg) center/cover`;
+				: `background:url(${bgUrl || `${A}/superextra-bg-color-${aspect}.jpg`}) center/cover`;
 	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${inner}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}</figcaption></figure>`;
 }
 
@@ -168,11 +210,12 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
   <div class="sbrand"><svg viewBox="0 0 12 12" fill="none"><line x1="6" y1="0.5" x2="6" y2="11.5" stroke="#ede9e3" stroke-width="1.5"/><line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="#ede9e3" stroke-width="1.5"/><line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="#ede9e3" stroke-width="1.5"/></svg><span class="nm">Superextra</span></div>
   <p class="sbrand-sub">Brand assets &amp; guidelines</p>
   <div class="navgroup"><h4>Foundations</h4><a href="#overview">Overview</a><a href="#logo">Logo</a><a href="#color">Color</a><a href="#type">Typography</a></div>
-  <div class="navgroup"><h4>System</h4><a href="#layouts">Layouts</a><a href="#backgrounds">Backgrounds</a></div>
+  <div class="navgroup"><h4>System</h4><a href="#layouts">Layouts</a><a href="#backgrounds">Backgrounds</a><a href="#colorful">Colorful palette</a></div>
   <div class="navgroup"><h4>Gallery</h4><a href="#cover">Cover</a><a href="#square">Square</a><a href="#portrait">Portrait</a><a href="#banners">Banners</a></div>
   <div class="navgroup"><h4>Marketing</h4><a href="#ads">Ad creatives</a></div>
   <div class="navgroup"><h4>Marks &amp; partners</h4><a href="#profile">Profile</a><a href="#stripe">Stripe</a></div>
   <div class="navgroup"><h4>Reference</h4><a href="#files">Files &amp; naming</a></div>
+  <div class="navgroup"><h4>Explorations</h4><a href="#explore">Asterisk arms</a></div>
 </aside>
 <main>
   <section id="overview">
@@ -263,11 +306,70 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
   <div class="hr"></div>
   <section id="backgrounds">
     <div class="eyebrow">System</div><h2>Backgrounds</h2>
-    <p class="lede">Every surface uses one of three — nothing else. The colorful background is the accent gradient with film-grain noise, rendered at native resolution per size so the grain stays crisp.</p>
+    <p class="lede">Every surface uses white, black, or the colorful gradient with noise — rendered at native resolution per size so the grain stays crisp. The colorful background comes in several color draws (see <a href="#colorful" style="color:var(--soft)">Colorful palette</a>).</p>
     ${grid(3, [
 			{ w: 1640, h: 624, bg: 'white', layout: 'lockup', label: 'White', note: '#FEFDF9' },
 			{ w: 1640, h: 624, bg: 'black', layout: 'lockup', label: 'Black', note: '#141210' },
 			{ w: 1640, h: 624, bg: 'color', layout: 'lockup', label: 'Colorful + noise' }
+		])}
+  </section>
+
+  <div class="hr"></div>
+  <section id="colorful">
+    <div class="eyebrow">System</div><h2>Colorful palette</h2>
+    <p class="lede">The colorful background comes in several color draws — the brand accent palette over film-grain noise. Pick per campaign; the wordmark stays cream.</p>
+    <div class="grid" style="grid-template-columns:repeat(2,1fr)">${[
+			['periwinkle', 'Periwinkle', 'violet-pink → blue'],
+			['lavender-pink', 'Lavender → Pink', 'violet → pink'],
+			['violet-cyan', 'Violet → Cyan', ''],
+			['blue-teal', 'Blue → Teal', 'indigo → cyan'],
+			['indigo-violet', 'Indigo → Violet', ''],
+			['mint', 'Mint', 'emerald → cyan']
+		]
+			.map(
+				([k, n, nt]) =>
+					`<figure class="tile"><div class="cv" style="aspect-ratio:1640/624;background:url(${A}/superextra-bg-${k}.jpg) center/cover"></div><figcaption><b>${n}</b>${nt ? ` · <span>${nt}</span>` : ''}</figcaption></figure>`
+			)
+			.join('')}</div>
+    <h3>On the colorful backgrounds</h3>
+    <p class="note">The lockup over a few of the draws — cream wordmark, same placement system.</p>
+    ${grid(2, [
+			{
+				w: 1640,
+				h: 624,
+				bg: 'color',
+				bgUrl: `${A}/superextra-bg-periwinkle.jpg`,
+				layout: 'lockup',
+				label: 'Periwinkle',
+				note: 'lockup'
+			},
+			{
+				w: 1640,
+				h: 624,
+				bg: 'color',
+				bgUrl: `${A}/superextra-bg-lavender-pink.jpg`,
+				layout: 'splitbr',
+				label: 'Lavender → Pink',
+				note: 'split'
+			},
+			{
+				w: 1640,
+				h: 624,
+				bg: 'color',
+				bgUrl: `${A}/superextra-bg-blue-teal.jpg`,
+				layout: 'lockup',
+				label: 'Blue → Teal',
+				note: 'lockup'
+			},
+			{
+				w: 1640,
+				h: 624,
+				bg: 'color',
+				bgUrl: `${A}/superextra-bg-violet-cyan.jpg`,
+				layout: 'splitbr',
+				label: 'Violet → Cyan',
+				note: 'split'
+			}
 		])}
   </section>
 
@@ -322,6 +424,14 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
       <tr><td><code>superextra-stripe-logo.png</code></td><td>Stripe logo, transparent</td><td>1760×480</td></tr>
       <tr><td><code>superextra-&lt;platform&gt;-&lt;format&gt;.png</code></td><td>Social exports, e.g. <code>superextra-instagram-square.png</code></td><td>platform spec, 2×</td></tr>
     </tbody></table>
+  </section>
+
+  <div class="hr"></div>
+  <section id="explore">
+    <div class="eyebrow">Temp · exploration</div><h2>Asterisk — extra arms</h2>
+    <p class="lede">A scratchpad, not part of the system. The mark is a six-point asterisk today — three lines crossing at the center. This explores two more arms: an even eight-point, four lines 45° apart. Each is shown large, in the lockup, and at 18px sidebar size.</p>
+    <div class="grid" style="grid-template-columns:repeat(2,1fr)">${ARM_VARIANTS.map(armCard).join('')}</div>
+    <p class="note">More arms means a denser center — where the strokes cross, the eight-point can clog at small sizes. A thinner stroke (≈1.2) or a small center gap would offset it.</p>
   </section>
 </main>`;
 
