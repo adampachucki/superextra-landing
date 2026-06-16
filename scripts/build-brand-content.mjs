@@ -23,6 +23,12 @@ const MARK_K = 0.75;
 const GAP_K = 2 / 22;
 const RAISE_K = 0.36;
 
+// Download controls — the brand route's export engine reads data-dl and renders
+// the SVG / PNG client-side. dbg maps the gallery 'white' bg name to 'cream'.
+const dbg = (bg) => (bg === 'white' ? 'cream' : bg);
+const dl = (o) =>
+	`<span class="dlbtns" data-dl='${JSON.stringify(o)}'><button type="button" class="dl" data-fmt="svg">SVG</button><button type="button" class="dl" data-fmt="png">PNG</button></span>`;
+
 // Icon / avatar tiles — the mark alone, and the ✲S monogram, on each background.
 function iconTile({ kind, bg, crop, label }) {
 	const r = (n) => n.toFixed(2);
@@ -46,7 +52,25 @@ function iconTile({ kind, bg, crop, label }) {
 			raise = SF * 0.36;
 		inner = `<div style="display:flex;align-items:center;gap:${r(gap)}px;color:${ink}"><span style="display:inline-flex;width:${r(mw)}px;height:${r(mw)}px;margin-top:-${r(raise)}px">${MK(ink)}</span><span class="wm" style="font-size:${r(SF)}px;color:${ink}">S</span></div>`;
 	}
-	return `<div class="card"><div class="frame" style="padding:24px"><div style="width:${size}px;height:${size}px;${bgcss};border-radius:${radius};display:flex;align-items:center;justify-content:center">${inner}</div></div><div class="cap"><b>${label}</b></div></div>`;
+	const sq = crop === 'square';
+	const desc =
+		kind === 'mark'
+			? {
+					name: `superextra-${sq ? 'icon' : 'avatar'}-${dbg(bg)}`,
+					kind: 'mark',
+					bg: dbg(bg),
+					w: sq ? 512 : 1080,
+					h: sq ? 512 : 1080,
+					markFrac: sq ? 0.5 : 0.44
+				}
+			: {
+					name: `superextra-monogram-${sq ? 'icon' : 'avatar'}-${dbg(bg)}`,
+					kind: 'monogram',
+					bg: dbg(bg),
+					w: sq ? 512 : 1080,
+					h: sq ? 512 : 1080
+				};
+	return `<div class="card"><div class="frame" style="padding:24px"><div style="width:${size}px;height:${size}px;${bgcss};border-radius:${radius};display:flex;align-items:center;justify-content:center">${inner}</div></div><div class="cap"><b>${label}</b>${dl(desc)}</div></div>`;
 }
 const ICON_BGS = [
 	['white', 'Cream'],
@@ -60,7 +84,7 @@ const iconSet = (kind) =>
 	].join('');
 
 // One gallery tile, sized entirely in cqw (% of the tile's own width).
-function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note, bgUrl }) {
+function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note, bgUrl, download }) {
 	const WORD = 5.85 * k,
 		MARKW = WORD * MARK_K,
 		GAP = WORD * GAP_K,
@@ -93,7 +117,20 @@ function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note, bgUrl
 			: bg === 'black'
 				? 'background:#141210'
 				: `background:url(${colorSrc}) center/cover`;
-	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${inner}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}</figcaption></figure>`;
+	const ctrl = download
+		? dl({
+				name: `superextra-${w}x${h}-${layout}-${dbg(bg)}`,
+				kind: 'tile',
+				bg: dbg(bg),
+				w,
+				h,
+				layout,
+				k,
+				m,
+				...(bg === 'color' ? { colorUrl: colorSrc } : {})
+			})
+		: '';
+	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${inner}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}${ctrl}</figcaption></figure>`;
 }
 
 const grid = (cols, items) =>
@@ -148,9 +185,9 @@ const matrix = (w, h, extra = {}) =>
 		LAYS.map(([ly, ln]) => ({ w, h, bg, layout: ly, label: ln, note: bn, ...extra }))
 	);
 
-const COVER = matrix(1640, 624);
-const SQUARE = matrix(1080, 1080, { k: 1.5, m: 0.075 });
-const PORTRAIT = matrix(1080, 1920, { k: 1.5, m: 0.075 });
+const COVER = matrix(1640, 624, { download: true });
+const SQUARE = matrix(1080, 1080, { k: 1.5, m: 0.075, download: true });
+const PORTRAIT = matrix(1080, 1920, { k: 1.5, m: 0.075, download: true });
 const BANNERS = [
 	{ w: 1500, h: 500, bg: 'white', layout: 'lockup', label: 'Wide', note: 'lockup · white' },
 	{
@@ -165,7 +202,7 @@ const BANNERS = [
 	{ w: 1128, h: 191, bg: 'white', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'white' },
 	{ w: 1128, h: 191, bg: 'black', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'black' },
 	{ w: 1128, h: 191, bg: 'color', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'colorful' }
-];
+].map((b) => ({ ...b, download: true }));
 
 // Colorful background swatch (no lockup) — used by the Colorful palette section.
 const bgFig = (src, ar, title, note) =>
@@ -214,6 +251,9 @@ p.note{font-size:13.5px;color:var(--mut);max-width:680px;margin:10px 0}
 .card img{display:block;max-width:100%}
 .cap{padding:11px 14px;font-size:12.5px;color:var(--soft);border-top:1px solid var(--line);line-height:1.45}
 .cap b{color:var(--ink);font-weight:600}.cap .dim{color:var(--mut)}
+.dlbtns{display:inline-flex;gap:6px;margin-left:8px;vertical-align:middle}
+.dl{font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.05em;color:var(--mut);background:transparent;border:1px solid var(--line2);border-radius:6px;padding:2px 7px;cursor:pointer;transition:color .15s,border-color .15s}
+.dl:hover{color:var(--ink);border-color:var(--soft)}
 .cream{background:var(--cream)}
 .swatch{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .swatch .chip{height:96px}.swatch .meta{padding:11px 13px;font-size:12.5px}
@@ -255,8 +295,8 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
     <div class="eyebrow">Foundations</div><h2>Logo</h2>
     <p class="lede">An eight-point asterisk mark beside the “Superextra” wordmark in the system sans, Light weight. The mark sits raised — its center aligns near the cap height of the wordmark.</p>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="card"><div class="frame cream" style="min-height:200px"><span style="display:inline-flex;width:120px;height:120px">${MK('#1a1a1a')}</span></div><div class="cap"><b>Mark</b> · the asterisk, used alone as the icon/avatar</div></div>
-      <div class="card"><div class="frame cream" style="min-height:200px"><div style="display:flex;align-items:center;gap:6px;color:#1a1a1a"><span style="display:inline-flex;width:49.5px;height:49.5px;margin-top:-23.76px">${MK('#1a1a1a')}</span><span class="wm" style="font-size:66px">Superextra</span></div></div><div class="cap"><b>Wordmark</b> · mark + name, the primary lockup</div></div>
+      <div class="card"><div class="frame cream" style="min-height:200px"><span style="display:inline-flex;width:120px;height:120px">${MK('#1a1a1a')}</span></div><div class="cap"><b>Mark</b> · the asterisk, used alone as the icon/avatar${dl({ name: 'superextra-mark', kind: 'mark', bg: 'transparent', w: 512, h: 512, markFrac: 0.78 })}</div></div>
+      <div class="card"><div class="frame cream" style="min-height:200px"><div style="display:flex;align-items:center;gap:6px;color:#1a1a1a"><span style="display:inline-flex;width:49.5px;height:49.5px;margin-top:-23.76px">${MK('#1a1a1a')}</span><span class="wm" style="font-size:66px">Superextra</span></div></div><div class="cap"><b>Wordmark</b> · mark + name, the primary lockup${dl({ name: 'superextra-wordmark', kind: 'lockup', bg: 'transparent', w: 0, h: 480 })}</div></div>
     </div>
     <div class="do"><div class="b ok"><div class="t">Do</div>Keep the raised mark, Light weight, and −0.025em tracking. Give the logo clear space of at least the mark’s height on every side.</div><div class="b no"><div class="t">Don’t</div>Recolor, outline, stretch, re-space, or swap the typeface. Don’t lower the mark to the baseline.</div></div>
   </section>
@@ -437,8 +477,8 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
     <div class="eyebrow">Marks &amp; partners</div><h2>Stripe</h2>
     <p class="lede">Upload targets for Stripe → Settings → Branding (set in both live and test mode). Icon shows in emails, Checkout, the customer portal, and invoices; logo shows in Checkout and invoice PDFs.</p>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="card"><div class="frame cream"><img src="${A}/superextra-stripe-icon.png" style="width:150px"/></div><div class="cap"><b>Icon</b> <span class="dim">— 512×512</span></div></div>
-      <div class="card"><div class="frame cream"><img src="${A}/superextra-stripe-logo.png" style="width:80%"/></div><div class="cap"><b>Logo</b> <span class="dim">— transparent wordmark</span></div></div>
+      <div class="card"><div class="frame cream" style="min-height:180px"><span style="display:inline-flex;width:140px;height:140px">${MK('#1a1a1a')}</span></div><div class="cap"><b>Icon</b> <span class="dim">— 512×512</span>${dl({ name: 'superextra-stripe-icon', kind: 'mark', bg: 'cream', w: 512, h: 512, markFrac: 0.5 })}</div></div>
+      <div class="card"><div class="frame cream" style="min-height:180px"><div style="display:flex;align-items:center;gap:6px;color:#1a1a1a"><span style="display:inline-flex;width:49.5px;height:49.5px;margin-top:-23.76px">${MK('#1a1a1a')}</span><span class="wm" style="font-size:66px">Superextra</span></div></div><div class="cap"><b>Logo</b> <span class="dim">— transparent wordmark</span>${dl({ name: 'superextra-stripe-logo', kind: 'lockup', bg: 'transparent', w: 0, h: 480 })}</div></div>
     </div>
     <p class="note">Companion settings — Brand color <code>#1A1A1A</code>, Accent <code>#FEFDF9</code>, Checkout font Inter.</p>
   </section>

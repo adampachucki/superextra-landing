@@ -92,6 +92,268 @@
 	function onKeydown(index: number, e: KeyboardEvent) {
 		if (e.key === 'Backspace' && !digits[index] && index > 0) inputs[index - 1]?.focus();
 	}
+
+	// ── Asset downloads (SVG + PNG, generated client-side) ───────────────────
+	// The mark is four lines; PNG is drawn straight onto a canvas (and text via the
+	// loaded system font), so exports are crisp at any size with no rasterization.
+	type DL = {
+		name: string;
+		kind: 'mark' | 'monogram' | 'lockup' | 'tile';
+		bg: 'transparent' | 'cream' | 'black' | 'color';
+		w: number;
+		h: number;
+		markFrac?: number;
+		layout?: 'lockup' | 'split' | 'splitbr';
+		k?: number;
+		m?: number;
+		colorUrl?: string;
+	};
+	const MARK_LINES: [number, number, number, number][] = [
+		[6, 0.5, 6, 11.5],
+		[0.5, 6, 11.5, 6],
+		[2.11, 2.11, 9.89, 9.89],
+		[2.11, 9.89, 9.89, 2.11]
+	];
+	const COLOR_SQ = '/brand-assets/superextra-bg-dusk-rich-sq.jpg';
+	const DL_FONT = "-apple-system,BlinkMacSystemFont,'Inter',ui-sans-serif,system-ui,sans-serif";
+	const dlInk = (bg: string) => (bg === 'black' || bg === 'color' ? '#fefdf9' : '#1a1a1a');
+
+	function dlLoadImage(src: string): Promise<HTMLImageElement> {
+		return new Promise((res, rej) => {
+			const im = new Image();
+			im.onload = () => res(im);
+			im.onerror = rej;
+			im.src = src;
+		});
+	}
+	function dlMeasure(text: string, fontPx: number): number {
+		const c = document.createElement('canvas').getContext('2d');
+		if (!c) return fontPx * text.length * 0.5;
+		c.font = `300 ${fontPx}px ${DL_FONT}`;
+		(c as unknown as { letterSpacing: string }).letterSpacing = '-0.025em';
+		return c.measureText(text).width;
+	}
+	function dlStrokeMark(
+		ctx: CanvasRenderingContext2D,
+		x: number,
+		y: number,
+		box: number,
+		c: string
+	) {
+		ctx.strokeStyle = c;
+		ctx.lineWidth = (box * 1.3) / 12;
+		ctx.lineCap = 'butt';
+		for (const [x1, y1, x2, y2] of MARK_LINES) {
+			ctx.beginPath();
+			ctx.moveTo(x + (x1 / 12) * box, y + (y1 / 12) * box);
+			ctx.lineTo(x + (x2 / 12) * box, y + (y2 / 12) * box);
+			ctx.stroke();
+		}
+	}
+	async function dlPaintBg(
+		ctx: CanvasRenderingContext2D,
+		bg: string,
+		w: number,
+		h: number,
+		colorUrl = COLOR_SQ
+	) {
+		if (bg === 'cream') {
+			ctx.fillStyle = '#fefdf9';
+			ctx.fillRect(0, 0, w, h);
+		} else if (bg === 'black') {
+			ctx.fillStyle = '#141210';
+			ctx.fillRect(0, 0, w, h);
+		} else if (bg === 'color') {
+			const im = await dlLoadImage(colorUrl);
+			const s = Math.max(w / im.width, h / im.height);
+			ctx.drawImage(
+				im,
+				(w - im.width * s) / 2,
+				(h - im.height * s) / 2,
+				im.width * s,
+				im.height * s
+			);
+		}
+	}
+	function dlSetText(ctx: CanvasRenderingContext2D, px: number, c: string) {
+		ctx.fillStyle = c;
+		ctx.font = `300 ${px}px ${DL_FONT}`;
+		(ctx as unknown as { letterSpacing: string }).letterSpacing = '-0.025em';
+		ctx.textBaseline = 'middle';
+	}
+	// Gallery-tile geometry — mirrors the generator's tile(): word/mark/tag sized in
+	// cqw (% of width), placed per layout. Returns absolute px positions.
+	function dlTileGeom(d: DL) {
+		const W = d.w,
+			H = d.h,
+			k = d.k ?? 1,
+			m = d.m ?? 0.12,
+			layout = d.layout ?? 'lockup';
+		const word = (5.85 * k * W) / 100;
+		const markw = word * 0.75,
+			gap = word * (2 / 22),
+			raise = word * 0.36,
+			tagsz = word * 0.31;
+		const M = m * Math.min(W, H);
+		const wordX = M + markw + gap;
+		if (layout === 'lockup') {
+			const tagBaseline = H - M - 0.21 * tagsz;
+			const wordCY = tagBaseline - 0.7 * tagsz - 0.5 * word;
+			return {
+				word,
+				markw,
+				tagsz,
+				markX: M,
+				markY: wordCY - 0.36 * word - markw / 2,
+				wordX,
+				wordCY,
+				tagX: wordX,
+				tagBaseline,
+				tagAnchor: 'start' as const
+			};
+		}
+		return {
+			word,
+			markw,
+			tagsz,
+			markX: M,
+			markY: M,
+			wordX,
+			wordCY: M + markw / 2 + raise,
+			tagX: layout === 'splitbr' ? W - M : M,
+			tagBaseline: H - M - 0.21 * tagsz,
+			tagAnchor: layout === 'splitbr' ? ('end' as const) : ('start' as const)
+		};
+	}
+	function dlTileTag(ctx: CanvasRenderingContext2D, g: ReturnType<typeof dlTileGeom>, c: string) {
+		ctx.fillStyle = c;
+		ctx.font = `300 ${g.tagsz}px ${DL_FONT}`;
+		(ctx as unknown as { letterSpacing: string }).letterSpacing = '0.01em';
+		ctx.textBaseline = 'alphabetic';
+		ctx.textAlign = g.tagAnchor === 'end' ? 'right' : 'left';
+		ctx.fillText('AI consultant for every restaurant', g.tagX, g.tagBaseline);
+		ctx.textAlign = 'left';
+	}
+	async function dlPNG(d: DL): Promise<Blob | null> {
+		await document.fonts.ready;
+		const color = dlInk(d.bg);
+		let w = d.w;
+		const h = d.h;
+		const cv = document.createElement('canvas');
+		const ctx = cv.getContext('2d');
+		if (!ctx) return null;
+		if (d.kind === 'lockup') {
+			const word = h * 0.55;
+			w = Math.ceil(word * 0.75 + word * (2 / 22) + dlMeasure('Superextra', word));
+		}
+		cv.width = w;
+		cv.height = h;
+		await dlPaintBg(ctx, d.bg, w, h, d.colorUrl);
+		if (d.kind === 'tile') {
+			const g = dlTileGeom(d);
+			dlSetText(ctx, g.word, color);
+			ctx.fillText('Superextra', g.wordX, g.wordCY);
+			dlStrokeMark(ctx, g.markX, g.markY, g.markw, color);
+			dlTileTag(ctx, g, color);
+		} else if (d.kind === 'lockup') {
+			const word = h * 0.55,
+				markBox = word * 0.75,
+				gap = word * (2 / 22),
+				raise = word * 0.36;
+			dlSetText(ctx, word, color);
+			ctx.fillText('Superextra', markBox + gap, h / 2);
+			dlStrokeMark(ctx, 0, (h - markBox) / 2 - raise, markBox, color);
+		} else if (d.kind === 'monogram') {
+			const sf = Math.min(w, h) * 0.5,
+				markBox = sf * 0.55,
+				gap = sf * 0.04,
+				raise = sf * 0.36;
+			const x0 = (w - (markBox + gap + dlMeasure('S', sf))) / 2;
+			dlSetText(ctx, sf, color);
+			ctx.fillText('S', x0 + markBox + gap, h / 2);
+			dlStrokeMark(ctx, x0, (h - markBox) / 2 - raise, markBox, color);
+		} else {
+			const box = Math.min(w, h) * (d.markFrac ?? 0.7);
+			dlStrokeMark(ctx, (w - box) / 2, (h - box) / 2, box, color);
+		}
+		return await new Promise<Blob | null>((res) => cv.toBlob(res, 'image/png'));
+	}
+	function dlSVGMark(ox: number, oy: number, box: number, c: string): string {
+		const sw = ((box * 1.3) / 12).toFixed(2);
+		return MARK_LINES.map(
+			([x1, y1, x2, y2]) =>
+				`<line x1="${(ox + (x1 / 12) * box).toFixed(2)}" y1="${(oy + (y1 / 12) * box).toFixed(2)}" x2="${(ox + (x2 / 12) * box).toFixed(2)}" y2="${(oy + (y2 / 12) * box).toFixed(2)}" stroke="${c}" stroke-width="${sw}"/>`
+		).join('');
+	}
+	function dlSVGText(x: number, h: number, px: number, c: string, t: string): string {
+		return `<text x="${x.toFixed(2)}" y="${(h / 2).toFixed(2)}" font-family="${DL_FONT}" font-weight="300" font-size="${px.toFixed(2)}" letter-spacing="-0.025em" dominant-baseline="central" fill="${c}">${t}</text>`;
+	}
+	function dlSVG(d: DL): string {
+		const color = dlInk(d.bg);
+		let w = d.w;
+		const h = d.h;
+		let body: string;
+		if (d.kind === 'tile') {
+			const g = dlTileGeom(d);
+			body =
+				dlSVGMark(g.markX, g.markY, g.markw, color) +
+				`<text x="${g.wordX.toFixed(2)}" y="${g.wordCY.toFixed(2)}" font-family="${DL_FONT}" font-weight="300" font-size="${g.word.toFixed(2)}" letter-spacing="-0.025em" dominant-baseline="central" fill="${color}">Superextra</text>` +
+				`<text x="${g.tagX.toFixed(2)}" y="${g.tagBaseline.toFixed(2)}" font-family="${DL_FONT}" font-weight="300" font-size="${g.tagsz.toFixed(2)}" letter-spacing="0.01em" text-anchor="${g.tagAnchor}" fill="${color}">AI consultant for every restaurant</text>`;
+		} else if (d.kind === 'lockup') {
+			const word = h * 0.55,
+				markBox = word * 0.75,
+				gap = word * (2 / 22),
+				raise = word * 0.36;
+			w = Math.ceil(markBox + gap + dlMeasure('Superextra', word));
+			body =
+				dlSVGMark(0, (h - markBox) / 2 - raise, markBox, color) +
+				dlSVGText(markBox + gap, h, word, color, 'Superextra');
+		} else if (d.kind === 'monogram') {
+			const sf = Math.min(w, h) * 0.5,
+				markBox = sf * 0.55,
+				gap = sf * 0.04,
+				raise = sf * 0.36;
+			const x0 = (w - (markBox + gap + dlMeasure('S', sf))) / 2;
+			body =
+				dlSVGMark(x0, (h - markBox) / 2 - raise, markBox, color) +
+				dlSVGText(x0 + markBox + gap, h, sf, color, 'S');
+		} else {
+			const box = Math.min(w, h) * (d.markFrac ?? 0.7);
+			body = dlSVGMark((w - box) / 2, (h - box) / 2, box, color);
+		}
+		let bgEl = '';
+		if (d.bg === 'cream') bgEl = `<rect width="${w}" height="${h}" fill="#fefdf9"/>`;
+		else if (d.bg === 'black') bgEl = `<rect width="${w}" height="${h}" fill="#141210"/>`;
+		else if (d.bg === 'color')
+			bgEl = `<image href="${location.origin}${d.colorUrl ?? COLOR_SQ}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>`;
+		return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${bgEl}${body}</svg>`;
+	}
+	function dlSave(data: Blob | string, filename: string, type: string) {
+		const blob = typeof data === 'string' ? new Blob([data], { type }) : data;
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		a.click();
+		setTimeout(() => URL.revokeObjectURL(url), 2000);
+	}
+	async function onAssetClick(e: MouseEvent) {
+		const btn = (e.target as HTMLElement).closest('button.dl') as HTMLElement | null;
+		if (!btn) return;
+		const host = btn.closest('[data-dl]') as HTMLElement | null;
+		if (!host?.dataset.dl) return;
+		const d = JSON.parse(host.dataset.dl) as DL;
+		if (btn.dataset.fmt === 'svg') dlSave(dlSVG(d), `${d.name}.svg`, 'image/svg+xml');
+		else {
+			const blob = await dlPNG(d);
+			if (blob) dlSave(blob, `${d.name}.png`, 'image/png');
+		}
+	}
+	$effect(() => {
+		if (phase !== 'unlocked') return;
+		document.addEventListener('click', onAssetClick);
+		return () => document.removeEventListener('click', onAssetClick);
+	});
 </script>
 
 <svelte:head>
