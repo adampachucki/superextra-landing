@@ -33,7 +33,7 @@ function iconTile({ kind, bg, crop, label }) {
 			? 'background:#fefdf9'
 			: bg === 'black'
 				? 'background:#141210'
-				: `background:url(${A}/superextra-bg-color-square.jpg) center/cover`;
+				: `background:url(${A}/superextra-bg-dusk-rich-sq.jpg) center/cover`;
 	const radius = crop === 'circle' ? '50%' : '24px';
 	let inner;
 	if (kind === 'mark') {
@@ -80,12 +80,19 @@ function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note, bgUrl
 		inner = `<div style="position:absolute;left:${M}cqw;bottom:${M}cqw;display:flex;flex-direction:column;align-items:flex-start">${mark}${tag(`margin-top:${r(WORD * 0.05)}cqw;margin-left:${r(MARKW + GAP)}cqw`)}</div>`;
 	}
 	const aspect = h > w ? 'portrait' : w === h ? 'square' : 'wide';
+	// Squares use the darker "dusk" draw so the cream mark always reads; wide/portrait use
+	// the default colorful draw. An explicit bgUrl wins (palette showcases pick the draw).
+	const colorSrc =
+		bgUrl ||
+		(aspect === 'square'
+			? `${A}/superextra-bg-dusk-rich-sq.jpg`
+			: `${A}/superextra-bg-color-${aspect}.jpg`);
 	const bgcss =
 		bg === 'white'
 			? 'background:#fefdf9'
 			: bg === 'black'
 				? 'background:#141210'
-				: `background:url(${bgUrl || `${A}/superextra-bg-color-${aspect}.jpg`}) center/cover`;
+				: `background:url(${colorSrc}) center/cover`;
 	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${inner}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}</figcaption></figure>`;
 }
 
@@ -98,12 +105,16 @@ function adCard({ headline, bg = 'white', w = 1080, h = 1080, label, note }) {
 	const ink = bg === 'white' ? '#1a1a1a' : '#fefdf9';
 	const M = ((Math.min(w, h) / w) * 0.06 * 100).toFixed(2); // cqw
 	const aspect = h > w ? 'portrait' : w === h ? 'square' : 'wide';
+	const colorSrc =
+		aspect === 'square'
+			? `${A}/superextra-bg-dusk-rich-sq.jpg`
+			: `${A}/superextra-bg-color-${aspect}.jpg`;
 	const bgcss =
 		bg === 'white'
 			? 'background:#fefdf9'
 			: bg === 'black'
 				? 'background:#141210'
-				: `background:url(${A}/superextra-bg-color-${aspect}.jpg) center/cover`;
+				: `background:url(${colorSrc}) center/cover`;
 	const r = (n) => n.toFixed(2);
 	const WM = 4.6,
 		MARKW = WM * MARK_K,
@@ -154,6 +165,20 @@ const BANNERS = [
 	{ w: 1128, h: 191, bg: 'white', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'white' },
 	{ w: 1128, h: 191, bg: 'black', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'black' },
 	{ w: 1128, h: 191, bg: 'color', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'colorful' }
+];
+
+// Colorful background swatch (no lockup) — used by the Colorful palette section.
+const bgFig = (src, ar, title, note) =>
+	`<figure class="tile"><div class="cv" style="aspect-ratio:${ar};background:url(${A}/${src}) center/cover"></div><figcaption><b>${title}</b>${note ? ` · <span>${note}</span>` : ''}</figcaption></figure>`;
+
+// The colour draws, each available flat (gradient + noise) and rich (+ circular glows).
+const COLOR_DRAWS = [
+	['periwinkle', 'Periwinkle', 'violet-pink → blue'],
+	['lavender-pink', 'Lavender → Pink', 'violet → pink'],
+	['violet-cyan', 'Violet → Cyan', ''],
+	['blue-teal', 'Blue → Teal', 'indigo → cyan'],
+	['indigo-violet', 'Indigo → Violet', ''],
+	['mint', 'Mint', 'emerald → cyan']
 ];
 
 const html = `<style>
@@ -318,28 +343,35 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
   <div class="hr"></div>
   <section id="colorful">
     <div class="eyebrow">System</div><h2>Colorful palette</h2>
-    <p class="lede">The colorful background comes in several color draws — the brand accent palette over film-grain noise. Pick per campaign; the wordmark stays cream.</p>
-    <div class="grid" style="grid-template-columns:repeat(2,1fr)">${[
-			['periwinkle', 'Periwinkle', 'violet-pink → blue'],
-			['lavender-pink', 'Lavender → Pink', 'violet → pink'],
-			['violet-cyan', 'Violet → Cyan', ''],
-			['blue-teal', 'Blue → Teal', 'indigo → cyan'],
-			['indigo-violet', 'Indigo → Violet', ''],
-			['mint', 'Mint', 'emerald → cyan']
-		]
-			.map(
-				([k, n, nt]) =>
-					`<figure class="tile"><div class="cv" style="aspect-ratio:1640/624;background:url(${A}/superextra-bg-${k}.jpg) center/cover"></div><figcaption><b>${n}</b>${nt ? ` · <span>${nt}</span>` : ''}</figcaption></figure>`
-			)
-			.join('')}</div>
+    <p class="lede">The colorful background is a set of color draws over film-grain noise, in two finishes: <b style="color:var(--ink);font-weight:600">flat</b> (gradient + noise) and <b style="color:var(--ink);font-weight:600">rich</b> (adds soft circular glows, like the squares and banners). Both are kept — pick per surface. The wordmark stays cream.</p>
+
+    <h3>Dusk <span class="pill">icons · squares · profiles</span></h3>
+    <p class="note">The darker violet→blue draw. Use it whenever an icon, square post, or profile photo needs the colorful background, so the cream mark always reads. Square for avatars and app icons; wide where a dusk banner is needed.</p>
+    <div class="grid" style="grid-template-columns:repeat(2,1fr)">
+      ${bgFig('superextra-bg-dusk-rich-sq.jpg', '1/1', 'Dusk · square', 'rich — circular glows')}
+      ${bgFig('superextra-bg-dusk-flat-sq.jpg', '1/1', 'Dusk · square', 'flat — gradient + noise')}
+    </div>
+    <div class="grid" style="grid-template-columns:repeat(2,1fr)">
+      ${bgFig('superextra-bg-dusk-rich.jpg', '1640/624', 'Dusk · wide', 'rich — circular glows')}
+      ${bgFig('superextra-bg-dusk-flat.jpg', '1640/624', 'Dusk · wide', 'flat — gradient + noise')}
+    </div>
+
+    <h3>Color draws <span class="pill">flat &amp; rich</span></h3>
+    <p class="note">Each draw in both finishes — flat on the left, rich on the right.</p>
+    <div class="grid" style="grid-template-columns:repeat(2,1fr)">${COLOR_DRAWS.map(
+			([k, n, nt]) =>
+				bgFig(`superextra-bg-${k}.jpg`, '1640/624', n, `flat${nt ? ` — ${nt}` : ''}`) +
+				bgFig(`superextra-bg-${k}-rich.jpg`, '1640/624', n, 'rich — circular glows')
+		).join('')}</div>
+
     <h3>On the colorful backgrounds</h3>
-    <p class="note">The lockup over a few of the draws — cream wordmark, same placement system.</p>
+    <p class="note">The lockup over a few rich draws — cream wordmark, same placement system.</p>
     ${grid(2, [
 			{
 				w: 1640,
 				h: 624,
 				bg: 'color',
-				bgUrl: `${A}/superextra-bg-periwinkle.jpg`,
+				bgUrl: `${A}/superextra-bg-periwinkle-rich.jpg`,
 				layout: 'lockup',
 				label: 'Periwinkle',
 				note: 'lockup'
@@ -348,7 +380,7 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
 				w: 1640,
 				h: 624,
 				bg: 'color',
-				bgUrl: `${A}/superextra-bg-lavender-pink.jpg`,
+				bgUrl: `${A}/superextra-bg-lavender-pink-rich.jpg`,
 				layout: 'splitbr',
 				label: 'Lavender → Pink',
 				note: 'split'
@@ -357,7 +389,7 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
 				w: 1640,
 				h: 624,
 				bg: 'color',
-				bgUrl: `${A}/superextra-bg-blue-teal.jpg`,
+				bgUrl: `${A}/superextra-bg-blue-teal-rich.jpg`,
 				layout: 'lockup',
 				label: 'Blue → Teal',
 				note: 'lockup'
@@ -366,7 +398,7 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
 				w: 1640,
 				h: 624,
 				bg: 'color',
-				bgUrl: `${A}/superextra-bg-violet-cyan.jpg`,
+				bgUrl: `${A}/superextra-bg-violet-cyan-rich.jpg`,
 				layout: 'splitbr',
 				label: 'Violet → Cyan',
 				note: 'split'
@@ -420,7 +452,9 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
       <tr><td><code>superextra-wordmark.png</code></td><td>Mark + wordmark, transparent</td><td>1760×480</td></tr>
       <tr><td><code>superextra-avatar.png</code></td><td>Square avatar, all platforms</td><td>1080×1080</td></tr>
       <tr><td><code>superextra-bg-{white,black}.png</code></td><td>Neutral backgrounds</td><td>per format</td></tr>
-      <tr><td><code>superextra-bg-color-{wide,square,portrait}.png</code></td><td>Colorful + noise, native per aspect</td><td>1640×624 · 1080² · 1080×1920</td></tr>
+      <tr><td><code>superextra-bg-color-{wide,portrait}.jpg</code></td><td>Default colorful draw — cover, portrait &amp; banners</td><td>1640×624 · 1080×1920</td></tr>
+      <tr><td><code>superextra-bg-&lt;draw&gt;{,-rich}.jpg</code></td><td>Palette color draws, flat &amp; rich (periwinkle, lavender-pink, violet-cyan, blue-teal, indigo-violet, mint)</td><td>1640×624</td></tr>
+      <tr><td><code>superextra-bg-dusk-{flat,rich}{,-sq}.jpg</code></td><td>Darker violet-blue — icons, squares &amp; profiles</td><td>1080² · 1640×624</td></tr>
       <tr><td><code>superextra-stripe-icon.png</code></td><td>Stripe icon</td><td>512×512</td></tr>
       <tr><td><code>superextra-stripe-logo.png</code></td><td>Stripe logo, transparent</td><td>1760×480</td></tr>
       <tr><td><code>superextra-&lt;platform&gt;-&lt;format&gt;.png</code></td><td>Social exports, e.g. <code>superextra-instagram-square.png</code></td><td>platform spec, 2×</td></tr>
