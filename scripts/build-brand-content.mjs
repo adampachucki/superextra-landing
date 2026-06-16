@@ -12,57 +12,59 @@ import { dirname, join } from 'path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const A = '/brand-assets'; // served from static/brand-assets
 
+// Eight-point asterisk mark — four lines crossing at 45°, weight 1.3.
 const MK = (c) =>
-	`<svg viewBox="0 0 12 12" fill="none"><line x1="6" y1="0.5" x2="6" y2="11.5" stroke="${c}" stroke-width="1.5"/><line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="${c}" stroke-width="1.5"/><line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="${c}" stroke-width="1.5"/></svg>`;
+	`<svg viewBox="0 0 12 12" fill="none"><line x1="6" y1="0.5" x2="6" y2="11.5" stroke="${c}" stroke-width="1.3"/><line x1="0.5" y1="6" x2="11.5" y2="6" stroke="${c}" stroke-width="1.3"/><line x1="2.11" y1="2.11" x2="9.89" y2="9.89" stroke="${c}" stroke-width="1.3"/><line x1="2.11" y1="9.89" x2="9.89" y2="2.11" stroke="${c}" stroke-width="1.3"/></svg>`;
 
-// ── Temp exploration: asterisk with extra arms ───────────────────────────────
-// Each variant is a set of lines through the center (6,6), radius ≈5.5 (matches MK).
-const LN = ([x1, y1, x2, y2], c, sw = 1.5) =>
-	`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${sw}"/>`;
-const AST = (lines, c, style = '', sw = 1.5) =>
-	`<svg viewBox="0 0 12 12" fill="none" style="${style}">${lines.map((l) => LN(l, c, sw)).join('')}</svg>`;
-const V = [6, 0.5, 6, 11.5]; // 90° (vertical)
-const H = [0.5, 6, 11.5, 6]; // 0° (horizontal)
-const D1 = [1.24, 3.25, 10.76, 8.75]; // ±30° diagonals (today's mark)
-const D2 = [1.24, 8.75, 10.76, 3.25];
-const X1 = [2.11, 2.11, 9.89, 9.89]; // 45° diagonals (even 8-point)
-const X2 = [2.11, 9.89, 9.89, 2.11]; // 135°
-const ARM_VARIANTS = [
-	{ name: '6-point — current', lines: [V, D1, D2], note: "today's mark · 3 lines, arms every 60°" },
-	// Thinner stroke: four lines cross at one point, so 1.5 reads heavier here.
-	{
-		name: '8-point — even',
-		lines: [V, H, X1, X2],
-		sw: 1.3,
-		note: '+2 arms · 4 lines, arms every 45°'
-	}
-];
-function armCard(v) {
-	const sw = v.sw ?? 1.5;
+// Lockup proportions (relative to the wordmark size). The eight-point mark runs a
+// touch smaller than the old 18/22 so its denser center doesn't read heavy; gap and
+// raise follow the system.
+const MARK_K = 0.75;
+const GAP_K = 2 / 22;
+const RAISE_K = 0.36;
+
+// Icon / avatar tiles — the mark alone, and the ✲S monogram, on each background.
+function iconTile({ kind, bg, crop, label }) {
 	const r = (n) => n.toFixed(2);
-	// Lockup mark/gap/raise locked to the logo system's exact ratios — mark 18/22,
-	// gap 2/22, raise 8/22 of the wordmark size (same as tile() and the Logo section).
-	const WORD = 38,
-		MARKW = WORD * (18 / 22),
-		GAP = WORD * (2 / 22),
-		RAISE = WORD * (8 / 22);
-	const big = AST(v.lines, '#1a1a1a', 'width:92px;height:92px', sw);
-	const lk = AST(
-		v.lines,
-		'#1a1a1a',
-		`width:${r(MARKW)}px;height:${r(MARKW)}px;margin-top:-${r(RAISE)}px`,
-		sw
-	);
-	const sm = AST(v.lines, '#1a1a1a', 'width:18px;height:18px', sw);
-	return `<div class="card"><div class="frame cream" style="min-height:230px;flex-direction:column;gap:20px">${big}<div style="display:flex;align-items:center;gap:${r(GAP)}px;color:#1a1a1a">${lk}<span class="wm" style="font-size:${WORD}px">Superextra</span></div><div style="display:flex;align-items:center;gap:8px">${sm}<span style="font-size:12px;color:#6f6a62">18px · sidebar size</span></div></div><div class="cap"><b>${v.name}</b> · <span>${v.note}</span></div></div>`;
+	const ink = bg === 'white' ? '#1a1a1a' : '#fefdf9';
+	const size = 128;
+	const bgcss =
+		bg === 'white'
+			? 'background:#fefdf9'
+			: bg === 'black'
+				? 'background:#141210'
+				: `background:url(${A}/superextra-bg-color-square.jpg) center/cover`;
+	const radius = crop === 'circle' ? '50%' : '24px';
+	let inner;
+	if (kind === 'mark') {
+		const mw = size * 0.46;
+		inner = `<span style="display:inline-flex;width:${r(mw)}px;height:${r(mw)}px">${MK(ink)}</span>`;
+	} else {
+		const SF = size * 0.5,
+			mw = SF * 0.55,
+			gap = SF * 0.04,
+			raise = SF * 0.36;
+		inner = `<div style="display:flex;align-items:center;gap:${r(gap)}px;color:${ink}"><span style="display:inline-flex;width:${r(mw)}px;height:${r(mw)}px;margin-top:-${r(raise)}px">${MK(ink)}</span><span class="wm" style="font-size:${r(SF)}px;color:${ink}">S</span></div>`;
+	}
+	return `<div class="card"><div class="frame" style="padding:24px"><div style="width:${size}px;height:${size}px;${bgcss};border-radius:${radius};display:flex;align-items:center;justify-content:center">${inner}</div></div><div class="cap"><b>${label}</b></div></div>`;
 }
+const ICON_BGS = [
+	['white', 'Cream'],
+	['black', 'Black'],
+	['color', 'Colorful']
+];
+const iconSet = (kind) =>
+	[
+		...ICON_BGS.map(([bg, bn]) => iconTile({ kind, bg, crop: 'square', label: `${bn} · icon` })),
+		...ICON_BGS.map(([bg, bn]) => iconTile({ kind, bg, crop: 'circle', label: `${bn} · avatar` }))
+	].join('');
 
 // One gallery tile, sized entirely in cqw (% of the tile's own width).
 function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note, bgUrl }) {
 	const WORD = 5.85 * k,
-		MARKW = WORD * (18 / 22),
-		GAP = WORD * (2 / 22),
-		RAISE = WORD * (8 / 22),
+		MARKW = WORD * MARK_K,
+		GAP = WORD * GAP_K,
+		RAISE = WORD * RAISE_K,
 		TAGSZ = WORD * 0.31;
 	const M = ((Math.min(w, h) / w) * m * 100).toFixed(2); // cqw
 	const ink = bg === 'white' ? '#1a1a1a' : '#fefdf9';
@@ -104,9 +106,9 @@ function adCard({ headline, bg = 'white', w = 1080, h = 1080, label, note }) {
 				: `background:url(${A}/superextra-bg-color-${aspect}.jpg) center/cover`;
 	const r = (n) => n.toFixed(2);
 	const WM = 4.6,
-		MARKW = WM * (18 / 22),
-		GAP = WM * (2 / 22),
-		RAISE = WM * (8 / 22);
+		MARKW = WM * MARK_K,
+		GAP = WM * GAP_K,
+		RAISE = WM * RAISE_K;
 	const sig = `<div style="position:absolute;left:${M}cqw;bottom:${M}cqw;display:flex;align-items:center;gap:${r(GAP)}cqw"><span style="display:inline-flex;width:${r(MARKW)}cqw;height:${r(MARKW)}cqw;margin-top:-${r(RAISE)}cqw">${MK(ink)}</span><span class="wm" style="font-size:${WM}cqw;color:${ink};white-space:nowrap">Superextra</span></div>`;
 	const head = `<div style="position:absolute;left:${M}cqw;right:${M}cqw;top:${M}cqw;font-size:12cqw;line-height:1.06;font-weight:500;letter-spacing:-0.03em;color:${ink}">${headline}</div>`;
 	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${head}${sig}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}</figcaption></figure>`;
@@ -162,7 +164,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Inter',-apple-system,sys
 .wm{font-family:-apple-system,BlinkMacSystemFont,'Inter',ui-sans-serif,system-ui,sans-serif;font-weight:300;letter-spacing:-0.025em}
 .sidebar{position:fixed;top:0;left:0;width:var(--sb);height:100vh;overflow-y:auto;background:#171411;border-right:1px solid var(--line);padding:28px 22px 40px}
 .sbrand{display:flex;align-items:center;gap:2px;margin-bottom:6px}
-.sbrand svg{width:18px;height:18px;margin-top:-8px}.sbrand .nm{font-size:22px;font-family:-apple-system,BlinkMacSystemFont,'Inter',ui-sans-serif,system-ui,sans-serif;font-weight:300;letter-spacing:-0.025em}
+.sbrand svg{width:16.5px;height:16.5px;margin-top:-8px}.sbrand .nm{font-size:22px;font-family:-apple-system,BlinkMacSystemFont,'Inter',ui-sans-serif,system-ui,sans-serif;font-weight:300;letter-spacing:-0.025em}
 .sbrand-sub{font-size:12px;color:var(--mut);margin-bottom:26px}
 .navgroup{margin-bottom:20px}
 .navgroup h4{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6f6a62;margin:0 0 8px 2px}
@@ -207,7 +209,7 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
 @media(max-width:820px){.sidebar{display:none}main{margin-left:0;padding:32px 22px 120px}.palette{grid-template-columns:repeat(3,1fr)}}
 </style>
 <aside class="sidebar">
-  <div class="sbrand"><svg viewBox="0 0 12 12" fill="none"><line x1="6" y1="0.5" x2="6" y2="11.5" stroke="#ede9e3" stroke-width="1.5"/><line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="#ede9e3" stroke-width="1.5"/><line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="#ede9e3" stroke-width="1.5"/></svg><span class="nm">Superextra</span></div>
+  <div class="sbrand">${MK('#ede9e3')}<span class="nm">Superextra</span></div>
   <p class="sbrand-sub">Brand assets &amp; guidelines</p>
   <div class="navgroup"><h4>Foundations</h4><a href="#overview">Overview</a><a href="#logo">Logo</a><a href="#color">Color</a><a href="#type">Typography</a></div>
   <div class="navgroup"><h4>System</h4><a href="#layouts">Layouts</a><a href="#backgrounds">Backgrounds</a><a href="#colorful">Colorful palette</a></div>
@@ -215,7 +217,6 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
   <div class="navgroup"><h4>Marketing</h4><a href="#ads">Ad creatives</a></div>
   <div class="navgroup"><h4>Marks &amp; partners</h4><a href="#profile">Profile</a><a href="#stripe">Stripe</a></div>
   <div class="navgroup"><h4>Reference</h4><a href="#files">Files &amp; naming</a></div>
-  <div class="navgroup"><h4>Explorations</h4><a href="#explore">Asterisk arms</a></div>
 </aside>
 <main>
   <section id="overview">
@@ -227,10 +228,10 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
   <div class="hr"></div>
   <section id="logo">
     <div class="eyebrow">Foundations</div><h2>Logo</h2>
-    <p class="lede">A six-point asterisk mark beside the “Superextra” wordmark in the system sans, Light weight. The mark sits raised — its center aligns near the cap height of the wordmark.</p>
+    <p class="lede">An eight-point asterisk mark beside the “Superextra” wordmark in the system sans, Light weight. The mark sits raised — its center aligns near the cap height of the wordmark.</p>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="card"><div class="frame cream" style="min-height:200px"><svg viewBox="0 0 12 12" fill="none" style="width:120px;height:120px"><line x1="6" y1="0.5" x2="6" y2="11.5" stroke="#1a1a1a" stroke-width="1.5"/><line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="#1a1a1a" stroke-width="1.5"/><line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="#1a1a1a" stroke-width="1.5"/></svg></div><div class="cap"><b>Mark</b> · the asterisk, used alone as the icon/avatar</div></div>
-      <div class="card"><div class="frame cream" style="min-height:200px"><div style="display:flex;align-items:center;gap:6px;color:#1a1a1a"><svg viewBox="0 0 12 12" fill="none" style="width:54px;height:54px;margin-top:-24px"><line x1="6" y1="0.5" x2="6" y2="11.5" stroke="#1a1a1a" stroke-width="1.5"/><line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="#1a1a1a" stroke-width="1.5"/><line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="#1a1a1a" stroke-width="1.5"/></svg><span class="wm" style="font-size:66px">Superextra</span></div></div><div class="cap"><b>Wordmark</b> · mark + name, the primary lockup</div></div>
+      <div class="card"><div class="frame cream" style="min-height:200px"><span style="display:inline-flex;width:120px;height:120px">${MK('#1a1a1a')}</span></div><div class="cap"><b>Mark</b> · the asterisk, used alone as the icon/avatar</div></div>
+      <div class="card"><div class="frame cream" style="min-height:200px"><div style="display:flex;align-items:center;gap:6px;color:#1a1a1a"><span style="display:inline-flex;width:49.5px;height:49.5px;margin-top:-23.76px">${MK('#1a1a1a')}</span><span class="wm" style="font-size:66px">Superextra</span></div></div><div class="cap"><b>Wordmark</b> · mark + name, the primary lockup</div></div>
     </div>
     <div class="do"><div class="b ok"><div class="t">Do</div>Keep the raised mark, Light weight, and −0.025em tracking. Give the logo clear space of at least the mark’s height on every side.</div><div class="b no"><div class="t">Don’t</div>Recolor, outline, stretch, re-space, or swap the typeface. Don’t lower the mark to the baseline.</div></div>
   </section>
@@ -391,12 +392,12 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
 
   <div class="hr"></div>
   <section id="profile">
-    <div class="eyebrow">Marks &amp; partners</div><h2>Profile &amp; avatar</h2>
-    <p class="lede">One square mark-on-cream avatar serves every platform. It crops cleanly to a circle (Instagram, X, Facebook) and a rounded square (LinkedIn, Google).</p>
-    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
-      <div class="card"><div class="frame" style="padding:22px"><img src="${A}/superextra-avatar.png" style="width:120px;border-radius:50%"/></div><div class="cap"><b>Circle</b> <span class="dim">— IG · X · FB</span></div></div>
-      <div class="card"><div class="frame" style="padding:22px"><img src="${A}/superextra-avatar.png" style="width:120px;border-radius:16px"/></div><div class="cap"><b>Square</b> <span class="dim">— LinkedIn · Google</span></div></div>
-    </div>
+    <div class="eyebrow">Marks &amp; partners</div><h2>Profile &amp; icon</h2>
+    <p class="lede">Two icon treatments — the mark alone, and the ✲S monogram (the mark as a small superscript over the “S”). Each works as a rounded-square app icon and a circular avatar, on every background.</p>
+    <h3>Mark</h3>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)">${iconSet('mark')}</div>
+    <h3>✲S monogram</h3>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)">${iconSet('mono')}</div>
   </section>
 
   <div class="hr"></div>
@@ -426,13 +427,6 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
     </tbody></table>
   </section>
 
-  <div class="hr"></div>
-  <section id="explore">
-    <div class="eyebrow">Temp · exploration</div><h2>Asterisk — extra arms</h2>
-    <p class="lede">A scratchpad, not part of the system. The mark is a six-point asterisk today — three lines crossing at the center. This explores two more arms: an even eight-point, four lines 45° apart. Each is shown large, in the lockup, and at 18px sidebar size.</p>
-    <div class="grid" style="grid-template-columns:repeat(2,1fr)">${ARM_VARIANTS.map(armCard).join('')}</div>
-    <p class="note">More arms means a denser center — where the strokes cross, the eight-point can clog at small sizes. A thinner stroke (≈1.2) or a small center gap would offset it.</p>
-  </section>
 </main>`;
 
 mkdirSync(join(root, 'src/lib/brand'), { recursive: true });

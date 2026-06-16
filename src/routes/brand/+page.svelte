@@ -107,9 +107,10 @@
 {:else}
 	<div class="gate" class:fade-out={phase === 'revealing'}>
 		<svg class="gmark" viewBox="0 0 12 12" fill="none">
-			<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.5" />
-			<line x1="1.24" y1="3.25" x2="10.76" y2="8.75" stroke="currentColor" stroke-width="1.5" />
-			<line x1="1.24" y1="8.75" x2="10.76" y2="3.25" stroke="currentColor" stroke-width="1.5" />
+			<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.3" />
+			<line x1="0.5" y1="6" x2="11.5" y2="6" stroke="currentColor" stroke-width="1.3" />
+			<line x1="2.11" y1="2.11" x2="9.89" y2="9.89" stroke="currentColor" stroke-width="1.3" />
+			<line x1="2.11" y1="9.89" x2="9.89" y2="2.11" stroke="currentColor" stroke-width="1.3" />
 		</svg>
 		<div class="pins" class:shake>
 			{#each digits as d, i (i)}
