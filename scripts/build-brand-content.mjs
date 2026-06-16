@@ -490,13 +490,10 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
     <table class="files"><thead><tr><th>File</th><th>What it is</th><th>Size</th></tr></thead><tbody>
       <tr><td><code>superextra-mark.svg</code></td><td>Asterisk mark (vector)</td><td>any</td></tr>
       <tr><td><code>superextra-wordmark.png</code></td><td>Mark + wordmark, transparent</td><td>1760×480</td></tr>
-      <tr><td><code>superextra-avatar.png</code></td><td>Square avatar, all platforms</td><td>1080×1080</td></tr>
       <tr><td><code>superextra-bg-{white,black}.png</code></td><td>Neutral backgrounds</td><td>per format</td></tr>
       <tr><td><code>superextra-bg-color-{wide,portrait}.jpg</code></td><td>Default colorful draw — cover, portrait &amp; banners</td><td>1640×624 · 1080×1920</td></tr>
       <tr><td><code>superextra-bg-&lt;draw&gt;{,-rich}.jpg</code></td><td>Palette color draws, flat &amp; rich (periwinkle, lavender-pink, violet-cyan, blue-teal, indigo-violet, mint)</td><td>1640×624</td></tr>
       <tr><td><code>superextra-bg-dusk-{flat,rich}{,-sq}.jpg</code></td><td>Darker violet-blue — icons, squares &amp; profiles</td><td>1080² · 1640×624</td></tr>
-      <tr><td><code>superextra-stripe-icon.png</code></td><td>Stripe icon</td><td>512×512</td></tr>
-      <tr><td><code>superextra-stripe-logo.png</code></td><td>Stripe logo, transparent</td><td>1760×480</td></tr>
       <tr><td><code>superextra-&lt;platform&gt;-&lt;format&gt;.png</code></td><td>Social exports, e.g. <code>superextra-instagram-square.png</code></td><td>platform spec, 2×</td></tr>
     </tbody></table>
   </section>
