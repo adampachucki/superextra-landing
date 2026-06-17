@@ -29,17 +29,27 @@ const dbg = (bg) => (bg === 'white' ? 'cream' : bg);
 const dl = (o) =>
 	`<span class="dlbtns" data-dl='${JSON.stringify(o)}'><button type="button" class="dl" data-fmt="svg">SVG</button><button type="button" class="dl" data-fmt="png">PNG</button></span>`;
 
+// Colour themes for the per-gallery picker. The brand route paints the live <canvas>
+// backgrounds and resolves a tile's theme from its gallery's current selection.
+const THEMES = [
+	['periwinkle', 'Periwinkle'],
+	['lavender-pink', 'Lavender → Pink'],
+	['violet-cyan', 'Violet → Cyan'],
+	['blue-teal', 'Blue → Teal'],
+	['indigo-violet', 'Indigo → Violet'],
+	['mint', 'Mint'],
+	['dusk', 'Dusk']
+];
+const bgsel = (gallery, def) =>
+	`<div class="bgsel" data-gallery="${gallery}" data-default="${def}"><span class="bgsel-l">Colour theme</span>${THEMES.map(([k, n]) => `<button type="button" class="theme${k === def ? ' active' : ''}" data-theme="${k}">${n}</button>`).join('')}</div>`;
+
 // Icon / avatar tiles — the mark alone, and the ✲S monogram, on each background.
 function iconTile({ kind, bg, crop, label }) {
 	const r = (n) => n.toFixed(2);
 	const ink = bg === 'white' ? '#1a1a1a' : '#fefdf9';
 	const size = 128;
-	const bgcss =
-		bg === 'white'
-			? 'background:#fefdf9'
-			: bg === 'black'
-				? 'background:#141210'
-				: `background:url(${A}/superextra-bg-dusk-rich-sq.jpg) center/cover`;
+	const bgcss = bg === 'white' ? 'background:#fefdf9' : bg === 'black' ? 'background:#141210' : '';
+	const canvasEl = bg === 'color' ? `<canvas class="bgc" data-gallery="profile"></canvas>` : '';
 	const radius = crop === 'circle' ? '50%' : '24px';
 	let inner;
 	if (kind === 'mark') {
@@ -53,6 +63,7 @@ function iconTile({ kind, bg, crop, label }) {
 		inner = `<div style="display:flex;align-items:center;gap:${r(gap)}px;color:${ink}"><span style="display:inline-flex;width:${r(mw)}px;height:${r(mw)}px;margin-top:-${r(raise)}px">${MK(ink)}</span><span class="wm" style="font-size:${r(SF)}px;color:${ink}">S</span></div>`;
 	}
 	const sq = crop === 'square';
+	const gx = bg === 'color' ? { gallery: 'profile' } : {};
 	const desc =
 		kind === 'mark'
 			? {
@@ -61,16 +72,18 @@ function iconTile({ kind, bg, crop, label }) {
 					bg: dbg(bg),
 					w: sq ? 512 : 1080,
 					h: sq ? 512 : 1080,
-					markFrac: sq ? 0.5 : 0.44
+					markFrac: sq ? 0.5 : 0.44,
+					...gx
 				}
 			: {
 					name: `superextra-monogram-${sq ? 'icon' : 'avatar'}-${dbg(bg)}`,
 					kind: 'monogram',
 					bg: dbg(bg),
 					w: sq ? 512 : 1080,
-					h: sq ? 512 : 1080
+					h: sq ? 512 : 1080,
+					...gx
 				};
-	return `<div class="card"><div class="frame" style="padding:24px"><div style="width:${size}px;height:${size}px;${bgcss};border-radius:${radius};display:flex;align-items:center;justify-content:center">${inner}</div></div><div class="cap"><b>${label}</b>${dl(desc)}</div></div>`;
+	return `<div class="card"><div class="frame" style="padding:24px"><div style="position:relative;width:${size}px;height:${size}px;${bgcss};border-radius:${radius};overflow:hidden;display:flex;align-items:center;justify-content:center">${canvasEl}${inner}</div></div><div class="cap"><b>${label}</b>${dl(desc)}</div></div>`;
 }
 const ICON_BGS = [
 	['white', 'Cream'],
@@ -84,7 +97,19 @@ const iconSet = (kind) =>
 	].join('');
 
 // One gallery tile, sized entirely in cqw (% of the tile's own width).
-function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note, bgUrl, download }) {
+function tile({
+	w,
+	h,
+	bg,
+	layout = 'lockup',
+	k = 1,
+	m = 0.12,
+	label,
+	note,
+	gallery,
+	theme,
+	download
+}) {
 	const WORD = 5.85 * k,
 		MARKW = WORD * MARK_K,
 		GAP = WORD * GAP_K,
@@ -103,20 +128,15 @@ function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note, bgUrl
 	} else {
 		inner = `<div style="position:absolute;left:${M}cqw;bottom:${M}cqw;display:flex;flex-direction:column;align-items:flex-start">${mark}${tag(`margin-top:${r(WORD * 0.05)}cqw;margin-left:${r(MARKW + GAP)}cqw`)}</div>`;
 	}
-	const aspect = h > w ? 'portrait' : w === h ? 'square' : 'wide';
-	// Squares use the darker "dusk" draw so the cream mark always reads; wide/portrait use
-	// the default colorful draw. An explicit bgUrl wins (palette showcases pick the draw).
-	const colorSrc =
-		bgUrl ||
-		(aspect === 'square'
-			? `${A}/superextra-bg-dusk-rich-sq.jpg`
-			: `${A}/superextra-bg-color-${aspect}.jpg`);
-	const bgcss =
-		bg === 'white'
-			? 'background:#fefdf9'
-			: bg === 'black'
-				? 'background:#141210'
-				: `background:url(${colorSrc}) center/cover`;
+	// Colourful backgrounds are painted live by the brand route into a <canvas>: a tile
+	// either follows a gallery's theme picker (data-gallery) or shows a fixed draw (data-draw).
+	const isColor = bg === 'color';
+	const canvasEl = isColor
+		? gallery
+			? `<canvas class="bgc" data-gallery="${gallery}"></canvas>`
+			: `<canvas class="bgc" data-draw="${theme || 'periwinkle'}" data-finish="rich"></canvas>`
+		: '';
+	const bgcss = bg === 'white' ? 'background:#fefdf9' : bg === 'black' ? 'background:#141210' : '';
 	const ctrl = download
 		? dl({
 				name: `superextra-${w}x${h}-${layout}-${dbg(bg)}`,
@@ -127,10 +147,10 @@ function tile({ w, h, bg, layout = 'lockup', k = 1, m = 0.12, label, note, bgUrl
 				layout,
 				k,
 				m,
-				...(bg === 'color' ? { colorUrl: colorSrc } : {})
+				...(isColor ? (gallery ? { gallery } : { theme: theme || 'periwinkle' }) : {})
 			})
 		: '';
-	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${inner}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}${ctrl}</figcaption></figure>`;
+	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${canvasEl}${inner}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}${ctrl}</figcaption></figure>`;
 }
 
 const grid = (cols, items) =>
@@ -141,17 +161,9 @@ const grid = (cols, items) =>
 function adCard({ headline, bg = 'white', w = 1080, h = 1080, label, note }) {
 	const ink = bg === 'white' ? '#1a1a1a' : '#fefdf9';
 	const M = ((Math.min(w, h) / w) * 0.06 * 100).toFixed(2); // cqw
-	const aspect = h > w ? 'portrait' : w === h ? 'square' : 'wide';
-	const colorSrc =
-		aspect === 'square'
-			? `${A}/superextra-bg-dusk-rich-sq.jpg`
-			: `${A}/superextra-bg-color-${aspect}.jpg`;
-	const bgcss =
-		bg === 'white'
-			? 'background:#fefdf9'
-			: bg === 'black'
-				? 'background:#141210'
-				: `background:url(${colorSrc}) center/cover`;
+	const canvasEl =
+		bg === 'color' ? `<canvas class="bgc" data-draw="dusk" data-finish="rich"></canvas>` : '';
+	const bgcss = bg === 'white' ? 'background:#fefdf9' : bg === 'black' ? 'background:#141210' : '';
 	const r = (n) => n.toFixed(2);
 	const WM = 4.6,
 		MARKW = WM * MARK_K,
@@ -159,7 +171,7 @@ function adCard({ headline, bg = 'white', w = 1080, h = 1080, label, note }) {
 		RAISE = WM * RAISE_K;
 	const sig = `<div style="position:absolute;left:${M}cqw;bottom:${M}cqw;display:flex;align-items:center;gap:${r(GAP)}cqw"><span style="display:inline-flex;width:${r(MARKW)}cqw;height:${r(MARKW)}cqw;margin-top:-${r(RAISE)}cqw">${MK(ink)}</span><span class="wm" style="font-size:${WM}cqw;color:${ink};white-space:nowrap">Superextra</span></div>`;
 	const head = `<div style="position:absolute;left:${M}cqw;right:${M}cqw;top:${M}cqw;font-size:12cqw;line-height:1.06;font-weight:500;letter-spacing:-0.03em;color:${ink}">${headline}</div>`;
-	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${head}${sig}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}</figcaption></figure>`;
+	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${canvasEl}${head}${sig}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}</figcaption></figure>`;
 }
 
 // Paid-social lead ads. Headline is the in-image hero; full copy lives in the campaign.
@@ -185,9 +197,9 @@ const matrix = (w, h, extra = {}) =>
 		LAYS.map(([ly, ln]) => ({ w, h, bg, layout: ly, label: ln, note: bn, ...extra }))
 	);
 
-const COVER = matrix(1640, 624, { download: true });
-const SQUARE = matrix(1080, 1080, { k: 1.5, m: 0.075, download: true });
-const PORTRAIT = matrix(1080, 1920, { k: 1.5, m: 0.075, download: true });
+const COVER = matrix(1640, 624, { download: true, gallery: 'cover' });
+const SQUARE = matrix(1080, 1080, { k: 1.5, m: 0.075, download: true, gallery: 'square' });
+const PORTRAIT = matrix(1080, 1920, { k: 1.5, m: 0.075, download: true, gallery: 'portrait' });
 const BANNERS = [
 	{ w: 1500, h: 500, bg: 'white', layout: 'lockup', label: 'Wide', note: 'lockup · white' },
 	{
@@ -202,11 +214,11 @@ const BANNERS = [
 	{ w: 1128, h: 191, bg: 'white', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'white' },
 	{ w: 1128, h: 191, bg: 'black', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'black' },
 	{ w: 1128, h: 191, bg: 'color', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'colorful' }
-].map((b) => ({ ...b, download: true }));
+].map((b) => ({ ...b, download: true, gallery: 'banners' }));
 
-// Colorful background swatch (no lockup) — used by the Colorful palette section.
-const bgFig = (src, ar, title, note) =>
-	`<figure class="tile"><div class="cv" style="aspect-ratio:${ar};background:url(${A}/${src}) center/cover"></div><figcaption><b>${title}</b>${note ? ` · <span>${note}</span>` : ''}</figcaption></figure>`;
+// Colorful background swatch (no lockup) — a live canvas preview of one draw + finish.
+const bgFig = (draw, finish, ar, title, note) =>
+	`<figure class="tile"><div class="cv" style="aspect-ratio:${ar}"><canvas class="bgc" data-draw="${draw}" data-finish="${finish}"></canvas></div><figcaption><b>${title}</b>${note ? ` · <span>${note}</span>` : ''}</figcaption></figure>`;
 
 // The colour draws, each available flat (gradient + noise) and rich (+ circular glows).
 const COLOR_DRAWS = [
@@ -254,6 +266,12 @@ p.note{font-size:13.5px;color:var(--mut);max-width:680px;margin:10px 0}
 .dlbtns{display:inline-flex;gap:6px;margin-left:8px;vertical-align:middle}
 .dl{font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.05em;color:var(--mut);background:transparent;border:1px solid var(--line2);border-radius:6px;padding:2px 7px;cursor:pointer;transition:color .15s,border-color .15s}
 .dl:hover{color:var(--ink);border-color:var(--soft)}
+.bgc{position:absolute;inset:0;width:100%;height:100%;display:block}
+.bgsel{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:16px 0 2px}
+.bgsel-l{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-right:4px}
+.theme{font-family:inherit;font-size:12px;color:var(--soft);background:transparent;border:1px solid var(--line2);border-radius:999px;padding:3px 11px;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+.theme:hover{color:var(--ink);border-color:var(--soft)}
+.theme.active{color:var(--ink);background:var(--panel2);border-color:var(--soft);font-weight:600}
 .cream{background:var(--cream)}
 .swatch{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .swatch .chip{height:96px}.swatch .meta{padding:11px 13px;font-size:12.5px}
@@ -376,7 +394,14 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
     ${grid(3, [
 			{ w: 1640, h: 624, bg: 'white', layout: 'lockup', label: 'White', note: '#FEFDF9' },
 			{ w: 1640, h: 624, bg: 'black', layout: 'lockup', label: 'Black', note: '#141210' },
-			{ w: 1640, h: 624, bg: 'color', layout: 'lockup', label: 'Colorful + noise' }
+			{
+				w: 1640,
+				h: 624,
+				bg: 'color',
+				theme: 'periwinkle',
+				layout: 'lockup',
+				label: 'Colorful + noise'
+			}
 		])}
   </section>
 
@@ -388,72 +413,31 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
     <h3>Dusk <span class="pill">icons · squares · profiles</span></h3>
     <p class="note">The darker violet→blue draw. Use it whenever an icon, square post, or profile photo needs the colorful background, so the cream mark always reads. Square for avatars and app icons; wide where a dusk banner is needed.</p>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">
-      ${bgFig('superextra-bg-dusk-rich-sq.jpg', '1/1', 'Dusk · square', 'rich — circular glows')}
-      ${bgFig('superextra-bg-dusk-flat-sq.jpg', '1/1', 'Dusk · square', 'flat — gradient + noise')}
+      ${bgFig('dusk', 'rich', '1/1', 'Dusk · square', 'rich — circular glows')}
+      ${bgFig('dusk', 'flat', '1/1', 'Dusk · square', 'flat — gradient + noise')}
     </div>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">
-      ${bgFig('superextra-bg-dusk-rich.jpg', '1640/624', 'Dusk · wide', 'rich — circular glows')}
-      ${bgFig('superextra-bg-dusk-flat.jpg', '1640/624', 'Dusk · wide', 'flat — gradient + noise')}
+      ${bgFig('dusk', 'rich', '1640/624', 'Dusk · wide', 'rich — circular glows')}
+      ${bgFig('dusk', 'flat', '1640/624', 'Dusk · wide', 'flat — gradient + noise')}
     </div>
 
     <h3>Color draws <span class="pill">flat &amp; rich</span></h3>
-    <p class="note">Each draw in both finishes — flat on the left, rich on the right.</p>
+    <p class="note">Each draw in both finishes — flat on the left, rich on the right. Pick any of these per gallery below; the lockup galleries render the rich finish live.</p>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">${COLOR_DRAWS.map(
 			([k, n, nt]) =>
-				bgFig(`superextra-bg-${k}.jpg`, '1640/624', n, `flat${nt ? ` — ${nt}` : ''}`) +
-				bgFig(`superextra-bg-${k}-rich.jpg`, '1640/624', n, 'rich — circular glows')
+				bgFig(k, 'flat', '1640/624', n, `flat${nt ? ` — ${nt}` : ''}`) +
+				bgFig(k, 'rich', '1640/624', n, 'rich — circular glows')
 		).join('')}</div>
-
-    <h3>On the colorful backgrounds</h3>
-    <p class="note">The lockup over a few rich draws — cream wordmark, same placement system.</p>
-    ${grid(2, [
-			{
-				w: 1640,
-				h: 624,
-				bg: 'color',
-				bgUrl: `${A}/superextra-bg-periwinkle-rich.jpg`,
-				layout: 'lockup',
-				label: 'Periwinkle',
-				note: 'lockup'
-			},
-			{
-				w: 1640,
-				h: 624,
-				bg: 'color',
-				bgUrl: `${A}/superextra-bg-lavender-pink-rich.jpg`,
-				layout: 'splitbr',
-				label: 'Lavender → Pink',
-				note: 'split'
-			},
-			{
-				w: 1640,
-				h: 624,
-				bg: 'color',
-				bgUrl: `${A}/superextra-bg-blue-teal-rich.jpg`,
-				layout: 'lockup',
-				label: 'Blue → Teal',
-				note: 'lockup'
-			},
-			{
-				w: 1640,
-				h: 624,
-				bg: 'color',
-				bgUrl: `${A}/superextra-bg-violet-cyan-rich.jpg`,
-				layout: 'splitbr',
-				label: 'Violet → Cyan',
-				note: 'split'
-			}
-		])}
   </section>
 
   <div class="hr"></div>
-  <section id="cover"><div class="eyebrow">Gallery</div><h2>Cover · 1640×624</h2><p class="lede">Every layout across every background.</p>${grid(3, COVER)}</section>
+  <section id="cover"><div class="eyebrow">Gallery</div><h2>Cover · 1640×624</h2><p class="lede">Every layout, on white, black, and the colour theme you pick. Each tile exports SVG or PNG.</p>${bgsel('cover', 'periwinkle')}${grid(3, COVER)}</section>
   <div class="hr"></div>
-  <section id="square"><div class="eyebrow">Gallery</div><h2>Square · 1080×1080</h2><p class="lede">Instagram &amp; shared posts — larger wordmark so it reads in-app.</p>${grid(3, SQUARE)}</section>
+  <section id="square"><div class="eyebrow">Gallery</div><h2>Square · 1080×1080</h2><p class="lede">Instagram &amp; shared posts — larger wordmark so it reads in-app.</p>${bgsel('square', 'dusk')}${grid(3, SQUARE)}</section>
   <div class="hr"></div>
-  <section id="portrait"><div class="eyebrow">Gallery</div><h2>Portrait · 1080×1920</h2><p class="lede">Stories &amp; Reels.</p>${grid(3, PORTRAIT)}</section>
+  <section id="portrait"><div class="eyebrow">Gallery</div><h2>Portrait · 1080×1920</h2><p class="lede">Stories &amp; Reels.</p>${bgsel('portrait', 'dusk')}${grid(3, PORTRAIT)}</section>
   <div class="hr"></div>
-  <section id="banners"><div class="eyebrow">Gallery</div><h2>Banners</h2><p class="lede">Wide 1500×500 and thin 1128×191 (LinkedIn-style). Thin uses the corner split.</p>${grid(1, BANNERS)}</section>
+  <section id="banners"><div class="eyebrow">Gallery</div><h2>Banners</h2><p class="lede">Wide 1500×500 and thin 1128×191 (LinkedIn-style). Thin uses the corner split.</p>${bgsel('banners', 'dusk')}${grid(1, BANNERS)}</section>
 
   <div class="hr"></div>
   <section id="ads">
@@ -466,6 +450,7 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
   <section id="profile">
     <div class="eyebrow">Marks &amp; partners</div><h2>Profile &amp; icon</h2>
     <p class="lede">Two icon treatments — the mark alone, and the ✲S monogram (the mark as a small superscript over the “S”). Each works as a rounded-square app icon and a circular avatar, on every background.</p>
+    ${bgsel('profile', 'dusk')}
     <h3>Mark</h3>
     <div class="grid" style="grid-template-columns:repeat(3,1fr)">${iconSet('mark')}</div>
     <h3>✲S monogram</h3>
@@ -490,10 +475,8 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
     <table class="files"><thead><tr><th>File</th><th>What it is</th><th>Size</th></tr></thead><tbody>
       <tr><td><code>superextra-mark.svg</code></td><td>Asterisk mark (vector)</td><td>any</td></tr>
       <tr><td><code>superextra-wordmark.png</code></td><td>Mark + wordmark, transparent</td><td>1760×480</td></tr>
-      <tr><td><code>superextra-bg-{white,black}.png</code></td><td>Neutral backgrounds</td><td>per format</td></tr>
-      <tr><td><code>superextra-bg-color-{wide,portrait}.jpg</code></td><td>Default colorful draw — cover, portrait &amp; banners</td><td>1640×624 · 1080×1920</td></tr>
-      <tr><td><code>superextra-bg-&lt;draw&gt;{,-rich}.jpg</code></td><td>Palette color draws, flat &amp; rich (periwinkle, lavender-pink, violet-cyan, blue-teal, indigo-violet, mint)</td><td>1640×624</td></tr>
-      <tr><td><code>superextra-bg-dusk-{flat,rich}{,-sq}.jpg</code></td><td>Darker violet-blue — icons, squares &amp; profiles</td><td>1080² · 1640×624</td></tr>
+      <tr><td>neutral backgrounds</td><td>Flat colours — white #FEFDF9, black #141210; no asset, baked into each export</td><td>—</td></tr>
+      <tr><td>colourful backgrounds</td><td>Generated live in-browser per asset (no files) — pick a theme per gallery, then export the composed tile as SVG/PNG</td><td>any</td></tr>
       <tr><td><code>superextra-&lt;platform&gt;-&lt;format&gt;.png</code></td><td>Social exports, e.g. <code>superextra-instagram-square.png</code></td><td>platform spec, 2×</td></tr>
     </tbody></table>
   </section>
