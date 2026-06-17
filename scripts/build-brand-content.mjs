@@ -10,7 +10,6 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const A = '/brand-assets'; // served from static/brand-assets
 
 // Eight-point asterisk mark — four lines crossing at 45°, weight 1.3.
 const MK = (c) =>
