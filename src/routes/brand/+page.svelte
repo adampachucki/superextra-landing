@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { DRAWS, paintColorful, type Draw } from '$lib/brand/colorful-bg';
 
 	const PIN_LENGTH = 4;
 
@@ -9,6 +10,9 @@
 	let shake = $state(false);
 	let busy = $state(false);
 	let inputs: HTMLInputElement[] = [];
+	// The injected gallery content, and each gallery's currently-selected colour theme.
+	let content = $state<HTMLElement | undefined>(undefined);
+	let selectedTheme: Record<string, string> = $state({});
 
 	function b64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
 		return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)) as Uint8Array<ArrayBuffer>;
@@ -106,7 +110,8 @@
 		layout?: 'lockup' | 'split' | 'splitbr';
 		k?: number;
 		m?: number;
-		colorUrl?: string;
+		gallery?: string; // colour tile → resolve theme from this gallery's picker
+		theme?: string; // colour tile with a fixed draw (no picker)
 	};
 	const MARK_LINES: [number, number, number, number][] = [
 		[6, 0.5, 6, 11.5],
@@ -114,17 +119,18 @@
 		[2.11, 2.11, 9.89, 9.89],
 		[2.11, 9.89, 9.89, 2.11]
 	];
-	const COLOR_SQ = '/brand-assets/superextra-bg-dusk-rich-sq.jpg';
 	const DL_FONT = "-apple-system,BlinkMacSystemFont,'Inter',ui-sans-serif,system-ui,sans-serif";
 	const dlInk = (bg: string) => (bg === 'black' || bg === 'color' ? '#fefdf9' : '#1a1a1a');
 
-	function dlLoadImage(src: string): Promise<HTMLImageElement> {
-		return new Promise((res, rej) => {
-			const im = new Image();
-			im.onload = () => res(im);
-			im.onerror = rej;
-			im.src = src;
-		});
+	// Resolve a colour tile's Draw from its gallery's current pick (or its fixed theme).
+	function resolveDraw(d: DL): Draw | undefined {
+		if (d.bg !== 'color') return undefined;
+		const key = d.gallery ? selectedTheme[d.gallery] : d.theme;
+		return key ? DRAWS[key]?.rich : undefined;
+	}
+	function colorName(d: DL): string {
+		const key = (d.gallery ? selectedTheme[d.gallery] : d.theme) || 'colour';
+		return d.name.replace(/color$/, key);
 	}
 	function dlMeasure(text: string, fontPx: number): number {
 		const c = document.createElement('canvas').getContext('2d');
@@ -150,29 +156,15 @@
 			ctx.stroke();
 		}
 	}
-	async function dlPaintBg(
-		ctx: CanvasRenderingContext2D,
-		bg: string,
-		w: number,
-		h: number,
-		colorUrl = COLOR_SQ
-	) {
+	function dlPaintBg(ctx: CanvasRenderingContext2D, bg: string, w: number, h: number, draw?: Draw) {
 		if (bg === 'cream') {
 			ctx.fillStyle = '#fefdf9';
 			ctx.fillRect(0, 0, w, h);
 		} else if (bg === 'black') {
 			ctx.fillStyle = '#141210';
 			ctx.fillRect(0, 0, w, h);
-		} else if (bg === 'color') {
-			const im = await dlLoadImage(colorUrl);
-			const s = Math.max(w / im.width, h / im.height);
-			ctx.drawImage(
-				im,
-				(w - im.width * s) / 2,
-				(h - im.height * s) / 2,
-				im.width * s,
-				im.height * s
-			);
+		} else if (bg === 'color' && draw) {
+			paintColorful(ctx, w, h, draw);
 		}
 	}
 	function dlSetText(ctx: CanvasRenderingContext2D, px: number, c: string) {
@@ -234,7 +226,7 @@
 		ctx.fillText('AI consultant for every restaurant', g.tagX, g.tagBaseline);
 		ctx.textAlign = 'left';
 	}
-	async function dlPNG(d: DL): Promise<Blob | null> {
+	async function dlPNG(d: DL, draw?: Draw): Promise<Blob | null> {
 		await document.fonts.ready;
 		const color = dlInk(d.bg);
 		let w = d.w;
@@ -248,7 +240,7 @@
 		}
 		cv.width = w;
 		cv.height = h;
-		await dlPaintBg(ctx, d.bg, w, h, d.colorUrl);
+		dlPaintBg(ctx, d.bg, w, h, draw);
 		if (d.kind === 'tile') {
 			const g = dlTileGeom(d);
 			dlSetText(ctx, g.word, color);
@@ -288,7 +280,7 @@
 	function dlSVGText(x: number, h: number, px: number, c: string, t: string): string {
 		return `<text x="${x.toFixed(2)}" y="${(h / 2).toFixed(2)}" font-family="${DL_FONT}" font-weight="300" font-size="${px.toFixed(2)}" letter-spacing="-0.025em" dominant-baseline="central" fill="${c}">${t}</text>`;
 	}
-	function dlSVG(d: DL): string {
+	function dlSVG(d: DL, draw?: Draw): string {
 		const color = dlInk(d.bg);
 		let w = d.w;
 		const h = d.h;
@@ -324,8 +316,15 @@
 		let bgEl = '';
 		if (d.bg === 'cream') bgEl = `<rect width="${w}" height="${h}" fill="#fefdf9"/>`;
 		else if (d.bg === 'black') bgEl = `<rect width="${w}" height="${h}" fill="#141210"/>`;
-		else if (d.bg === 'color')
-			bgEl = `<image href="${location.origin}${d.colorUrl ?? COLOR_SQ}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>`;
+		else if (d.bg === 'color' && draw) {
+			// Rasterise the live background and embed it (vector lockup over a raster bg).
+			const bc = document.createElement('canvas');
+			bc.width = w;
+			bc.height = h;
+			const bx = bc.getContext('2d');
+			if (bx) paintColorful(bx, w, h, draw);
+			bgEl = `<image href="${bc.toDataURL('image/png')}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>`;
+		}
 		return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${bgEl}${body}</svg>`;
 	}
 	function dlSave(data: Blob | string, filename: string, type: string) {
@@ -343,16 +342,77 @@
 		const host = btn.closest('[data-dl]') as HTMLElement | null;
 		if (!host?.dataset.dl) return;
 		const d = JSON.parse(host.dataset.dl) as DL;
-		if (btn.dataset.fmt === 'svg') dlSave(dlSVG(d), `${d.name}.svg`, 'image/svg+xml');
+		const draw = resolveDraw(d);
+		const name = d.bg === 'color' ? colorName(d) : d.name;
+		if (btn.dataset.fmt === 'svg') dlSave(dlSVG(d, draw), `${name}.svg`, 'image/svg+xml');
 		else {
-			const blob = await dlPNG(d);
-			if (blob) dlSave(blob, `${d.name}.png`, 'image/png');
+			const blob = await dlPNG(d, draw);
+			if (blob) dlSave(blob, `${name}.png`, 'image/png');
 		}
+	}
+
+	// ── Live colourful backgrounds ───────────────────────────────────────────
+	// Each colour tile/swatch is a <canvas>; paint it from the engine, sized to its
+	// display pixels so the film grain reads at the same zoom on every asset size.
+	function paintCanvas(cv: HTMLCanvasElement) {
+		const cw = Math.round(cv.clientWidth);
+		const ch = Math.round(cv.clientHeight);
+		if (!cw || !ch) return;
+		const dpr = Math.min(window.devicePixelRatio || 1, 2);
+		cv.width = Math.round(cw * dpr);
+		cv.height = Math.round(ch * dpr);
+		const ctx = cv.getContext('2d');
+		if (!ctx) return;
+		let draw: Draw | undefined;
+		if (cv.dataset.gallery) {
+			draw = DRAWS[selectedTheme[cv.dataset.gallery]]?.rich;
+		} else if (cv.dataset.draw) {
+			const t = DRAWS[cv.dataset.draw];
+			draw = t && (cv.dataset.finish === 'flat' ? t.flat : t.rich);
+		}
+		if (draw) paintColorful(ctx, cv.width, cv.height, draw);
+	}
+	function paintScope(sel: string) {
+		content?.querySelectorAll<HTMLCanvasElement>(sel).forEach(paintCanvas);
+	}
+	function initThemes() {
+		const sel: Record<string, string> = {};
+		content?.querySelectorAll<HTMLElement>('.bgsel').forEach((el) => {
+			if (el.dataset.gallery && el.dataset.default) sel[el.dataset.gallery] = el.dataset.default;
+		});
+		selectedTheme = sel;
+	}
+	function onThemeClick(e: MouseEvent) {
+		const btn = (e.target as HTMLElement).closest('button.theme') as HTMLElement | null;
+		if (!btn) return;
+		const sel = btn.closest('.bgsel') as HTMLElement | null;
+		const g = sel?.dataset.gallery;
+		const key = btn.dataset.theme;
+		if (!g || !key) return;
+		selectedTheme = { ...selectedTheme, [g]: key };
+		sel.querySelectorAll('button.theme').forEach((b) => b.classList.toggle('active', b === btn));
+		paintScope(`canvas.bgc[data-gallery="${g}"]`);
 	}
 	$effect(() => {
 		if (phase !== 'unlocked') return;
+		let ro: ResizeObserver | undefined;
+		let raf = requestAnimationFrame(() => {
+			initThemes();
+			paintScope('canvas.bgc');
+			ro = new ResizeObserver(() => {
+				cancelAnimationFrame(raf);
+				raf = requestAnimationFrame(() => paintScope('canvas.bgc'));
+			});
+			if (content) ro.observe(content);
+		});
 		document.addEventListener('click', onAssetClick);
-		return () => document.removeEventListener('click', onAssetClick);
+		document.addEventListener('click', onThemeClick);
+		return () => {
+			document.removeEventListener('click', onAssetClick);
+			document.removeEventListener('click', onThemeClick);
+			ro?.disconnect();
+			cancelAnimationFrame(raf);
+		};
 	});
 </script>
 
@@ -365,7 +425,7 @@
 	<!-- Trusted source: our own HTML, AES-GCM-decrypted from the bundled ciphertext (never user input).
 	     DOMPurify isn't used because the content ships its own <style> block, which sanitizers strip. -->
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-	<div class="reveal">{@html html}</div>
+	<div class="reveal" bind:this={content}>{@html html}</div>
 {:else}
 	<div class="gate" class:fade-out={phase === 'revealing'}>
 		<svg class="gmark" viewBox="0 0 12 12" fill="none">
