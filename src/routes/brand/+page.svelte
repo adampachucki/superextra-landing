@@ -1,6 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { DRAWS, paintColorful, type Draw } from '$lib/brand/colorful-bg';
+	import {
+		MARK_LINES,
+		MARK_VB,
+		MARK_STROKE,
+		MARK_K,
+		GAP_K,
+		RAISE_K,
+		WORD_K,
+		TAG_K,
+		MONO_MARK_K,
+		MONO_GAP_K
+	} from '$lib/brand/brand-geometry';
 
 	const PIN_LENGTH = 4;
 
@@ -14,8 +26,8 @@
 	let content = $state<HTMLElement | undefined>(undefined);
 	let selectedTheme: Record<string, string> = $state({});
 
-	function b64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
-		return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)) as Uint8Array<ArrayBuffer>;
+	function b64ToBytes(b64: string) {
+		return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 	}
 
 	async function tryDecrypt(pin: string): Promise<string | null> {
@@ -111,32 +123,24 @@
 		k?: number;
 		m?: number;
 		gallery?: string; // colour tile → resolve theme from this gallery's picker
-		theme?: string; // colour tile with a fixed draw (no picker)
 	};
-	const MARK_LINES: [number, number, number, number][] = [
-		[6, 0.5, 6, 11.5],
-		[0.5, 6, 11.5, 6],
-		[2.11, 2.11, 9.89, 9.89],
-		[2.11, 9.89, 9.89, 2.11]
-	];
 	const DL_FONT = "-apple-system,BlinkMacSystemFont,'Inter',ui-sans-serif,system-ui,sans-serif";
 	const dlInk = (bg: string) => (bg === 'black' || bg === 'color' ? '#fefdf9' : '#1a1a1a');
 
-	// Resolve a colour tile's Draw from its gallery's current pick (or its fixed theme).
+	// Resolve a colour tile's Draw from its gallery's current theme pick.
 	function resolveDraw(d: DL): Draw | undefined {
-		if (d.bg !== 'color') return undefined;
-		const key = d.gallery ? selectedTheme[d.gallery] : d.theme;
+		if (d.bg !== 'color' || !d.gallery) return undefined;
+		const key = selectedTheme[d.gallery];
 		return key ? DRAWS[key]?.rich : undefined;
 	}
 	function colorName(d: DL): string {
-		const key = (d.gallery ? selectedTheme[d.gallery] : d.theme) || 'colour';
+		const key = (d.gallery && selectedTheme[d.gallery]) || 'colour';
 		return d.name.replace(/color$/, key);
 	}
 	function dlMeasure(text: string, fontPx: number): number {
-		const c = document.createElement('canvas').getContext('2d');
-		if (!c) return fontPx * text.length * 0.5;
+		const c = document.createElement('canvas').getContext('2d')!;
 		c.font = `300 ${fontPx}px ${DL_FONT}`;
-		(c as unknown as { letterSpacing: string }).letterSpacing = '-0.025em';
+		c.letterSpacing = '-0.025em';
 		return c.measureText(text).width;
 	}
 	function dlStrokeMark(
@@ -147,12 +151,12 @@
 		c: string
 	) {
 		ctx.strokeStyle = c;
-		ctx.lineWidth = (box * 1.3) / 12;
+		ctx.lineWidth = (box * MARK_STROKE) / MARK_VB;
 		ctx.lineCap = 'butt';
 		for (const [x1, y1, x2, y2] of MARK_LINES) {
 			ctx.beginPath();
-			ctx.moveTo(x + (x1 / 12) * box, y + (y1 / 12) * box);
-			ctx.lineTo(x + (x2 / 12) * box, y + (y2 / 12) * box);
+			ctx.moveTo(x + (x1 / MARK_VB) * box, y + (y1 / MARK_VB) * box);
+			ctx.lineTo(x + (x2 / MARK_VB) * box, y + (y2 / MARK_VB) * box);
 			ctx.stroke();
 		}
 	}
@@ -170,7 +174,7 @@
 	function dlSetText(ctx: CanvasRenderingContext2D, px: number, c: string) {
 		ctx.fillStyle = c;
 		ctx.font = `300 ${px}px ${DL_FONT}`;
-		(ctx as unknown as { letterSpacing: string }).letterSpacing = '-0.025em';
+		ctx.letterSpacing = '-0.025em';
 		ctx.textBaseline = 'middle';
 	}
 	// Gallery-tile geometry — mirrors the generator's tile(): word/mark/tag sized in
@@ -181,11 +185,11 @@
 			k = d.k ?? 1,
 			m = d.m ?? 0.12,
 			layout = d.layout ?? 'lockup';
-		const word = (5.85 * k * W) / 100;
-		const markw = word * 0.75,
-			gap = word * (2 / 22),
-			raise = word * 0.36,
-			tagsz = word * 0.31;
+		const word = (WORD_K * k * W) / 100;
+		const markw = word * MARK_K,
+			gap = word * GAP_K,
+			raise = word * RAISE_K,
+			tagsz = word * TAG_K;
 		const M = m * Math.min(W, H);
 		const wordX = M + markw + gap;
 		if (layout === 'lockup') {
@@ -196,7 +200,7 @@
 				markw,
 				tagsz,
 				markX: M,
-				markY: wordCY - 0.36 * word - markw / 2,
+				markY: wordCY - raise - markw / 2,
 				wordX,
 				wordCY,
 				tagX: wordX,
@@ -220,7 +224,7 @@
 	function dlTileTag(ctx: CanvasRenderingContext2D, g: ReturnType<typeof dlTileGeom>, c: string) {
 		ctx.fillStyle = c;
 		ctx.font = `300 ${g.tagsz}px ${DL_FONT}`;
-		(ctx as unknown as { letterSpacing: string }).letterSpacing = '0.01em';
+		ctx.letterSpacing = '0.01em';
 		ctx.textBaseline = 'alphabetic';
 		ctx.textAlign = g.tagAnchor === 'end' ? 'right' : 'left';
 		ctx.fillText('AI consultant for every restaurant', g.tagX, g.tagBaseline);
@@ -232,11 +236,10 @@
 		let w = d.w;
 		const h = d.h;
 		const cv = document.createElement('canvas');
-		const ctx = cv.getContext('2d');
-		if (!ctx) return null;
+		const ctx = cv.getContext('2d')!;
 		if (d.kind === 'lockup') {
 			const word = h * 0.55;
-			w = Math.ceil(word * 0.75 + word * (2 / 22) + dlMeasure('Superextra', word));
+			w = Math.ceil(word * MARK_K + word * GAP_K + dlMeasure('Superextra', word));
 		}
 		cv.width = w;
 		cv.height = h;
@@ -249,17 +252,17 @@
 			dlTileTag(ctx, g, color);
 		} else if (d.kind === 'lockup') {
 			const word = h * 0.55,
-				markBox = word * 0.75,
-				gap = word * (2 / 22),
-				raise = word * 0.36;
+				markBox = word * MARK_K,
+				gap = word * GAP_K,
+				raise = word * RAISE_K;
 			dlSetText(ctx, word, color);
 			ctx.fillText('Superextra', markBox + gap, h / 2);
 			dlStrokeMark(ctx, 0, (h - markBox) / 2 - raise, markBox, color);
 		} else if (d.kind === 'monogram') {
 			const sf = Math.min(w, h) * 0.5,
-				markBox = sf * 0.55,
-				gap = sf * 0.04,
-				raise = sf * 0.36;
+				markBox = sf * MONO_MARK_K,
+				gap = sf * MONO_GAP_K,
+				raise = sf * RAISE_K;
 			const x0 = (w - (markBox + gap + dlMeasure('S', sf))) / 2;
 			dlSetText(ctx, sf, color);
 			ctx.fillText('S', x0 + markBox + gap, h / 2);
@@ -271,10 +274,10 @@
 		return await new Promise<Blob | null>((res) => cv.toBlob(res, 'image/png'));
 	}
 	function dlSVGMark(ox: number, oy: number, box: number, c: string): string {
-		const sw = ((box * 1.3) / 12).toFixed(2);
+		const sw = ((box * MARK_STROKE) / MARK_VB).toFixed(2);
 		return MARK_LINES.map(
 			([x1, y1, x2, y2]) =>
-				`<line x1="${(ox + (x1 / 12) * box).toFixed(2)}" y1="${(oy + (y1 / 12) * box).toFixed(2)}" x2="${(ox + (x2 / 12) * box).toFixed(2)}" y2="${(oy + (y2 / 12) * box).toFixed(2)}" stroke="${c}" stroke-width="${sw}"/>`
+				`<line x1="${(ox + (x1 / MARK_VB) * box).toFixed(2)}" y1="${(oy + (y1 / MARK_VB) * box).toFixed(2)}" x2="${(ox + (x2 / MARK_VB) * box).toFixed(2)}" y2="${(oy + (y2 / MARK_VB) * box).toFixed(2)}" stroke="${c}" stroke-width="${sw}"/>`
 		).join('');
 	}
 	function dlSVGText(x: number, h: number, px: number, c: string, t: string): string {
@@ -293,18 +296,18 @@
 				`<text x="${g.tagX.toFixed(2)}" y="${g.tagBaseline.toFixed(2)}" font-family="${DL_FONT}" font-weight="300" font-size="${g.tagsz.toFixed(2)}" letter-spacing="0.01em" text-anchor="${g.tagAnchor}" fill="${color}">AI consultant for every restaurant</text>`;
 		} else if (d.kind === 'lockup') {
 			const word = h * 0.55,
-				markBox = word * 0.75,
-				gap = word * (2 / 22),
-				raise = word * 0.36;
+				markBox = word * MARK_K,
+				gap = word * GAP_K,
+				raise = word * RAISE_K;
 			w = Math.ceil(markBox + gap + dlMeasure('Superextra', word));
 			body =
 				dlSVGMark(0, (h - markBox) / 2 - raise, markBox, color) +
 				dlSVGText(markBox + gap, h, word, color, 'Superextra');
 		} else if (d.kind === 'monogram') {
 			const sf = Math.min(w, h) * 0.5,
-				markBox = sf * 0.55,
-				gap = sf * 0.04,
-				raise = sf * 0.36;
+				markBox = sf * MONO_MARK_K,
+				gap = sf * MONO_GAP_K,
+				raise = sf * RAISE_K;
 			const x0 = (w - (markBox + gap + dlMeasure('S', sf))) / 2;
 			body =
 				dlSVGMark(x0, (h - markBox) / 2 - raise, markBox, color) +
@@ -321,8 +324,7 @@
 			const bc = document.createElement('canvas');
 			bc.width = w;
 			bc.height = h;
-			const bx = bc.getContext('2d');
-			if (bx) paintColorful(bx, w, h, draw);
+			paintColorful(bc.getContext('2d')!, w, h, draw);
 			bgEl = `<image href="${bc.toDataURL('image/png')}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>`;
 		}
 		return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${bgEl}${body}</svg>`;
@@ -361,8 +363,7 @@
 		const dpr = Math.min(window.devicePixelRatio || 1, 2);
 		cv.width = Math.round(cw * dpr);
 		cv.height = Math.round(ch * dpr);
-		const ctx = cv.getContext('2d');
-		if (!ctx) return;
+		const ctx = cv.getContext('2d')!;
 		let draw: Draw | undefined;
 		if (cv.dataset.gallery) {
 			draw = DRAWS[selectedTheme[cv.dataset.gallery]]?.rich;
@@ -393,6 +394,12 @@
 		sel.querySelectorAll('button.theme').forEach((b) => b.classList.toggle('active', b === btn));
 		paintScope(`canvas.bgc[data-gallery="${g}"]`);
 	}
+	// One delegated click handler for the injected content; download and theme clicks
+	// are mutually exclusive (button.dl vs button.theme), so each guards itself.
+	function onContentClick(e: MouseEvent) {
+		onAssetClick(e);
+		onThemeClick(e);
+	}
 	$effect(() => {
 		if (phase !== 'unlocked') return;
 		let ro: ResizeObserver | undefined;
@@ -405,11 +412,9 @@
 			});
 			if (content) ro.observe(content);
 		});
-		document.addEventListener('click', onAssetClick);
-		document.addEventListener('click', onThemeClick);
+		document.addEventListener('click', onContentClick);
 		return () => {
-			document.removeEventListener('click', onAssetClick);
-			document.removeEventListener('click', onThemeClick);
+			document.removeEventListener('click', onContentClick);
 			ro?.disconnect();
 			cancelAnimationFrame(raf);
 		};
@@ -428,11 +433,10 @@
 	<div class="reveal" bind:this={content}>{@html html}</div>
 {:else}
 	<div class="gate" class:fade-out={phase === 'revealing'}>
-		<svg class="gmark" viewBox="0 0 12 12" fill="none">
-			<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.3" />
-			<line x1="0.5" y1="6" x2="11.5" y2="6" stroke="currentColor" stroke-width="1.3" />
-			<line x1="2.11" y1="2.11" x2="9.89" y2="9.89" stroke="currentColor" stroke-width="1.3" />
-			<line x1="2.11" y1="9.89" x2="9.89" y2="2.11" stroke="currentColor" stroke-width="1.3" />
+		<svg class="gmark" viewBox="0 0 {MARK_VB} {MARK_VB}" fill="none">
+			{#each MARK_LINES as [x1, y1, x2, y2] (x1 + ',' + y1 + ',' + x2 + ',' + y2)}
+				<line {x1} {y1} {x2} {y2} stroke="currentColor" stroke-width={MARK_STROKE} />
+			{/each}
 		</svg>
 		<div class="pins" class:shake>
 			{#each digits as d, i (i)}

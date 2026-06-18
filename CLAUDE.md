@@ -182,7 +182,7 @@ The sessions/turns/events doc shapes and their writer/reader map live in `docs/f
 
 `agent.superextra.ai/brand` is a PIN-gated brand-assets collection, mirroring the memo page's encryption pattern (AES-256-GCM, PBKDF2 key from the PIN; only the ciphertext ships; the browser decrypts client-side via `crypto.subtle`).
 
-- **Content is generated** by `scripts/build-brand-content.mjs` → `src/lib/brand/brand-content.html` (pure HTML/CSS; gallery tiles use container-query `cqw` units, colorful backgrounds are `static/brand-assets/*.jpg`). Edit the generator, not the HTML.
+- **Content is generated** by `scripts/build-brand-content.mjs` → `src/lib/brand/brand-content.html` (pure HTML/CSS; gallery tiles use container-query `cqw` units; nothing ships as an image — marks are inline SVG, colorful backgrounds are painted live in a `<canvas>`, and SVG/PNG exports are rendered client-side by the brand route). Mark + lockup proportions live in `src/lib/brand/brand-geometry.js`, shared by the generator and the route. Edit the generator, not the HTML.
 - **Re-encrypt after any content change:** `npm run encrypt-brand <PIN>` (runs the generator, then encrypts → `src/lib/brand/brand-encrypted.ts`). The PIN is the **same as the memo PIN** and is never committed.
 - `crypto.subtle` needs a secure context — works on `agent.superextra.ai` and `localhost`, **not** over the LAN-IP dev URL (`http://<ip>:5199`).
 - Route: `src/routes/brand/+page.svelte`. `noindex` via `<meta>` + a `firebase.json` `X-Robots-Tag` header.

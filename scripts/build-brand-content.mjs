@@ -1,26 +1,35 @@
 /**
  * Generates the Superextra brand-collection HTML (src/lib/brand/brand-content.html).
- * Pure HTML/CSS — gallery tiles use container-query (cqw) units so they scale crisply
- * with no per-tile images. Only the colorful backgrounds + avatar + Stripe marks are files.
+ * Pure HTML/CSS — gallery tiles use container-query (cqw) units so they scale crisply.
+ * Nothing is shipped as an image: marks are inline SVG, colorful backgrounds are painted
+ * live in a <canvas>, and every export is rendered client-side by the brand route.
  *
  * Run:  node scripts/build-brand-content.mjs   (then: npm run encrypt-brand <PIN>)
  */
 import { writeFileSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import {
+	MARK_LINES,
+	MARK_VB,
+	MARK_STROKE,
+	MARK_K,
+	GAP_K,
+	RAISE_K,
+	WORD_K,
+	TAG_K,
+	MONO_MARK_K,
+	MONO_GAP_K
+} from '../src/lib/brand/brand-geometry.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Eight-point asterisk mark — four lines crossing at 45°, weight 1.3.
+// Eight-point asterisk mark — geometry from the shared brand-geometry module.
 const MK = (c) =>
-	`<svg viewBox="0 0 12 12" fill="none"><line x1="6" y1="0.5" x2="6" y2="11.5" stroke="${c}" stroke-width="1.3"/><line x1="0.5" y1="6" x2="11.5" y2="6" stroke="${c}" stroke-width="1.3"/><line x1="2.11" y1="2.11" x2="9.89" y2="9.89" stroke="${c}" stroke-width="1.3"/><line x1="2.11" y1="9.89" x2="9.89" y2="2.11" stroke="${c}" stroke-width="1.3"/></svg>`;
-
-// Lockup proportions (relative to the wordmark size). The eight-point mark runs a
-// touch smaller than the old 18/22 so its denser center doesn't read heavy; gap and
-// raise follow the system.
-const MARK_K = 0.75;
-const GAP_K = 2 / 22;
-const RAISE_K = 0.36;
+	`<svg viewBox="0 0 ${MARK_VB} ${MARK_VB}" fill="none">${MARK_LINES.map(
+		([x1, y1, x2, y2]) =>
+			`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${MARK_STROKE}"/>`
+	).join('')}</svg>`;
 
 // Download controls — the brand route's export engine reads data-dl and renders
 // the SVG / PNG client-side. dbg maps the gallery 'white' bg name to 'cream'.
@@ -56,9 +65,9 @@ function iconTile({ kind, bg, crop, label }) {
 		inner = `<span style="display:inline-flex;width:${r(mw)}px;height:${r(mw)}px">${MK(ink)}</span>`;
 	} else {
 		const SF = size * 0.5,
-			mw = SF * 0.55,
-			gap = SF * 0.04,
-			raise = SF * 0.36;
+			mw = SF * MONO_MARK_K,
+			gap = SF * MONO_GAP_K,
+			raise = SF * RAISE_K;
 		inner = `<div style="display:flex;align-items:center;gap:${r(gap)}px;color:${ink}"><span style="display:inline-flex;width:${r(mw)}px;height:${r(mw)}px;margin-top:-${r(raise)}px">${MK(ink)}</span><span class="wm" style="font-size:${r(SF)}px;color:${ink}">S</span></div>`;
 	}
 	const sq = crop === 'square';
@@ -109,11 +118,11 @@ function tile({
 	theme,
 	download
 }) {
-	const WORD = 5.85 * k,
+	const WORD = WORD_K * k,
 		MARKW = WORD * MARK_K,
 		GAP = WORD * GAP_K,
 		RAISE = WORD * RAISE_K,
-		TAGSZ = WORD * 0.31;
+		TAGSZ = WORD * TAG_K;
 	const M = ((Math.min(w, h) / w) * m * 100).toFixed(2); // cqw
 	const ink = bg === 'white' ? '#1a1a1a' : '#fefdf9';
 	const r = (n) => n.toFixed(2);
@@ -136,6 +145,8 @@ function tile({
 			: `<canvas class="bgc" data-draw="${theme || 'periwinkle'}" data-finish="rich"></canvas>`
 		: '';
 	const bgcss = bg === 'white' ? 'background:#fefdf9' : bg === 'black' ? 'background:#141210' : '';
+	// Every downloadable colour tile follows a gallery's theme picker; there is no
+	// downloadable fixed-draw tile, so the export only ever resolves via `gallery`.
 	const ctrl = download
 		? dl({
 				name: `superextra-${w}x${h}-${layout}-${dbg(bg)}`,
@@ -146,7 +157,7 @@ function tile({
 				layout,
 				k,
 				m,
-				...(isColor ? (gallery ? { gallery } : { theme: theme || 'periwinkle' }) : {})
+				...(isColor && gallery ? { gallery } : {})
 			})
 		: '';
 	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${canvasEl}${inner}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}${ctrl}</figcaption></figure>`;
