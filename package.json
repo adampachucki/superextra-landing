@@ -6,7 +6,6 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"build-brand-content": "node scripts/build-brand-content.mjs",
 		"encrypt-brand": "node scripts/build-brand-content.mjs && node scripts/encrypt-brand.mjs",
 		"preview": "vite preview",
 		"postinstall": "patch-package",

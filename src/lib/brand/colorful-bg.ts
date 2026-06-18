@@ -103,7 +103,9 @@ export function paintColorful(ctx: CanvasRenderingContext2D, W: number, H: numbe
 
 	// 2) soft radial blobs
 	const RPAL = d.cool ? COOLPAL : PALETTE;
-	const flatPOOL: RGB[] = [a, b, lerp(a, b, 0.5), lighten(a, 0.28), lighten(b, 0.22)];
+	// Flat-finish blobs draw from a near-gradient pool; rich-finish ones use RPAL, so
+	// only build the flat pool when it's actually used.
+	const flatPOOL: RGB[] = RICH ? [] : [a, b, lerp(a, b, 0.5), lighten(a, 0.28), lighten(b, 0.22)];
 	const NB = RICH ? 16 : 4;
 	const RBASE = RICH ? (W + H) / 2 : Math.min(W, H);
 	for (let i = 0; i < NB; i++) {

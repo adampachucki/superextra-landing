@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { theme } from '$lib/theme.svelte';
 	import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
+	import Mark from '$lib/components/Mark.svelte';
 	import { getLocale, localizeHref } from '$lib/paraglide/runtime';
 	import * as m from '$lib/paraglide/messages';
 
@@ -14,30 +15,9 @@
 		<div class="flex flex-col items-center justify-between gap-6 md:flex-row">
 			<div class="flex flex-col items-center gap-2 md:items-start">
 				<div class="group flex items-center gap-0 md:gap-0.5">
-					<svg
+					<Mark
 						class="-mt-2.5 h-[18px] w-[18px] transition-transform duration-500 ease-out group-hover:rotate-45 md:-mt-2"
-						viewBox="0 0 12 12"
-						fill="none"
-					>
-						<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.3" />
-						<line x1="0.5" y1="6" x2="11.5" y2="6" stroke="currentColor" stroke-width="1.3" />
-						<line
-							x1="2.11"
-							y1="2.11"
-							x2="9.89"
-							y2="9.89"
-							stroke="currentColor"
-							stroke-width="1.3"
-						/>
-						<line
-							x1="2.11"
-							y1="9.89"
-							x2="9.89"
-							y2="2.11"
-							stroke="currentColor"
-							stroke-width="1.3"
-						/>
-					</svg>
+					/>
 					<span class="text-[22px] font-light tracking-tight text-black dark:text-white"
 						>Superextra</span
 					>

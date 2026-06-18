@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/auth.svelte';
 	import LoginForm from '$lib/components/agent/LoginForm.svelte';
+	import Mark from '$lib/components/Mark.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import * as m from '$lib/paraglide/messages';
@@ -156,26 +157,7 @@
 						href="/"
 						class="inline-flex items-center gap-0.5 text-black no-underline dark:text-white"
 					>
-						<svg class="-mt-1 h-[16px] w-[16px]" viewBox="0 0 12 12" fill="none">
-							<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.3" />
-							<line x1="0.5" y1="6" x2="11.5" y2="6" stroke="currentColor" stroke-width="1.3" />
-							<line
-								x1="2.11"
-								y1="2.11"
-								x2="9.89"
-								y2="9.89"
-								stroke="currentColor"
-								stroke-width="1.3"
-							/>
-							<line
-								x1="2.11"
-								y1="9.89"
-								x2="9.89"
-								y2="2.11"
-								stroke="currentColor"
-								stroke-width="1.3"
-							/>
-						</svg>
+						<Mark class="-mt-1 h-[16px] w-[16px]" />
 						<span class="text-[20px] font-light tracking-tight">Superextra</span>
 					</a>
 					<h1 class="pt-4 text-[18px] font-light text-black dark:text-white">
@@ -215,26 +197,7 @@
 					href="/"
 					class="inline-flex items-center gap-0.5 text-black no-underline dark:text-white"
 				>
-					<svg class="-mt-1 h-[16px] w-[16px]" viewBox="0 0 12 12" fill="none">
-						<line x1="6" y1="0.5" x2="6" y2="11.5" stroke="currentColor" stroke-width="1.3" />
-						<line x1="0.5" y1="6" x2="11.5" y2="6" stroke="currentColor" stroke-width="1.3" />
-						<line
-							x1="2.11"
-							y1="2.11"
-							x2="9.89"
-							y2="9.89"
-							stroke="currentColor"
-							stroke-width="1.3"
-						/>
-						<line
-							x1="2.11"
-							y1="9.89"
-							x2="9.89"
-							y2="2.11"
-							stroke="currentColor"
-							stroke-width="1.3"
-						/>
-					</svg>
+					<Mark class="-mt-1 h-[16px] w-[16px]" />
 					<span class="text-[20px] font-light tracking-tight">Superextra</span>
 				</a>
 				<LoginForm
