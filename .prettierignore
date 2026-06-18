@@ -22,3 +22,5 @@ agent/
 # Generated brand-page content (built by scripts/build-brand-content.mjs, encrypted by encrypt-brand.mjs)
 src/lib/brand/brand-content.html
 src/lib/brand/brand-encrypted.ts
+# Generated SF Pro Light wordmark/tagline outlines (built by scripts/build-brand-glyphs.py)
+src/lib/brand/brand-glyphs.js
