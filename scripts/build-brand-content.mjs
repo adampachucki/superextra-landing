@@ -130,8 +130,7 @@ function tile({
 	const pc = (px) => ((px / w) * 100).toFixed(3); // px → cqw (% of tile width)
 	const mark = `<span style="position:absolute;left:${pc(g.markX)}cqw;top:${pc(g.markY)}cqw;width:${pc(g.markw)}cqw;height:${pc(g.markw)}cqw;display:inline-flex">${MK(ink)}</span>`;
 	const word = `<span class="wm" style="position:absolute;left:${pc(g.wordX)}cqw;top:${pc(g.wordCY - g.word / 2)}cqw;font-size:${pc(g.word)}cqw;line-height:1;color:${ink};white-space:nowrap">Superextra</span>`;
-	const tagPos =
-		g.tagAnchor === 'end' ? `right:${pc(w - g.tagX)}cqw` : `left:${pc(g.tagX)}cqw`;
+	const tagPos = g.tagAnchor === 'end' ? `right:${pc(w - g.tagX)}cqw` : `left:${pc(g.tagX)}cqw`;
 	const tag = `<span style="position:absolute;${tagPos};top:${pc(g.tagBaseline - g.tagsz * ASCENT_K)}cqw;font-size:${pc(g.tagsz)}cqw;line-height:1;font-weight:300;letter-spacing:0.01em;color:${ink};white-space:nowrap">AI consultant for every restaurant</span>`;
 	const inner = mark + word + tag;
 	// Colourful backgrounds are painted live by the brand route into a <canvas>: a tile
