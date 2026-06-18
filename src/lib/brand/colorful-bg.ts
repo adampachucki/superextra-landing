@@ -17,30 +17,28 @@ export type Draw = {
 	grain?: number; // film-grain overlay alpha (default 0.5)
 };
 
-export type Theme = { label: string; rich: Draw; flat: Draw };
+export type Theme = { rich: Draw; flat: Draw };
 
 const theme = (
-	label: string,
 	c1: string,
 	c2: string,
 	ang: number,
 	seed: number,
 	extra: Partial<Draw> = {}
 ): Theme => ({
-	label,
 	rich: { c1, c2, ang, seed, rich: true, ...extra },
 	flat: { c1, c2, ang, seed, rich: false }
 });
 
 // The colour themes, in picker order. Params match the approved renders.
 export const DRAWS: Record<string, Theme> = {
-	periwinkle: theme('Periwinkle', 'b39ddb', '6d8fe3', 6, 3),
-	'lavender-pink': theme('Lavender → Pink', 'a78bfa', 'f472b6', 8, 7),
-	'violet-cyan': theme('Violet → Cyan', 'a78bfa', '22b6d4', 8, 5),
-	'blue-teal': theme('Blue → Teal', '6366f1', '06b6d4', 8, 11),
-	'indigo-violet': theme('Indigo → Violet', '6366f1', 'b39ddb', 8, 9),
-	mint: theme('Mint', '6ee7b7', '2fb6d4', 8, 13),
-	dusk: theme('Dusk', '5d47b3', '324fb0', 8, 4, { cool: true, br: 1.5, bs: 0.62 })
+	periwinkle: theme('b39ddb', '6d8fe3', 6, 3),
+	'lavender-pink': theme('a78bfa', 'f472b6', 8, 7),
+	'violet-cyan': theme('a78bfa', '22b6d4', 8, 5),
+	'blue-teal': theme('6366f1', '06b6d4', 8, 11),
+	'indigo-violet': theme('6366f1', 'b39ddb', 8, 9),
+	mint: theme('6ee7b7', '2fb6d4', 8, 13),
+	dusk: theme('5d47b3', '324fb0', 8, 4, { cool: true, br: 1.5, bs: 0.62 })
 };
 
 type RGB = [number, number, number];
@@ -138,7 +136,7 @@ export function paintColorful(ctx: CanvasRenderingContext2D, W: number, H: numbe
 	if (o) {
 		const img = o.createImageData(W, H);
 		for (let i = 0; i < img.data.length; i += 4) {
-			const v = Math.random() * 255;
+			const v = rnd() * 255;
 			img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
 			img.data[i + 3] = 255;
 		}
