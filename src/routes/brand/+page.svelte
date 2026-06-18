@@ -7,9 +7,10 @@
 		MARK_STROKE,
 		MARK_K,
 		GAP_K,
-		RAISE_K,
+		LOCKUP_RAISE_K,
 		MONO_MARK_K,
 		MONO_GAP_K,
+		MONO_RAISE_K,
 		MONO_DROP_K,
 		lockupGeom
 	} from '$lib/brand/brand-geometry';
@@ -215,7 +216,7 @@
 			const word = h * 0.55,
 				markBox = word * MARK_K,
 				gap = word * GAP_K,
-				raise = word * RAISE_K;
+				raise = word * LOCKUP_RAISE_K;
 			dlSetText(ctx, word, color);
 			ctx.fillText('Superextra', markBox + gap, h / 2);
 			dlStrokeMark(ctx, 0, (h - markBox) / 2 - raise, markBox, color);
@@ -223,7 +224,7 @@
 			const sf = Math.min(w, h) * 0.5,
 				markBox = sf * MONO_MARK_K,
 				gap = sf * MONO_GAP_K,
-				raise = sf * RAISE_K,
+				raise = sf * MONO_RAISE_K,
 				drop = sf * MONO_DROP_K;
 			const x0 = (w - (markBox + gap + dlMeasure('S', sf))) / 2;
 			dlSetText(ctx, sf, color);
@@ -260,7 +261,7 @@
 			const word = h * 0.55,
 				markBox = word * MARK_K,
 				gap = word * GAP_K,
-				raise = word * RAISE_K;
+				raise = word * LOCKUP_RAISE_K;
 			w = Math.ceil(markBox + gap + dlMeasure('Superextra', word));
 			body =
 				dlSVGMark(0, (h - markBox) / 2 - raise, markBox, color) +
@@ -269,7 +270,7 @@
 			const sf = Math.min(w, h) * 0.5,
 				markBox = sf * MONO_MARK_K,
 				gap = sf * MONO_GAP_K,
-				raise = sf * RAISE_K,
+				raise = sf * MONO_RAISE_K,
 				drop = sf * MONO_DROP_K;
 			const x0 = (w - (markBox + gap + dlMeasure('S', sf))) / 2;
 			// dlSVGText centres at h/2; pass h + 2·drop so the baseline lands at h/2 + drop.
