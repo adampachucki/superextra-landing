@@ -16,11 +16,11 @@ import {
 	MARK_K,
 	GAP_K,
 	RAISE_K,
-	WORD_K,
-	TAG_K,
 	MONO_MARK_K,
 	MONO_GAP_K,
-	MONO_DROP_K
+	MONO_DROP_K,
+	ASCENT_K,
+	lockupGeom
 } from '../src/lib/brand/brand-geometry.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -122,24 +122,18 @@ function tile({
 	theme,
 	download
 }) {
-	const WORD = WORD_K * k,
-		MARKW = WORD * MARK_K,
-		GAP = WORD * GAP_K,
-		RAISE = WORD * RAISE_K,
-		TAGSZ = WORD * TAG_K;
-	const M = ((Math.min(w, h) / w) * m * 100).toFixed(2); // cqw
 	const ink = bg === 'white' ? '#1a1a1a' : '#fefdf9';
-	const r = (n) => n.toFixed(2);
-	const mark = `<div style="display:flex;align-items:center;gap:${r(GAP)}cqw"><span style="display:inline-flex;width:${r(MARKW)}cqw;height:${r(MARKW)}cqw;margin-top:-${r(RAISE)}cqw">${MK(ink)}</span><span class="wm" style="font-size:${r(WORD)}cqw;color:${ink};white-space:nowrap">Superextra</span></div>`;
-	const tag = (ex = '') =>
-		`<div style="font-size:${r(TAGSZ)}cqw;font-weight:300;letter-spacing:0.01em;color:${ink};white-space:nowrap;${ex}">AI consultant for every restaurant</div>`;
-	let inner;
-	if (layout === 'split' || layout === 'splitbr') {
-		const ta = layout === 'splitbr' ? `right:${M}cqw` : `left:${M}cqw`;
-		inner = `<div style="position:absolute;left:${M}cqw;top:${M}cqw">${mark}</div><div style="position:absolute;${ta};bottom:${M}cqw">${tag()}</div>`;
-	} else {
-		inner = `<div style="position:absolute;left:${M}cqw;bottom:${M}cqw;display:flex;flex-direction:column;align-items:flex-start">${mark}${tag(`margin-top:${r(WORD * 0.05)}cqw;margin-left:${r(MARKW + GAP)}cqw`)}</div>`;
-	}
+	// Absolute positions from the shared lockupGeom, so the preview lands pixel-for-pixel on
+	// the SVG/PNG exports. The wordmark is placed by its em-middle (line-height:1) to mirror
+	// the canvas textBaseline:'middle'; the tagline by its alphabetic baseline.
+	const g = lockupGeom(w, h, k, m, layout);
+	const pc = (px) => ((px / w) * 100).toFixed(3); // px → cqw (% of tile width)
+	const mark = `<span style="position:absolute;left:${pc(g.markX)}cqw;top:${pc(g.markY)}cqw;width:${pc(g.markw)}cqw;height:${pc(g.markw)}cqw;display:inline-flex">${MK(ink)}</span>`;
+	const word = `<span class="wm" style="position:absolute;left:${pc(g.wordX)}cqw;top:${pc(g.wordCY - g.word / 2)}cqw;font-size:${pc(g.word)}cqw;line-height:1;color:${ink};white-space:nowrap">Superextra</span>`;
+	const tagPos =
+		g.tagAnchor === 'end' ? `right:${pc(w - g.tagX)}cqw` : `left:${pc(g.tagX)}cqw`;
+	const tag = `<span style="position:absolute;${tagPos};top:${pc(g.tagBaseline - g.tagsz * ASCENT_K)}cqw;font-size:${pc(g.tagsz)}cqw;line-height:1;font-weight:300;letter-spacing:0.01em;color:${ink};white-space:nowrap">AI consultant for every restaurant</span>`;
+	const inner = mark + word + tag;
 	// Colourful backgrounds are painted live by the brand route into a <canvas>: a tile
 	// either follows a gallery's theme picker (data-gallery) or shows a fixed draw (data-draw).
 	const isColor = bg === 'color';
@@ -183,7 +177,7 @@ function adCard({ headline, bg = 'white', w = 1080, h = 1080, label, note }) {
 		MARKW = WM * MARK_K,
 		GAP = WM * GAP_K,
 		RAISE = WM * RAISE_K;
-	const sig = `<div style="position:absolute;left:${M}cqw;bottom:${M}cqw;display:flex;align-items:center;gap:${r(GAP)}cqw"><span style="display:inline-flex;width:${r(MARKW)}cqw;height:${r(MARKW)}cqw;margin-top:-${r(RAISE)}cqw">${MK(ink)}</span><span class="wm" style="font-size:${WM}cqw;color:${ink};white-space:nowrap">Superextra</span></div>`;
+	const sig = `<div style="position:absolute;left:${M}cqw;bottom:${M}cqw;display:flex;align-items:center;gap:${r(GAP)}cqw"><span style="display:inline-flex;width:${r(MARKW)}cqw;height:${r(MARKW)}cqw;position:relative;top:-${r(RAISE)}cqw">${MK(ink)}</span><span class="wm" style="font-size:${WM}cqw;color:${ink};white-space:nowrap">Superextra</span></div>`;
 	const head = `<div style="position:absolute;left:${M}cqw;right:${M}cqw;top:${M}cqw;font-size:12cqw;line-height:1.06;font-weight:500;letter-spacing:-0.03em;color:${ink}">${headline}</div>`;
 	return `<figure class="tile"><div class="cv" style="aspect-ratio:${w}/${h};${bgcss}">${canvasEl}${head}${sig}</div><figcaption><b>${label}</b>${note ? ` · <span>${note}</span>` : ''}</figcaption></figure>`;
 }
@@ -329,9 +323,18 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
     <p class="lede">An eight-point asterisk mark beside the “Superextra” wordmark in the system sans, Light weight. The mark sits raised — its center aligns near the cap height of the wordmark.</p>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">
       <div class="card"><div class="frame cream" style="min-height:200px"><span style="display:inline-flex;width:120px;height:120px">${MK('#1a1a1a')}</span></div><div class="cap"><b>Mark</b> · the asterisk, used alone as the icon/avatar${dl({ name: 'superextra-mark', kind: 'mark', bg: 'transparent', w: 512, h: 512, markFrac: 0.78 })}</div></div>
-      <div class="card"><div class="frame cream" style="min-height:200px"><div style="display:flex;align-items:center;gap:6px;color:#1a1a1a"><span style="display:inline-flex;width:49.5px;height:49.5px;margin-top:-23.76px">${MK('#1a1a1a')}</span><span class="wm" style="font-size:66px">Superextra</span></div></div><div class="cap"><b>Wordmark</b> · mark + name, the primary lockup${dl({ name: 'superextra-wordmark', kind: 'lockup', bg: 'transparent', w: 0, h: 480 })}</div></div>
+      <div class="card"><div class="frame cream" style="min-height:200px"><div style="display:flex;align-items:center;gap:6px;color:#1a1a1a"><span style="display:inline-flex;width:49.5px;height:49.5px;position:relative;top:-23.76px">${MK('#1a1a1a')}</span><span class="wm" style="font-size:66px">Superextra</span></div></div><div class="cap"><b>Wordmark</b> · mark + name, the primary lockup${dl({ name: 'superextra-wordmark', kind: 'lockup', bg: 'transparent', w: 0, h: 480 })}</div></div>
     </div>
     <div class="do"><div class="b ok"><div class="t">Do</div>Keep the raised mark, Light weight, and −0.025em tracking. Give the logo clear space of at least the mark’s height on every side.</div><div class="b no"><div class="t">Don’t</div>Recolor, outline, stretch, re-space, or swap the typeface. Don’t lower the mark to the baseline.</div></div>
+    <h3>Construction <span class="pill">one source of truth</span></h3>
+    <p class="note">The lockup is built from fixed ratios of the wordmark size — never spaced by eye. The mark is raised so its centre sits above the wordmark’s vertical centre.</p>
+    <table class="files"><thead><tr><th>Measure</th><th>Ratio · × wordmark</th></tr></thead><tbody>
+      <tr><td>Mark width</td><td><code>0.75</code></td></tr>
+      <tr><td>Mark → wordmark gap</td><td><code>2 / 22 ≈ 0.091</code></td></tr>
+      <tr><td>Mark raise — centre above the wordmark’s centre</td><td><code>0.36</code></td></tr>
+      <tr><td>Tagline size</td><td><code>0.31</code></td></tr>
+    </tbody></table>
+    <p class="note">Every asset — the previews on this page <b style="color:var(--ink);font-weight:600">and</b> every downloaded SVG/PNG — is generated from one shared geometry module (<code>brand-geometry</code>), so the mark lands in exactly the same place relative to the wordmark everywhere, on screen and in the file. <b style="color:var(--ink);font-weight:600">That pixel-for-pixel match is the whole point of this collection: always export the asset from here — never rebuild the lockup or place the mark by hand.</b></p>
   </section>
 
   <div class="hr"></div>
@@ -478,7 +481,7 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
     <p class="lede">Upload targets for Stripe → Settings → Branding (set in both live and test mode). Icon shows in emails, Checkout, the customer portal, and invoices; logo shows in Checkout and invoice PDFs.</p>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">
       <div class="card"><div class="frame cream" style="min-height:180px"><span style="display:inline-flex;width:140px;height:140px">${MK('#1a1a1a')}</span></div><div class="cap"><b>Icon</b> <span class="dim">— 512×512</span>${dl({ name: 'superextra-stripe-icon', kind: 'mark', bg: 'cream', w: 512, h: 512, markFrac: 0.5 })}</div></div>
-      <div class="card"><div class="frame cream" style="min-height:180px"><div style="display:flex;align-items:center;gap:6px;color:#1a1a1a"><span style="display:inline-flex;width:49.5px;height:49.5px;margin-top:-23.76px">${MK('#1a1a1a')}</span><span class="wm" style="font-size:66px">Superextra</span></div></div><div class="cap"><b>Logo</b> <span class="dim">— transparent wordmark</span>${dl({ name: 'superextra-stripe-logo', kind: 'lockup', bg: 'transparent', w: 0, h: 480 })}</div></div>
+      <div class="card"><div class="frame cream" style="min-height:180px"><div style="display:flex;align-items:center;gap:6px;color:#1a1a1a"><span style="display:inline-flex;width:49.5px;height:49.5px;position:relative;top:-23.76px">${MK('#1a1a1a')}</span><span class="wm" style="font-size:66px">Superextra</span></div></div><div class="cap"><b>Logo</b> <span class="dim">— transparent wordmark</span>${dl({ name: 'superextra-stripe-logo', kind: 'lockup', bg: 'transparent', w: 0, h: 480 })}</div></div>
     </div>
     <p class="note">Companion settings — Brand color <code>#1A1A1A</code>, Accent <code>#FEFDF9</code>, Checkout font Inter.</p>
   </section>
