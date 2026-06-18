@@ -8,11 +8,10 @@
 		MARK_K,
 		GAP_K,
 		RAISE_K,
-		WORD_K,
-		TAG_K,
 		MONO_MARK_K,
 		MONO_GAP_K,
-		MONO_DROP_K
+		MONO_DROP_K,
+		lockupGeom
 	} from '$lib/brand/brand-geometry';
 
 	const PIN_LENGTH = 4;
@@ -178,49 +177,10 @@
 		ctx.letterSpacing = '-0.025em';
 		ctx.textBaseline = 'middle';
 	}
-	// Gallery-tile geometry — mirrors the generator's tile(): word/mark/tag sized in
-	// cqw (% of width), placed per layout. Returns absolute px positions.
+	// Gallery-tile geometry — the shared lockup layout, so the canvas exports and the
+	// CSS preview place the mark/wordmark/tagline on identical coordinates.
 	function dlTileGeom(d: DL) {
-		const W = d.w,
-			H = d.h,
-			k = d.k ?? 1,
-			m = d.m ?? 0.12,
-			layout = d.layout ?? 'lockup';
-		const word = (WORD_K * k * W) / 100;
-		const markw = word * MARK_K,
-			gap = word * GAP_K,
-			raise = word * RAISE_K,
-			tagsz = word * TAG_K;
-		const M = m * Math.min(W, H);
-		const wordX = M + markw + gap;
-		if (layout === 'lockup') {
-			const tagBaseline = H - M - 0.21 * tagsz;
-			const wordCY = tagBaseline - 0.7 * tagsz - 0.5 * word;
-			return {
-				word,
-				markw,
-				tagsz,
-				markX: M,
-				markY: wordCY - raise - markw / 2,
-				wordX,
-				wordCY,
-				tagX: wordX,
-				tagBaseline,
-				tagAnchor: 'start' as const
-			};
-		}
-		return {
-			word,
-			markw,
-			tagsz,
-			markX: M,
-			markY: M,
-			wordX,
-			wordCY: M + markw / 2 + raise,
-			tagX: layout === 'splitbr' ? W - M : M,
-			tagBaseline: H - M - 0.21 * tagsz,
-			tagAnchor: layout === 'splitbr' ? ('end' as const) : ('start' as const)
-		};
+		return lockupGeom(d.w, d.h, d.k ?? 1, d.m ?? 0.12, d.layout ?? 'lockup');
 	}
 	function dlTileTag(ctx: CanvasRenderingContext2D, g: ReturnType<typeof dlTileGeom>, c: string) {
 		ctx.fillStyle = c;

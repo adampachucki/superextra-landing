@@ -30,3 +30,58 @@ export const MONO_CAP_K = 0.7; // S cap height ÷ S (system-font approximation)
 // The "S" is centred and the mark raised, which leaves the ✲S group top-heavy; drop the
 // whole group by this fraction of S so its bounding box sits centred in a square icon.
 export const MONO_DROP_K = (RAISE_K + MONO_MARK_K / 2 - MONO_CAP_K / 2) / 2; // ≈ 0.1425
+
+// Tagline vertical rhythm (lockup layout): baseline sits TAG_BOTTOM_K·tagsz above the
+// bottom inset, and TAG_GAP_K·tagsz + 0.5·word below the wordmark's vertical centre.
+export const TAG_BOTTOM_K = 0.21;
+export const TAG_GAP_K = 0.7;
+// Alphabetic baseline measured from the top of a line-height:1 box for the system sans,
+// so the CSS preview can place text on the exact baseline the canvas exports draw from.
+export const ASCENT_K = 0.92;
+
+/**
+ * Lockup element positions for a w×h tile — the single source the on-page preview (absolute
+ * CSS) and the SVG/PNG exports (canvas) both render from, so the mark, wordmark and tagline
+ * land on identical coordinates. Values in px; the preview converts each to cqw (÷w·100).
+ * @param {number} w @param {number} h @param {number} [k] @param {number} [m]
+ * @param {'lockup'|'split'|'splitbr'} [layout]
+ */
+export function lockupGeom(w, h, k = 1, m = 0.12, layout = 'lockup') {
+	const word = (WORD_K * k * w) / 100;
+	const markw = word * MARK_K;
+	const gap = word * GAP_K;
+	const raise = word * RAISE_K;
+	const tagsz = word * TAG_K;
+	const M = m * Math.min(w, h);
+	const wordX = M + markw + gap;
+	const tagBaseline = h - M - TAG_BOTTOM_K * tagsz;
+	if (layout === 'lockup') {
+		const wordCY = tagBaseline - TAG_GAP_K * tagsz - 0.5 * word;
+		return {
+			word,
+			markw,
+			gap,
+			tagsz,
+			markX: M,
+			markY: wordCY - raise - markw / 2,
+			wordX,
+			wordCY,
+			tagX: wordX,
+			tagBaseline,
+			tagAnchor: 'start'
+		};
+	}
+	return {
+		word,
+		markw,
+		gap,
+		tagsz,
+		markX: M,
+		markY: M,
+		wordX,
+		wordCY: M + markw / 2 + raise,
+		tagX: layout === 'splitbr' ? w - M : M,
+		tagBaseline,
+		tagAnchor: layout === 'splitbr' ? 'end' : 'start'
+	};
+}
