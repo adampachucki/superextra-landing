@@ -130,15 +130,22 @@ export function paintColorful(ctx: CanvasRenderingContext2D, W: number, H: numbe
 		ctx.restore();
 	}
 
-	// 3) film-grain overlay + faint scanlines
+	// 3) film grain. Deterministic (so it doesn't reshuffle on every repaint and matches
+	//    exports), but hashed per pixel index — reusing the blob LCG here tiles its lattice
+	//    into visible diagonal patterns, so each pixel gets an independent hashed value.
 	const off = document.createElement('canvas');
 	off.width = W;
 	off.height = H;
 	const o = off.getContext('2d');
 	if (o) {
 		const img = o.createImageData(W, H);
-		for (let i = 0; i < img.data.length; i += 4) {
-			const v = rnd() * 255;
+		const gseed = Math.imul(d.seed || 3, 0x9e3779b1) >>> 0;
+		for (let p = 0, i = 0; i < img.data.length; i += 4, p++) {
+			let hsh = (p ^ gseed) >>> 0;
+			hsh = Math.imul(hsh ^ (hsh >>> 16), 0x45d9f3b);
+			hsh = Math.imul(hsh ^ (hsh >>> 16), 0x45d9f3b);
+			hsh ^= hsh >>> 16;
+			const v = hsh & 255;
 			img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
 			img.data[i + 3] = 255;
 		}
@@ -149,9 +156,4 @@ export function paintColorful(ctx: CanvasRenderingContext2D, W: number, H: numbe
 		ctx.drawImage(off, 0, 0);
 		ctx.restore();
 	}
-	ctx.save();
-	ctx.globalAlpha = 0.04;
-	ctx.fillStyle = '#000';
-	for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
-	ctx.restore();
 }
