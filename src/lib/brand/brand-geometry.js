@@ -26,3 +26,7 @@ export const TAG_K = 0.31; // tagline size ÷ wordmark
 // ✲S monogram, relative to the "S" size.
 export const MONO_MARK_K = 0.55; // monogram mark width ÷ S
 export const MONO_GAP_K = 0.04; // monogram mark→S gap ÷ S
+export const MONO_CAP_K = 0.7; // S cap height ÷ S (system-font approximation)
+// The "S" is centred and the mark raised, which leaves the ✲S group top-heavy; drop the
+// whole group by this fraction of S so its bounding box sits centred in a square icon.
+export const MONO_DROP_K = (RAISE_K + MONO_MARK_K / 2 - MONO_CAP_K / 2) / 2; // ≈ 0.1425

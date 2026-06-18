@@ -11,7 +11,8 @@
 		WORD_K,
 		TAG_K,
 		MONO_MARK_K,
-		MONO_GAP_K
+		MONO_GAP_K,
+		MONO_DROP_K
 	} from '$lib/brand/brand-geometry';
 
 	const PIN_LENGTH = 4;
@@ -262,11 +263,12 @@
 			const sf = Math.min(w, h) * 0.5,
 				markBox = sf * MONO_MARK_K,
 				gap = sf * MONO_GAP_K,
-				raise = sf * RAISE_K;
+				raise = sf * RAISE_K,
+				drop = sf * MONO_DROP_K;
 			const x0 = (w - (markBox + gap + dlMeasure('S', sf))) / 2;
 			dlSetText(ctx, sf, color);
-			ctx.fillText('S', x0 + markBox + gap, h / 2);
-			dlStrokeMark(ctx, x0, (h - markBox) / 2 - raise, markBox, color);
+			ctx.fillText('S', x0 + markBox + gap, h / 2 + drop);
+			dlStrokeMark(ctx, x0, (h - markBox) / 2 - raise + drop, markBox, color);
 		} else {
 			const box = Math.min(w, h) * (d.markFrac ?? 0.7);
 			dlStrokeMark(ctx, (w - box) / 2, (h - box) / 2, box, color);
@@ -307,11 +309,13 @@
 			const sf = Math.min(w, h) * 0.5,
 				markBox = sf * MONO_MARK_K,
 				gap = sf * MONO_GAP_K,
-				raise = sf * RAISE_K;
+				raise = sf * RAISE_K,
+				drop = sf * MONO_DROP_K;
 			const x0 = (w - (markBox + gap + dlMeasure('S', sf))) / 2;
+			// dlSVGText centres at h/2; pass h + 2·drop so the baseline lands at h/2 + drop.
 			body =
-				dlSVGMark(x0, (h - markBox) / 2 - raise, markBox, color) +
-				dlSVGText(x0 + markBox + gap, h, sf, color, 'S');
+				dlSVGMark(x0, (h - markBox) / 2 - raise + drop, markBox, color) +
+				dlSVGText(x0 + markBox + gap, h + 2 * drop, sf, color, 'S');
 		} else {
 			const box = Math.min(w, h) * (d.markFrac ?? 0.7);
 			body = dlSVGMark((w - box) / 2, (h - box) / 2, box, color);

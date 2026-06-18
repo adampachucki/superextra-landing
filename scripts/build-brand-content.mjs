@@ -19,7 +19,8 @@ import {
 	WORD_K,
 	TAG_K,
 	MONO_MARK_K,
-	MONO_GAP_K
+	MONO_GAP_K,
+	MONO_DROP_K
 } from '../src/lib/brand/brand-geometry.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -67,8 +68,11 @@ function iconTile({ kind, bg, crop, label }) {
 		const SF = size * 0.5,
 			mw = SF * MONO_MARK_K,
 			gap = SF * MONO_GAP_K,
-			raise = SF * RAISE_K;
-		inner = `<div style="display:flex;align-items:center;gap:${r(gap)}px;color:${ink}"><span style="display:inline-flex;width:${r(mw)}px;height:${r(mw)}px;margin-top:-${r(raise)}px">${MK(ink)}</span><span class="wm" style="font-size:${r(SF)}px;color:${ink}">S</span></div>`;
+			raise = SF * RAISE_K,
+			drop = SF * MONO_DROP_K;
+		// align-items:center centres the "S"; the mark is raised visually (position, not
+		// margin, so it doesn't skew centring); the whole group drops to sit centred.
+		inner = `<div style="display:flex;align-items:center;gap:${r(gap)}px;color:${ink};line-height:1;transform:translateY(${r(drop)}px)"><span style="display:inline-flex;width:${r(mw)}px;height:${r(mw)}px;position:relative;top:-${r(raise)}px">${MK(ink)}</span><span class="wm" style="font-size:${r(SF)}px;color:${ink}">S</span></div>`;
 	}
 	const sq = crop === 'square';
 	const gx = bg === 'color' ? { gallery: 'profile' } : {};
@@ -91,7 +95,7 @@ function iconTile({ kind, bg, crop, label }) {
 					h: sq ? 512 : 1080,
 					...gx
 				};
-	return `<div class="card"><div class="frame" style="padding:24px"><div style="position:relative;width:${size}px;height:${size}px;${bgcss};border-radius:${radius};overflow:hidden;display:flex;align-items:center;justify-content:center">${canvasEl}${inner}</div></div><div class="cap"><b>${label}</b>${dl(desc)}</div></div>`;
+	return `<div class="card"><div class="frame" style="padding:24px"><div style="position:relative;width:${size}px;height:${size}px;${bgcss};border-radius:${radius};overflow:hidden;display:flex;align-items:center;justify-content:center">${canvasEl}<span class="ic-fg">${inner}</span></div></div><div class="cap"><b>${label}</b>${dl(desc)}</div></div>`;
 }
 const ICON_BGS = [
 	['white', 'Cream'],
@@ -277,6 +281,7 @@ p.note{font-size:13.5px;color:var(--mut);max-width:680px;margin:10px 0}
 .dl{font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.05em;color:var(--mut);background:transparent;border:1px solid var(--line2);border-radius:6px;padding:2px 7px;cursor:pointer;transition:color .15s,border-color .15s}
 .dl:hover{color:var(--ink);border-color:var(--soft)}
 .bgc{position:absolute;inset:0;width:100%;height:100%;display:block}
+.ic-fg{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center}
 .bgsel{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:16px 0 2px}
 .bgsel-l{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-right:4px}
 .theme{font-family:inherit;font-size:12px;color:var(--soft);background:transparent;border:1px solid var(--line2);border-radius:999px;padding:3px 11px;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
