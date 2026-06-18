@@ -19,7 +19,11 @@ export const MARK_STROKE = 1.3; // mark stroke-width, in viewBox units
 // touch smaller than the old 18/22 so its denser center doesn't read heavy.
 export const MARK_K = 0.75; // lockup mark width ÷ wordmark
 export const GAP_K = 2 / 22; // mark→word gap ÷ wordmark
-export const RAISE_K = 0.36; // mark raise ÷ wordmark (also the monogram raise)
+// The lockup mark is raised so its centre sits this fraction of the wordmark ABOVE the
+// wordmark's vertical centre — landing it near the cap height. This is a true full raise
+// (applied via explicit coordinates / position, never a centred-flex margin, which would
+// only move it half as far). The monogram's superscript raise is larger — see MONO_RAISE_K.
+export const LOCKUP_RAISE_K = 0.18; // lockup mark raise ÷ wordmark
 export const WORD_K = 5.85; // gallery-tile wordmark size in cqw, at k = 1
 export const TAG_K = 0.31; // tagline size ÷ wordmark
 
@@ -27,14 +31,15 @@ export const TAG_K = 0.31; // tagline size ÷ wordmark
 export const MONO_MARK_K = 0.55; // monogram mark width ÷ S
 export const MONO_GAP_K = 0.04; // monogram mark→S gap ÷ S
 export const MONO_CAP_K = 0.7; // S cap height ÷ S (system-font approximation)
+export const MONO_RAISE_K = 0.36; // monogram mark raise ÷ S — the mark as a superscript over the "S"
 // The "S" is centred and the mark raised, which leaves the ✲S group top-heavy; drop the
 // whole group by this fraction of S so its bounding box sits centred in a square icon.
-export const MONO_DROP_K = (RAISE_K + MONO_MARK_K / 2 - MONO_CAP_K / 2) / 2; // ≈ 0.1425
+export const MONO_DROP_K = (MONO_RAISE_K + MONO_MARK_K / 2 - MONO_CAP_K / 2) / 2; // ≈ 0.1425
 
 // Tagline vertical rhythm (lockup layout): baseline sits TAG_BOTTOM_K·tagsz above the
 // bottom inset, and TAG_GAP_K·tagsz + 0.5·word below the wordmark's vertical centre.
-export const TAG_BOTTOM_K = 0.21;
-export const TAG_GAP_K = 0.7;
+export const TAG_BOTTOM_K = 0.58;
+export const TAG_GAP_K = 2.13;
 // Alphabetic baseline measured from the top of a line-height:1 box for the system sans,
 // so the CSS preview can place text on the exact baseline the canvas exports draw from.
 export const ASCENT_K = 0.92;
@@ -50,7 +55,7 @@ export function lockupGeom(w, h, k = 1, m = 0.12, layout = 'lockup') {
 	const word = (WORD_K * k * w) / 100;
 	const markw = word * MARK_K;
 	const gap = word * GAP_K;
-	const raise = word * RAISE_K;
+	const raise = word * LOCKUP_RAISE_K;
 	const tagsz = word * TAG_K;
 	const M = m * Math.min(w, h);
 	const wordX = M + markw + gap;
