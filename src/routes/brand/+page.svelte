@@ -14,6 +14,7 @@
 		MONO_DROP_K,
 		lockupGeom
 	} from '$lib/brand/brand-geometry';
+	import { UPM, SUPEREXTRA, S as MONO_S, TAGLINE } from '$lib/brand/brand-glyphs';
 
 	const PIN_LENGTH = 4;
 
@@ -111,8 +112,9 @@
 	}
 
 	// ── Asset downloads (SVG + PNG, generated client-side) ───────────────────
-	// The mark is four lines; PNG is drawn straight onto a canvas (and text via the
-	// loaded system font), so exports are crisp at any size with no rasterization.
+	// The mark is four lines; the wordmark and tagline are SF Pro Light vector outlines
+	// (brand-glyphs), so every export carries the exact typeface font-independently — no
+	// reliance on the viewer having SF Pro, and crisp at any size with no rasterization.
 	type DL = {
 		name: string;
 		kind: 'mark' | 'monogram' | 'lockup' | 'tile';
@@ -125,8 +127,13 @@
 		m?: number;
 		gallery?: string; // colour tile → resolve theme from this gallery's picker
 	};
-	const DL_FONT = "-apple-system,BlinkMacSystemFont,'Inter',ui-sans-serif,system-ui,sans-serif";
 	const dlInk = (bg: string) => (bg === 'black' || bg === 'color' ? '#fefdf9' : '#1a1a1a');
+	// Outlined-glyph helpers. Paths are SF Pro Light in font units (y-up, alphabetic
+	// baseline at y=0); their advance widths come from the same source. A glyph string's
+	// alphabetic baseline sits BASELINE_K·size below its em-centre, matching where the
+	// on-page wordmark — placed by its em-centre (textBaseline 'middle') — renders.
+	const BASELINE_K = 0.394;
+	const glyphWidth = (g: { adv: number }, size: number) => (g.adv * size) / UPM;
 
 	// Resolve a colour tile's Draw from its gallery's current theme pick.
 	function resolveDraw(d: DL): Draw | undefined {
@@ -138,11 +145,26 @@
 		const key = (d.gallery && selectedTheme[d.gallery]) || 'colour';
 		return d.name.replace(/color$/, key);
 	}
-	function dlMeasure(text: string, fontPx: number): number {
-		const c = document.createElement('canvas').getContext('2d')!;
-		c.font = `300 ${fontPx}px ${DL_FONT}`;
-		c.letterSpacing = '-0.025em';
-		return c.measureText(text).width;
+	// Render an outlined glyph string: place its alphabetic baseline at `baseline`, scaled
+	// to `size` px. Paths are font units with y-up, so the y-scale is negated.
+	function dlGlyphPNG(
+		ctx: CanvasRenderingContext2D,
+		g: { d: string },
+		x: number,
+		baseline: number,
+		size: number,
+		color: string
+	) {
+		ctx.save();
+		ctx.fillStyle = color;
+		ctx.translate(x, baseline);
+		ctx.scale(size / UPM, -size / UPM);
+		ctx.fill(new Path2D(g.d));
+		ctx.restore();
+	}
+	function dlGlyphSVG(g: { d: string }, x: number, baseline: number, size: number, color: string) {
+		const s = (size / UPM).toFixed(5);
+		return `<path transform="translate(${x.toFixed(2)} ${baseline.toFixed(2)}) scale(${s} -${s})" d="${g.d}" fill="${color}"/>`;
 	}
 	function dlStrokeMark(
 		ctx: CanvasRenderingContext2D,
@@ -172,28 +194,12 @@
 			paintColorful(ctx, w, h, draw);
 		}
 	}
-	function dlSetText(ctx: CanvasRenderingContext2D, px: number, c: string) {
-		ctx.fillStyle = c;
-		ctx.font = `300 ${px}px ${DL_FONT}`;
-		ctx.letterSpacing = '-0.025em';
-		ctx.textBaseline = 'middle';
-	}
 	// Gallery-tile geometry — the shared lockup layout, so the canvas exports and the
 	// CSS preview place the mark/wordmark/tagline on identical coordinates.
 	function dlTileGeom(d: DL) {
 		return lockupGeom(d.w, d.h, d.k ?? 1, d.m ?? 0.12, d.layout ?? 'lockup');
 	}
-	function dlTileTag(ctx: CanvasRenderingContext2D, g: ReturnType<typeof dlTileGeom>, c: string) {
-		ctx.fillStyle = c;
-		ctx.font = `300 ${g.tagsz}px ${DL_FONT}`;
-		ctx.letterSpacing = '0.01em';
-		ctx.textBaseline = 'alphabetic';
-		ctx.textAlign = g.tagAnchor === 'end' ? 'right' : 'left';
-		ctx.fillText('AI consultant for every restaurant', g.tagX, g.tagBaseline);
-		ctx.textAlign = 'left';
-	}
 	async function dlPNG(d: DL, draw?: Draw): Promise<Blob | null> {
-		await document.fonts.ready;
 		const color = dlInk(d.bg);
 		let w = d.w;
 		const h = d.h;
@@ -201,24 +207,23 @@
 		const ctx = cv.getContext('2d')!;
 		if (d.kind === 'lockup') {
 			const word = h * 0.55;
-			w = Math.ceil(word * MARK_K + word * GAP_K + dlMeasure('Superextra', word));
+			w = Math.ceil(word * MARK_K + word * GAP_K + glyphWidth(SUPEREXTRA, word));
 		}
 		cv.width = w;
 		cv.height = h;
 		dlPaintBg(ctx, d.bg, w, h, draw);
 		if (d.kind === 'tile') {
 			const g = dlTileGeom(d);
-			dlSetText(ctx, g.word, color);
-			ctx.fillText('Superextra', g.wordX, g.wordCY);
+			dlGlyphPNG(ctx, SUPEREXTRA, g.wordX, g.wordCY + BASELINE_K * g.word, g.word, color);
 			dlStrokeMark(ctx, g.markX, g.markY, g.markw, color);
-			dlTileTag(ctx, g, color);
+			const tagX = g.tagAnchor === 'end' ? g.tagX - glyphWidth(TAGLINE, g.tagsz) : g.tagX;
+			dlGlyphPNG(ctx, TAGLINE, tagX, g.tagBaseline, g.tagsz, color);
 		} else if (d.kind === 'lockup') {
 			const word = h * 0.55,
 				markBox = word * MARK_K,
 				gap = word * GAP_K,
 				raise = word * LOCKUP_RAISE_K;
-			dlSetText(ctx, word, color);
-			ctx.fillText('Superextra', markBox + gap, h / 2);
+			dlGlyphPNG(ctx, SUPEREXTRA, markBox + gap, h / 2 + BASELINE_K * word, word, color);
 			dlStrokeMark(ctx, 0, (h - markBox) / 2 - raise, markBox, color);
 		} else if (d.kind === 'monogram') {
 			const sf = Math.min(w, h) * 0.5,
@@ -226,9 +231,8 @@
 				gap = sf * MONO_GAP_K,
 				raise = sf * MONO_RAISE_K,
 				drop = sf * MONO_DROP_K;
-			const x0 = (w - (markBox + gap + dlMeasure('S', sf))) / 2;
-			dlSetText(ctx, sf, color);
-			ctx.fillText('S', x0 + markBox + gap, h / 2 + drop);
+			const x0 = (w - (markBox + gap + glyphWidth(MONO_S, sf))) / 2;
+			dlGlyphPNG(ctx, MONO_S, x0 + markBox + gap, h / 2 + drop + BASELINE_K * sf, sf, color);
 			dlStrokeMark(ctx, x0, (h - markBox) / 2 - raise + drop, markBox, color);
 		} else {
 			const box = Math.min(w, h) * (d.markFrac ?? 0.7);
@@ -243,9 +247,6 @@
 				`<line x1="${(ox + (x1 / MARK_VB) * box).toFixed(2)}" y1="${(oy + (y1 / MARK_VB) * box).toFixed(2)}" x2="${(ox + (x2 / MARK_VB) * box).toFixed(2)}" y2="${(oy + (y2 / MARK_VB) * box).toFixed(2)}" stroke="${c}" stroke-width="${sw}"/>`
 		).join('');
 	}
-	function dlSVGText(x: number, h: number, px: number, c: string, t: string): string {
-		return `<text x="${x.toFixed(2)}" y="${(h / 2).toFixed(2)}" font-family="${DL_FONT}" font-weight="300" font-size="${px.toFixed(2)}" letter-spacing="-0.025em" dominant-baseline="central" fill="${c}">${t}</text>`;
-	}
 	function dlSVG(d: DL, draw?: Draw): string {
 		const color = dlInk(d.bg);
 		let w = d.w;
@@ -253,30 +254,30 @@
 		let body: string;
 		if (d.kind === 'tile') {
 			const g = dlTileGeom(d);
+			const tagX = g.tagAnchor === 'end' ? g.tagX - glyphWidth(TAGLINE, g.tagsz) : g.tagX;
 			body =
 				dlSVGMark(g.markX, g.markY, g.markw, color) +
-				`<text x="${g.wordX.toFixed(2)}" y="${g.wordCY.toFixed(2)}" font-family="${DL_FONT}" font-weight="300" font-size="${g.word.toFixed(2)}" letter-spacing="-0.025em" dominant-baseline="central" fill="${color}">Superextra</text>` +
-				`<text x="${g.tagX.toFixed(2)}" y="${g.tagBaseline.toFixed(2)}" font-family="${DL_FONT}" font-weight="300" font-size="${g.tagsz.toFixed(2)}" letter-spacing="0.01em" text-anchor="${g.tagAnchor}" fill="${color}">AI consultant for every restaurant</text>`;
+				dlGlyphSVG(SUPEREXTRA, g.wordX, g.wordCY + BASELINE_K * g.word, g.word, color) +
+				dlGlyphSVG(TAGLINE, tagX, g.tagBaseline, g.tagsz, color);
 		} else if (d.kind === 'lockup') {
 			const word = h * 0.55,
 				markBox = word * MARK_K,
 				gap = word * GAP_K,
 				raise = word * LOCKUP_RAISE_K;
-			w = Math.ceil(markBox + gap + dlMeasure('Superextra', word));
+			w = Math.ceil(markBox + gap + glyphWidth(SUPEREXTRA, word));
 			body =
 				dlSVGMark(0, (h - markBox) / 2 - raise, markBox, color) +
-				dlSVGText(markBox + gap, h, word, color, 'Superextra');
+				dlGlyphSVG(SUPEREXTRA, markBox + gap, h / 2 + BASELINE_K * word, word, color);
 		} else if (d.kind === 'monogram') {
 			const sf = Math.min(w, h) * 0.5,
 				markBox = sf * MONO_MARK_K,
 				gap = sf * MONO_GAP_K,
 				raise = sf * MONO_RAISE_K,
 				drop = sf * MONO_DROP_K;
-			const x0 = (w - (markBox + gap + dlMeasure('S', sf))) / 2;
-			// dlSVGText centres at h/2; pass h + 2·drop so the baseline lands at h/2 + drop.
+			const x0 = (w - (markBox + gap + glyphWidth(MONO_S, sf))) / 2;
 			body =
 				dlSVGMark(x0, (h - markBox) / 2 - raise + drop, markBox, color) +
-				dlSVGText(x0 + markBox + gap, h + 2 * drop, sf, color, 'S');
+				dlGlyphSVG(MONO_S, x0 + markBox + gap, h / 2 + drop + BASELINE_K * sf, sf, color);
 		} else {
 			const box = Math.min(w, h) * (d.markFrac ?? 0.7);
 			body = dlSVGMark((w - box) / 2, (h - box) / 2, box, color);
