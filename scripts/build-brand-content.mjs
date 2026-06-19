@@ -16,9 +16,14 @@ import {
 	MARK_K,
 	GAP_K,
 	LOCKUP_RAISE_K,
+	WORD_K,
+	TAG_K,
+	TAG_GAP_K,
+	TAG_BOTTOM_K,
 	MONO_MARK_K,
 	MONO_GAP_K,
 	MONO_RAISE_K,
+	MONO_CAP_K,
 	MONO_DROP_K
 } from '../src/lib/brand/brand-geometry.js';
 import { lockupBodySVG, glyphDefs } from '../src/lib/brand/brand-render.js';
@@ -198,23 +203,45 @@ const matrix = (w, h, extra = {}) =>
 		LAYS.map(([ly, ln]) => ({ w, h, bg, layout: ly, label: ln, note: bn, ...extra }))
 	);
 
-const COVER = matrix(1640, 624, { k: 0.85, download: true, gallery: 'cover' });
-const SQUARE = matrix(1080, 1080, { k: 1.5, m: 0.075, download: true, gallery: 'square' });
-const PORTRAIT = matrix(1080, 1920, { k: 1.5, m: 0.075, download: true, gallery: 'portrait' });
+// Export formats — the single source for the gallery sizes AND the Construction spec table,
+// so the documented scale can never drift from what's actually rendered. `k` scales the lockup
+// relative to the canvas; `m` is the inset margin (× the shorter side).
+const FORMATS = [
+	{ id: 'cover', label: 'Cover', w: 1640, h: 624, k: 0.85, m: 0.12 },
+	{ id: 'square', label: 'Square', w: 1080, h: 1080, k: 1.5, m: 0.075 },
+	{ id: 'portrait', label: 'Portrait', w: 1080, h: 1920, k: 1.5, m: 0.075 },
+	{ id: 'bannerWide', label: 'Banner · wide', w: 1500, h: 500, k: 1, m: 0.12 },
+	{ id: 'bannerThin', label: 'Banner · thin', w: 1128, h: 191, k: 0.85, m: 0.12 }
+];
+const F = Object.fromEntries(FORMATS.map((f) => [f.id, f]));
+
+const COVER = matrix(F.cover.w, F.cover.h, {
+	k: F.cover.k,
+	m: F.cover.m,
+	download: true,
+	gallery: 'cover'
+});
+const SQUARE = matrix(F.square.w, F.square.h, {
+	k: F.square.k,
+	m: F.square.m,
+	download: true,
+	gallery: 'square'
+});
+const PORTRAIT = matrix(F.portrait.w, F.portrait.h, {
+	k: F.portrait.k,
+	m: F.portrait.m,
+	download: true,
+	gallery: 'portrait'
+});
+const wide = { w: F.bannerWide.w, h: F.bannerWide.h, k: F.bannerWide.k };
+const thin = { w: F.bannerThin.w, h: F.bannerThin.h, k: F.bannerThin.k };
 const BANNERS = [
-	{ w: 1500, h: 500, bg: 'white', layout: 'lockup', label: 'Wide', note: 'lockup · white' },
-	{
-		w: 1500,
-		h: 500,
-		bg: 'color',
-		layout: 'splitbr',
-		label: 'Wide',
-		note: 'split-right · colorful'
-	},
-	{ w: 1500, h: 500, bg: 'black', layout: 'split', label: 'Wide', note: 'split-left · black' },
-	{ w: 1128, h: 191, bg: 'white', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'white' },
-	{ w: 1128, h: 191, bg: 'black', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'black' },
-	{ w: 1128, h: 191, bg: 'color', layout: 'splitbr', k: 0.85, label: 'Thin', note: 'colorful' }
+	{ ...wide, bg: 'white', layout: 'lockup', label: 'Wide', note: 'lockup · white' },
+	{ ...wide, bg: 'color', layout: 'splitbr', label: 'Wide', note: 'split-right · colorful' },
+	{ ...wide, bg: 'black', layout: 'split', label: 'Wide', note: 'split-left · black' },
+	{ ...thin, bg: 'white', layout: 'splitbr', label: 'Thin', note: 'white' },
+	{ ...thin, bg: 'black', layout: 'splitbr', label: 'Thin', note: 'black' },
+	{ ...thin, bg: 'color', layout: 'splitbr', label: 'Thin', note: 'colorful' }
 ].map((b) => ({ ...b, download: true, gallery: 'banners' }));
 
 // Colorful background swatch (no lockup) — a live canvas preview of one draw + finish.
@@ -230,6 +257,46 @@ const COLOR_DRAWS = [
 	['indigo-violet', 'Indigo → Violet', ''],
 	['mint', 'Mint', 'emerald → cyan']
 ];
+
+// Construction spec — generated from the same constants the lockup renders from, so the
+// documented proportions/scale can never drift from the artwork. Edit brand-geometry, re-run.
+const num = (n) => Number(n.toFixed(3)).toString();
+const constructionSpec = `
+    <h3>Construction — proportions <span class="pill">one source of truth</span></h3>
+    <p class="note">Every ratio below is <b style="color:var(--ink);font-weight:600">× the wordmark size</b> (the font-size of “Superextra”). The lockup is built from these fixed ratios — never spaced by eye — so it stays self-similar at every size. The tagline is left-aligned to the “S” (not the mark) and runs <b style="color:var(--ink);font-weight:600">≈ 8%</b> past the wordmark’s right edge — a fixed consequence of its size, so it is identical on every asset.</p>
+    <table class="files"><thead><tr><th>Measure</th><th>Ratio · × wordmark</th></tr></thead><tbody>
+      <tr><td>Mark width</td><td><code>${num(MARK_K)}</code></td></tr>
+      <tr><td>Mark → wordmark gap</td><td><code>2 / 22 ≈ ${num(GAP_K)}</code></td></tr>
+      <tr><td>Mark raise — centre above the wordmark’s centre</td><td><code>${num(LOCKUP_RAISE_K)}</code></td></tr>
+      <tr><td>Tagline size</td><td><code>${num(TAG_K)}</code></td></tr>
+      <tr><td>Tagline baseline — below the wordmark’s centre</td><td><code>${num(TAG_GAP_K * TAG_K + 0.5)}</code></td></tr>
+      <tr><td>Tagline baseline — above the bottom inset</td><td><code>${num(TAG_BOTTOM_K)} × tagline</code> · <code>${num(TAG_BOTTOM_K * TAG_K)}</code> × wordmark</td></tr>
+    </tbody></table>
+
+    <h3>Scale per format</h3>
+    <p class="note">The wordmark is <code>${num(WORD_K)}%</code> of the tile width at <code>k = 1</code> — i.e. <code>word = ${num(WORD_K)} · k · width ÷ 100</code>. The inset margin is <code>m × the shorter side</code>. <code>k</code> is the only knob that changes the logo’s size relative to the canvas.</p>
+    <table class="files"><thead><tr><th>Format</th><th>Size</th><th>k</th><th>Wordmark</th><th>Inset m</th></tr></thead><tbody>
+      ${FORMATS.map(
+				(f) =>
+					`<tr><td>${f.label}</td><td>${f.w}×${f.h}</td><td><code>${num(f.k)}</code></td><td>${(WORD_K * f.k).toFixed(2)}% · ${Math.round((WORD_K * f.k * f.w) / 100)}px</td><td><code>${num(f.m)}</code></td></tr>`
+			).join('')}
+    </tbody></table>
+
+    <h3>Monogram <span class="pill">✲S</span></h3>
+    <p class="note">A separate icon — the mark as a superscript over the “S”. Ratios are <b style="color:var(--ink);font-weight:600">× the “S” size</b>.</p>
+    <table class="files"><thead><tr><th>Measure</th><th>Ratio · × S</th></tr></thead><tbody>
+      <tr><td>Mark width</td><td><code>${num(MONO_MARK_K)}</code></td></tr>
+      <tr><td>Mark → S gap</td><td><code>${num(MONO_GAP_K)}</code></td></tr>
+      <tr><td>Mark raise</td><td><code>${num(MONO_RAISE_K)}</code></td></tr>
+      <tr><td>S cap height (approx.)</td><td><code>${num(MONO_CAP_K)}</code></td></tr>
+      <tr><td>Group drop — re-centres the ✲S in a square</td><td><code>≈ ${num(MONO_DROP_K)}</code></td></tr>
+    </tbody></table>
+
+    <h3>Typeface</h3>
+    <p class="note">The system sans at the <b style="color:var(--ink);font-weight:600">Light</b> instance — SF Pro on Apple, Inter (300) elsewhere — variable weight <code>274.315</code> (where CSS <code>font-weight: 300</code> maps). Tracking: wordmark <code>−0.025em</code>, tagline <code>+0.01em</code>. Every export embeds the wordmark/tagline as <b style="color:var(--ink);font-weight:600">outlined vector paths</b> (SF Pro Light), so each file is the exact typeface with no font dependency.</p>
+
+    <p class="note">Every asset — the previews on this page <b style="color:var(--ink);font-weight:600">and</b> every downloaded SVG/PNG — renders from one shared pipeline: <code>brand-geometry</code> (these proportions) + <code>brand-glyphs</code> (the SF Pro Light outlines) + <code>brand-render</code> (the lockup SVG). <b style="color:var(--ink);font-weight:600">Preview equals export, pixel-for-pixel, on every asset — and this whole spec is generated from those same constants, so it can’t drift.</b> Change a number in <code>brand-geometry</code>, re-run the generator, and it updates everywhere — including here.</p>
+`;
 
 const html = `<style>
 :root{--bg:#1a1714;--panel:#211e1a;--panel2:#262320;--line:#2e2a25;--line2:#3d3832;--ink:#ede9e3;--mut:#9b958c;--soft:#c7c1b8;--cream:#fefdf9;--sb:248px}
@@ -321,15 +388,7 @@ ${glyphDefs()}
       <div class="card"><div class="frame cream" style="min-height:200px"><div style="display:flex;align-items:center;gap:6px;color:#1a1a1a"><span style="display:inline-flex;width:49.5px;height:49.5px;position:relative;top:-11.88px">${MK('#1a1a1a')}</span><span class="wm" style="font-size:66px">Superextra</span></div></div><div class="cap"><b>Wordmark</b> · mark + name, the primary lockup${dl({ name: 'superextra-wordmark', kind: 'lockup', bg: 'transparent', w: 0, h: 480 })}</div></div>
     </div>
     <div class="do"><div class="b ok"><div class="t">Do</div>Keep the raised mark, Light weight, and −0.025em tracking. Give the logo clear space of at least the mark’s height on every side.</div><div class="b no"><div class="t">Don’t</div>Recolor, outline, stretch, re-space, or swap the typeface. Don’t lower the mark to the baseline.</div></div>
-    <h3>Construction <span class="pill">one source of truth</span></h3>
-    <p class="note">The lockup is built from fixed ratios of the wordmark size — never spaced by eye. The mark is raised so its centre sits above the wordmark’s vertical centre.</p>
-    <table class="files"><thead><tr><th>Measure</th><th>Ratio · × wordmark</th></tr></thead><tbody>
-      <tr><td>Mark width</td><td><code>0.75</code></td></tr>
-      <tr><td>Mark → wordmark gap</td><td><code>2 / 22 ≈ 0.091</code></td></tr>
-      <tr><td>Mark raise — centre above the wordmark’s centre</td><td><code>0.18</code></td></tr>
-      <tr><td>Tagline size</td><td><code>0.31</code></td></tr>
-    </tbody></table>
-    <p class="note">Every asset — the previews on this page <b style="color:var(--ink);font-weight:600">and</b> every downloaded SVG/PNG — is generated from one shared geometry module (<code>brand-geometry</code>), so the mark lands in exactly the same place relative to the wordmark everywhere, on screen and in the file. <b style="color:var(--ink);font-weight:600">That pixel-for-pixel match is the whole point of this collection: always export the asset from here — never rebuild the lockup or place the mark by hand.</b></p>
+${constructionSpec}
   </section>
 
   <div class="hr"></div>
