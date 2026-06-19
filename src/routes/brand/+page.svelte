@@ -15,6 +15,13 @@
 		lockupGeom
 	} from '$lib/brand/brand-geometry';
 	import { UPM, SUPEREXTRA, S as MONO_S, TAGLINE } from '$lib/brand/brand-glyphs';
+	import {
+		BASELINE_K,
+		glyphWidth,
+		markLinesSVG,
+		glyphPathSVG,
+		lockupBodySVG
+	} from '$lib/brand/brand-render';
 
 	const PIN_LENGTH = 4;
 
@@ -128,12 +135,6 @@
 		gallery?: string; // colour tile → resolve theme from this gallery's picker
 	};
 	const dlInk = (bg: string) => (bg === 'black' || bg === 'color' ? '#fefdf9' : '#1a1a1a');
-	// Outlined-glyph helpers. Paths are SF Pro Light in font units (y-up, alphabetic
-	// baseline at y=0); their advance widths come from the same source. A glyph string's
-	// alphabetic baseline sits BASELINE_K·size below its em-centre, matching where the
-	// on-page wordmark — placed by its em-centre (textBaseline 'middle') — renders.
-	const BASELINE_K = 0.394;
-	const glyphWidth = (g: { adv: number }, size: number) => (g.adv * size) / UPM;
 
 	// Resolve a colour tile's Draw from its gallery's current theme pick.
 	function resolveDraw(d: DL): Draw | undefined {
@@ -161,10 +162,6 @@
 		ctx.scale(size / UPM, -size / UPM);
 		ctx.fill(new Path2D(g.d));
 		ctx.restore();
-	}
-	function dlGlyphSVG(g: { d: string }, x: number, baseline: number, size: number, color: string) {
-		const s = (size / UPM).toFixed(5);
-		return `<path transform="translate(${x.toFixed(2)} ${baseline.toFixed(2)}) scale(${s} -${s})" d="${g.d}" fill="${color}"/>`;
 	}
 	function dlStrokeMark(
 		ctx: CanvasRenderingContext2D,
@@ -240,25 +237,13 @@
 		}
 		return await new Promise<Blob | null>((res) => cv.toBlob(res, 'image/png'));
 	}
-	function dlSVGMark(ox: number, oy: number, box: number, c: string): string {
-		const sw = ((box * MARK_STROKE) / MARK_VB).toFixed(2);
-		return MARK_LINES.map(
-			([x1, y1, x2, y2]) =>
-				`<line x1="${(ox + (x1 / MARK_VB) * box).toFixed(2)}" y1="${(oy + (y1 / MARK_VB) * box).toFixed(2)}" x2="${(ox + (x2 / MARK_VB) * box).toFixed(2)}" y2="${(oy + (y2 / MARK_VB) * box).toFixed(2)}" stroke="${c}" stroke-width="${sw}"/>`
-		).join('');
-	}
 	function dlSVG(d: DL, draw?: Draw): string {
 		const color = dlInk(d.bg);
 		let w = d.w;
 		const h = d.h;
 		let body: string;
 		if (d.kind === 'tile') {
-			const g = dlTileGeom(d);
-			const tagX = g.tagAnchor === 'end' ? g.tagX - glyphWidth(TAGLINE, g.tagsz) : g.tagX;
-			body =
-				dlSVGMark(g.markX, g.markY, g.markw, color) +
-				dlGlyphSVG(SUPEREXTRA, g.wordX, g.wordCY + BASELINE_K * g.word, g.word, color) +
-				dlGlyphSVG(TAGLINE, tagX, g.tagBaseline, g.tagsz, color);
+			body = lockupBodySVG(d.w, d.h, d.k ?? 1, d.m ?? 0.12, d.layout ?? 'lockup', color);
 		} else if (d.kind === 'lockup') {
 			const word = h * 0.55,
 				markBox = word * MARK_K,
@@ -266,8 +251,8 @@
 				raise = word * LOCKUP_RAISE_K;
 			w = Math.ceil(markBox + gap + glyphWidth(SUPEREXTRA, word));
 			body =
-				dlSVGMark(0, (h - markBox) / 2 - raise, markBox, color) +
-				dlGlyphSVG(SUPEREXTRA, markBox + gap, h / 2 + BASELINE_K * word, word, color);
+				markLinesSVG(0, (h - markBox) / 2 - raise, markBox, color) +
+				glyphPathSVG(SUPEREXTRA, markBox + gap, h / 2 + BASELINE_K * word, word, color);
 		} else if (d.kind === 'monogram') {
 			const sf = Math.min(w, h) * 0.5,
 				markBox = sf * MONO_MARK_K,
@@ -276,11 +261,11 @@
 				drop = sf * MONO_DROP_K;
 			const x0 = (w - (markBox + gap + glyphWidth(MONO_S, sf))) / 2;
 			body =
-				dlSVGMark(x0, (h - markBox) / 2 - raise + drop, markBox, color) +
-				dlGlyphSVG(MONO_S, x0 + markBox + gap, h / 2 + drop + BASELINE_K * sf, sf, color);
+				markLinesSVG(x0, (h - markBox) / 2 - raise + drop, markBox, color) +
+				glyphPathSVG(MONO_S, x0 + markBox + gap, h / 2 + drop + BASELINE_K * sf, sf, color);
 		} else {
 			const box = Math.min(w, h) * (d.markFrac ?? 0.7);
-			body = dlSVGMark((w - box) / 2, (h - box) / 2, box, color);
+			body = markLinesSVG((w - box) / 2, (h - box) / 2, box, color);
 		}
 		let bgEl = '';
 		if (d.bg === 'cream') bgEl = `<rect width="${w}" height="${h}" fill="#fefdf9"/>`;
