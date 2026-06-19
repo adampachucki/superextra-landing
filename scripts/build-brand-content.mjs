@@ -19,10 +19,9 @@ import {
 	MONO_MARK_K,
 	MONO_GAP_K,
 	MONO_RAISE_K,
-	MONO_DROP_K,
-	ASCENT_K,
-	lockupGeom
+	MONO_DROP_K
 } from '../src/lib/brand/brand-geometry.js';
+import { lockupBodySVG, glyphDefs } from '../src/lib/brand/brand-render.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -124,16 +123,10 @@ function tile({
 	download
 }) {
 	const ink = bg === 'white' ? '#1a1a1a' : '#fefdf9';
-	// Absolute positions from the shared lockupGeom, so the preview lands pixel-for-pixel on
-	// the SVG/PNG exports. The wordmark is placed by its em-middle (line-height:1) to mirror
-	// the canvas textBaseline:'middle'; the tagline by its alphabetic baseline.
-	const g = lockupGeom(w, h, k, m, layout);
-	const pc = (px) => ((px / w) * 100).toFixed(3); // px → cqw (% of tile width)
-	const mark = `<span style="position:absolute;left:${pc(g.markX)}cqw;top:${pc(g.markY)}cqw;width:${pc(g.markw)}cqw;height:${pc(g.markw)}cqw;display:inline-flex">${MK(ink)}</span>`;
-	const word = `<span class="wm" style="position:absolute;left:${pc(g.wordX)}cqw;top:${pc(g.wordCY - g.word / 2)}cqw;font-size:${pc(g.word)}cqw;line-height:1;color:${ink};white-space:nowrap">Superextra</span>`;
-	const tagPos = g.tagAnchor === 'end' ? `right:${pc(w - g.tagX)}cqw` : `left:${pc(g.tagX)}cqw`;
-	const tag = `<span style="position:absolute;${tagPos};top:${pc(g.tagBaseline - g.tagsz * ASCENT_K)}cqw;font-size:${pc(g.tagsz)}cqw;line-height:1;font-weight:300;letter-spacing:0.01em;color:${ink};white-space:nowrap">AI consultant for every restaurant</span>`;
-	const inner = mark + word + tag;
+	// The lockup is rendered as the SAME outlined SF Pro Light SVG the export draws (shared
+	// brand-render), so the preview is byte-identical to the downloaded file — no live-font
+	// optical-sizing drift, and the wordmark/tagline proportions are constant on every tile.
+	const inner = `<svg class="lk" viewBox="0 0 ${w} ${h}">${lockupBodySVG(w, h, k, m, layout, ink, true)}</svg>`;
 	// Colourful backgrounds are painted live by the brand route into a <canvas>: a tile
 	// either follows a gallery's theme picker (data-gallery) or shows a fixed draw (data-draw).
 	const isColor = bg === 'color';
@@ -205,7 +198,7 @@ const matrix = (w, h, extra = {}) =>
 		LAYS.map(([ly, ln]) => ({ w, h, bg, layout: ly, label: ln, note: bn, ...extra }))
 	);
 
-const COVER = matrix(1640, 624, { download: true, gallery: 'cover' });
+const COVER = matrix(1640, 624, { k: 0.85, download: true, gallery: 'cover' });
 const SQUARE = matrix(1080, 1080, { k: 1.5, m: 0.075, download: true, gallery: 'square' });
 const PORTRAIT = matrix(1080, 1920, { k: 1.5, m: 0.075, download: true, gallery: 'portrait' });
 const BANNERS = [
@@ -275,6 +268,7 @@ p.note{font-size:13.5px;color:var(--mut);max-width:680px;margin:10px 0}
 .dl{font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.05em;color:var(--mut);background:transparent;border:1px solid var(--line2);border-radius:6px;padding:2px 7px;cursor:pointer;transition:color .15s,border-color .15s}
 .dl:hover{color:var(--ink);border-color:var(--soft)}
 .bgc{position:absolute;inset:0;width:100%;height:100%;display:block}
+.lk{position:absolute;inset:0;width:100%;height:100%;display:block}
 .ic-fg{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center}
 .bgsel{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:16px 0 2px}
 .bgsel-l{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-right:4px}
@@ -300,6 +294,7 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
 .do .b .t{font-weight:600;margin-bottom:4px}.do .ok .t{color:#7fd6a6}.do .no .t{color:#e0907f}
 @media(max-width:820px){.sidebar{display:none}main{margin-left:0;padding:32px 22px 120px}.palette{grid-template-columns:repeat(3,1fr)}}
 </style>
+${glyphDefs()}
 <aside class="sidebar">
   <div class="sbrand">${MK('#ede9e3')}<span class="nm">Superextra</span></div>
   <p class="sbrand-sub">Brand assets &amp; guidelines</p>
@@ -379,6 +374,7 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
 			{
 				w: 1640,
 				h: 624,
+				k: 0.85,
 				bg: 'white',
 				layout: 'lockup',
 				label: 'Lockup',
@@ -387,6 +383,7 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
 			{
 				w: 1640,
 				h: 624,
+				k: 0.85,
 				bg: 'white',
 				layout: 'split',
 				label: 'Split',
@@ -395,6 +392,7 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
 			{
 				w: 1640,
 				h: 624,
+				k: 0.85,
 				bg: 'white',
 				layout: 'splitbr',
 				label: 'Split',
@@ -410,11 +408,12 @@ table.files td code,p code{color:var(--ink);font-family:ui-monospace,Menlo,monos
     <div class="eyebrow">System</div><h2>Backgrounds</h2>
     <p class="lede">Every surface uses white, black, or the colorful gradient with noise — rendered at native resolution per size so the grain stays crisp. The colorful background comes in several color draws (see <a href="#colorful" style="color:var(--soft)">Colorful palette</a>).</p>
     ${grid(3, [
-			{ w: 1640, h: 624, bg: 'white', layout: 'lockup', label: 'White', note: '#FEFDF9' },
-			{ w: 1640, h: 624, bg: 'black', layout: 'lockup', label: 'Black', note: '#141210' },
+			{ w: 1640, h: 624, k: 0.85, bg: 'white', layout: 'lockup', label: 'White', note: '#FEFDF9' },
+			{ w: 1640, h: 624, k: 0.85, bg: 'black', layout: 'lockup', label: 'Black', note: '#141210' },
 			{
 				w: 1640,
 				h: 624,
+				k: 0.85,
 				bg: 'color',
 				theme: 'periwinkle',
 				layout: 'lockup',

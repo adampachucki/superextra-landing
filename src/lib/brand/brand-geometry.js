@@ -25,7 +25,7 @@ export const GAP_K = 2 / 22; // mark→word gap ÷ wordmark
 // only move it half as far). The monogram's superscript raise is larger — see MONO_RAISE_K.
 export const LOCKUP_RAISE_K = 0.18; // lockup mark raise ÷ wordmark
 export const WORD_K = 5.85; // gallery-tile wordmark size in cqw, at k = 1
-export const TAG_K = 0.31; // tagline size ÷ wordmark
+export const TAG_K = 0.33; // tagline size ÷ wordmark (sized so it overruns the wordmark ~8%)
 
 // ✲S monogram, relative to the "S" size.
 export const MONO_MARK_K = 0.55; // monogram mark width ÷ S
@@ -39,15 +39,12 @@ export const MONO_DROP_K = (MONO_RAISE_K + MONO_MARK_K / 2 - MONO_CAP_K / 2) / 2
 // Tagline vertical rhythm (lockup layout): baseline sits TAG_BOTTOM_K·tagsz above the
 // bottom inset, and TAG_GAP_K·tagsz + 0.5·word below the wordmark's vertical centre.
 export const TAG_BOTTOM_K = 0.58;
-export const TAG_GAP_K = 2.13;
-// Alphabetic baseline measured from the top of a line-height:1 box for the system sans,
-// so the CSS preview can place text on the exact baseline the canvas exports draw from.
-export const ASCENT_K = 0.92;
+export const TAG_GAP_K = 1.6;
 
 /**
- * Lockup element positions for a w×h tile — the single source the on-page preview (absolute
- * CSS) and the SVG/PNG exports (canvas) both render from, so the mark, wordmark and tagline
- * land on identical coordinates. Values in px; the preview converts each to cqw (÷w·100).
+ * Lockup element positions for a w×h tile, in the tile's own px coordinate space — the single
+ * source both the on-page preview and the SVG/PNG exports render from (as outlined SVG paths),
+ * so the mark, wordmark and tagline land on identical coordinates everywhere.
  * @param {number} w @param {number} h @param {number} [k] @param {number} [m]
  * @param {'lockup'|'split'|'splitbr'} [layout]
  */
