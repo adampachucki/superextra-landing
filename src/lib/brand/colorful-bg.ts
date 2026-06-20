@@ -74,7 +74,7 @@ const lighten = (c: RGB, t: number): RGB => lerp(c, [255, 255, 255], t);
 // grain; assets shown small (an avatar from a big export) get a coarser file that resolves to
 // the same fineness once shrunk. Independent of export resolution, so it can't drift coarse on
 // large assets or wash out on small ones.
-export const GRAIN_CELL_PX = 1.5;
+export const GRAIN_CELL_PX = 1.0;
 
 // Paint the full background (gradient → blobs → film grain) into ctx at W×H. `shownAt` is the
 // shorter-side pixel size at which the asset is displayed (default = native, i.e. min(W,H)); it
