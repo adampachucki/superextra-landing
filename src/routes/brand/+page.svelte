@@ -34,9 +34,6 @@
 	// The injected gallery content, and each gallery's currently-selected colour theme.
 	let content = $state<HTMLElement | undefined>(undefined);
 	let selectedTheme: Record<string, string> = $state({});
-	// Shorter-side display size for the small-display assets (avatars/icons); the colorful grain
-	// is calibrated so a cell reads as a fine speck at this size instead of averaging away.
-	const AVATAR_SHOWN_AT = 96;
 
 	function b64ToBytes(b64: string) {
 		return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -136,7 +133,6 @@
 		k?: number;
 		m?: number;
 		gallery?: string; // colour tile → resolve theme from this gallery's picker
-		shownAt?: number; // shorter-side display size → calibrates grain (small assets only)
 	};
 	const dlInk = (bg: string) => (bg === 'black' || bg === 'color' ? '#fefdf9' : '#1a1a1a');
 
@@ -184,14 +180,7 @@
 			ctx.stroke();
 		}
 	}
-	function dlPaintBg(
-		ctx: CanvasRenderingContext2D,
-		bg: string,
-		w: number,
-		h: number,
-		draw?: Draw,
-		shownAt?: number
-	) {
+	function dlPaintBg(ctx: CanvasRenderingContext2D, bg: string, w: number, h: number, draw?: Draw) {
 		if (bg === 'cream') {
 			ctx.fillStyle = '#fefdf9';
 			ctx.fillRect(0, 0, w, h);
@@ -199,7 +188,7 @@
 			ctx.fillStyle = '#141210';
 			ctx.fillRect(0, 0, w, h);
 		} else if (bg === 'color' && draw) {
-			paintColorful(ctx, w, h, draw, shownAt);
+			paintColorful(ctx, w, h, draw);
 		}
 	}
 	// Gallery-tile geometry — the shared lockup layout, so the canvas exports and the
@@ -207,8 +196,7 @@
 	function dlTileGeom(d: DL) {
 		return lockupGeom(d.w, d.h, d.k ?? 1, d.m ?? 0.12, d.layout ?? 'lockup');
 	}
-	// Compose an asset into a canvas at full export resolution. Shared by the PNG export and the
-	// real-size preview strip, so the downscaled preview shows the exact pixels that get exported.
+	// Compose an asset into a canvas at full export resolution.
 	function dlCompose(d: DL, draw?: Draw): HTMLCanvasElement {
 		const color = dlInk(d.bg);
 		let w = d.w;
@@ -221,7 +209,7 @@
 		}
 		cv.width = w;
 		cv.height = h;
-		dlPaintBg(ctx, d.bg, w, h, draw, d.shownAt);
+		dlPaintBg(ctx, d.bg, w, h, draw);
 		if (d.kind === 'tile') {
 			const g = dlTileGeom(d);
 			dlGlyphPNG(ctx, SUPEREXTRA, g.wordX, g.wordCY + BASELINE_K * g.word, g.word, color);
@@ -292,7 +280,7 @@
 			const bc = document.createElement('canvas');
 			bc.width = w;
 			bc.height = h;
-			paintColorful(bc.getContext('2d')!, w, h, draw, d.shownAt);
+			paintColorful(bc.getContext('2d')!, w, h, draw);
 			bgEl = `<image href="${bc.toDataURL('image/png')}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>`;
 		}
 		return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${bgEl}${body}</svg>`;
@@ -323,8 +311,7 @@
 
 	// ── Live colourful backgrounds ───────────────────────────────────────────
 	// Each colour tile/swatch is a <canvas>; paint it from the engine, sized to its display
-	// pixels. The grain defaults to native (shownAt = buffer size) → a fine speck on screen,
-	// which is exactly how every asset reads at the size it's shown.
+	// pixels so the film grain reads at the same zoom on every asset size.
 	function paintCanvas(cv: HTMLCanvasElement) {
 		const cw = Math.round(cv.clientWidth);
 		const ch = Math.round(cv.clientHeight);
@@ -345,39 +332,6 @@
 	function paintScope(sel: string) {
 		content?.querySelectorAll<HTMLCanvasElement>(sel).forEach(paintCanvas);
 	}
-	// Real-size preview: render the avatar export at full resolution, then downscale into a small
-	// canvas — exactly what a platform does when it shrinks the upload — so the auto-calibrated
-	// grain can be seen holding a fine, even texture at the sizes it's actually shown.
-	function paintSizeCanvas(cv: HTMLCanvasElement) {
-		const gallery = cv.dataset.gallery;
-		if (!gallery) return;
-		const draw = DRAWS[selectedTheme[gallery]]?.rich;
-		if (!draw) return;
-		const px = Number(cv.dataset.size) || 64;
-		const kind = cv.dataset.kind === 'mono' ? 'monogram' : 'mark';
-		// Compose at the avatar export size (1080²) with the avatar grain calibration, so the
-		// downscale ratio and the grain both match the real exported file.
-		const d: DL = {
-			name: 'preview',
-			kind,
-			bg: 'color',
-			w: 1080,
-			h: 1080,
-			gallery,
-			shownAt: AVATAR_SHOWN_AT
-		};
-		if (kind === 'mark') d.markFrac = 0.44;
-		const full = dlCompose(d, draw);
-		cv.width = px;
-		cv.height = px;
-		const ctx = cv.getContext('2d')!;
-		ctx.imageSmoothingEnabled = true;
-		ctx.imageSmoothingQuality = 'high';
-		ctx.drawImage(full, 0, 0, px, px);
-	}
-	function paintSizeScope(sel: string) {
-		content?.querySelectorAll<HTMLCanvasElement>(sel).forEach(paintSizeCanvas);
-	}
 	function initThemes() {
 		const sel: Record<string, string> = {};
 		content?.querySelectorAll<HTMLElement>('.bgsel').forEach((el) => {
@@ -395,7 +349,6 @@
 		selectedTheme = { ...selectedTheme, [g]: key };
 		sel.querySelectorAll('button.theme').forEach((b) => b.classList.toggle('active', b === btn));
 		paintScope(`canvas.bgc[data-gallery="${g}"]`);
-		paintSizeScope(`canvas.szc[data-gallery="${g}"]`);
 	}
 	// One delegated click handler for the injected content; download and theme clicks are
 	// mutually exclusive (button.dl vs button.theme), so each guards itself.
@@ -409,7 +362,6 @@
 		let raf = requestAnimationFrame(() => {
 			initThemes();
 			paintScope('canvas.bgc');
-			paintSizeScope('canvas.szc');
 			ro = new ResizeObserver(() => {
 				cancelAnimationFrame(raf);
 				raf = requestAnimationFrame(() => paintScope('canvas.bgc'));

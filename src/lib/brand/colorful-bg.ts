@@ -68,24 +68,10 @@ const lerp = (a: RGB, b: RGB, t: number): RGB => [
 ];
 const lighten = (c: RGB, t: number): RGB => lerp(c, [255, 255, 255], t);
 
-// Target grain cell size, in pixels, measured at the size an asset is actually shown — the
-// visual fineness of the film grain. Grain is generated at this size relative to `shownAt`, so
-// it reads as the same fine texture everywhere: assets shown near native get ~GRAIN_CELL_PX
-// grain; assets shown small (an avatar from a big export) get a coarser file that resolves to
-// the same fineness once shrunk. Independent of export resolution, so it can't drift coarse on
-// large assets or wash out on small ones.
-export const GRAIN_CELL_PX = 1.0;
-
-// Paint the full background (gradient → blobs → film grain) into ctx at W×H. `shownAt` is the
-// shorter-side pixel size at which the asset is displayed (default = native, i.e. min(W,H)); it
-// sets the grain coarseness so a cell stays ~GRAIN_CELL_PX at that display size.
-export function paintColorful(
-	ctx: CanvasRenderingContext2D,
-	W: number,
-	H: number,
-	d: Draw,
-	shownAt: number = Math.min(W, H)
-): void {
+// Paint the full background (gradient -> blobs -> film grain) into ctx at W x H.
+// Grain is generated per output pixel, so exported masters keep a fine native texture
+// instead of baking in coarse cells for a guessed downstream display size.
+export function paintColorful(ctx: CanvasRenderingContext2D, W: number, H: number, d: Draw): void {
 	const a = hx(d.c1);
 	const b = hx(d.c2);
 	const ANG = (d.ang * Math.PI) / 180;
@@ -143,21 +129,15 @@ export function paintColorful(
 		ctx.restore();
 	}
 
-	// 3) film grain. Generated at low resolution — cells of ~GRAIN_CELL_PX at the display size —
-	//    then scaled up to fill the asset, so the cell is a constant apparent fineness regardless
-	//    of export resolution. That keeps it from averaging away when a platform shrinks the file
-	//    (small avatars) and from reading as coarse blocks on large assets. Deterministic per seed
-	//    so it doesn't reshuffle on repaint and the export matches the preview; hashed per cell
-	//    index so the lattice doesn't band diagonally.
-	const cell = GRAIN_CELL_PX * (Math.min(W, H) / Math.max(1, shownAt));
-	const bw = Math.max(1, Math.round(W / cell));
-	const bh = Math.max(1, Math.round(H / cell));
+	// 3) film grain. Deterministic (so it doesn't reshuffle on every repaint and matches
+	//    exports), but hashed per pixel index - reusing the blob LCG here tiles its lattice
+	//    into visible diagonal patterns, so each pixel gets an independent hashed value.
 	const off = document.createElement('canvas');
-	off.width = bw;
-	off.height = bh;
+	off.width = W;
+	off.height = H;
 	const o = off.getContext('2d');
 	if (o) {
-		const img = o.createImageData(bw, bh);
+		const img = o.createImageData(W, H);
 		const gseed = Math.imul(d.seed || 3, 0x9e3779b1) >>> 0;
 		for (let p = 0, i = 0; i < img.data.length; i += 4, p++) {
 			let hsh = (p ^ gseed) >>> 0;
@@ -172,8 +152,7 @@ export function paintColorful(
 		ctx.save();
 		ctx.globalCompositeOperation = 'overlay';
 		ctx.globalAlpha = GRAIN;
-		ctx.imageSmoothingEnabled = false; // crisp cells; platform downscaling softens them
-		ctx.drawImage(off, 0, 0, W, H);
+		ctx.drawImage(off, 0, 0);
 		ctx.restore();
 	}
 }

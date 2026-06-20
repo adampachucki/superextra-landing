@@ -57,21 +57,6 @@ const THEMES = [
 const bgsel = (gallery, def) =>
 	`<div class="bgsel" data-gallery="${gallery}" data-default="${def}"><span class="bgsel-l">Colour theme</span>${THEMES.map(([k, n]) => `<button type="button" class="theme${k === def ? ' active' : ''}" data-theme="${k}">${n}</button>`).join('')}</div>`;
 
-// Real-size preview strip — the brand route composes the avatar export at full resolution, then
-// downscales each canvas to the px size platforms actually display, so the grain pick can be
-// judged where it matters (fine grain washes out small; coarse survives). Follows a gallery picker.
-const SIZE_PX = [96, 64, 48, 32];
-const sizeStrip = (gallery, kind) =>
-	`<div class="sizes">${SIZE_PX.map(
-		(px) =>
-			`<figure class="szf"><canvas class="szc" data-gallery="${gallery}" data-kind="${kind}" data-size="${px}" style="width:${px}px;height:${px}px"></canvas><figcaption>${px}px</figcaption></figure>`
-	).join('')}</div>`;
-
-// Shorter-side display size for avatars/icons. The colorful grain is calibrated so a cell reads
-// as a fine speck at this size — so it survives the shrink from the big export instead of washing
-// out. (Matches AVATAR_SHOWN_AT in the brand route's export engine.)
-const AVATAR_SHOWN_AT = 96;
-
 // Icon / avatar tiles — the mark alone, and the ✲S monogram, on each background.
 function iconTile({ kind, bg, crop, label }) {
 	const r = (n) => n.toFixed(2);
@@ -105,7 +90,6 @@ function iconTile({ kind, bg, crop, label }) {
 					w: sq ? 512 : 1080,
 					h: sq ? 512 : 1080,
 					markFrac: sq ? 0.5 : 0.44,
-					shownAt: AVATAR_SHOWN_AT,
 					...gx
 				}
 			: {
@@ -114,7 +98,6 @@ function iconTile({ kind, bg, crop, label }) {
 					bg: dbg(bg),
 					w: sq ? 512 : 1080,
 					h: sq ? 512 : 1080,
-					shownAt: AVATAR_SHOWN_AT,
 					...gx
 				};
 	return `<div class="card"><div class="frame" style="padding:24px"><div style="position:relative;width:${size}px;height:${size}px;${bgcss};border-radius:${radius};overflow:hidden;display:flex;align-items:center;justify-content:center">${canvasEl}<span class="ic-fg">${inner}</span></div></div><div class="cap"><b>${label}</b>${dl(desc)}</div></div>`;
@@ -359,12 +342,6 @@ p.note{font-size:13.5px;color:var(--mut);max-width:680px;margin:10px 0}
 .theme{font-family:inherit;font-size:12px;color:var(--soft);background:transparent;border:1px solid var(--line2);border-radius:999px;padding:3px 11px;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
 .theme:hover{color:var(--ink);border-color:var(--soft)}
 .theme.active{color:var(--ink);background:var(--panel2);border-color:var(--soft);font-weight:600}
-.sizerow{display:flex;align-items:flex-end;gap:18px;margin:14px 0}
-.szlabel{width:34px;flex:none;font-size:12px;color:var(--mut);padding-bottom:24px}
-.sizes{display:flex;align-items:flex-end;gap:20px}
-.szf{display:flex;flex-direction:column;align-items:center;gap:7px}
-.szc{display:block;border-radius:50%;border:1px solid var(--line)}
-.szf figcaption{font-size:10.5px;color:var(--mut);font-variant-numeric:tabular-nums}
 .cream{background:var(--cream)}
 .swatch{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .swatch .chip{height:96px}.swatch .meta{padding:11px 13px;font-size:12.5px}
@@ -488,7 +465,7 @@ ${constructionSpec}
   <div class="hr"></div>
   <section id="backgrounds">
     <div class="eyebrow">System</div><h2>Backgrounds</h2>
-    <p class="lede">Every surface uses white, black, or the colorful gradient with film grain. The grain is tuned per asset to stay a fine, even texture at the size each surface is shown — so it never averages away on small exports or turns coarse on large ones. The colorful background comes in several color draws (see <a href="#colorful" style="color:var(--soft)">Colorful palette</a>).</p>
+    <p class="lede">Every surface uses white, black, or the colorful gradient with fine native film grain. The colorful background comes in several color draws (see <a href="#colorful" style="color:var(--soft)">Colorful palette</a>).</p>
     ${grid(3, [
 			{ w: 1640, h: 624, k: 0.85, bg: 'white', layout: 'lockup', label: 'White', note: '#FEFDF9' },
 			{ w: 1640, h: 624, k: 0.85, bg: 'black', layout: 'lockup', label: 'Black', note: '#141210' },
@@ -549,12 +526,7 @@ ${constructionSpec}
   <section id="profile">
     <div class="eyebrow">Marks &amp; partners</div><h2>Profile &amp; icon</h2>
     <p class="lede">Two icon treatments — the mark alone, and the ✲S monogram (the mark as a small superscript over the “S”). Each works as a rounded-square app icon and a circular avatar, on every background.</p>
-    <p class="note">Avatars are displayed tiny, so the colorful grain is tuned to stay a fine, even texture at avatar size instead of averaging away when a platform shrinks the export. The strip below shows it at the sizes platforms actually render.</p>
     ${bgsel('profile', 'dusk')}
-    <h3>Shown at real size <span class="pill">downscaled like a platform</span></h3>
-    <p class="note">The colorful avatar composed at full export resolution, then shrunk to the sizes platforms display — so you can see the grain holds an even, fine texture at every size.</p>
-    <div class="sizerow"><span class="szlabel">Mark</span>${sizeStrip('profile', 'mark')}</div>
-    <div class="sizerow"><span class="szlabel">✲S</span>${sizeStrip('profile', 'mono')}</div>
     <h3>Mark</h3>
     <div class="grid" style="grid-template-columns:repeat(3,1fr)">${iconSet('mark')}</div>
     <h3>✲S monogram</h3>
