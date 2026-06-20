@@ -68,23 +68,23 @@ const lerp = (a: RGB, b: RGB, t: number): RGB => [
 ];
 const lighten = (c: RGB, t: number): RGB => lerp(c, [255, 255, 255], t);
 
-// Grain coarseness presets — the number of grain cells across the shorter side of the asset.
-// Fewer cells = larger cells = coarser grain that survives heavy downscaling (small avatars);
-// more cells = finer grain for assets shown large (covers, banners). The count is a fraction of
-// the image (not its pixel resolution), so a preset looks identical at every export size — and
-// that fraction is what keeps the grain alive when a platform shrinks the file to display size.
-export const GRAIN_CELLS = { fine: 180, medium: 96, coarse: 46 } as const;
-export type GrainLevel = keyof typeof GRAIN_CELLS;
+// Target grain cell size, in pixels, measured at the size an asset is actually shown — the
+// visual fineness of the film grain. Grain is generated at this size relative to `shownAt`, so
+// it reads as the same fine texture everywhere: assets shown near native get ~GRAIN_CELL_PX
+// grain; assets shown small (an avatar from a big export) get a coarser file that resolves to
+// the same fineness once shrunk. Independent of export resolution, so it can't drift coarse on
+// large assets or wash out on small ones.
+export const GRAIN_CELL_PX = 1.5;
 
-// Paint the full background (gradient → blobs → film grain) into ctx at W×H. `grainCells` sets
-// the grain coarseness as cells across the shorter side, independent of W,H — so preview and
-// export pick the same level and look the same once each is viewed at its real size.
+// Paint the full background (gradient → blobs → film grain) into ctx at W×H. `shownAt` is the
+// shorter-side pixel size at which the asset is displayed (default = native, i.e. min(W,H)); it
+// sets the grain coarseness so a cell stays ~GRAIN_CELL_PX at that display size.
 export function paintColorful(
 	ctx: CanvasRenderingContext2D,
 	W: number,
 	H: number,
 	d: Draw,
-	grainCells: number = GRAIN_CELLS.medium
+	shownAt: number = Math.min(W, H)
 ): void {
 	const a = hx(d.c1);
 	const b = hx(d.c2);
@@ -143,13 +143,13 @@ export function paintColorful(
 		ctx.restore();
 	}
 
-	// 3) film grain. Generated at a low resolution — `grainCells` cells across the shorter side —
-	//    then scaled up to fill the asset, so each cell is a constant fraction of the image at any
-	//    export resolution. That is what lets the grain survive when a platform downscales the
-	//    file: a coarse cell still spans a display pixel at small size, where 1-px-per-pixel grain
-	//    averages away to flat. Deterministic per seed (so it doesn't reshuffle on repaint and the
-	//    export matches the preview), hashed per cell index so the lattice doesn't band diagonally.
-	const cell = Math.min(W, H) / Math.max(1, grainCells);
+	// 3) film grain. Generated at low resolution — cells of ~GRAIN_CELL_PX at the display size —
+	//    then scaled up to fill the asset, so the cell is a constant apparent fineness regardless
+	//    of export resolution. That keeps it from averaging away when a platform shrinks the file
+	//    (small avatars) and from reading as coarse blocks on large assets. Deterministic per seed
+	//    so it doesn't reshuffle on repaint and the export matches the preview; hashed per cell
+	//    index so the lattice doesn't band diagonally.
+	const cell = GRAIN_CELL_PX * (Math.min(W, H) / Math.max(1, shownAt));
 	const bw = Math.max(1, Math.round(W / cell));
 	const bh = Math.max(1, Math.round(H / cell));
 	const off = document.createElement('canvas');
