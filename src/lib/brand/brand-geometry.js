@@ -22,19 +22,16 @@ export const GAP_K = 2 / 22; // mark→word gap ÷ wordmark
 // The lockup mark is raised so its centre sits this fraction of the wordmark ABOVE the
 // wordmark's vertical centre — landing it near the cap height. This is a true full raise
 // (applied via explicit coordinates / position, never a centred-flex margin, which would
-// only move it half as far). The monogram's superscript raise is larger — see MONO_RAISE_K.
+// only move it half as far).
 export const LOCKUP_RAISE_K = 0.18; // lockup mark raise ÷ wordmark
 export const WORD_K = 5.85; // gallery-tile wordmark size in cqw, at k = 1
 export const TAG_K = 0.33; // tagline size ÷ wordmark (sized so it overruns the wordmark ~8%)
 
-// ✲S monogram, relative to the "S" size.
-export const MONO_MARK_K = 0.55; // monogram mark width ÷ S
-export const MONO_GAP_K = 0.04; // monogram mark→S gap ÷ S
+// The mark+S monogram reuses the same mark width, gap, and raise as the primary lockup,
+// measured against the S size. Only the whole-group drop is monogram-specific, so the same
+// mark→letter relationship sits optically centred inside square/circle icon crops.
 export const MONO_CAP_K = 0.7; // S cap height ÷ S (system-font approximation)
-export const MONO_RAISE_K = 0.36; // monogram mark raise ÷ S — the mark as a superscript over the "S"
-// The "S" is centred and the mark raised, which leaves the ✲S group top-heavy; drop the
-// whole group by this fraction of S so its bounding box sits centred in a square icon.
-export const MONO_DROP_K = (MONO_RAISE_K + MONO_MARK_K / 2 - MONO_CAP_K / 2) / 2; // ≈ 0.1425
+export const MONOGRAM_DROP_K = (LOCKUP_RAISE_K + MARK_K / 2 - MONO_CAP_K / 2) / 2; // ≈ 0.1025
 
 // Tagline vertical rhythm (lockup layout): baseline sits TAG_BOTTOM_K·tagsz above the
 // bottom inset, and TAG_GAP_K·tagsz + 0.5·word below the wordmark's vertical centre.

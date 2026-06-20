@@ -8,10 +8,7 @@
 		MARK_K,
 		GAP_K,
 		LOCKUP_RAISE_K,
-		MONO_MARK_K,
-		MONO_GAP_K,
-		MONO_RAISE_K,
-		MONO_DROP_K,
+		MONOGRAM_DROP_K,
 		lockupGeom
 	} from '$lib/brand/brand-geometry';
 	import { UPM, SUPEREXTRA, S as MONO_S, TAGLINE } from '$lib/brand/brand-glyphs';
@@ -225,10 +222,10 @@
 			dlStrokeMark(ctx, 0, (h - markBox) / 2 - raise, markBox, color);
 		} else if (d.kind === 'monogram') {
 			const sf = Math.min(w, h) * 0.5,
-				markBox = sf * MONO_MARK_K,
-				gap = sf * MONO_GAP_K,
-				raise = sf * MONO_RAISE_K,
-				drop = sf * MONO_DROP_K;
+				markBox = sf * MARK_K,
+				gap = sf * GAP_K,
+				raise = sf * LOCKUP_RAISE_K,
+				drop = sf * MONOGRAM_DROP_K;
 			const x0 = (w - (markBox + gap + glyphWidth(MONO_S, sf))) / 2;
 			dlGlyphPNG(ctx, MONO_S, x0 + markBox + gap, h / 2 + drop + BASELINE_K * sf, sf, color);
 			dlStrokeMark(ctx, x0, (h - markBox) / 2 - raise + drop, markBox, color);
@@ -260,10 +257,10 @@
 				glyphPathSVG(SUPEREXTRA, markBox + gap, h / 2 + BASELINE_K * word, word, color);
 		} else if (d.kind === 'monogram') {
 			const sf = Math.min(w, h) * 0.5,
-				markBox = sf * MONO_MARK_K,
-				gap = sf * MONO_GAP_K,
-				raise = sf * MONO_RAISE_K,
-				drop = sf * MONO_DROP_K;
+				markBox = sf * MARK_K,
+				gap = sf * GAP_K,
+				raise = sf * LOCKUP_RAISE_K,
+				drop = sf * MONOGRAM_DROP_K;
 			const x0 = (w - (markBox + gap + glyphWidth(MONO_S, sf))) / 2;
 			body =
 				markLinesSVG(x0, (h - markBox) / 2 - raise + drop, markBox, color) +

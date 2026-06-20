@@ -20,13 +20,18 @@ import {
 	TAG_K,
 	TAG_GAP_K,
 	TAG_BOTTOM_K,
-	MONO_MARK_K,
-	MONO_GAP_K,
-	MONO_RAISE_K,
 	MONO_CAP_K,
-	MONO_DROP_K
+	MONOGRAM_DROP_K
 } from '../src/lib/brand/brand-geometry.js';
-import { lockupBodySVG, glyphDefs } from '../src/lib/brand/brand-render.js';
+import {
+	BASELINE_K,
+	lockupBodySVG,
+	glyphDefs,
+	glyphPathSVG,
+	glyphWidth,
+	markLinesSVG
+} from '../src/lib/brand/brand-render.js';
+import { S as MONO_S } from '../src/lib/brand/brand-glyphs.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -57,7 +62,7 @@ const THEMES = [
 const bgsel = (gallery, def) =>
 	`<div class="bgsel" data-gallery="${gallery}" data-default="${def}"><span class="bgsel-l">Colour theme</span>${THEMES.map(([k, n]) => `<button type="button" class="theme${k === def ? ' active' : ''}" data-theme="${k}">${n}</button>`).join('')}</div>`;
 
-// Icon / avatar tiles — the mark alone, and the ✲S monogram, on each background.
+// Icon / avatar tiles — the mark alone, and the mark+S monogram, on each background.
 function iconTile({ kind, bg, crop, label }) {
 	const r = (n) => n.toFixed(2);
 	const ink = bg === 'white' ? '#1a1a1a' : '#fefdf9';
@@ -67,17 +72,19 @@ function iconTile({ kind, bg, crop, label }) {
 	const radius = crop === 'circle' ? '50%' : '24px';
 	let inner;
 	if (kind === 'mark') {
-		const mw = size * 0.46;
+		const mw = size * (crop === 'square' ? 0.5 : 0.44);
 		inner = `<span style="display:inline-flex;width:${r(mw)}px;height:${r(mw)}px">${MK(ink)}</span>`;
 	} else {
 		const SF = size * 0.5,
-			mw = SF * MONO_MARK_K,
-			gap = SF * MONO_GAP_K,
-			raise = SF * MONO_RAISE_K,
-			drop = SF * MONO_DROP_K;
-		// align-items:center centres the "S"; the mark is raised visually (position, not
-		// margin, so it doesn't skew centring); the whole group drops to sit centred.
-		inner = `<div style="display:flex;align-items:center;gap:${r(gap)}px;color:${ink};line-height:1;transform:translateY(${r(drop)}px)"><span style="display:inline-flex;width:${r(mw)}px;height:${r(mw)}px;position:relative;top:-${r(raise)}px">${MK(ink)}</span><span class="wm" style="font-size:${r(SF)}px;color:${ink}">S</span></div>`;
+			mw = SF * MARK_K,
+			gap = SF * GAP_K,
+			raise = SF * LOCKUP_RAISE_K,
+			drop = SF * MONOGRAM_DROP_K;
+		const x0 = (size - (mw + gap + glyphWidth(MONO_S, SF))) / 2;
+		const body =
+			markLinesSVG(x0, (size - mw) / 2 - raise + drop, mw, ink) +
+			glyphPathSVG(MONO_S, x0 + mw + gap, size / 2 + drop + BASELINE_K * SF, SF, ink);
+		inner = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">${body}</svg>`;
 	}
 	const sq = crop === 'square';
 	const gx = bg === 'color' ? { gallery: 'profile' } : {};
@@ -283,13 +290,13 @@ const constructionSpec = `
     </tbody></table>
 
     <h3>Monogram <span class="pill">✲S</span></h3>
-    <p class="note">A separate icon — the mark as a superscript over the “S”. Ratios are <b style="color:var(--ink);font-weight:600">× the “S” size</b>.</p>
+    <p class="note">A compact icon built from the same mark→S relationship as the primary lockup. Ratios are <b style="color:var(--ink);font-weight:600">× the “S” size</b>; only the final group drop is icon-specific, to centre the pair inside square and circular crops.</p>
     <table class="files"><thead><tr><th>Measure</th><th>Ratio · × S</th></tr></thead><tbody>
-      <tr><td>Mark width</td><td><code>${num(MONO_MARK_K)}</code></td></tr>
-      <tr><td>Mark → S gap</td><td><code>${num(MONO_GAP_K)}</code></td></tr>
-      <tr><td>Mark raise</td><td><code>${num(MONO_RAISE_K)}</code></td></tr>
+      <tr><td>Mark width</td><td><code>${num(MARK_K)}</code> · same as logo</td></tr>
+      <tr><td>Mark → S gap</td><td><code>2 / 22 ≈ ${num(GAP_K)}</code> · same as logo</td></tr>
+      <tr><td>Mark raise — centre above the S centre</td><td><code>${num(LOCKUP_RAISE_K)}</code> · same as logo</td></tr>
       <tr><td>S cap height (approx.)</td><td><code>${num(MONO_CAP_K)}</code></td></tr>
-      <tr><td>Group drop — re-centres the ✲S in a square</td><td><code>≈ ${num(MONO_DROP_K)}</code></td></tr>
+      <tr><td>Group drop — re-centres the pair in icon crops</td><td><code>≈ ${num(MONOGRAM_DROP_K)}</code></td></tr>
     </tbody></table>
 
     <h3>Typeface</h3>
@@ -525,7 +532,7 @@ ${constructionSpec}
   <div class="hr"></div>
   <section id="profile">
     <div class="eyebrow">Marks &amp; partners</div><h2>Profile &amp; icon</h2>
-    <p class="lede">Two icon treatments — the mark alone, and the ✲S monogram (the mark as a small superscript over the “S”). Each works as a rounded-square app icon and a circular avatar, on every background.</p>
+    <p class="lede">Two icon treatments — the mark alone, and the ✲S monogram, which keeps the same asterisk-to-S relationship as the primary logo. Each works as a rounded-square app icon and a circular avatar, on every background.</p>
     ${bgsel('profile', 'dusk')}
     <h3>Mark</h3>
     <div class="grid" style="grid-template-columns:repeat(3,1fr)">${iconSet('mark')}</div>
