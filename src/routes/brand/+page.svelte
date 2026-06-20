@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { DRAWS, paintColorful, type Draw } from '$lib/brand/colorful-bg';
+	import {
+		DRAWS,
+		paintColorful,
+		GRAIN_CELLS,
+		type Draw,
+		type GrainLevel
+	} from '$lib/brand/colorful-bg';
 	import {
 		MARK_LINES,
 		MARK_VB,
@@ -34,6 +40,8 @@
 	// The injected gallery content, and each gallery's currently-selected colour theme.
 	let content = $state<HTMLElement | undefined>(undefined);
 	let selectedTheme: Record<string, string> = $state({});
+	// Each gallery's grain coarseness pick (Fine/Medium/Coarse), parallel to selectedTheme.
+	let selectedGrain: Record<string, string> = $state({});
 
 	function b64ToBytes(b64: string) {
 		return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -142,6 +150,12 @@
 		const key = selectedTheme[d.gallery];
 		return key ? DRAWS[key]?.rich : undefined;
 	}
+	// Resolve a colour tile's grain coarseness (cells across the shorter side) from its gallery's
+	// pick. undefined → paintColorful uses its default; the picker always sets one for these tiles.
+	function resolveGrain(d: DL): number | undefined {
+		if (d.bg !== 'color' || !d.gallery) return undefined;
+		return GRAIN_CELLS[selectedGrain[d.gallery] as GrainLevel];
+	}
 	function colorName(d: DL): string {
 		const key = (d.gallery && selectedTheme[d.gallery]) || 'colour';
 		return d.name.replace(/color$/, key);
@@ -180,7 +194,14 @@
 			ctx.stroke();
 		}
 	}
-	function dlPaintBg(ctx: CanvasRenderingContext2D, bg: string, w: number, h: number, draw?: Draw) {
+	function dlPaintBg(
+		ctx: CanvasRenderingContext2D,
+		bg: string,
+		w: number,
+		h: number,
+		draw?: Draw,
+		grain?: number
+	) {
 		if (bg === 'cream') {
 			ctx.fillStyle = '#fefdf9';
 			ctx.fillRect(0, 0, w, h);
@@ -188,7 +209,7 @@
 			ctx.fillStyle = '#141210';
 			ctx.fillRect(0, 0, w, h);
 		} else if (bg === 'color' && draw) {
-			paintColorful(ctx, w, h, draw);
+			paintColorful(ctx, w, h, draw, grain);
 		}
 	}
 	// Gallery-tile geometry — the shared lockup layout, so the canvas exports and the
@@ -196,7 +217,9 @@
 	function dlTileGeom(d: DL) {
 		return lockupGeom(d.w, d.h, d.k ?? 1, d.m ?? 0.12, d.layout ?? 'lockup');
 	}
-	async function dlPNG(d: DL, draw?: Draw): Promise<Blob | null> {
+	// Compose an asset into a canvas at full export resolution. Shared by the PNG export and the
+	// real-size preview strip, so the downscaled preview shows the exact pixels that get exported.
+	function dlCompose(d: DL, draw?: Draw): HTMLCanvasElement {
 		const color = dlInk(d.bg);
 		let w = d.w;
 		const h = d.h;
@@ -208,7 +231,7 @@
 		}
 		cv.width = w;
 		cv.height = h;
-		dlPaintBg(ctx, d.bg, w, h, draw);
+		dlPaintBg(ctx, d.bg, w, h, draw, resolveGrain(d));
 		if (d.kind === 'tile') {
 			const g = dlTileGeom(d);
 			dlGlyphPNG(ctx, SUPEREXTRA, g.wordX, g.wordCY + BASELINE_K * g.word, g.word, color);
@@ -235,6 +258,10 @@
 			const box = Math.min(w, h) * (d.markFrac ?? 0.7);
 			dlStrokeMark(ctx, (w - box) / 2, (h - box) / 2, box, color);
 		}
+		return cv;
+	}
+	async function dlPNG(d: DL, draw?: Draw): Promise<Blob | null> {
+		const cv = dlCompose(d, draw);
 		return await new Promise<Blob | null>((res) => cv.toBlob(res, 'image/png'));
 	}
 	function dlSVG(d: DL, draw?: Draw): string {
@@ -275,7 +302,7 @@
 			const bc = document.createElement('canvas');
 			bc.width = w;
 			bc.height = h;
-			paintColorful(bc.getContext('2d')!, w, h, draw);
+			paintColorful(bc.getContext('2d')!, w, h, draw, resolveGrain(d));
 			bgEl = `<image href="${bc.toDataURL('image/png')}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>`;
 		}
 		return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${bgEl}${body}</svg>`;
@@ -316,16 +343,42 @@
 		cv.height = Math.round(ch * dpr);
 		const ctx = cv.getContext('2d')!;
 		let draw: Draw | undefined;
+		let grain: number | undefined;
 		if (cv.dataset.gallery) {
 			draw = DRAWS[selectedTheme[cv.dataset.gallery]]?.rich;
+			grain = GRAIN_CELLS[selectedGrain[cv.dataset.gallery] as GrainLevel];
 		} else if (cv.dataset.draw) {
 			const t = DRAWS[cv.dataset.draw];
 			draw = t && (cv.dataset.finish === 'flat' ? t.flat : t.rich);
 		}
-		if (draw) paintColorful(ctx, cv.width, cv.height, draw);
+		if (draw) paintColorful(ctx, cv.width, cv.height, draw, grain);
 	}
 	function paintScope(sel: string) {
 		content?.querySelectorAll<HTMLCanvasElement>(sel).forEach(paintCanvas);
+	}
+	// Real-size preview: render the avatar export at full resolution, then downscale into a small
+	// canvas — exactly what a platform does when it shrinks the upload — so the grain choice can be
+	// judged at the sizes it's actually shown, where fine grain washes out and coarse survives.
+	function paintSizeCanvas(cv: HTMLCanvasElement) {
+		const gallery = cv.dataset.gallery;
+		if (!gallery) return;
+		const draw = DRAWS[selectedTheme[gallery]]?.rich;
+		if (!draw) return;
+		const px = Number(cv.dataset.size) || 64;
+		const kind = cv.dataset.kind === 'mono' ? 'monogram' : 'mark';
+		// Compose at the avatar export size (1080²) so the downscale ratio matches a real upload.
+		const d: DL = { name: 'preview', kind, bg: 'color', w: 1080, h: 1080, gallery };
+		if (kind === 'mark') d.markFrac = 0.44;
+		const full = dlCompose(d, draw);
+		cv.width = px;
+		cv.height = px;
+		const ctx = cv.getContext('2d')!;
+		ctx.imageSmoothingEnabled = true;
+		ctx.imageSmoothingQuality = 'high';
+		ctx.drawImage(full, 0, 0, px, px);
+	}
+	function paintSizeScope(sel: string) {
+		content?.querySelectorAll<HTMLCanvasElement>(sel).forEach(paintSizeCanvas);
 	}
 	function initThemes() {
 		const sel: Record<string, string> = {};
@@ -333,6 +386,16 @@
 			if (el.dataset.gallery && el.dataset.default) sel[el.dataset.gallery] = el.dataset.default;
 		});
 		selectedTheme = sel;
+	}
+	// The grain picker rows share the .bgsel class but carry data-grain-default (not data-default),
+	// so initThemes skips them and this reads only those.
+	function initGrains() {
+		const sel: Record<string, string> = {};
+		content?.querySelectorAll<HTMLElement>('.bgsel').forEach((el) => {
+			if (el.dataset.gallery && el.dataset.grainDefault)
+				sel[el.dataset.gallery] = el.dataset.grainDefault;
+		});
+		selectedGrain = sel;
 	}
 	function onThemeClick(e: MouseEvent) {
 		const btn = (e.target as HTMLElement).closest('button.theme') as HTMLElement | null;
@@ -344,19 +407,35 @@
 		selectedTheme = { ...selectedTheme, [g]: key };
 		sel.querySelectorAll('button.theme').forEach((b) => b.classList.toggle('active', b === btn));
 		paintScope(`canvas.bgc[data-gallery="${g}"]`);
+		paintSizeScope(`canvas.szc[data-gallery="${g}"]`);
 	}
-	// One delegated click handler for the injected content; download and theme clicks
-	// are mutually exclusive (button.dl vs button.theme), so each guards itself.
+	function onGrainClick(e: MouseEvent) {
+		const btn = (e.target as HTMLElement).closest('button.grain') as HTMLElement | null;
+		if (!btn) return;
+		const sel = btn.closest('.bgsel') as HTMLElement | null;
+		const g = sel?.dataset.gallery;
+		const level = btn.dataset.grain;
+		if (!g || !level) return;
+		selectedGrain = { ...selectedGrain, [g]: level };
+		sel.querySelectorAll('button.grain').forEach((b) => b.classList.toggle('active', b === btn));
+		paintScope(`canvas.bgc[data-gallery="${g}"]`);
+		paintSizeScope(`canvas.szc[data-gallery="${g}"]`);
+	}
+	// One delegated click handler for the injected content; download, theme, and grain clicks
+	// are mutually exclusive (button.dl vs button.theme vs button.grain), so each guards itself.
 	function onContentClick(e: MouseEvent) {
 		onAssetClick(e);
 		onThemeClick(e);
+		onGrainClick(e);
 	}
 	$effect(() => {
 		if (phase !== 'unlocked') return;
 		let ro: ResizeObserver | undefined;
 		let raf = requestAnimationFrame(() => {
 			initThemes();
+			initGrains();
 			paintScope('canvas.bgc');
+			paintSizeScope('canvas.szc');
 			ro = new ResizeObserver(() => {
 				cancelAnimationFrame(raf);
 				raf = requestAnimationFrame(() => paintScope('canvas.bgc'));

@@ -57,6 +57,27 @@ const THEMES = [
 const bgsel = (gallery, def) =>
 	`<div class="bgsel" data-gallery="${gallery}" data-default="${def}"><span class="bgsel-l">Colour theme</span>${THEMES.map(([k, n]) => `<button type="button" class="theme${k === def ? ' active' : ''}" data-theme="${k}">${n}</button>`).join('')}</div>`;
 
+// Grain coarseness picker — Fine/Medium/Coarse, per gallery, parallel to the colour-theme picker.
+// The level controls the film-grain cell size as a fraction of the asset, so coarse grain stays
+// visible when an export is shown small (avatars), and fine grain stays delicate on large assets.
+const GRAINS = [
+	['fine', 'Fine'],
+	['medium', 'Medium'],
+	['coarse', 'Coarse']
+];
+const grainsel = (gallery, def) =>
+	`<div class="bgsel" data-gallery="${gallery}" data-grain-default="${def}"><span class="bgsel-l">Grain</span>${GRAINS.map(([k, n]) => `<button type="button" class="grain${k === def ? ' active' : ''}" data-grain="${k}">${n}</button>`).join('')}</div>`;
+
+// Real-size preview strip — the brand route composes the avatar export at full resolution, then
+// downscales each canvas to the px size platforms actually display, so the grain pick can be
+// judged where it matters (fine grain washes out small; coarse survives). Follows a gallery picker.
+const SIZE_PX = [96, 64, 48, 32];
+const sizeStrip = (gallery, kind) =>
+	`<div class="sizes">${SIZE_PX.map(
+		(px) =>
+			`<figure class="szf"><canvas class="szc" data-gallery="${gallery}" data-kind="${kind}" data-size="${px}" style="width:${px}px;height:${px}px"></canvas><figcaption>${px}px</figcaption></figure>`
+	).join('')}</div>`;
+
 // Icon / avatar tiles — the mark alone, and the ✲S monogram, on each background.
 function iconTile({ kind, bg, crop, label }) {
 	const r = (n) => n.toFixed(2);
@@ -339,9 +360,15 @@ p.note{font-size:13.5px;color:var(--mut);max-width:680px;margin:10px 0}
 .ic-fg{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center}
 .bgsel{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:16px 0 2px}
 .bgsel-l{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-right:4px}
-.theme{font-family:inherit;font-size:12px;color:var(--soft);background:transparent;border:1px solid var(--line2);border-radius:999px;padding:3px 11px;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
-.theme:hover{color:var(--ink);border-color:var(--soft)}
-.theme.active{color:var(--ink);background:var(--panel2);border-color:var(--soft);font-weight:600}
+.theme,.grain{font-family:inherit;font-size:12px;color:var(--soft);background:transparent;border:1px solid var(--line2);border-radius:999px;padding:3px 11px;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+.theme:hover,.grain:hover{color:var(--ink);border-color:var(--soft)}
+.theme.active,.grain.active{color:var(--ink);background:var(--panel2);border-color:var(--soft);font-weight:600}
+.sizerow{display:flex;align-items:flex-end;gap:18px;margin:14px 0}
+.szlabel{width:34px;flex:none;font-size:12px;color:var(--mut);padding-bottom:24px}
+.sizes{display:flex;align-items:flex-end;gap:20px}
+.szf{display:flex;flex-direction:column;align-items:center;gap:7px}
+.szc{display:block;border-radius:50%;border:1px solid var(--line)}
+.szf figcaption{font-size:10.5px;color:var(--mut);font-variant-numeric:tabular-nums}
 .cream{background:var(--cream)}
 .swatch{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .swatch .chip{height:96px}.swatch .meta{padding:11px 13px;font-size:12.5px}
@@ -465,7 +492,7 @@ ${constructionSpec}
   <div class="hr"></div>
   <section id="backgrounds">
     <div class="eyebrow">System</div><h2>Backgrounds</h2>
-    <p class="lede">Every surface uses white, black, or the colorful gradient with noise — rendered at native resolution per size so the grain stays crisp. The colorful background comes in several color draws (see <a href="#colorful" style="color:var(--soft)">Colorful palette</a>).</p>
+    <p class="lede">Every surface uses white, black, or the colorful gradient with film grain. The grain cell scales with the asset — pick Fine, Medium, or Coarse per gallery — so it stays visible even when an export is shown small. The colorful background comes in several color draws (see <a href="#colorful" style="color:var(--soft)">Colorful palette</a>).</p>
     ${grid(3, [
 			{ w: 1640, h: 624, k: 0.85, bg: 'white', layout: 'lockup', label: 'White', note: '#FEFDF9' },
 			{ w: 1640, h: 624, k: 0.85, bg: 'black', layout: 'lockup', label: 'Black', note: '#141210' },
@@ -507,13 +534,13 @@ ${constructionSpec}
   </section>
 
   <div class="hr"></div>
-  <section id="cover"><div class="eyebrow">Gallery</div><h2>Cover · 1640×624</h2><p class="lede">Every layout, on white, black, and the colour theme you pick. Each tile exports SVG or PNG.</p>${bgsel('cover', 'periwinkle')}${grid(3, COVER)}</section>
+  <section id="cover"><div class="eyebrow">Gallery</div><h2>Cover · 1640×624</h2><p class="lede">Every layout, on white, black, and the colour theme you pick. Each tile exports SVG or PNG.</p>${bgsel('cover', 'periwinkle')}${grainsel('cover', 'fine')}${grid(3, COVER)}</section>
   <div class="hr"></div>
-  <section id="square"><div class="eyebrow">Gallery</div><h2>Square · 1080×1080</h2><p class="lede">Instagram &amp; shared posts — larger wordmark so it reads in-app.</p>${bgsel('square', 'dusk')}${grid(3, SQUARE)}</section>
+  <section id="square"><div class="eyebrow">Gallery</div><h2>Square · 1080×1080</h2><p class="lede">Instagram &amp; shared posts — larger wordmark so it reads in-app.</p>${bgsel('square', 'dusk')}${grainsel('square', 'medium')}${grid(3, SQUARE)}</section>
   <div class="hr"></div>
-  <section id="portrait"><div class="eyebrow">Gallery</div><h2>Portrait · 1080×1920</h2><p class="lede">Stories &amp; Reels.</p>${bgsel('portrait', 'dusk')}${grid(3, PORTRAIT)}</section>
+  <section id="portrait"><div class="eyebrow">Gallery</div><h2>Portrait · 1080×1920</h2><p class="lede">Stories &amp; Reels.</p>${bgsel('portrait', 'dusk')}${grainsel('portrait', 'medium')}${grid(3, PORTRAIT)}</section>
   <div class="hr"></div>
-  <section id="banners"><div class="eyebrow">Gallery</div><h2>Banners</h2><p class="lede">Wide 1500×500 and thin 1128×191 (LinkedIn-style). Thin uses the corner split.</p>${bgsel('banners', 'dusk')}${grid(1, BANNERS)}</section>
+  <section id="banners"><div class="eyebrow">Gallery</div><h2>Banners</h2><p class="lede">Wide 1500×500 and thin 1128×191 (LinkedIn-style). Thin uses the corner split.</p>${bgsel('banners', 'dusk')}${grainsel('banners', 'fine')}${grid(1, BANNERS)}</section>
 
   <div class="hr"></div>
   <section id="ads">
@@ -526,7 +553,12 @@ ${constructionSpec}
   <section id="profile">
     <div class="eyebrow">Marks &amp; partners</div><h2>Profile &amp; icon</h2>
     <p class="lede">Two icon treatments — the mark alone, and the ✲S monogram (the mark as a small superscript over the “S”). Each works as a rounded-square app icon and a circular avatar, on every background.</p>
-    ${bgsel('profile', 'dusk')}
+    <p class="note">Avatars are displayed tiny, so the colorful background defaults to <b style="color:var(--ink);font-weight:600">Coarse</b> grain — fine grain averages away when a platform shrinks the export. The strip below previews the pick at the sizes platforms actually render.</p>
+    ${bgsel('profile', 'dusk')}${grainsel('profile', 'coarse')}
+    <h3>Shown at real size <span class="pill">downscaled like a platform</span></h3>
+    <p class="note">The colorful avatar composed at full export resolution, then shrunk to the sizes platforms display — so you can see whether the grain survives. Switch Grain above and watch the smallest sizes.</p>
+    <div class="sizerow"><span class="szlabel">Mark</span>${sizeStrip('profile', 'mark')}</div>
+    <div class="sizerow"><span class="szlabel">✲S</span>${sizeStrip('profile', 'mono')}</div>
     <h3>Mark</h3>
     <div class="grid" style="grid-template-columns:repeat(3,1fr)">${iconSet('mark')}</div>
     <h3>✲S monogram</h3>
