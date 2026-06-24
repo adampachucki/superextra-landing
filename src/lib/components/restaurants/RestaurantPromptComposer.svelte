@@ -119,7 +119,12 @@
 	}
 
 	let promptFocusTracked = false;
-	function handlePromptFocus() {
+	// Set right before our own programmatic `.focus()` calls (desktop autofocus on
+	// mount, focus-on-query-change) so the resulting `focus` event isn't counted as
+	// engagement — only a genuine user focus or keystroke should fire `prompt_focus`.
+	let suppressFocusEvent = false;
+
+	function trackPromptEngagement() {
 		if (promptFocusTracked) return;
 		promptFocusTracked = true;
 		let firstSession = true;
@@ -130,6 +135,28 @@
 			// localStorage unavailable (private mode) — treat as first session.
 		}
 		capture('prompt_focus', { is_first_session: firstSession });
+	}
+
+	function handlePromptFocus() {
+		if (suppressFocusEvent) {
+			suppressFocusEvent = false;
+			return;
+		}
+		trackPromptEngagement();
+	}
+
+	// Typing into an already-(auto)focused box is genuine engagement that never
+	// re-fires `focus`, so count the first real keystroke too. Programmatic value
+	// changes (pills, dictation, draft restore) don't fire the DOM input event.
+	function handlePromptInput() {
+		trackPromptEngagement();
+	}
+
+	function focusTextareaSilently() {
+		// Nothing to suppress if it's already focused — no focus event will fire.
+		if (!inputEl || (typeof document !== 'undefined' && document.activeElement === inputEl)) return;
+		suppressFocusEvent = true;
+		focusWithoutScroll(inputEl);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -212,13 +239,14 @@
 			document.activeElement !== inputEl &&
 			!mobileViewport()
 		) {
-			requestAnimationFrame(focusTextarea);
+			requestAnimationFrame(focusTextareaSilently);
 		}
 		previousQuery = currentQuery;
 	});
 
 	onMount(() => {
-		if (autofocusMode === 'desktop' && !mobileViewport()) requestAnimationFrame(focusTextarea);
+		if (autofocusMode === 'desktop' && !mobileViewport())
+			requestAnimationFrame(focusTextareaSilently);
 	});
 
 	onDestroy(() => {
@@ -238,6 +266,7 @@
 				bind:value={query}
 				onkeydown={handleKeydown}
 				onfocus={handlePromptFocus}
+				oninput={handlePromptInput}
 				data-agent-prompt-input="true"
 				placeholder={dictation.active
 					? m.composer_placeholder_speaking()

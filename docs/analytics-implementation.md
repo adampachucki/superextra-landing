@@ -31,18 +31,18 @@ The events below cover the funnel end-to-end. The behavioral events live in the 
 
 **Core funnel (Phase 1).**
 
-| Event                | Where it fires                                              | Key props                                                                        |
-| -------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `$pageview`          | PostHog autocapture                                         | path, utm\_\*, referrer (initial UTM captured automatically on the anon profile) |
-| `prompt_focus`       | Prompt textarea focus                                       | is_first_session                                                                 |
-| `prompt_submitted`   | Question submitted                                          | prompt_length, is_first_message, pillar                                          |
-| `research_started`   | Agent run begins                                            | session_id, run_id                                                               |
-| `research_completed` | Agent returns final report                                  | session_id, run_id, duration_ms                                                  |
-| `quota_block_hit`    | A turn returns `turnKind === 'quota_block'`                 | session_id                                                                       |
-| `checkout_started`   | `billing.startCheckout()` fires (`billing-state.svelte.ts`) | market, currency, billing_mode                                                   |
-| `signup`             | First-time auth resolves (new Firebase user)                | first*touch*\* props                                                             |
-| `return_visit`       | Authed user lands on a new calendar day                     | days_since_signup                                                                |
-| `feedback_submitted` | Existing `agentFeedback` function                           | rating, reason, kind, **text** (the freeform comment)                            |
+| Event                | Where it fires                                                                                          | Key props                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `$pageview`          | PostHog autocapture                                                                                     | path, utm\_\*, referrer (initial UTM captured automatically on the anon profile) |
+| `prompt_focus`       | Genuine prompt engagement: real user focus or first keystroke (programmatic desktop autofocus excluded) | is_first_session                                                                 |
+| `prompt_submitted`   | Question submitted                                                                                      | prompt_length, is_first_message, pillar                                          |
+| `research_started`   | Agent run begins                                                                                        | session_id, run_id                                                               |
+| `research_completed` | Agent returns final report                                                                              | session_id, run_id, duration_ms                                                  |
+| `quota_block_hit`    | A turn returns `turnKind === 'quota_block'`                                                             | session_id                                                                       |
+| `checkout_started`   | `billing.startCheckout()` fires (`billing-state.svelte.ts`)                                             | market, currency, billing_mode                                                   |
+| `signup`             | First-time auth resolves (new Firebase user)                                                            | first*touch*\* props                                                             |
+| `return_visit`       | Authed user lands on a new calendar day                                                                 | days_since_signup                                                                |
+| `feedback_submitted` | Existing `agentFeedback` function                                                                       | rating, reason, kind, **text** (the freeform comment)                            |
 
 **Gate, engagement & monetization (Phase 1.5).** Added to make the sign-in gate, the prompt pills, and the paid path measurable — each answers a question the core set can't (gate conversion, which topics seed first prompts, free→paid drop-off). Call sites: `auth.svelte.ts`, `LoginForm.svelte`, `/login/+page.svelte`, `TopicPills.svelte`, `billing-state.svelte.ts`, `chat-state.svelte.ts`.
 
