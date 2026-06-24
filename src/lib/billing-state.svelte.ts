@@ -190,12 +190,19 @@ let initialized = false;
 let modeInitialized = browser;
 let currentUid: string | null = null;
 let unsubscribe: Unsubscribe | null = null;
+// Last plan/market pushed to the PostHog person — so we only `setPersonProperties`
+// when they actually change, not on every snapshot tick.
+let lastIdentifiedPlan: BillingSnapshot['plan'] | null = null;
+let lastIdentifiedMarket: BillingMarket | null = null;
 
 function detach() {
 	unsubscribe?.();
 	unsubscribe = null;
 	snapshot = emptySnapshot();
 	currentUid = null;
+	// Next user's first snapshot must re-push its plan/market to the new person.
+	lastIdentifiedPlan = null;
+	lastIdentifiedMarket = null;
 }
 
 async function attach(uid: string, force = false) {
@@ -230,6 +237,18 @@ async function attach(uid: string, force = false) {
 							? rawBilling.stripeSubscriptionId
 							: null
 				};
+				// Keep `plan`/`market` on the PostHog person current so every event
+				// (quota blocks, prompts, funnels) can be sliced by them.
+				if (snapshot.plan !== lastIdentifiedPlan || snapshot.market !== lastIdentifiedMarket) {
+					lastIdentifiedPlan = snapshot.plan;
+					lastIdentifiedMarket = snapshot.market;
+					analytics.setPersonProperties({
+						plan: snapshot.plan,
+						// Pass null (not undefined) so clearing a market overwrites the
+						// person's previous value instead of being dropped by JSON.stringify.
+						market: snapshot.market
+					});
+				}
 			},
 			(err) => {
 				console.warn('[billing] user listener error', err);
@@ -276,20 +295,24 @@ function setMode(mode: BillingMode) {
 	}
 }
 
-function openUpgrade(options?: { market?: BillingMarket }) {
+function openUpgrade(options?: { market?: BillingMarket; trigger?: string }) {
 	init();
 	error = null;
 	selectedMarket = options?.market ?? preferredMarket();
+	const trigger = options?.trigger ?? 'unknown';
 	if (!auth.user) {
 		auth.openModal({
+			trigger: 'billing_upgrade',
 			afterSignIn: () => {
 				selectedMarket = options?.market ?? preferredMarket();
 				modalVisible = true;
+				analytics.capture('upgrade_modal_shown', { trigger });
 			}
 		});
 		return;
 	}
 	modalVisible = true;
+	analytics.capture('upgrade_modal_shown', { trigger });
 }
 
 function closeUpgrade() {
@@ -347,7 +370,7 @@ async function openPortal() {
 	if (posting) return;
 	init();
 	if (!auth.user) {
-		auth.openModal();
+		auth.openModal({ trigger: 'billing_portal' });
 		return;
 	}
 	posting = true;
@@ -382,6 +405,15 @@ async function confirmCheckout(sessionId: string): Promise<BillingConfirmResult>
 		stripeCustomerId: result.billing.stripeCustomerId,
 		stripeSubscriptionId: result.billing.stripeSubscriptionId
 	};
+	// Client-side checkout-return milestone (the funnel step), NOT subscription
+	// truth — the Stripe connector owns MRR/active-subscription state.
+	if (result.plan === 'paid') {
+		analytics.capture('checkout_confirmed', {
+			market: result.billing.market,
+			currency: result.billing.currency,
+			billing_mode: billingMode
+		});
+	}
 	return result;
 }
 

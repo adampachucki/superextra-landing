@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { pickPills, pickPillsWithCategory, type TopicPillItem } from '$lib/topic-pills-shuffle';
 	import { campaignCategory } from '$lib/campaign';
+	import * as analytics from '$lib/analytics';
 	import * as m from '$lib/paraglide/messages';
 
 	let {
@@ -262,6 +263,16 @@
 		pillGen++;
 		topics = pickPills(PILL_POOL, VISIBLE_COUNT, isMobile);
 	}
+
+	function handlePick(topic: TopicPillItem, position: number) {
+		analytics.capture('pill_clicked', {
+			pill_id: topic.id,
+			category: topic.category,
+			position,
+			reshuffled: pillGen > 0
+		});
+		onPick(topic.query);
+	}
 </script>
 
 {#key pillGen}
@@ -278,7 +289,7 @@
 				style="animation-delay: {firstDelay + i * STAGGER}ms"
 			>
 				<button
-					onclick={() => onPick(topic.query)}
+					onclick={() => handlePick(topic, i)}
 					class="topic-pill inline-flex items-center gap-2 rounded-full border border-black/[0.12] px-3.5 py-2 text-[13px] whitespace-nowrap text-black/55 transition-all duration-200 hover:border-black/[0.30] hover:text-black/75 active:border-black/[0.30] active:text-black/75 dark:border-white/[0.12] dark:text-white/55 dark:hover:border-white/[0.30] dark:hover:text-white/75 dark:active:border-white/[0.30] dark:active:text-white/75"
 				>
 					<span class="h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {topic.color}"

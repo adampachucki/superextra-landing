@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { auth } from '$lib/auth.svelte';
 	import { localizeHref } from '$lib/paraglide/runtime';
+	import * as analytics from '$lib/analytics';
 	import * as m from '$lib/paraglide/messages';
 
 	interface Props {
@@ -58,6 +59,7 @@
 
 	async function handleGoogle() {
 		if (busy) return;
+		analytics.capture('login_method_selected', { method: 'google' });
 		pending = 'google';
 		localErrorCode = null;
 		try {
@@ -80,6 +82,7 @@
 			localErrorCode = 'auth/invalid-email';
 			return;
 		}
+		analytics.capture('login_method_selected', { method: 'magic_link' });
 		pending = 'email';
 		localErrorCode = null;
 		try {

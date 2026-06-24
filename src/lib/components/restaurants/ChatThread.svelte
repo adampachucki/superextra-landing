@@ -304,7 +304,7 @@
 						{/each}
 						{#if showUpgrade}<button
 								type="button"
-								onclick={() => billing.openUpgrade()}
+								onclick={() => billing.openUpgrade({ trigger: 'quota_block' })}
 								disabled={billing.posting}
 								class="group ml-1 transition-colors hover:text-black disabled:opacity-50 dark:hover:text-white"
 								><span

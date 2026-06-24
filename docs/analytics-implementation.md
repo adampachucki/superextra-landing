@@ -27,20 +27,38 @@ Rationale: PostHog gets us from "no analytics" to "signup conversion by ad creat
 
 ## Event taxonomy
 
-Ten events cover the funnel end-to-end. The behavioral events live in the client; the money events come from the Stripe connector. Resist adding more until they answer a question the current set can't.
+The events below cover the funnel end-to-end. The behavioral events live in the client; the money events come from the Stripe connector. Resist adding more until they answer a question the current set can't.
 
-| Event                | Where it fires                                                  | Key props                                                                        |
-| -------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `$pageview`          | PostHog autocapture                                             | path, utm\_\*, referrer (initial UTM captured automatically on the anon profile) |
-| `prompt_focus`       | Prompt textarea focus                                           | is_first_session                                                                 |
-| `prompt_submitted`   | Question submitted                                              | prompt_length, is_first_message, pillar                                          |
-| `research_started`   | Agent run begins                                                | session_id, run_id                                                               |
-| `research_completed` | Agent returns final report                                      | session_id, run_id, duration_ms                                                  |
-| `quota_block_hit`    | A turn returns `turnKind === 'quota_block'`                     | session_id                                                                       |
-| `checkout_started`   | `billing.startCheckout()` fires (`billing-state.svelte.ts:324`) | market, currency, billing_mode                                                   |
-| `signup`             | First-time auth resolves (new Firebase user)                    | first*touch*\* props                                                             |
-| `return_visit`       | Authed user lands on a new calendar day                         | days_since_signup                                                                |
-| `feedback_submitted` | Existing `agentFeedback` function                               | rating, reason, kind, **text** (the freeform comment)                            |
+**Core funnel (Phase 1).**
+
+| Event                | Where it fires                                              | Key props                                                                        |
+| -------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `$pageview`          | PostHog autocapture                                         | path, utm\_\*, referrer (initial UTM captured automatically on the anon profile) |
+| `prompt_focus`       | Prompt textarea focus                                       | is_first_session                                                                 |
+| `prompt_submitted`   | Question submitted                                          | prompt_length, is_first_message, pillar                                          |
+| `research_started`   | Agent run begins                                            | session_id, run_id                                                               |
+| `research_completed` | Agent returns final report                                  | session_id, run_id, duration_ms                                                  |
+| `quota_block_hit`    | A turn returns `turnKind === 'quota_block'`                 | session_id                                                                       |
+| `checkout_started`   | `billing.startCheckout()` fires (`billing-state.svelte.ts`) | market, currency, billing_mode                                                   |
+| `signup`             | First-time auth resolves (new Firebase user)                | first*touch*\* props                                                             |
+| `return_visit`       | Authed user lands on a new calendar day                     | days_since_signup                                                                |
+| `feedback_submitted` | Existing `agentFeedback` function                           | rating, reason, kind, **text** (the freeform comment)                            |
+
+**Gate, engagement & monetization (Phase 1.5).** Added to make the sign-in gate, the prompt pills, and the paid path measurable — each answers a question the core set can't (gate conversion, which topics seed first prompts, free→paid drop-off). Call sites: `auth.svelte.ts`, `LoginForm.svelte`, `/login/+page.svelte`, `TopicPills.svelte`, `billing-state.svelte.ts`, `chat-state.svelte.ts`.
+
+| Event                   | Where it fires                                                           | Key props                                                                 |
+| ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `login_shown`           | Login modal opens (`auth.openModal`) or the `/login` choice form renders | trigger (landing_submit/navbar/billing_upgrade/billing_portal/login_page) |
+| `login_method_selected` | Google button / magic-link submit (intent, before the round-trip)        | method (google/magic_link)                                                |
+| `signed_in`             | Every successful sign-in (identify fires first)                          | method, is_new_user                                                       |
+| `pill_clicked`          | A prompt suggestion pill is clicked                                      | pill_id, category, position, reshuffled                                   |
+| `upgrade_modal_shown`   | Upgrade modal becomes visible (`billing.openUpgrade`)                    | trigger (quota_block/account_menu)                                        |
+| `checkout_confirmed`    | Stripe return confirms a paid plan (`confirmCheckout`)                   | market, currency, billing_mode                                            |
+| `rate_limited`          | Agent send hits a 429 abuse cap (distinct from `quota_block_hit`)        | reason                                                                    |
+
+`signed_in` is kept alongside `signup`: `signup` is the new-account acquisition event named in the funnels above; `signed_in` adds returning-user success and the auth-method mix. `login_method_selected` minus `signed_in` of the same method measures the magic-link send→never-completed leak and Google-popup abandonment. `checkout_confirmed` is a client funnel-completion milestone only — the Stripe connector remains authoritative for subscription/MRR truth (see "Revenue is not a client event").
+
+**Person properties & super property.** `plan` and `market` are kept current on the PostHog person via `setPersonProperties` from the billing snapshot listener (gated on actual change), so every event can be sliced by plan without per-event props. Every event also carries an `environment` super property (`production`/`development`, from `$app/environment`'s `dev`) — there is one PostHog project, so dev/localhost traffic is filtered out in insights rather than hard-gated, which keeps analytics testable locally.
 
 **Send the full feedback, including the freeform text.** The `agentFeedback` function already stores the comment in a private server-side collection (`functions/index.js:965`) — that stays as the durable record. PostHog gets a _copy_ on the `feedback_submitted` event so a 1-star rating or a complaint can be read next to that person's funnel position, their query history, and their session replay. For an MVP where qualitative signal is the highest-value data we'll get, tying free text to behavior is worth more than the tidiness of keeping it out. (The earlier draft excluded it on privacy grounds; with consent assumed, that objection no longer applies.) The server collection remains the source of truth; HogQL over free text is weak, so treat the PostHog copy as context-while-browsing-a-person, not as the place you run text analysis.
 
@@ -55,7 +73,7 @@ The merge from anonymous → authed person is the load-bearing piece of attribut
 1. Anonymous visitor lands; PostHog assigns a `distinct_id`. Autocapture records UTM + referrer on the anonymous person.
 2. Visitor signs in (Google popup or magic link).
 3. The auth singleton's `auth.onAuthChange(uid)` (`src/lib/auth.svelte.ts:235`) is the single hook every consumer already uses. On a non-null `uid`, call `posthog.identify(uid, { email, first_touch_source, first_touch_campaign, first_touch_content })`. PostHog merges the anonymous person into the identified one; the whole session history transfers. **On sign-out (`uid === null`), call `posthog.reset()`** so a shared browser doesn't bleed one person's session into the next — this is the matching half of identify and is easy to forget.
-4. **New-user (signup) detection:** there is **no Firebase Auth `user.create` blocking function** in this repo (the original memo assumed one). Users are auto-created on their first `agentStream` call. Detect a genuine signup client-side with `getAdditionalUserInfo(result).isNewUser` inside `signInWithGoogle` / `finishMagicLinkSignIn` (`auth.svelte.ts:105,157`), and only then `posthog.capture('signup', …)`. Returning sign-ins must not re-fire `signup`.
+4. **New-user (signup) detection:** there is **no Firebase Auth `user.create` blocking function** in this repo (the original memo assumed one). Users are auto-created on their first `agentStream` call. The `trackSignIn()` helper in `auth.svelte.ts` (called from `signInWithGoogle` / `finishMagicLinkSignIn`) **identifies first** — `identify(uid, { email }, firstTouch)` — so the conversion events attach to the Firebase UID and merge anonymous history deterministically rather than racing the `onAuthStateChanged` identify. It then captures `signed_in { method, is_new_user }` for every success, and `signup` only when `getAdditionalUserInfo(result).isNewUser`. Returning sign-ins must not re-fire `signup`.
 
 ## Attribution glue (UTM + click-IDs)
 

@@ -823,6 +823,9 @@ async function postAgentStream(body: Record<string, unknown>): Promise<void> {
 	if (!res.ok) {
 		const payload = await res.json().catch(() => null);
 		const reason = (payload as { error?: string } | null)?.error ?? `http_${res.status}`;
+		// Abuse rate-limit (IP / per-UID caps in chat-handlers.js) — distinct from
+		// the freemium quota block, which arrives as a normal `quota_block` reply.
+		if (res.status === 429) analytics.capture('rate_limited', { reason });
 		const err = new Error(reason) as Error & { status?: number };
 		err.status = res.status;
 		throw err;

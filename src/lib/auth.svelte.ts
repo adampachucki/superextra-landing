@@ -85,15 +85,27 @@ function onAuthenticated(u: User): void {
 	analytics.capture('return_visit', { days_since_signup: daysSinceSignup });
 }
 
-/** Fire `signup` only for genuinely new Firebase users, so returning sign-ins
- *  don't re-count. */
-function trackSignupIfNew(authMod: typeof import('firebase/auth'), result: UserCredential): void {
+/** Track a completed sign-in. Identify FIRST so the conversion events attach to
+ *  the Firebase UID and merge the anonymous pre-login history into this person —
+ *  rather than racing the `onAuthStateChanged` identify. Fires `signed_in` for
+ *  every success (with the chosen method) and `signup` only for genuinely new
+ *  Firebase users, so returning sign-ins don't re-count. */
+function trackSignIn(
+	authMod: typeof import('firebase/auth'),
+	result: UserCredential,
+	method: 'google' | 'magic_link'
+): void {
 	try {
-		if (authMod.getAdditionalUserInfo(result)?.isNewUser) {
-			analytics.capture('signup', firstTouchProps());
-		}
+		const isNewUser = authMod.getAdditionalUserInfo(result)?.isNewUser ?? false;
+		analytics.identify(
+			result.user.uid,
+			{ email: result.user.email ?? undefined },
+			firstTouchProps()
+		);
+		analytics.capture('signed_in', { method, is_new_user: isNewUser });
+		if (isNewUser) analytics.capture('signup', firstTouchProps());
 	} catch (err) {
-		console.warn('[auth] signup tracking failed', err);
+		console.warn('[auth] sign-in tracking failed', err);
 	}
 }
 
@@ -164,7 +176,7 @@ async function signInWithGoogle(): Promise<User> {
 	const authMod = await import('firebase/auth');
 	const provider = new authMod.GoogleAuthProvider();
 	const result = await authMod.signInWithPopup(fbAuth, provider);
-	trackSignupIfNew(authMod, result);
+	trackSignIn(authMod, result, 'google');
 	return result.user;
 }
 
@@ -216,7 +228,7 @@ async function finishMagicLinkSignIn(url: string, email: string): Promise<User> 
 	const { auth: fbAuth } = await getFirebase();
 	const authMod = await import('firebase/auth');
 	const result = await authMod.signInWithEmailLink(fbAuth, email, url);
-	trackSignupIfNew(authMod, result);
+	trackSignIn(authMod, result, 'magic_link');
 	if (browser) {
 		try {
 			localStorage.removeItem(MAGIC_LINK_EMAIL_KEY);
@@ -325,10 +337,15 @@ function onAuthChange(listener: AuthChangeListener): () => void {
 	};
 }
 
-function openModal(options?: { returnTo?: string | null; afterSignIn?: () => void }) {
+function openModal(options?: {
+	returnTo?: string | null;
+	afterSignIn?: () => void;
+	trigger?: string;
+}) {
 	modalReturnTo = options?.returnTo ?? null;
 	modalAfterSignIn = options?.afterSignIn ?? null;
 	modalVisible = true;
+	analytics.capture('login_shown', { trigger: options?.trigger ?? 'unknown' });
 }
 
 function closeModal() {

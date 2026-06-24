@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/auth.svelte';
+	import * as analytics from '$lib/analytics';
 	import LoginForm from '$lib/components/agent/LoginForm.svelte';
 	import Mark from '$lib/components/Mark.svelte';
 	import Seo from '$lib/components/Seo.svelte';
@@ -132,6 +133,18 @@
 			const dest = await postSignInDestination();
 			goto(dest, { replaceState: true });
 		})();
+	});
+
+	// The full-page login gate is shown once the sign-in choice form renders to a
+	// signed-out visitor — counted once. Skips the magic-link completing/confirm
+	// legs (phase !== 'form') and already-signed-in redirects (status check).
+	let loginShownTracked = false;
+	$effect(() => {
+		if (loginShownTracked) return;
+		if (phase === 'form' && auth.status === 'signed-out') {
+			loginShownTracked = true;
+			analytics.capture('login_shown', { trigger: 'login_page' });
+		}
 	});
 </script>
 

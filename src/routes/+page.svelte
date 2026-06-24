@@ -59,6 +59,7 @@
 		}
 		auth.saveDraft({ prompt: query, placeContext: place });
 		auth.openModal({
+			trigger: 'landing_submit',
 			afterSignIn: () => proceedToChat(query, place)
 		});
 	}

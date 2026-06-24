@@ -36,6 +36,7 @@
 
 	function handleLoginClick() {
 		auth.openModal({
+			trigger: 'navbar',
 			afterSignIn: () => {
 				goto('/chat');
 			}

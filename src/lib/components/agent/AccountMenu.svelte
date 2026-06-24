@@ -58,7 +58,7 @@
 		if (billing.canManage) {
 			await billing.openPortal();
 		} else {
-			billing.openUpgrade();
+			billing.openUpgrade({ trigger: 'account_menu' });
 		}
 	}
 </script>
