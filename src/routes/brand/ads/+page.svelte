@@ -5,7 +5,7 @@
 	// "Export JSON" to hand changes back to commit into the data file.
 	import BrandGate from '$lib/components/brand/BrandGate.svelte';
 	import {
-		campaign,
+		campaigns,
 		newAd,
 		CTAS,
 		COLOR_THEMES,
@@ -17,12 +17,15 @@
 	import { cardInnerHTML, exportPng, fill, glyphDefs } from '$lib/brand/ad-creative';
 	import { paintColorful, DRAWS } from '$lib/brand/colorful-bg';
 
-	let data = $state<Campaign>(structuredClone(campaign));
-	let selected = $state(0);
+	let store = $state<Campaign[]>(structuredClone(campaigns));
+	let ci = $state(0); // selected campaign index
+	let selected = $state(0); // selected ad index within the campaign
 	let copied = $state(false);
 	let showJson = $state(false);
 
-	const ad = $derived(data.ads[selected]);
+	const data = $derived(store[ci]);
+	const si = $derived(Math.min(selected, data.ads.length - 1)); // clamped ad index
+	const ad = $derived(data.ads[si]);
 
 	const BGS: { key: Bg; label: string }[] = [
 		{ key: 'white', label: 'Cream' },
@@ -31,31 +34,32 @@
 	];
 
 	function setHero(v: string) {
-		data.ads[selected].hero = v.replace(/\n/g, '<br>');
+		store[ci].ads[si].hero = v.replace(/\n/g, '<br>');
 	}
 
 	function addAd() {
 		const id = String.fromCharCode(65 + data.ads.length);
-		data.ads.push(newAd(id));
+		store[ci].ads.push(newAd(id));
 		selected = data.ads.length - 1;
 	}
 	function duplicateAd() {
 		const copy = structuredClone($state.snapshot(ad)) as Ad;
 		copy.id = copy.id + '′';
-		data.ads.splice(selected + 1, 0, copy);
-		selected += 1;
+		store[ci].ads.splice(si + 1, 0, copy);
+		selected = si + 1;
 	}
 	function removeAd(i: number) {
 		if (data.ads.length <= 1) return;
-		data.ads.splice(i, 1);
+		store[ci].ads.splice(i, 1);
 		selected = Math.max(0, Math.min(selected, data.ads.length - 1));
 	}
 	function resetToFile() {
-		data = structuredClone(campaign);
+		store = structuredClone(campaigns);
+		ci = 0;
 		selected = 0;
 	}
 	async function exportJson() {
-		const json = JSON.stringify(data, null, 2);
+		const json = JSON.stringify(store, null, 2);
 		try {
 			await navigator.clipboard.writeText(json);
 			copied = true;
@@ -145,7 +149,13 @@
 			<div class="brand"><b>Superextra</b> · Ad studio</div>
 			<label class="fld">
 				<span>Campaign</span>
-				<input bind:value={data.name} />
+				<select bind:value={ci} onchange={() => (selected = 0)}>
+					{#each store as c, i (i)}<option value={i}>{c.name}</option>{/each}
+				</select>
+			</label>
+			<label class="fld">
+				<span>Name</span>
+				<input bind:value={store[ci].name} />
 			</label>
 			<div class="addrow">
 				<button onclick={addAd}>+ Add</button>
@@ -161,7 +171,7 @@
 		<main class="main">
 			<div class="adtabs">
 				{#each data.ads as a, i (a.id + i)}
-					<button class="adtab" class:on={i === selected} onclick={() => (selected = i)}>
+					<button class="adtab" class:on={i === si} onclick={() => (selected = i)}>
 						<b>{a.id}</b><span>{a.note}</span>
 						{#if data.ads.length > 1}
 							<span
@@ -181,21 +191,21 @@
 			<div class="toolbar">
 				<div class="seg">
 					{#each BGS as b (b.key)}
-						<button class:on={ad.bg === b.key} onclick={() => (data.ads[selected].bg = b.key)}>
+						<button class:on={ad.bg === b.key} onclick={() => (store[ci].ads[si].bg = b.key)}>
 							{b.label}
 						</button>
 					{/each}
 				</div>
 				{#if ad.bg === 'color'}
-					<select bind:value={data.ads[selected].colorTheme}>
+					<select bind:value={store[ci].ads[si].colorTheme}>
 						{#each COLOR_THEMES as t (t.key)}<option value={t.key}>{t.label}</option>{/each}
 					</select>
 				{/if}
-				<select bind:value={data.ads[selected].cta}>
+				<select bind:value={store[ci].ads[si].cta}>
 					{#each CTAS as c (c)}<option value={c}>{c}</option>{/each}
 				</select>
 				<label class="chk">
-					<input type="checkbox" bind:checked={data.ads[selected].taglineOnCard} /> tagline
+					<input type="checkbox" bind:checked={store[ci].ads[si].taglineOnCard} /> tagline
 				</label>
 				<button class="dl" onclick={() => exportPng($state.snapshot(ad) as Ad)}>Download PNG</button
 				>
@@ -212,16 +222,16 @@
 						></textarea>
 					</label>
 					<label class="fld"
-						><span>Primary text</span>
-						<textarea rows="4" bind:value={data.ads[selected].primary}></textarea>
+						><span>Primary text {ad.headline === '' ? '(post caption)' : ''}</span>
+						<textarea rows="8" bind:value={store[ci].ads[si].primary}></textarea>
 					</label>
 					<label class="fld"
 						><span>Meta headline</span>
-						<input bind:value={data.ads[selected].headline} />
+						<input bind:value={store[ci].ads[si].headline} />
 					</label>
 					<label class="fld"
 						><span>Note (internal)</span>
-						<input bind:value={data.ads[selected].note} />
+						<input bind:value={store[ci].ads[si].note} />
 					</label>
 				</div>
 				<div class="preview">
@@ -235,10 +245,13 @@
 			{#if showJson}
 				<div class="jsonpanel">
 					<div class="jh">
-						<span>Campaign JSON — paste into <code>src/lib/brand/ads-data.ts</code></span>
+						<span
+							>Campaigns JSON — paste into the <code>campaigns</code> array in
+							<code>src/lib/brand/ads-data.ts</code></span
+						>
 						<button onclick={() => (showJson = false)}>Close</button>
 					</div>
-					<textarea readonly rows="12">{JSON.stringify(data, null, 2)}</textarea>
+					<textarea readonly rows="12">{JSON.stringify(store, null, 2)}</textarea>
 				</div>
 			{/if}
 		</main>
