@@ -1,9 +1,8 @@
 <script lang="ts">
 	// Internal ad studio — compose paid-social campaigns, preview in-feed, export PNGs.
-	// Source of truth is src/lib/brand/ads-data.ts; live edits persist to localStorage.
-	// Use "Export JSON" to hand changes back to commit into the data file.
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
+	// Always loads the committed campaign from src/lib/brand/ads-data.ts (no localStorage,
+	// so it can never get stuck on a stale state). Edits are session-only — use
+	// "Export JSON" to hand changes back to commit into the data file.
 	import BrandGate from '$lib/components/brand/BrandGate.svelte';
 	import {
 		campaign,
@@ -18,29 +17,12 @@
 	import { cardInnerHTML, exportPng, fill, glyphDefs } from '$lib/brand/ad-creative';
 	import { paintColorful, DRAWS } from '$lib/brand/colorful-bg';
 
-	const STORAGE = 'se_ads_studio_v1';
-
 	let data = $state<Campaign>(structuredClone(campaign));
 	let selected = $state(0);
 	let copied = $state(false);
 	let showJson = $state(false);
 
 	const ad = $derived(data.ads[selected]);
-
-	onMount(() => {
-		const saved = localStorage.getItem(STORAGE);
-		if (saved) {
-			try {
-				data = JSON.parse(saved);
-			} catch {
-				/* fall back to the committed campaign */
-			}
-		}
-	});
-
-	$effect(() => {
-		if (browser) localStorage.setItem(STORAGE, JSON.stringify(data));
-	});
 
 	const BGS: { key: Bg; label: string }[] = [
 		{ key: 'white', label: 'Cream' },
@@ -165,11 +147,22 @@
 				<span>Campaign</span>
 				<input bind:value={data.name} />
 			</label>
-			<div class="adlist">
+			<div class="addrow">
+				<button onclick={addAd}>+ Add</button>
+				<button onclick={duplicateAd}>Duplicate</button>
+			</div>
+			<div class="spacer"></div>
+			<div class="sidefoot">
+				<button class="primary" onclick={exportJson}>{copied ? 'Copied ✓' : 'Export JSON'}</button>
+				<button class="ghost" onclick={resetToFile}>Reset to file</button>
+			</div>
+		</aside>
+
+		<main class="main">
+			<div class="adtabs">
 				{#each data.ads as a, i (a.id + i)}
-					<button class="aditem" class:active={i === selected} onclick={() => (selected = i)}>
-						<b>{a.id}</b>
-						<span>{a.note}</span>
+					<button class="adtab" class:on={i === selected} onclick={() => (selected = i)}>
+						<b>{a.id}</b><span>{a.note}</span>
 						{#if data.ads.length > 1}
 							<span
 								class="rm"
@@ -185,18 +178,6 @@
 					</button>
 				{/each}
 			</div>
-			<div class="addrow">
-				<button onclick={addAd}>+ Add</button>
-				<button onclick={duplicateAd}>Duplicate</button>
-			</div>
-			<div class="spacer"></div>
-			<div class="sidefoot">
-				<button class="primary" onclick={exportJson}>{copied ? 'Copied ✓' : 'Export JSON'}</button>
-				<button class="ghost" onclick={resetToFile}>Reset to file</button>
-			</div>
-		</aside>
-
-		<main class="main">
 			<div class="toolbar">
 				<div class="seg">
 					{#each BGS as b (b.key)}
@@ -326,48 +307,47 @@
 		resize: vertical;
 		line-height: 1.4;
 	}
-	.adlist {
+	.adtabs {
 		display: flex;
-		flex-direction: column;
-		gap: 4px;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-bottom: 16px;
 	}
-	.aditem {
-		display: flex;
+	.adtab {
+		display: inline-flex;
 		align-items: center;
-		gap: 8px;
+		gap: 7px;
 		text-align: left;
-		background: transparent;
-		border: 1px solid transparent;
-		border-radius: 8px;
-		padding: 8px 10px;
-		color: #c7c1b8;
-		cursor: pointer;
-		font-size: 13px;
-	}
-	.aditem:hover {
 		background: #211e1a;
-	}
-	.aditem.active {
-		background: #262320;
-		border-color: #3d3832;
-		color: #ede9e3;
-	}
-	.aditem b {
-		color: #ede9e3;
-	}
-	.aditem span {
+		border: 1px solid #2e2a25;
+		border-radius: 8px;
+		padding: 7px 12px;
 		color: #9b958c;
-		flex: 1;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		cursor: pointer;
+		font: inherit;
+		font-size: 12.5px;
 	}
-	.aditem .rm {
+	.adtab:hover {
+		border-color: #5b5650;
+		color: #ede9e3;
+	}
+	.adtab.on {
+		background: #ede9e3;
+		border-color: #ede9e3;
+		color: #1a1714;
+	}
+	.adtab b {
+		color: #c7c1b8;
+	}
+	.adtab.on b {
+		color: #1a1714;
+	}
+	.adtab .rm {
 		color: #6f6a62;
-		font-size: 16px;
-		padding: 0 2px;
+		font-size: 15px;
+		padding: 0 1px;
 	}
-	.aditem .rm:hover {
+	.adtab .rm:hover {
 		color: #e0907f;
 	}
 	.addrow {
