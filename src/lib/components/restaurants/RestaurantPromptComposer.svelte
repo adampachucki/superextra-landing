@@ -5,6 +5,7 @@
 	import PromptIcon from './PromptIcon.svelte';
 	import PlaceSearchWidget from './PlaceSearchWidget.svelte';
 	import { capture } from '$lib/analytics';
+	import { trackEngagedVisit } from '$lib/meta-pixel';
 	import * as m from '$lib/paraglide/messages';
 
 	const PREFIX = m.composer_prefix();
@@ -135,6 +136,7 @@
 			// localStorage unavailable (private mode) — treat as first session.
 		}
 		capture('prompt_focus', { is_first_session: firstSession });
+		trackEngagedVisit();
 	}
 
 	function handlePromptFocus() {

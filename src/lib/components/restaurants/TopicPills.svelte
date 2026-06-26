@@ -3,6 +3,7 @@
 	import { pickPills, pickPillsWithCategory, type TopicPillItem } from '$lib/topic-pills-shuffle';
 	import { campaignCategory } from '$lib/campaign';
 	import * as analytics from '$lib/analytics';
+	import { trackEngagedVisit } from '$lib/meta-pixel';
 	import * as m from '$lib/paraglide/messages';
 
 	let {
@@ -271,6 +272,7 @@
 			position,
 			reshuffled: pillGen > 0
 		});
+		trackEngagedVisit();
 		onPick(topic.query);
 	}
 </script>
